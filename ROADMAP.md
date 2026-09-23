@@ -104,6 +104,23 @@ State: open; previous private run and deployment receipts do not qualify this so
 | CI-005 | **qualify** paired full/selected or shadow experiments on exact source, runner/cache/profile/run/attempt cohorts. Record elapsed time, coordination overhead, real CPU or explicit estimate, negative savings and uncertainty. Do not inherit former five-minute or CPU-saving claims. | CI-003, CI-004, CI-027, CI-028; custom activation CI-018/CI-055 |
 | CI-006 | **open** measured own-CI cost reduction: PostgreSQL preparation/query/cleanup, duplicated coverage runs, fixture lifetime, shards, mutation, Compose, Dev Container, browsers and tool startup. Preserve collected tests and independent oracles; five minutes per job is a design objective, not permission to omit work. [Efficiency contract](docs/features/proof-preserving-ci-efficiency.md). | CI-001; compare before/after, with CI-057 for complete coverage claim |
 
+CI-001 qualification checkpoint (2026-09-23): hosted jobs execute in the new
+private repository; no self-hosted runners are registered. The recovered PR's
+[native run](https://github.com/research-engineering/ci-coordinator/actions/runs/35851411775)
+exposed a stale exact job-inventory assertion and an unresolved nested-process
+cancellation timeout. The assertion repair preserves the independent expected
+set; bounded fixture diagnostics preserve the original timeout and cleanup
+oracles. Both require fresh native execution after repair. Static checks are
+not a substitute for this evidence.
+
+Provider prerequisites are separate: Dependency Review is unavailable and the
+branch protection/rules APIs reject the current plan; `master` is unprotected.
+The current CI-002 release contract also requires GitHub artifact attestations,
+which need Enterprise Cloud for private repositories. The owner must enable
+the required features or admit an explicit replacement contract before those
+tasks close. Do not make the repository public, skip a required check or treat
+an independent dependency scan as provider enforcement.
+
 ### B2: Durable Observation And Recovery
 
 State: open; existing storage and worker slices require current qualification, not blind reimplementation.

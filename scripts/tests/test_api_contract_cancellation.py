@@ -146,7 +146,22 @@ def test_developer_cancellation_reaps_nested_campaign_child_before_releasing_lea
                     break
                 except EnvironmentError as error:
                     assert error.reason == Reason.PREPARATION_IN_PROGRESS
-                assert time.monotonic() < deadline, "cancellation did not release the lease"
+                if time.monotonic() >= deadline:
+                    diagnostics = {"dispatcherExit": process.poll()}
+                    fixture_output: dict[str, str] = {}
+                    for path in (stdout_path, stderr_path, root / "child-term.json"):
+                        try:
+                            with path.open("rb") as stream:
+                                stream.seek(max(0, stream.seek(0, os.SEEK_END) - 4096))
+                                fixture_output[path.name] = stream.read(4096).decode(
+                                    "utf-8", errors="replace"
+                                )
+                        except FileNotFoundError:
+                            fixture_output[path.name] = "<not created>"
+                    pytest.fail(
+                        "cancellation did not release the lease: "
+                        f"{diagnostics!r}; fixture output: {fixture_output!r}"
+                    )
                 time.sleep(0.01)
             assert process.wait(timeout=5) == 128 + number
             assert json.loads((root / "child-term.json").read_text()) == {"leaseRetained": True}

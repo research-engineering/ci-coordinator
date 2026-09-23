@@ -55,6 +55,7 @@ def test_provider_workflow_supports_only_the_admitted_python_patches() -> None:
         "operator-workbench",
         "persistence-mutation",
         "postgres-witness",
+        "provider-dependency-review",
         "pull-request-gate",
         "repository-quality",
         "secret-scan",
