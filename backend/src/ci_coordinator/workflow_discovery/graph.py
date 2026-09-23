@@ -117,7 +117,7 @@ def _edge_draft(
         return _EdgeDraft(
             caller_path, job_id, uses, "dynamic", "dynamic", None, None, None, provenance
         )
-    if uses.startswith("./"):
+    if uses.startswith(("./", "$/")):
         target = uses[2:]
         try:
             require_workflow_path(target)
