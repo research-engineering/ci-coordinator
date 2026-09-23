@@ -16,6 +16,14 @@ starts with `State:` is a readiness declaration, and `ROADMAP.md` is its sole
 owner. Other documents may link to or explain an owned state, but they may not
 declare another state.
 
+`ROADMAP.md` also owns the sole current task register: stable `CI-` identifiers,
+state, prerequisites and closure. Feature plans are execution/acceptance
+references, not independent work queues. Audit records retain scoped evidence
+and hypotheses; only an admitted task can turn them into scheduled work.
+When consolidation deletes a task-bearing document, preserve each still-live
+requirement and falsifier in an existing owner before removing its last source.
+Shared external inputs remain outside repository-only deletion authority.
+
 The exact machine policy is
 `docs/specs/ci-coordinator-proofkit-adoption/documentation-graph-profile.v1.json`.
 
@@ -86,6 +94,11 @@ Arbitrary prose may still become semantically stale. Detecting semantic
 equivalence across unrestricted language is outside this deterministic gate;
 reviews and future agent analysis may report stricter findings but cannot make
 the native gate pass.
+
+The gate's readiness checks do not parse task-table states or prove that every
+natural-language obligation has a task. A consolidation review must separately
+check unique task IDs, dependency consistency and complete source-to-task
+conservation. Do not claim that link reachability proves those relations.
 
 ## 5. Failure And Bounds
 
