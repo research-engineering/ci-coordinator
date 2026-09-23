@@ -17,6 +17,7 @@ SHELL_SOURCES = (
     (".github/actions/secret-scan/run.sh", "bash"),
     (".devcontainer/post-create.sh", "bash"),
     (".githooks/pre-push", "sh"),
+    (".qodana/preflight.sh", "sh"),
     ("docker/development/secret-entrypoint.sh", "sh"),
     ("docker/runtime/assemble.sh", "bash"),
     ("docker/runtime/install.sh", "sh"),

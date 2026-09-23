@@ -113,13 +113,19 @@ set; bounded fixture diagnostics preserve the original timeout and cleanup
 oracles. Both require fresh native execution after repair. Static checks are
 not a substitute for this evidence.
 
-Provider prerequisites are separate: Dependency Review is unavailable and the
-branch protection/rules APIs reject the current plan; `master` is unprotected.
-The current CI-002 release contract also requires GitHub artifact attestations,
-which need Enterprise Cloud for private repositories. The owner must enable
-the required features or admit an explicit replacement contract before those
-tasks close. Do not make the repository public, skip a required check or treat
-an independent dependency scan as provider enforcement.
+On 2026-09-23 the owner authorized public source visibility to remove the
+private-plan restrictions. GitHub now reports PUBLIC; anonymous repository
+access, Dependency Review comparison and branch-rules API access are verified.
+The history secret scan covered all 11 observed commits, including PR refs,
+without findings. Public feature availability is not active branch protection,
+a passed Dependency Review job, an attested release or production admission.
+Do not skip required checks or replace provider enforcement with a local scan.
+
+The successor native run at `82c2e68` also found the restored Qodana preflight
+missing from the standalone shell-input owner and a PostgreSQL activity
+diagnostic timeout. The shell repair extends the existing ShellCheck inventory
+and its independent oracles, without a new scanner or exclusion. The database
+timeout remains an investigation, not permission to increase its budget.
 
 ### B2: Durable Observation And Recovery
 
@@ -225,7 +231,7 @@ State: open; hypothesis validation, source repair and external qualification rem
 | CI-067 | **qualify** database platform, TLS/primary/ACL/schema and existing-data migration, explicit text semantics, safe provisioner credentials, backup/restore and independent integrity/access/RPO/RTO evidence. A CLI, fresh database or artificial downgrade is not restore proof. | Current DB platform baseline; admitted operational environment |
 | CI-068 | **qualify** all-replica secret/signing/emergency-bearer rotation, custody, expiry/revocation, shutdown, bounded cleanup, rollout and compatible rollback. Live state and saved declarations must agree; no neighboring application data may be changed by qualification. | CI-062, CI-067 |
 | CI-069 | **qualify** composed failure and capacity envelope: independent offered arrivals, COMMIT/ack response loss, crashes/cancellation/reclaim, saturated pools/queues, dependent-service outage, rolling deploy and recovery. Measure all outcomes, queue age, CPU/RSS and drain; eight developers/two repositories is a scenario, not a proven ceiling. | CI-014, CI-058, CI-066; authorized workload and independent state reads |
-| CI-070 | **open** final clean-history public export with current exact-source CI, package/release/deployment authority and explicit residual limits. Verify no private history, caches, external reports or former receipts escape. Public publication is a separate owner decision; do not waive unresolved release blockers with a score. | Required scoped product/qualification tasks, CI-064; excludes conditional/optional extensions |
+| CI-070 | **open** final release qualification of the owner-authorized public source, with current exact-source CI, package/release/deployment authority and explicit residual limits. Source visibility was authorized and enabled on 2026-09-23; it does not close this release task. Verify no private history, caches, external reports or former receipts escape. Do not waive unresolved release blockers with a score. | Required scoped product/qualification tasks, CI-064; excludes conditional/optional extensions |
 
 ### B8: Conditional Extensions And Chat Last
 

@@ -323,6 +323,7 @@ _LINT_SHELLS = (
     ".github/actions/secret-scan/run.sh",
     ".devcontainer/post-create.sh",
     ".githooks/pre-push",
+    ".qodana/preflight.sh",
     "docker/development/secret-entrypoint.sh",
     "docker/runtime/assemble.sh",
     "docker/runtime/install.sh",
