@@ -117,8 +117,12 @@ def _edge_draft(
         return _EdgeDraft(
             caller_path, job_id, uses, "dynamic", "dynamic", None, None, None, provenance
         )
-    if uses.startswith("./"):
+    if uses.startswith(("./", "$/")):
         target = uses[2:]
+        if "@" in target:
+            return _EdgeDraft(
+                caller_path, job_id, uses, "unknown", "invalid", None, None, None, provenance
+            )
         try:
             require_workflow_path(target)
         except ValueError:

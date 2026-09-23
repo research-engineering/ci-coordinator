@@ -410,13 +410,16 @@ def test_branch_pattern_metacharacters_cannot_masquerade_as_exact_branch_identit
     assert coverage.value == ()
 
 
-def test_local_call_graph_resolves_only_same_snapshot_targets_and_detects_cycles() -> None:
+@pytest.mark.parametrize("local_prefix", ["./", "$/"])
+def test_local_call_graph_resolves_only_same_snapshot_targets_and_detects_cycles(
+    local_prefix: str,
+) -> None:
     caller = _source(
-        _call_document("./.github/workflows/target.yml"),
+        _call_document(f"{local_prefix}.github/workflows/target.yml"),
         ".github/workflows/caller.yml",
     )
     target = _source(
-        _call_document("./.github/workflows/caller.yml"),
+        _call_document(f"{local_prefix}.github/workflows/caller.yml"),
         ".github/workflows/target.yml",
     )
 
@@ -439,17 +442,18 @@ def test_local_call_graph_resolves_only_same_snapshot_targets_and_detects_cycles
         replace(resolved.report, local_graph_closed=False)
 
 
-def test_local_call_graph_classifies_cycles_and_only_overlong_paths() -> None:
-    long_chain = _call_chain("long", 11)
-    limit_chain = _call_chain("limit", 10)
-    short_chain = _call_chain("short", 2)
+@pytest.mark.parametrize("local_prefix", ["./", "$/"])
+def test_local_call_graph_classifies_cycles_and_only_overlong_paths(local_prefix: str) -> None:
+    long_chain = _call_chain("long", 11, local_prefix)
+    limit_chain = _call_chain("limit", 10, local_prefix)
+    short_chain = _call_chain("short", 2, local_prefix)
     cycle = (
         _source(
-            _call_document("./.github/workflows/cycle-b.yml"),
+            _call_document(f"{local_prefix}.github/workflows/cycle-b.yml"),
             ".github/workflows/cycle-a.yml",
         ),
         _source(
-            _call_document("./.github/workflows/cycle-a.yml"),
+            _call_document(f"{local_prefix}.github/workflows/cycle-a.yml"),
             ".github/workflows/cycle-b.yml",
         ),
     )
@@ -473,6 +477,45 @@ def test_local_call_graph_classifies_cycles_and_only_overlong_paths() -> None:
         "local_call_cycle",
         "local_call_depth_exceeded",
     }
+
+
+@pytest.mark.parametrize(
+    ("reference", "kind", "status"),
+    [
+        ("$/.github/workflows/missing.yml", "local", "missing"),
+        ("$/.github/workflows/target.yml@main", "unknown", "invalid"),
+        ("$/.github/workflows/nested/target.yml", "unknown", "invalid"),
+        ("$/.github/workflows/../target.yml", "unknown", "invalid"),
+    ],
+)
+def test_github_same_repository_calls_reject_unavailable_or_invalid_targets(
+    reference: str, kind: str, status: str
+) -> None:
+    result = _completed(_source(_call_document(reference)))
+
+    assert [(edge.kind, edge.status) for edge in result.report.call_edges] == [(kind, status)]
+    assert result.report.local_graph_closed is False
+    assert result.proposal.state == "blocked"
+
+
+@pytest.mark.parametrize("local_prefix", ["./", "$/"])
+@pytest.mark.parametrize("filename", ["target@release.yml", "target@nightly.yaml"])
+def test_same_repository_call_cannot_admit_ambiguous_ref_suffix_as_a_filename(
+    local_prefix: str,
+    filename: str,
+) -> None:
+    target = f".github/workflows/{filename}"
+    result = _completed(
+        _source(_call_document(f"{local_prefix}{target}")),
+        _source(_valid_document(), target),
+    )
+
+    assert [(edge.kind, edge.status) for edge in result.report.call_edges] == [
+        ("unknown", "invalid")
+    ]
+    assert not any(fact.field == "call.target" for fact in result.report.facts)
+    assert result.report.local_graph_closed is False
+    assert "local_graph_open" in result.proposal.blockers
 
 
 @pytest.mark.parametrize(
@@ -654,11 +697,13 @@ def _call_document(target: str) -> str:
     return f"name: Caller\non: push\njobs:\n  call:\n    uses: {target}\n"
 
 
-def _call_chain(prefix: str, levels: int) -> tuple[WorkflowSource, ...]:
+def _call_chain(prefix: str, levels: int, local_prefix: str = "./") -> tuple[WorkflowSource, ...]:
     paths = tuple(f".github/workflows/{prefix}-{index:02}.yml" for index in range(levels))
     return tuple(
         _source(
-            _valid_document() if index == levels - 1 else _call_document(f"./{paths[index + 1]}"),
+            _valid_document()
+            if index == levels - 1
+            else _call_document(f"{local_prefix}{paths[index + 1]}"),
             path,
         )
         for index, path in enumerate(paths)

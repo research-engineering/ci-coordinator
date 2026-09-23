@@ -195,13 +195,21 @@ Mapping keys remain bounded to 4,096 UTF-8 bytes during event preflight, before
 node composition. Reflected text and unknown syntax retain their existing
 4,096-byte or narrower field bounds. This distinction does not relax the source
 file, 50,000-event, 20,000-node, or depth-64 limits.
-Parser provenance is `github-actions-static/v2` for this admission change;
+Parser provenance is `github-actions-static/v3` for this admission change;
 regenerate discovery reports rather than relabeling earlier parser evidence.
 
 ## 6. Call Graph
 
 Local reusable-workflow references are resolved only when their normalized
 repository-relative path identifies an admitted source in the same snapshot.
+The GitHub.com profile admits both `./.github/workflows/{filename}` and
+`$/.github/workflows/{filename}` with identical caller-commit semantics. Neither
+form admits an `@ref` suffix or expressions. The `$/` form is not available on
+GitHub Enterprise Server; that provider profile is outside this adapter's
+current `api.github.com` scope. GitHub rejects any `@` in either local call
+coordinate, so such a call remains unknown even when a same-named file exists
+in the snapshot. Invalid local syntax remains an explicit unknown, never an
+inferred remote edge.
 Remote calls are recorded but are not fetched in this slice.
 
 ```text
