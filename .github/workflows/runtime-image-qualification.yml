@@ -1,7 +1,12 @@
 name: Runtime Image Qualification
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      baseline_commit:
+        description: Exact current-repository commit for an optional performance comparison
+        required: false
+        type: string
   push:
     branches: [master]
     paths:
@@ -37,6 +42,7 @@ jobs:
       - name: Check out exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up pinned builder
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -236,68 +242,11 @@ jobs:
           grep -F 'Application shutdown complete.' "${root}/shutdown.log"
           jq -e '(.ExitCode == 0 or .ExitCode == 143) and .OOMKilled == false and .Error == ""' \
             "${root}/shutdown.json" > /dev/null
-      - name: Compare bounded runtime workloads with the predecessor
+      - name: Compare bounded runtime workloads with exact baseline source
         env:
           SOURCE_COMMIT: ${{ github.sha }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          baseline=050b7ef3947ad69b5d1e7762308a75a57503ee4e
-          gh api -H 'Accept: application/vnd.github.raw+json' \
-            "repos/${GITHUB_REPOSITORY}/contents/Dockerfile?ref=${baseline}" \
-            > "${RUNNER_TEMP}/baseline.Dockerfile"
-          docker buildx build --platform linux/amd64 --load --provenance=false \
-            --tag ci-coordinator:runtime-baseline --file "${RUNNER_TEMP}/baseline.Dockerfile" \
-            --build-arg "CI_COORDINATOR_SOURCE_COMMIT=${SOURCE_COMMIT}" .
-          python3 -I -B - <<'PY'
-          import json
-          import os
-          import statistics
-          import subprocess
-          from pathlib import Path
-
-          root = Path(os.environ["RUNNER_TEMP"]) / "qualification"
-          script = Path("docker/runtime/benchmark.py").read_bytes()
-          images = [os.environ["IMAGE"], "ci-coordinator:runtime-baseline"]
-          subjects = {image: subprocess.check_output([
-              "docker", "image", "inspect", image, "--format", "{{.Id}}"
-          ], text=True, timeout=20).strip() for image in images}
-          results = {image: [] for image in images}
-          allocators = {
-              os.environ["IMAGE"]: "/usr/lib/x86_64-linux-gnu/libc.so.6",
-              "ci-coordinator:runtime-baseline": "/lib/x86_64-linux-gnu/libc.so.6",
-          }
-          try:
-              for sample in range(5):
-                  for image in images[::1 if sample % 2 == 0 else -1]:
-                      output = subprocess.check_output([
-                          "docker", "run", "--rm", "-i", "--name", "runtime-benchmark",
-                          "--network", "none", "--read-only", "--cap-drop", "ALL",
-                          "--security-opt", "no-new-privileges", "--memory", "256m",
-                          "--pids-limit", "32", "--cpus", "1", "--user", "10001:10001",
-                          "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
-                          "--env", "EXPECTED_MALLOC_PROVIDER=" + allocators[image],
-                          "--entrypoint", "/app/backend/.venv/bin/python", subjects[image], "-I", "-B", "-"
-                      ], input=script, timeout=30)
-                      results[image].append(json.loads(output))
-          finally:
-              subprocess.run(["docker", "rm", "--force", "runtime-benchmark"],
-                             check=False, capture_output=True, timeout=20)
-          assert len({row["payloadSha256"] for rows in results.values() for row in rows}) == 1
-          summary = {image: {
-              "imageId": subjects[image], "samples": rows,
-              "medianImportNs": statistics.median(row["importNs"] for row in rows),
-              "medianMaxRssKiB": statistics.median(row["maxRssKiB"] for row in rows),
-              "medianElapsedNs": {key: statistics.median(row["elapsedNs"][key] for row in rows)
-                                  for key in rows[0]["elapsedNs"]},
-              "medianCpuNs": {key: statistics.median(row["cpuNs"][key] for row in rows)
-                              for key in rows[0]["cpuNs"]}
-          } for image, rows in results.items()}
-          (root / "performance.json").write_text(json.dumps({
-              "baselineSource": "050b7ef3947ad69b5d1e7762308a75a57503ee4e", "results": summary,
-              "nonClaim": "Five alternating isolated workload samples; not global runtime equivalence or connected capacity"
-          }))
-          PY
+          BASELINE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before || inputs.baseline_commit }}
+        run: python3 -I -B docker/runtime/compare.py
       - name: Verify application-only layer reuse
         if: ${{ !cancelled() && steps.capture.outputs.built == 'true' }}
         env:

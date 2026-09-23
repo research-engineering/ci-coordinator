@@ -22,11 +22,13 @@ const session = controlPlaneSessionFixture({ roles: ["read", "audit", "configure
 test("creates, edits and disables the same budget identity through revision CAS", async () => {
   let policies: BudgetPolicy[] = [];
   const commands: BudgetCommand[] = [];
+  const writeSignals: AbortSignal[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (request: Request) => {
       if (request.method === "GET") return Response.json(budgetPolicies(policies));
       const command: BudgetCommand = await request.json();
+      writeSignals.push(request.signal);
       commands.push(command);
       expect(request.headers.get("x-csrf-token")).toBe(session.csrfToken);
       const policy: BudgetPolicy = {
@@ -66,6 +68,33 @@ test("creates, edits and disables the same budget identity through revision CAS"
   expect(commands.map((command) => command.configuration.enabled)).toEqual([true, false]);
   expect(new Set(commands.map((command) => command.operationId)).size).toBe(2);
   expect(commands[0]?.configuration).toEqual(budgetPolicy().configuration);
+  expect(writeSignals).toHaveLength(2);
+  expect(writeSignals.every((signal) => !signal.aborted)).toBe(true);
+});
+
+test("unmount cancels an unfinished budget write", async () => {
+  const write = Promise.withResolvers<Response>();
+  const requests: Request[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      if (request.method === "GET") return Response.json(budgetPolicies());
+      requests.push(request);
+      request.signal.addEventListener(
+        "abort",
+        () => write.reject(new DOMException("aborted", "AbortError")),
+        { once: true },
+      );
+      return write.promise;
+    }),
+  );
+  const view = render(<BudgetPoliciesPanel scope={scope} session={session} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Edit backend-cpu" }));
+  await userEvent.click(screen.getByRole("button", { name: "Save policy" }));
+  expect(requests).toHaveLength(1);
+  expect(requests[0]?.signal.aborted).toBe(false);
+  await act(async () => view.unmount());
+  expect(requests[0]?.signal.aborted).toBe(true);
 });
 
 test.each(["network", "revision_conflict", "operation_conflict", "capacity_reached"])(

@@ -45,6 +45,23 @@ friction without replacing the existing eight-batch plan.
 
 ## Remaining Evidence
 
+### Portable Follow-Up Order
+
+1. Preserve the source merge receipt and account-level blockers separately.
+2. Restore the operator completion plan and its roadmap/index/proof routes.
+   Retain final clean-history publication after implementation and qualification.
+3. Separate provider dependency review from native quality without changing the
+   final PR gate. Exercise success, failure and inapplicable event outcomes.
+4. Replace the obsolete performance baseline with exact current-repository
+   source and isolate the layer-reuse mutation in a disposable snapshot. Test
+   failed setup/build, source drift and absent/manual/PR/push baseline choices.
+5. Adjudicate the connected browser diagnosis and implement only the confirmed
+   minimal repair with a causal regression witness, retaining all SQL/effect
+   and authentication controls.
+6. Run affected local tests under the user's focused-test authorization, then
+   independent frozen review and exact-head GitHub qualification. Report any
+   remaining private-plan provider limitation without converting it to pass.
+
 The runner blocker is external and explicit. Preserve C3 delivered-userspace
 tests, L1-L3/L9 current performance qualification, L6 reviewed repair renewal,
 L7/L8 runtime hardening, IV-04/05 analyzer/cost provenance, IV-12-14 database

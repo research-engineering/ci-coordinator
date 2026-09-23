@@ -35,6 +35,7 @@ NATIVE_JOBS = frozenset(
         "operator-workbench",
         "persistence-mutation",
         "postgres-witness",
+        "provider-dependency-review",
         "repository-quality",
         "secret-scan",
         REQUESTER_ID,

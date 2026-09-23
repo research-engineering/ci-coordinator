@@ -27,6 +27,7 @@
     ["001","authority-transition-fallback-law","authority-transition-fallback-law","contract","docs/architecture/cross-cutting/authority-transition-safety.md",["proofkit.verify","requirements.admission","selective.plan","text.policy"],["local-python"]],
     ["001","050","050","contract","docs/architecture/modules/agent-risk-advice.md",["requirements.admission","text.policy"],["local-python"]],
     ["001","573","573","contract","docs/architecture/modules/api-http.md",["proofkit.verify","requirements.admission","selective.plan","text.policy"],["local-python"]],
+    ["001","operator-capability-completion-plan","operator-capability-completion-plan","contract","docs/features/ci-operator-capability-completion-plan.md",["documentation.graph","proofkit.verify","requirements.admission","selective.plan","text.policy"],["local-python"]],
     ["001","target-authority-relation-fallback-plan","target-authority-relation-fallback-plan","contract","docs/features/target-authority-relation-implementation-plan.md",["proofkit.verify","requirements.admission","selective.plan","text.policy"],["local-python"]],
     ["001","060","060","contract","docs/specs/ci-coordinator-core/overview.md",["requirements.admission","text.policy"],["local-python"]],
     ["001","575","575","contract","docs/specs/ci-coordinator-core/requirements.v1.json",["proofkit.verify","requirements.admission","selective.plan"],["local-python"]],

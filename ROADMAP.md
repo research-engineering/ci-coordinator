@@ -12,6 +12,14 @@ Last validated: 2026-09-07
 
 ## 1. Product Law Projection
 
+Planning refinement: 2026-09-23. The
+[operator capability completion plan](docs/features/ci-operator-capability-completion-plan.md)
+retains O1-O6 refinements within the existing delivery sequence. This update
+does not requalify historical provider, release or production claims. The
+repository is temporarily private; after implementation and qualification,
+prepare a new clean-history export before any public publication. Do not
+transfer current Git history, provider runs, caches or private recovery notes.
+
 CI Coordinator is a GitHub App control plane for truthful CI governance. The
 canonical authority is MS-1 through MS-3 in
 [`01-meta-specification.md`](docs/architecture/01-meta-specification.md); this
@@ -668,6 +676,31 @@ decomposition; otherwise retain the boundary until an alternative is proved
 preferable. Coverage, route count, LOC and review-agent count are not progress
 or production-readiness measures.
 
+### Cohesive Delivery Batches
+
+This grouping conserves the eighteen agreed directions. B1-B8 here are delivery
+batches, not the earlier repair IDs, mandatory separate PRs or new services.
+The [operator completion plan](docs/features/ci-operator-capability-completion-plan.md)
+refines their acceptance without introducing a second backlog.
+
+| Batch | Remaining outcome | Original directions |
+| --- | --- | --- |
+| B1 | Own-CI pilot, independent fallback, comparable baseline and measured critical-path/cost reduction; release/deployment authority stays separate. | 13; parts of 7, 8, 15, 16 |
+| B2 | Durable history, incremental/rescan and old reruns; gaps, retention/erasure and permanent statistics; actor audit, sessions, fairness and drain. | 1, 2, 3, 5; part of 15 |
+| B3 | API-first whole-workflow adoption; reusable dependency passport O2, diagnostics O1, dry-run/diff/import/export/register/activate/rollback, progress, accessibility and Diataxis. | 6, 9, 11; relevant 4, 14 |
+| B4 | Economics portfolio O3, qualified test reliability O4, actionable notifications O5, external analysis/advice O6; filters, CPU/queue/cache/retry, forecasts/regressions, bot commands and PR evidence. | 7, 10; relevant 11 |
+| B5 | Precomputed dynamic CI, deploy/Compose closure, sound reuse and eligible-runner shards; own-CI first, then separately authorized consumers and bounded omission. | 8, 16, 17; relevant 6, 13 |
+| B6 | Draft stages, related PRs, governance drift, credential/incident profiles, release/environment bindings and safe worktree-aware lifecycle. | 12 |
+| B7 | Remaining audits, blueprint/contract comparison, FastAPI/PostgreSQL qualification, dependencies/privacy/licensing, simplification, docs and restore/rotation/load/rollback; final clean public export. | 4, 14, 15; residual acceptance of 1-17 |
+| B8 | Optional UI chat last; reuse external advice first. DSL/central dispatch needs demonstrated demand and separate admission. | 18 |
+
+B1 is the next operational outcome, pulling forward only needed safety and
+qualification work. B3/B4/B6 may proceed while external evidence is blocked.
+Each batch closes one usable scenario with contracts, UI/API and falsifiers,
+not one layer at a time. Restoring this plan does not implement its features.
+The source-only PR #1 squash merge is complete; its CI was not fully green.
+Private-plan provider checks and independent runtime qualification remain open.
+
 ### Snapshot Audit Follow-Up
 
 | Existing phase               | Next scoped work                                                                                                                                                                                                                                                                          | Acceptance boundary                                                                                                                                                                                                                      |
@@ -1309,6 +1342,26 @@ layers. Security redaction and reliable settlement remain higher priority than
 diagnostic convenience.
 
 ### Cross-Repository Reusable Workflows And Model Limits
+
+The [O2 dependency passport](docs/features/ci-operator-capability-completion-plan.md#o2-reusable-dependency-passport)
+projects exact caller/callee/action identities and authorized reverse-consumer
+references. It does not create a second parser or omission authority.
+
+The proposed organization-wide CI library belongs to B3/B5, after the current
+portability repairs. Extract portable check implementations, typed inputs and
+versioned result contracts, not this repository's complete matrix as a mandatory
+organizational policy. Consumer-owned manifests retain applicable checks, native
+test roots, required outcomes, budgets and coverage/security thresholds. Keep
+the catalog flat for selection and the execution DAG dependency-aware.
+
+Before repository extraction, qualify one shared block against two different
+synthetic consumer profiles with immutable caller/callee commits, minimal
+permissions, no inherited deployment secrets, native evidence artifacts and
+explicit missing/failed/cancelled/not-applicable outcomes. Test inaccessible
+library, changed library with unchanged application, fork PRs and final-gate
+identity. Bootstrap the coordinator first; create no external repository or
+consumer workflow changes merely from this planning entry. Reconsider extraction
+if the second consumer needs broad special cases or duplicates local policy.
 
 The2026-09-13 review intake is validated against the unchanged planning owners
 at fefdeb38 and the current archive repair. Its six observations are not six

@@ -19,13 +19,23 @@ def test_runtime_qualification_is_current_ref_scoped_and_read_only() -> None:
     assert {"Dockerfile", "docker/runtime/**", "backend/uv.lock"} <= set(events["push"]["paths"])
     assert workflow["permissions"] == {"contents": "read"}
     steps = workflow["jobs"]["qualify"]["steps"]
+    checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout@"))
+    assert checkout["with"]["fetch-depth"] == 0
+    comparison = next(
+        step for step in steps if step.get("run") == "python3 -I -B docker/runtime/compare.py"
+    )
+    assert comparison["env"]["BASELINE_COMMIT"] == (
+        "${{ github.event.pull_request.base.sha || github.event.before || inputs.baseline_commit }}"
+    )
+    assert "GH_TOKEN" not in comparison["env"]
+    assert events["workflow_dispatch"]["inputs"]["baseline_commit"]["type"] == "string"
     build = next(step for step in steps if step.get("id") == "build")["with"]
     scope = "scope=runtime-qualification-amd64-${{ github.ref }}"
     assert scope in build["cache-from"]
     assert scope in build["cache-to"]
     assert build["push"] is False
     scripts = "\n".join(step.get("run", "") for step in steps)
-    assert "EXPECTED_MALLOC_PROVIDER=" in scripts
+    assert "050b7ef3947ad69b5d1e7762308a75a57503ee4e" not in scripts
     assert "python3 - <<" not in scripts
     assert "python3 -I -B docker/runtime/check_layer_reuse.py" in scripts
 

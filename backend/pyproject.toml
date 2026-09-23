@@ -143,6 +143,8 @@ select = ["ASYNC", "B", "E", "F", "FURB", "I", "PERF", "PIE", "RUF", "S", "SIM",
 "../docker/runtime/verify.py" = ["S101"]
 "../docker/runtime/benchmark.py" = ["S101"]
 "../docker/runtime/check_layer_reuse.py" = ["S101", "S603", "S607"]
+# Isolated CI witness: fixed Docker/Git commands, validated commits and argv lists.
+"../docker/runtime/compare.py" = ["S603", "S607"]
 "../scripts/conformance/*_test.py" = ["S101"]
 "../scripts/tests/**/*.py" = ["S101", "S603", "S607"]
 "alembic/versions/20260716_0001_initial_schema.py" = ["S608"]

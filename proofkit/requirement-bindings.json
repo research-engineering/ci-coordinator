@@ -5,11 +5,11 @@
   "sourceColumns": ["sourceId","path","sha256"],
   "sources": [
     ["ci-coordinator.routes.control-plane","proofkit/routes/control-plane.v2.json","4441aa36ea0309ab7f30e63fa2a9e4be132ebba4784df76d09473ba12104b911"],
-    ["ci-coordinator.routes.core","proofkit/routes/core.v2.json","5fdfb34d5fabf90161126402cdc230503471701295ab2fbee00c7a027159f080"],
+    ["ci-coordinator.routes.core","proofkit/routes/core.v2.json","d16f52d550e68fb770189cde87b68a4c148239d566bd490bbc6800d076fc1f3f"],
     ["ci-coordinator.routes.developer-environment","proofkit/routes/developer-environment.v2.json","8d878470a3b7afe50429d1e932caeda7dc7a6ae17cff4d6109eb726435550bf6"],
-    ["ci-coordinator.routes.operator-ui","proofkit/routes/operator-ui.v2.json","10621a257249eefa9928aa6685ec355160c7205fffc91f851cd74211c33ec075"],
+    ["ci-coordinator.routes.operator-ui","proofkit/routes/operator-ui.v2.json","0196fda73b8d2010f0e7cd1b207d36307305600d9f4b88fadf1fb5cd1aa56682"],
     ["ci-coordinator.routes.proofkit-adoption","proofkit/routes/proofkit-adoption.v2.json","9f7719b1baa4bd737d113c11b189f9fb4fe56899159ca079d810867069b7a610"],
-    ["ci-coordinator.routes.release","proofkit/routes/release.v2.json","61f5e9dba69ca15d17a39a36c66cb965df474bb080544be39208b0b00de8d8cc"],
+    ["ci-coordinator.routes.release","proofkit/routes/release.v2.json","6e6b27cf554da14b3de50c5a10dde16fdcf120980e276588a86e462969b4ed64"],
     ["ci-coordinator.routes.runtime","proofkit/routes/runtime.v2.json","f127d2094aae04d2a11b024f8c3a180555b85e483df01342a7a2e8cbc4d1154a"]
   ],
   "nonClaims": ["This index authenticates route-source bytes; final route admission remains owned by Agentic Proofkit."]

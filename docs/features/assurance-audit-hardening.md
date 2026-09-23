@@ -100,7 +100,7 @@ and event-based qualification scheduling. No coverage/mutation floor is lowered.
 
 ## Runner And Transfer Gate
 
-GitHub Actions is enabled, but current check annotations explicitly say hosted
+Historical runner observation: GitHub Actions was enabled, but check annotations said hosted
 runners are disabled by the Enterprise administrator. The repository has no
 registered self-hosted runners. Do not change `runs-on` to an invented label,
 turn failures into skips, run behavioral suites locally, or deploy a persistent
@@ -114,6 +114,39 @@ Requalify all runner families, caches, cancellation/cleanup and exact-head
 required checks before merge. That is a distinct infrastructure task, not a
 reason to loosen this batch's acceptance. No billing or host provisioning is
 authorized by this document.
+
+### Portable Repository Follow-Up
+
+On 2026-09-23 hosted execution succeeded in the new repository. The user then
+made it temporarily private and authorized the source-only PR #1 merge while
+provider-dependent qualification remained incomplete. At that epoch GitHub
+rejected branch protection and Dependency Review under the account plan.
+This does not justify silently skipping security admission or claiming green CI.
+
+The current follow-up has these independent owners and protected observations:
+
+| Owner | Delta and simplest sufficient choice | Falsifier and closure |
+| --- | --- | --- |
+| Full Check DAG | Run provider dependency review in an independent required job; do not let its availability suppress native quality checks. Keep its PR-only step condition, severity threshold and final required job outcome. | A PR dependency-review failure must reject the final gate while native quality has no dependency on that job; non-PR runs retain the explicitly inapplicable step, not a claim of executed review. |
+| Runtime comparison | Replace the unavailable historical Dockerfile revision with exact current-repository baseline source: PR base, push before, or explicit manual commit. Build the entire baseline tree, not old Dockerfile plus new source. | Reject malformed/missing commits, retain both commit/image identities and common workload hash; missing baseline is an explicit unmeasured result, never a performance pass. |
+| Layer reuse witness | Mutate only a disposable Git snapshot, not the checked-out source. | Both success and interrupted/failed build leave original source bytes unchanged; layer equality and changed-layer expectations remain enforced. |
+| Connected browser witness | Diagnose the observed POST-200/body-unavailable path before changing its oracle. | Retain real login, one UI command, independent committed SQL/audit readback, reload and replay/rejection controls; no automatic retry-to-green. |
+| Completion roadmap | Restore the accepted operator capability refinements without old Git history or private identities; keep shared CI extraction a separately qualified delivery item. | All O1-O6 acceptance slices remain linked to existing owners, with no claim that restored planning is implemented behavior. |
+
+These changes do not authorize production omission, deployment, public
+publication, a new repository, billing changes or broader credentials. Keep
+runtime/security qualification independent of optional performance comparison;
+an unavailable comparison cannot be represented as measured equivalence.
+Reconsider this split if exact-source native evidence is lost, a required
+security failure becomes success, or the comparison ceases to use the same
+workload and resource envelope for both subjects.
+
+The focused editor test reproduces cancellation after a fully validated write.
+Separate the one-submission latch from the pending request controller: completion
+releases cancellation ownership before the success callback can unmount the
+editor, but does not admit another submission. Pending-unmount cancellation and
+uncertain-write/reload rules remain unchanged. This closes the lifecycle defect;
+it does not by itself prove that every historical CDP body error had this cause.
 
 ## Current Dependency And Runtime Evidence
 

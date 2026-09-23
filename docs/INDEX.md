@@ -108,6 +108,7 @@ Neither listing alone asserts that the capability is currently available.
 
 - [CI assurance convergence](features/ci-assurance-convergence.md)
 - [CI assurance convergence plan](features/ci-assurance-convergence-plan.md)
+- [Operator capability completion plan](features/ci-operator-capability-completion-plan.md)
 - [Runtime admission cost](features/runtime-admission-cost.md)
 - [Runtime base qualification and security repairs](features/runtime-base-qualification.md)
 - [Assurance audit hardening and finding dispositions](features/assurance-audit-hardening.md)
