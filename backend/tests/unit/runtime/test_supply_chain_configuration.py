@@ -87,8 +87,8 @@ def test_dependency_proposals_are_paused_without_repository_merge_authority() ->
 def test_provider_workflow_reviews_dependency_diffs_with_an_immutable_action() -> None:
     document = _yaml_mapping(_repo_path(".github/workflows/python-persistence.yml"))
     jobs = cast(dict[str, object], document["jobs"])
-    quality = cast(dict[str, object], jobs["repository-quality"])
-    steps = cast(list[object], quality["steps"])
+    provider = cast(dict[str, object], jobs["provider-dependency-review"])
+    steps = cast(list[object], provider["steps"])
     review = next(
         cast(dict[str, object], step)
         for step in steps
