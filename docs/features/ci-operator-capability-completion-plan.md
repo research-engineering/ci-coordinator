@@ -69,6 +69,11 @@ All slices preserve repository/installation authorization, exact evidence
 identity, deterministic planning and independent FullCI fallback. Missing,
 stale, denied, failed and incomplete observations stay distinguishable. UI and
 API share policy; no UI-only administration path or invented green readiness.
+On narrow catalog and selection screens, retain target identity alongside its
+action rather than proving only that each is separately reachable by scrolling.
+Exercise similar repository names, long owner/name values, catalog-only rows,
+return navigation and keyboard focus. Preserve security and evidence state;
+prefer a local row adaptation over a global table abstraction change.
 
 For every new persisted or derived value specify its independent inputs,
 refresh/invalidation, retention/deletion, query/cardinality budget and failure

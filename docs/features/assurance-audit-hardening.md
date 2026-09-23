@@ -18,6 +18,14 @@ Its target and the implementation base are
 report are not current defect verdicts. This design adopts narrow improvements
 after source review; it does not claim an exhaustive assurance frontier.
 
+Reports are discovery inputs, not current defect registers. Once their adopted
+predicates, counterexamples, scoped refutations and revision triggers are in
+the existing owners, raw drafts, convergence records and obsolete execution
+packets need no historical archive. A retained digest identifies an input; it
+does not promise continued byte availability or replay of an old execution.
+An original still needed for a specifically named unresolved review must have
+an explicit consumer and retirement condition before it can be discarded.
+
 The new public source target is `research-engineering/ci-coordinator` with clean
 initial history. No former redirect/readback, App admission, OIDC trust, package
 ownership, release attestation or deployment authorization transfers with source
@@ -97,6 +105,46 @@ and event-based qualification scheduling. No coverage/mutation floor is lowered.
 | IV-11 | Consistent observation integer formatting is justified; repair and test with hostile ambient formatting. |
 | IV-12/IV-13/IV-14 | Database collation, provisioner environment hardening and restore drills belong to deployment B7; no claimed injection/leak/recovery absence. |
 | IV-15/IV-16 | Optional hook and monotonic timing assertions are not defects by themselves. Keep exact-budget witnesses. |
+
+### Scoped Refutations And Reopening
+
+A guarded success relation `H => R = E` does not mean every supplied `R` equals
+`E`. UID/GID observations precede successful normalization; repair witnesses
+are reached through build dependencies. These facts reject the original
+tautology, fabricated-identity and unread-input arguments, not the need for
+final-image qualification. Automatic mutation discovery intentionally has no
+score floor but rejects execution/admission failures. A finite all-killed
+corpus is not universal adequacy. Reopen on changed guard order, reachability,
+input or failure admission, not merely repeated wording of the old objection.
+
+The old 174 `PyInvalidCast` bindings establish oracle applicability, not cast
+safety or false positives; mypy silence and the withdrawn foreign-node probe
+establish neither verdict. The old 1120 all-error/warning and 1117 in-target
+cohorts overlap other dispositions. Closed historical cohorts were 26 workflow
+(20 dialect and 6 fixture), 95 Annotator, 8 CSS, 7 HTML, 7 Markdown, 15 Zod and
+5 regex occurrences: 163, not 183. They are not current-source counts or
+suppression authority. The 382 generic clauses were unverified, not blanket
+N/A; mixed units and a difference of 852 prove no unread-clause count.
+
+The [history convergence owner](history-review-convergence.md) conserves PR160
+A-D01 through A-G07 and H1-H16. G05 still needs independent deletion fencing
+and restore reconciliation before destructive erasure; G06 cannot invent an
+unknown historical workflow blob; G07 requires offered-load qualification.
+Sorted SQL `VALUES` alone does not prove function evaluation order, but current
+nonblocking try-locks do not establish a deadlock either. Reopen that concern
+for an applicable ordering contract or a reachable concurrency failure,
+especially before replacing try-locks with blocking acquisition.
+
+The older verifier, selected-test and catalog-cost concerns are owned by
+[selective planning safety](selective-planning-safety.md); CPU preemption by
+the [policy admission plan](bounded-policy-admission-implementation-plan.md);
+provider JWK metadata by the
+[JWKS admission plan](github-actions-jwks-admission-implementation-plan.md).
+`to_thread` cannot terminate its CPU function, unchecked mutable caching is
+not immutable identity caching, and indiscriminate key dropping is not an
+admitted JWK projection. LOC, export counts, package SCCs, missing commit
+trailers or a maturity score do not establish a current semantic defect.
+These scoped refutations do not exempt current code from new counterexamples.
 
 ## Runner And Transfer Gate
 

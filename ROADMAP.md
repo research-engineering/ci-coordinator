@@ -695,7 +695,12 @@ refines their acceptance without introducing a second backlog.
 | B8 | Optional UI chat last; reuse external advice first. DSL/central dispatch needs demonstrated demand and separate admission. | 18 |
 
 B1 is the next operational outcome, pulling forward only needed safety and
-qualification work. B3/B4/B6 may proceed while external evidence is blocked.
+qualification work. Its own-workflow graph needs the admitted `$/` local-call
+grammar; activating a custom registered policy also needs the exact-epoch
+review journey from B3. These are confirmed source gaps in the
+[adoption and assurance plan](docs/features/recovered-work-admission.md), not a
+reason to complete all B3 before read-only baseline or shadow measurement.
+B3/B4/B6 may proceed while external evidence is blocked.
 Each batch closes one usable scenario with contracts, UI/API and falsifiers,
 not one layer at a time. Restoring this plan does not implement its features.
 The source-only PR #1 squash merge is complete; its CI was not fully green.
@@ -703,11 +708,21 @@ Private-plan provider checks and independent runtime qualification remain open.
 
 ### Snapshot Audit Follow-Up
 
-The [recovered work register](docs/features/recovered-work-admission.md) retains
+The [adoption and assurance plan](docs/features/recovered-work-admission.md) retains
 unfinished registered-epoch review, decision-provenance and critical-mutation
 candidates in B1/B3/B5/B7 rather than treating local-worktree retirement as
 feature completion. Current contracts and focused native witnesses decide
 whether each draft is adapted or rejected; archived code is not merge authority.
+The 2026-09-23 companion intake also routes unsigned candidate preparation to
+B5, completion-bound economics to B4/B1, native consumed-input and Proofkit
+feedback validation to B7, and conditional authority-transfer work to existing
+contract/effect owners. Already implemented source repairs require current
+qualification, not repeated implementation. The private artifact catalog is
+retirement traceability, not a required archive. Preserve an external original
+only for a named unresolved dependency or a specifically requested recoverable
+source point, with an explicit retirement condition. This ROADMAP remains the
+only priority/status owner; module contracts and linked feature plans own their
+respective behavior and acceptance without a second external backlog.
 
 | Existing phase               | Next scoped work                                                                                                                                                                                                                                                                          | Acceptance boundary                                                                                                                                                                                                                      |
 |------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -1184,8 +1199,11 @@ profile mapping, shadow measurement and operational omission remain open;
 this slice is not completion of the blueprint or self-optimization.
 
 Before D9/B5 closes own-CI validation, re-read and freeze the current external
-`dynamic-ci-review-architecture-blueprint.md` in the repository's parent
-directory. Treat it as candidate methodology, not canonical project authority.
+`dynamic-ci-review-architecture-blueprint.md`. Its historical location is not a
+checkout requirement; the private companion catalog records the input path and
+digest. Keep accepted predicates in repository-owned plans without publishing
+private historical payloads. Treat it as candidate methodology, not canonical
+project authority.
 Compare its applicable validation classes with current requirements, source
 risks and native CI witnesses. Record each class as covered, a confirmed gap,
 not applicable with rationale, or unresolved; include proof limits and cost.

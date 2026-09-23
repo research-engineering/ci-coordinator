@@ -53,6 +53,13 @@ choosing one audit chain settles the objection "a global lock is intrinsically
 wrong" but not a demonstrated throughput or deadlock defect. Choosing one Python
 minor settles "a newer minor exists" but not an applicable security advisory.
 
+Explicit authorization and deterministic selection alone do not prove least
+privilege: a deterministic `AllPermissions` profile is a counterexample. Bind
+necessary capabilities to the task before comparing them with the granted set.
+A stable required gate excludes ungated dynamic execution, not every generated
+workflow that preserves that gate. Compare only alternatives preserving the
+actual hard constraints; rejecting one invalid option proves no global optimum.
+
 ## Record Classes And Lifecycle
 
 - `owner-choice` records a currently selected product/platform boundary.
