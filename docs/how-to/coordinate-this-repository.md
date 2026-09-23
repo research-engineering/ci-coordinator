@@ -36,7 +36,7 @@ empty native-job test manifest, conservative dependency graph and packaged
 CommonJS control bundle. The generated inventory binds every source input by
 SHA-256 and records the native aggregate's result and output predicates.
 
-The complete Python collection, nine native shards and coverage join form one
+The complete Python collection, eleven native shards and coverage join form one
 obligation with three witnesses. The trusted requester negative contract groups
 its invocation with a separate assertion that its result is `plan_url_invalid`.
 Neither helper is a standalone substitute for its complete validation family.

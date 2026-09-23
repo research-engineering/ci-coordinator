@@ -162,7 +162,7 @@ PostgreSQL and one tooling/conformance shard. This is an initial measured-load
 hypothesis, not proof of the minimum worker count. New files use the cohort
 mean cost or a positive fallback and always remain in the native universe.
 
-For the current 12,593-node population, revise the tooling count from one to
+For the 12,593-node baseline population, revise the tooling count from one to
 three while retaining four backend and four PostgreSQL shards. Rebalance with
 complete per-file phase hints from the exact successful run above. LPT on the
 observed tooling phases yields about 287 seconds per tooling shard before

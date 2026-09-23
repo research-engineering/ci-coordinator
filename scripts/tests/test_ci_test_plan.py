@@ -248,7 +248,7 @@ def test_artifact_join_rejects_each_independent_binding_substitution(
 ) -> None:
     plan = _plan()
     _shards(plan, tmp_path)
-    assert len(admit_shards(plan, tmp_path)) == 9
+    assert len(admit_shards(plan, tmp_path)) == len(plan.assignments)
     folder = tmp_path / f"shard-{plan.assignments[0].shard}"
     path = folder / "receipt.json"
     value = json.loads(path.read_bytes())
