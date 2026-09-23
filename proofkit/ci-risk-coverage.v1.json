@@ -908,7 +908,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+          "sourceSha256": "01fad45ee64a7fb12b4a0718152d49c5633209f7214bd1ec0c4e4769c4add731"
         }
       ]
     },
@@ -937,7 +937,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+          "sourceSha256": "01fad45ee64a7fb12b4a0718152d49c5633209f7214bd1ec0c4e4769c4add731"
         }
       ]
     },
@@ -1036,7 +1036,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+          "sourceSha256": "01fad45ee64a7fb12b4a0718152d49c5633209f7214bd1ec0c4e4769c4add731"
         }
       ]
     },
@@ -1065,7 +1065,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+          "sourceSha256": "01fad45ee64a7fb12b4a0718152d49c5633209f7214bd1ec0c4e4769c4add731"
         }
       ]
     },
@@ -1321,7 +1321,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+          "sourceSha256": "01fad45ee64a7fb12b4a0718152d49c5633209f7214bd1ec0c4e4769c4add731"
         }
       ]
     },
@@ -1546,13 +1546,13 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+          "sourceSha256": "01fad45ee64a7fb12b4a0718152d49c5633209f7214bd1ec0c4e4769c4add731"
         },
         {
           "requirementId": "REQ-CI-PROOFKIT-012",
           "witnessPath": "scripts/tests/test_ci_utility_checks.py",
           "assertion": "test_native_cgo_refusal_stops_every_analyzer",
-          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6",
+          "sourceSha256": "01fad45ee64a7fb12b4a0718152d49c5633209f7214bd1ec0c4e4769c4add731",
           "commandIds": [
             "python.test"
           ],

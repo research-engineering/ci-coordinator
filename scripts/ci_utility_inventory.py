@@ -27,8 +27,14 @@ SPELLING_LINE_FILES = {
     "scripts/tests/test_dev_environment_log_transport.py": "transport-fixtures.txt",
     "scripts/tests/test_documentation_graph.py": "documentation-fixtures.txt",
 }
-_SPDX_SCHEMA = "docs/specs/ci-coordinator-release/spdx-2.3.schema.json"
-_SPDX_SHA256 = "23b238cde51ad35021a61eb79639814c91a436b1d62061a1122aba6107b1c927"
+_SPDX_SOURCE_DIGESTS = {
+    "docs/specs/ci-coordinator-release/spdx-2.3.schema.json": (
+        "23b238cde51ad35021a61eb79639814c91a436b1d62061a1122aba6107b1c927"
+    ),
+    "docs/specs/ci-coordinator-release/SPDX-LICENSE.txt": (
+        "a69d068ec0e987513259d3d355f10c1b39cae1bfb275e8a6ed250b8c1d17531f"
+    ),
+}
 _BINARY_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".ico", ".woff", ".woff2", ".pdf"})
 _GENERATED_SPELLING_PATHS = frozenset(
     {
@@ -116,8 +122,8 @@ def spelling_exclusion(name: str) -> str | None:
         return "generated dependency resolution data"
     if name in {DEVCONTAINER_SCHEMA, f"{QUALITY_DIRECTORY}/schemas/devcontainers/LICENSE-CODE"}:
         return "immutable upstream source; core schema provenance is checked separately"
-    if name == _SPDX_SCHEMA:
-        return "immutable SPDX schema; release specification owns exact upstream provenance"
+    if name in _SPDX_SOURCE_DIGESTS:
+        return "immutable SPDX source; release specification owns exact upstream provenance"
     if name in {f"{QUALITY_DIRECTORY}/spelling/{path}" for path in SPELLING_LINE_FILES.values()}:
         return "exact spelling exclusion lines; validated against their owning source file"
     return None
@@ -139,11 +145,12 @@ def spelling_line_file(root: Path, name: str) -> str | None:
 
 
 def admit_spelling_vendor_exclusions(root: Path, names: tuple[str, ...]) -> None:
-    if (
-        _SPDX_SCHEMA in names
-        and hashlib.sha256(source_text(root, _SPDX_SCHEMA).encode()).hexdigest() != _SPDX_SHA256
-    ):
-        raise ValueError("vendored SPDX schema spelling exclusion has stale provenance")
+    for source, expected in _SPDX_SOURCE_DIGESTS.items():
+        if (
+            source in names
+            and hashlib.sha256(source_text(root, source).encode()).hexdigest() != expected
+        ):
+            raise ValueError("vendored SPDX source spelling exclusion has stale provenance")
     for source, excluded in SPELLING_LINE_FILES.items():
         exception = f"{QUALITY_DIRECTORY}/spelling/{excluded}"
         if exception in names and source not in names:
