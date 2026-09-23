@@ -1,690 +1,270 @@
 # CI Coordinator Roadmap
 
-> Public-export boundary: historical source, PR, run, provider and rollout
-> observations retained below are design context only, not acceptance evidence
-> for `research-engineering/ci-coordinator`. Former private receipts are revoked.
-> Synthetic pilot archetypes are proposed examples, not renamed executions.
-> Requalify applicable requirements and open tasks against the new exact source.
-
-Status: product and engineering roadmap
-
-Last validated: 2026-09-07
-
-## 1. Product Law Projection
-
-CI Coordinator is a GitHub App control plane for truthful CI governance. The
-canonical authority is MS-1 through MS-3 in
-[`01-meta-specification.md`](docs/architecture/01-meta-specification.md); this
-roadmap projects those laws only to explain delivery order:
-
-```text
-Deterministic proof may reduce work.
-Agent advice may only increase validation.
-Uncertainty runs FullCI or produces an explicit failure.
-```
-
-This law is necessary but not sufficient. Identity, freshness, credentials,
-availability, replay, rollback, and provider semantics are independent
-conjuncts of production admission.
-
-## 2. Current Boundary
-
-The Python/FastAPI implementation is the sole backend. The local connected
-runtime can authenticate, plan, sign and replay envelopes, hot-activate policy
-epochs, apply monotonic controls, shape shards, reconcile provider observations,
-collect shadow evidence, and expose an authorization-first organization and
-repository catalog. It can also acquire one authorized repository's workflows
-at an exact commit, produce a closed provenance and unknown ledger, and emit an
-admitted observe-only proposal when the provider signal is unambiguous. Its
-backend can also authorize an affirmative review, reproduce the proposal at the
-current default-branch head, and atomically register its immutable epoch, audit,
-and review records without activation. Its enforcing path can authenticate an
-externally signed receipt, durably register exact production authority, and
-issue selected plans for admitted scopes.
-
-When explicitly enabled, the browser plane authenticates organization
-administrators through an opaque token-free Keycloak-backed session. Exact
-Keycloak roles govern control-plane capabilities, while the organization-owned
-GitHub App provides repository inventory and provider reads within the admitted
-installation scope. A proposal-bound GitHub reviewer token exists only during
-one repository-owner attestation callback, is reduced to immutable reviewer and
-permission evidence, and is discarded before durable commit. Activation is a
-separate administrator operation that rechecks the retained reviewer through
-the GitHub App and revalidates the complete active baseline under lock.
-
-The repository cannot make the receipt's external evidence true, centrally
-dispatch runner work, publish omitted-check success, or claim a live production
-rollout. Until external admission succeeds, deployments remain non-enforcing.
-
-```text
-LocalImplementationComplete
-and not ExternalProductionAdmission
-=> DeploymentMode in {disabled, non_enforcing}
-and FullCIFallbackRequired
-```
-
-## 3. Capability Map
-
-| Capability                            | Deterministic core                                                                                                                                                                 | Agent extension                                            | Combined result                                                                                                 | State                                                                                                                                                                                                                                                                                         |
-|---------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Trust substrate                       | Hash chain, replay, identity binding                                                                                                                                               | Explanation and anomaly triage                             | Replayable proof with bounded diagnosis                                                                         | implemented                                                                                                                                                                                                                                                                                   |
-| Dynamic CI planning                   | Impact closure, omission proof, FullCI fallback                                                                                                                                    | Additional risk and depth                                  | Lower cost without agent downgrade authority                                                                    | implemented locally                                                                                                                                                                                                                                                                           |
-| Runner capacity                       | Exact static selector binding, bounded self-hosted-runner observation, and shared-pool shard allocation                                                                            | Queue-pressure hypothesis                                  | Faster selected execution without coverage change                                                               | implemented locally; live GitHub App permission and target pilot remain external evidence                                                                                                                                                                                                     |
-| Hot configuration                     | Immutable epochs, CAS activation, rollback                                                                                                                                         | Policy proposal                                            | No-restart policy control with deterministic admission                                                          | implemented                                                                                                                                                                                                                                                                                   |
-| Shadow rollout                        | Candidate/baseline comparison                                                                                                                                                      | Failure clustering                                         | Non-enforcing safety evidence                                                                                   | implemented locally                                                                                                                                                                                                                                                                           |
-| Production authority consumption      | Canonical receipt, packaged build binding, durable registration, transactional guard                                                                                               | Evidence explanation only                                  | Scope-bound selected-plan issuance without ambient enable flags                                                 | v1 implemented locally; independent target-authority relation and external signer evidence remain mandatory before production omission                                                                                                                                                        |
-| Target authority relation             | Finite Phase-0 conservation, exact full-row equality, total raw-domain projection, strict Git source binding, independently enumerated producers, and replayable retained evidence | None; authority transition is deterministic                | Reviewable unactivated closure that cannot mint omission authority                                              | relation, producers, retained evidence, successor persistence and generation-fenced cutover implemented with native proof; live drain, activation and pilot remain pending                                                                                                                    |
-| Immutable release artifact            | Exact master/Full Check binding, registry digest, provenance, SBOM, signer verification                                                                                            | None; publication authority is deterministic               | One attestable production-eligible OCI artifact                                                                 | source capability; public exact-source release and deployment qualification pending                                                                                                                                                   |
-| FastAPI Production assurance          | Exact sealed profile identity and three-valued conformance                                                                                                                         | Evidence explanation only                                  | Release-bound project conformance without acronym ambiguity                                                     | profile selected; project status `NOT_DETERMINED` pending context and external receipts                                                                                                                                                                                                       |
-| Provider inventory                    | Keycloak read role intersected with deployment scope and exact GitHub App installation evidence, credential-plane separation, bounded decoding                                     | None; provider identity is deterministic                   | Discoverable organization/repository portfolio without widening command authority                               | implemented locally                                                                                                                                                                                                                                                                           |
-| Governance and drift                  | Effective default-branch rules observation; owner-approved durable baseline; exact comparison                                                                                      | Suspicious-change interpretation                           | Truthful provider evidence and explicit expected state now; continuous control-plane review later               | observation, baseline, and comparison implemented locally                                                                                                                                                                                                                                     |
-| Draft PR orchestration                | Revision-bound lifecycle and stage gates                                                                                                                                           | Risk explanation and stricter-stage proposal               | Richer lifecycle than the provider draft flag                                                                   | planned                                                                                                                                                                                                                                                                                       |
-| Secrets prevention                    | Credential profiles and fork restrictions                                                                                                                                          | Risk classification                                        | Least-privilege validation                                                                                      | designed                                                                                                                                                                                                                                                                                      |
-| Release evidence                      | Immutable build and gate provenance                                                                                                                                                | Failure clustering and release summary                     | Explainable deploy admission                                                                                    | designed                                                                                                                                                                                                                                                                                      |
-| Proof workbench UI                    | Runtime-decoded identity, provider catalog, scoped snapshot, discovery, attestation, and activation state                                                                          | Natural-language summary                                   | Repository inspection, one-use owner attestation, and separately authorized activation                          | implemented locally                                                                                                                                                                                                                                                                           |
-| Operator experience and visual system | Task-centered information architecture, explicit evidence hierarchy, responsive layout, keyboard and screen-reader semantics, deterministic visual regression                      | Contextual explanation only                                | A distinctive, efficient administration surface without hiding authority or uncertainty                         | navigation and console implemented; [evidence presentation repair](docs/features/operator-evidence-presentation.md) and [visual system implementation](docs/features/operator-visual-system-implementation-plan.md) in progress; analytics and task-level usability qualification remain open |
-| Workflow discovery                    | Exact-commit inventory, provenance, closed predicate ledger, and stable terminal-signal topology                                                                                   | Future explanation only; no authority                      | Reviewable current-default-head observe-only proposals without repository-specific assumptions                  | implemented; three frozen topology replays validated                                                                                                                                                                                                                                          |
-| Proposal review registration          | Exact replay, current-head reproduction, ABA-resistant baseline, bounded semantic diff, and atomic epoch + audit + review commit                                                   | None; affirmative mutation authority remains deterministic | Durable non-activating review through a proposal-bound one-use GitHub reviewer handoff                          | implemented locally                                                                                                                                                                                                                                                                           |
-| API-first repository administration   | Versioned request contracts, dry-run admission, immutable epochs, idempotent commands, audit replay                                                                                | Configuration explanation and draft generation only        | Every UI operation has the same complete API capability; UI is never required for automation                    | configuration lifecycle API implemented locally; complete journey parity and workflow-adaptation recommendations remain pending                                                                                                                                                               |
-| External review escalation            | Authenticated block registry, revision binding, idempotency, credential profiles, monotonic admission                                                                              | A review bot selects additional blocks and depth           | Any admitted block may be added without granting omission or credential-broadening authority                    | deterministic admission exists; command channel planned                                                                                                                                                                                                                                       |
-| CI economics and regression telemetry | Per-job timing, runner identity, planned route, exact attempt evidence, finite retention                                                                                           | Regression explanation and clustering                      | Replayable CI evidence without influencing planning                                                             | v1 implemented locally; actual CPU utilization, saved-compute comparison, regression alerting, and production capacity evidence remain pending                                                                                                                                                |
-| Configuration assistant               | Schema-constrained read model, evidence citations, proposal validation                                                                                                             | Interactive UI chat produces explanations and drafts       | Optional guided configuration without direct model mutation authority                                           | last priority, after all other product, repair, pilot and deployment-qualification work                                                                                                                                                                                                       |
-| Consumer contract laboratory          | Real application planning path and exact target validators, lab-only signing, synthetic-result labels, independent route scenarios, and content-addressed source epochs            | Failure explanation only                                   | Provider-independent proof of coordinator-to-target control flow without pretending to emulate GitHub           | reusable profile laboratory source present; public fallback and selected-canary qualification pending                                                                                                                                                   |
-| Thin target consumer control          | One content-addressed generated bundle with a closed three-command dispatcher and exact target-registry binding                                                                    | None; target execution authority is deterministic          | Four generated target artifacts instead of nine while preserving local fallback and decomposed source ownership | source implemented; fresh public CI, fallback/selected pilot and savings evidence remain pending                                                                                                                                                             |
-
-Telemetry is admitted by one bounded law rather than by an unbounded promise to
-collect every observable:
-
-```text
-Measure(x) := DecisionUseful(x)
-              and DefinitionVersioned(x)
-              and SubjectEpochBound(x)
-              and ProvenanceComplete(x)
-              and AccuracyOrUncertaintyAdmitted(x)
-              and BoundedCardinality(x)
-              and PrivacyAdmitted(x)
-              and CollectionCostWithinBudget(x)
-              and DataClassRetentionPolicyOwned(x)
-
-Compare(x, y) := Measure(x)
-                 and Measure(y)
-                 and ComparisonRelationAdmitted(x, y)
-                 and InputProvenanceRetained(x, y)
-
-Persisted(x, t) => RetentionAllows(x, t)
-```
-
-This includes queue, setup, wall-clock and estimated CPU time; runner, shard and
-cache utilization; selected, omitted and fallback reasons; retries, flakiness,
-FullCI counterfactuals, saved compute, and SLO regressions. It excludes secrets,
-unbounded labels, and data without an explicit purpose-bound retention policy.
-For the proposed historical archive, compact statistics have no automatic
-expiry; optional job/step detail has its own configurable lifetime. This target
-does not extend the current 90-day CI-evidence contract. `RetentionAllows`
-evaluates the admitted data-class policy, not an absent deadline interpreted
-as permission to retain. Finite storage and collection budgets still apply.
-Every
-record binds its repository, revision, run attempt, runner profile, units, and
-measurement-definition version. Derived estimates additionally bind their
-estimator version and admitted uncertainty, so unlike epochs are not compared
-as equivalent observations. A comparison is admitted only when both definition
-epochs are identical or an owner-approved normalization relates them, and the
-derived result retains both source identities. Retention conformance requires
-preserving permanent statistical facts and deleting finite-lived detail when
-due, not merely recording that a policy exists.
-
-## 4. Delivery Sequence
-
-Product delivery and production admission are related partial orders, not one
-false linear sequence:
-
-```mermaid
-flowchart TD
-  A["Local connected backend"] --> B["Authenticated repository portfolio"]
-  B --> C["Exact-commit workflow discovery"]
-  C --> D["Owner attestation, registration, and activation"]
-  D --> E["Role-governed UI and shadow pilot"]
-
-  A --> F["Immutable artifact and live provider proof"]
-  F --> G["Fallback, rollback, and stable-gate proof"]
-  E --> H["Non-vacuous shadow evidence"]
-  C --> Q["Independent target-authority relation and generation cutover"]
-  G --> I["Bounded deterministic omission"]
-  H --> I
-  Q --> I
-
-  I --> J["Governance, draft, and release controls"]
-  C --> K["Monotonic AI escalation"]
-  J --> L["Optional central dispatch evaluation"]
-```
-
-### Stage A: Local Backend And Authority Consumer
-
-State: implemented.
-
-Exit proof: repository quality, container smoke, PostgreSQL integration,
-mutation witnesses, non-enforcing and enforcing runtime composition, signed
-fallback, receipt admission, durable authority registration, transactional
-selected-issuance guards, and shadow evidence pass without claiming external
-rollout truth.
-
-### Stage B: Authenticated Repository Portfolio
-
-State: implemented locally.
-
-The operator UI authenticates one Keycloak human session, intersects the
-operation-specific role with deployment scope and exact GitHub App installation
-evidence, distinguishes provider visibility from exact action authority, and
-opens the bounded proof snapshot. The deployment-owned break-glass credential
-is a disjoint emergency plane restricted to safety-increasing controls.
-
-### Stage B.1: Organization Identity And API-First Administration
-
-State: target contract, machine profile, runtime cutover, repository
-attestation, and activation implemented locally; external provider receipts and
-complete API-first administration remain pending.
-
-The
-[organization control-plane contract](docs/architecture/cross-cutting/organization-control-plane.md)
-and [machine profile](docs/specs/ci-coordinator-control-plane/control-plane-profile.v1.json)
-freeze eight separate credential planes, exact fine-grained administrator
-roles, current read-only GitHub App permissions, deferred write profiles,
-session bounds, attribution, and pre-release cutover semantics. The local
-runtime now implements the Keycloak human and machine paths, exact App-backed
-repository reads, one-use GitHub reviewer attestation, and separately
-authorized activation. It cannot claim live Keycloak, GitHub callback, secret
-custody, or deployment conformance until external receipts close those facts.
-
-All repository onboarding, workflow discovery, policy proposal, validation,
-activation, rollback, and status operations must be available through a
-versioned API. The UI calls those same application capabilities and owns no
-separate business behavior.
-
-### Stage B.2: Operator Experience And Visual System
-
-State: planned immediately after API-first capability parity.
-
-The first screen is the working repository portfolio, not a marketing surface.
-The experience groups actions by operator task, exposes authority, freshness,
-uncertainty, and next action without collapsing them into one status, and uses
-progressive disclosure for raw evidence. The design batch must define reusable
-layout and state primitives, guided repository onboarding, dense comparison and
-operations views, responsive behavior, keyboard and assistive-technology
-semantics, reduced motion, empty/loading/error/stale states, and deterministic
-Playwright screenshots at desktop and mobile viewports. Visual polish cannot
-invent success, hide fallback, or duplicate backend policy.
-
-### Stage C: Workflow Discovery And Proposal
-
-State: implemented as a synchronous discovery slice; frozen target revisions
-validated through the same proposal predicate.
-
-The service acquires workflows at one exact provider commit, derives a bounded
-provenance graph and closed unknown ledger, and produces deterministic
-secret-free observe-only proposals through existing policy admission. The UI exposes
-the exact evidence and blockers; an independently authenticated and authorized
-command may hand a complete current-head proposal to review registration.
-
-### Stage C.1: Proposal Review Registration
-
-State: non-activating review registration and separately authorized activation
-implemented locally.
-
-An authorized command resolves exact replay before provider work, binds the
-client-observed active epoch and revision, reproduces the current-head manifest,
-computes a bounded semantic diff, then commits the epoch, review, and pair-owned
-audit event atomically under the repository-scope lock. A one-use GitHub
-reviewer callback adds current `maintain` or `admin` evidence without retaining
-its token. A distinct Keycloak `activate` command rechecks that reviewer through
-the App, reproduces the current proposal, and rejects changed or ABA baselines
-before the activation compare-and-set.
-
-### Stage C.2: Dormant Target Authority Relation
-
-State: pure transition, strict workflow-source binding, independently
-enumerated producers, and replayable dormant evidence implemented locally.
-
-The kernel derives the expected adapted relation only from the exact Phase-0
-baseline and owner-approved delta, binds registration to that expected domain,
-binds observation to its total raw candidate domain, and emits only an
-unactivated closure. The exact workflow Git tree and current source binding are
-separate, registration and observation use asymmetric independently enumerated
-domains, and one canonical bundle can replay their exact retained Stage C
-evidence. The successor persistence and generation-fenced implementation has
-separate D3 native evidence. Complete live provider authority, old-authority
-drain and production activation remain pending and cannot be inferred from
-this dormant stage.
-
-### Stage D: External Production Admission
-
-State: platform-owned and not locally provable.
-
-Required conjunction:
-
-- one immutable artifact identity across every witness;
-- a provider-independent consumer contract laboratory covering request,
-  planner, signature, validator, fallback, and gate behavior with lab-only
-  authority; the reusable exact-source profile laboratory is implemented
-  locally; public exact-target fallback and selected canaries, and their
-  independently admitted target profiles, remain pending;
-- externally migrated and attested PostgreSQL schema;
-- live GitHub App, OIDC, JWKS, and bootstrap behavior;
-- exact-revision, content-addressed target adapter admission for every
-  path-scoped workflow identity;
-- bounded coordinator outage with automatic FullCI fallback;
-- rollback using the same declared artifact and schema compatibility facts;
-- stable required-check identity, including merge queue behavior;
-- non-vacuous shadow observations over admitted repositories and risk classes.
-- one complete release-bound FastAPI Production context and conformance record
-  against the exact selected profile epoch.
-
-### Stage E: Bounded Deterministic Omission
-
-State: future production decision.
-
-Enable only explicitly admitted surfaces. Unknown paths, stale graphs,
-incomplete diffs, provider uncertainty, and invalid policy always run FullCI.
-
-### Stage F: Governance, Draft Lifecycle, And Release Evidence
-
-State: effective-governance observation, owner-approved durable baseline, and
-exact deterministic comparison implemented locally; drift policy, draft
-lifecycle, and release evidence planned.
-
-Observe bounded active default-branch rules without claiming a baseline or
-compliance. Then add owner-approved baselines, exact comparison, drift detection,
-revision-bound draft stages, dependency ordering for related pull requests,
-and immutable release evidence. Coordinator stages do not override provider
-draft state, branch protection, or required checks.
-
-### Stage G: AI Escalation
-
-State: pure admission and monotonic verifier implemented; external review-bot
-command transport, model execution, independent evaluation orchestration, and
-durable advice evidence deferred.
-
-Agent output may add checks, increase depth, request fixtures, or propose policy.
-It may not omit checks, weaken depth, broaden credentials, or disable fallback.
-The external review-bot channel precedes the embedded assistant because it
-delivers operational value without coupling product configuration to a chat UI.
-It is optional: absence or timeout of the bot cannot delay or alter the normal
-deterministic route. A separately scoped read-only API exposes bounded
-repository statistics and evidence to the bot; direct database access is not a
-supported integration boundary.
-The optional assistant may explain configuration and submit deterministically
-validated drafts, but cannot directly activate or execute them.
-
-### Stage H: Optional Central Dispatch
-
-State: uncommitted option.
-
-Adopt only if central dispatch produces measurable value beyond the static
-bootstrap. Coordinator unavailability must remain bounded by FullCI fallback.
-
-## 5. Authority Map
-
-One fact has one owner:
-
-| Fact                                              | Authority                                                                              |
-|---------------------------------------------------|----------------------------------------------------------------------------------------|
-| Product order and future capability state         | this file                                                                              |
-| Architecture laws and boundaries                  | `docs/architecture/01-meta-specification.md` and `docs/architecture/02-context-map.md` |
-| Derived architecture diagrams                     | `docs/architecture/ARCHITECTURE.md`                                                    |
-| Specification routing                             | `docs/architecture/INDEX.md`                                                           |
-| Dataflow and state machines                       | `docs/architecture/03-dataflow-and-state-machines.md`                                  |
-| Module behavior                                   | `docs/architecture/modules/`                                                           |
-| Cross-cutting invariants                          | `docs/architecture/cross-cutting/`                                                     |
-| Production admission gate                         | `docs/architecture/cross-cutting/production-admission.md`                              |
-| Machine product requirements                      | `docs/specs/**/requirements.v1.json`                                                   |
-| Architecture traceability closure                 | `docs/specs/ci-coordinator-core/architecture-traceability-profile.v1.json`             |
-| Requirement-to-witness graph                      | `proofkit/requirement-bindings.json`                                                   |
-| Proof environment and commands                    | `proofkit/witness-plan-input.json`                                                     |
-| Repository proof policy                           | `proofkit/repo-profile.json`                                                           |
-| Runtime interpreter set                           | `docs/specs/ci-coordinator-runtime/python-runtime-profile.v1.json`                     |
-| Contract regression vectors                       | `fixtures/conformance/v1/product-contract-vectors.v1.json`                             |
-| Target-repository adoption and rollback procedure | `docs/target-repository-migration.md`                                                  |
-
-Feature detail:
-
-- [Dynamic CI enforcement](docs/features/dynamic-ci-enforcement.md)
-- [Governance and release evidence](docs/features/governance-drift-release-evidence.md)
-- [Secrets and incident prevention](docs/features/secrets-incident-prevention.md)
-- [Agent risk advice](docs/architecture/modules/agent-risk-advice.md)
-- [Proof workbench UI](docs/features/proof-workbench-ui.md)
-- [Repository adoption experience](docs/features/repository-adoption-ux.md)
-- [Workflow discovery UI](docs/features/workflow-discovery-ui.md)
-- [Control-plane identity authority cutover](docs/features/control-plane-identity-authority-cutover.md)
-
-## 6. Production Invariants
-
-- No green state without a deterministic owner and fresh evidence.
-- Coordinator failure maps to FullCI or explicit failure, never silent success.
-- Input, policy, graph, diff, plan, verifier, and observation identities replay.
-- Untrusted events and fork contexts cannot receive privileged credentials.
-- Required-check and merge-queue semantics are modeled explicitly.
-- Metrics, alerting, rollback, and replay precede enforcement.
-- Agent output is monotonic with respect to validation coverage.
-- Coordinator lifecycle stages cannot override provider facts or branch policy.
-
-## 7. Risk Register
-
-| Risk                              | Failure mode                                                                      | Required control                                                                                                 |
-|-----------------------------------|-----------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
-| Required-check ambiguity          | Unrelated or skipped work appears successful                                      | Stable required gate and coordinator-owned proof                                                                 |
-| Stale graph                       | A dependent surface is missed                                                     | FullCI unless freshness is proved                                                                                |
-| Diff truncation                   | Changed files are absent                                                          | FullCI on incomplete evidence                                                                                    |
-| Agent trust inversion             | Advice removes validation                                                         | Monotonic verifier                                                                                               |
-| Store corruption                  | Decisions cannot be reconstructed                                                 | Hash chain, attestation, replay                                                                                  |
-| Credential amplification          | Dynamic work receives excessive privilege                                         | Explicit credential profiles and fork policy                                                                     |
-| Dispatch outage                   | CI never starts                                                                   | Static bootstrap and bounded FullCI timeout                                                                      |
-| Documentation drift               | Agents consume obsolete authority                                                 | Single-owner document graph and Proofkit routing                                                                 |
-| Draft-state confusion             | Coordinator stage is mistaken for merge readiness                                 | Provider facts and policy stages remain separate                                                                 |
-| Executable-language blind spot    | A CommonJS artifact is counted physically but its dependency surface is unknown   | Conservative CommonJS signal extraction with unknown-to-review behavior                                          |
-| Proof-surface growth              | Proof maintenance costs more than the residual risk it removes                    | Measure precision and authoring cost; migrate to parity-proven compact routes; remove only dominated projections |
-| Runtime-version drift             | Repeated patch identities disagree or intentional caps outlive their evidence     | One machine runtime profile, validated projections, freshness SLA, and expiring compatibility exceptions         |
-| Premature observability expansion | Tracing adds cost and sensitive data without closing a critical journey           | Add telemetry only with an owned journey, collector, sampling, retention, and data-classification contract       |
-| Stale temporal authority          | A pre-lock clock sample admits a write after lease expiry                         | Database-owned admission instant, exact generation/token fencing, and lock/expiry race witnesses                 |
-| Incomplete schema admission       | A declared capability lacks its runtime schema check                              | Complete capability-to-attestor dispatch and independent schema/ACL tamper witnesses                             |
-| Recovery-free overload            | Bounded rejection loses webhook or logout delivery without an owned recovery path | Bounded ingress, durable acknowledgement rules, provider recovery and revocation guarantees                      |
-| History-dependent admission cost  | A normal operation rechecks an ever-growing audit history                         | Measured query cost and maintained integrity proof without weakening drift detection                             |
+Status: sole task, priority and readiness register
+
+Consolidated: 2026-09-23 against source `beb1abf8faa36c6629d82b7dbb8cee6b2a2b6015`.
+This is a documentation/conservation checkpoint, not fresh runtime qualification.
+
+## Authority And Use
+
+This file is the complete current work queue. A task has one stable `CI-` ID,
+one state, a deliverable, a closure condition and its actual prerequisites.
+Feature designs, implementation recipes and audit dispositions explain its
+contract and evidence; they do not own separate priorities or completion states.
+Change the task here when a detailed document exposes a new remaining delta.
+Do not copy its status into another plan or create one PR per task by default.
+
+The product remains a GitHub App CI control plane, not a general infrastructure
+manager or a central repository-command executor. Its canonical laws are in the
+[meta-specification](docs/architecture/01-meta-specification.md): deterministic
+proof may reduce work; advice may only increase validation; uncertainty runs
+independent FullCI or produces an explicit failure. A local implementation,
+passing CI, provider behavior and production admission are distinct facts.
+
+Use [the documentation index](docs/INDEX.md) for contracts and execution recipes.
+The [documentation authority contract](docs/architecture/cross-cutting/documentation-authority.md)
+and native graph gate enforce the single `State:` owner and valid navigation.
+The gate does not prove semantic completeness of arbitrary prose.
+
+### Reading Task States
+
+- **open**: an accepted outcome still needs a scoped implementation and/or
+  qualification delta. Reuse implemented parts; do not rebuild a feature simply
+  because its end-to-end acceptance is open.
+- **qualify**: source mechanisms are recorded; obtain current native, provider
+  or operational evidence as named. A discovered source defect becomes an
+  explicit repair within that task, not a false passing qualification.
+- **validate**: adjudicate hypotheses before accepting a code change. Historical
+  counts, severity, LOC, library names and generic clauses are not defect proof.
+- **conditional**: adopt only after the named value/authority decision; explicit
+  rejection with a falsifier can close the decision without implementing it.
+- **optional-last**: never blocks the required product, pilot or release work.
+
+Closure requires the exact changed source, preserved hard constraints, the
+task's native falsifiers and any separately owned external evidence. Record a
+closed state and its evidence here; an old receipt cannot qualify a new epoch.
+No meaningful completion percentage follows from counting these unequal tasks.
+
+## Cohesive Delivery Batches
+
+The eight batches group the existing eighteen directions, not eight mandatory
+PRs or new services. Only `CI-` IDs below identify current tasks. Historical
+repair B1-B5, delivery D1-D9 and external E1-E3 labels in retained references are
+context, not additional queues or competing batch definitions.
+
+| Batch | Outcome | Conserved original directions |
+| --- | --- | --- |
+| B1 | Own-CI observation, independent fallback and measured improvement | 13; relevant 7, 8, 15, 16 |
+| B2 | Durable history, retention, recovery and administration audit | 1, 2, 3, 5; relevant 15 |
+| B3 | API-first workflow adoption and usable administration | 6, 9, 11; relevant 4, 14 |
+| B4 | Useful analytics, notifications and optional external bot integration | 7, 10; relevant 11 |
+| B5 | Sound selective execution, reuse, consumers and controlled enforcement | 8, 16, 17; relevant 6, 13 |
+| B6 | Draft/related PR, governance, credentials and environment lifecycle | 12 |
+| B7 | Audit, architecture, security and operational/public-release qualification | 4, 14, 15; residual acceptance of 1-17 |
+| B8 | Optional extensions; embedded chat last | 18 |
+
+### Immediate Execution Order
+
+Start with CI-001 and the minimum own-CI path. Pull forward the confirmed
+workflow grammar CI-017, custom-epoch review CI-018 and plan TTL CI-055 only
+where the exercised path requires them. Read-only observation does not wait
+for every configuration, analytics or optional UI feature.
+
+Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
+this repository without omission. CI-004 qualifies independent fallback.
+CI-005 measures comparable execution using CI-027/CI-028; CI-006 optimizes the
+measured bottleneck without weakening the independent baseline. Complete the
+own-CI coverage comparison CI-057 before claiming complete self-optimization.
+
+While external access or native CI is unavailable, finish independent B2-B6
+source work and the applicable B7 repairs, never relabel the unavailable proof
+as passed. Full production admission additionally needs CI-058/CI-059 and
+CI-067-CI-069. CI-047 alone owns controlled omission after its complete external
+conjunction. UI polish, optional advice and chat neither waive nor substitute
+for those gates. Include related source, API/UI, documentation and falsifiers
+in one outcome-oriented batch instead of serial layer-only PRs.
 
 ## 8. Next Work
 
-### Current audit and completed work
+The following register is the only list of remaining tasks. The acceptance
+details after it refine these IDs; their numbered clauses are not extra tasks.
+Prerequisites name hard closure dependencies, not a ban on independent design
+or source work. A condition within a dependency is explicitly identified.
 
-The [September 23 audit hardening](docs/features/assurance-audit-hardening.md)
-and [implementation plan](docs/features/assurance-audit-hardening-plan.md)
-adjudicate the revised September 21 report against exact base `065a4d9c`.
-This B7 batch strengthens runtime typing, non-vacuous timeout and generated API
-witnesses, build-linked diagnostics, locale consistency and qualification routes.
-It does not turn discovery-only mutation or incomplete coverage into a product
-defect. The complete grouped disposition and remaining evidence are in that
-design; source changes do not imply native/runtime qualification.
+### B1: Own-CI Pilot And Measured Efficiency
 
-Publication targets a new public repository, `research-engineering/ci-coordinator`,
-with clean initial history. Former runner-policy observations are not evidence
-about that target. Qualify an admitted execution environment and bind App scope,
-OIDC/attestation trust, registry ownership and required checks independently.
-No former receipt, local behavioral fallback, reduced threshold or unapproved
-runner provisioning is implied.
+State: open; previous private run and deployment receipts do not qualify this source.
 
-Retain in B7: delivered-userspace pytest qualification; exact-head runtime
-performance and repair-policy renewal; analyzer/database and cost-hint
-provenance; database text semantics, provisioner hardening and restore drill;
-remaining SARIF/clause dispositions and risk-based coverage expansion. These
-items are not closed by the narrow repairs or by static gate success.
+| ID | Work And Closure | Depends On |
+| --- | --- | --- |
+| CI-001 | **qualify** the current repository execution environment, trusted base/head, native test inventory, required gates and baseline costs. Reobserve hosted/self-hosted runner availability; preserve every required outcome, coverage/mutation floor and secret boundary. No assumed former-account restriction or unapproved runner provisioning. | None |
+| CI-002 | **qualify** an immutable release from exact master and its explicitly dispatched Full Check. Bind OCI digest, provenance, SBOM, registry ownership, signing/attestation and packaged build identity; source or local image is not a published artifact. Image admission does not require unrelated follow-ups or all of CI-054. [Release contract](docs/architecture/cross-cutting/release-artifact-publication.md). | CI-001; applicable required image-admission predicates from CI-060/CI-061 |
+| CI-003 | **qualify** this repository as the first consenting non-enforcing consumer: inventory, discovery, real runs, webhook/durable reread, duplicates, errors and browser login/renewal/logout. Preserve independently runnable FullCI. Use the bounded environment's actual admission; do not wait for unrelated product features or claim production capacity. | CI-001, CI-002, CI-062; CI-017 for affected discovery |
+| CI-004 | **qualify** target-local timeout fallback and stable gate under coordinator outage, unavailable reusable definition, invalid/stale plan, fork context, push/PR/merge-group and cancellation. Explicit failure is distinct from FullCI actually executed; required checks cannot turn missing work green. [Consumer laboratory](docs/features/consumer-contract-laboratory.md). | CI-001; live cases CI-003 |
+| CI-005 | **qualify** paired full/selected or shadow experiments on exact source, runner/cache/profile/run/attempt cohorts. Record elapsed time, coordination overhead, real CPU or explicit estimate, negative savings and uncertainty. Do not inherit former five-minute or CPU-saving claims. | CI-003, CI-004, CI-027, CI-028; custom activation CI-018/CI-055 |
+| CI-006 | **open** measured own-CI cost reduction: PostgreSQL preparation/query/cleanup, duplicated coverage runs, fixture lifetime, shards, mutation, Compose, Dev Container, browsers and tool startup. Preserve collected tests and independent oracles; five minutes per job is a design objective, not permission to omit work. [Efficiency contract](docs/features/proof-preserving-ci-efficiency.md). | CI-001; compare before/after, with CI-057 for complete coverage claim |
 
-The September 2026 master integration adds complete documentation-diagram
-qualification (PR194), explicit rather than automatic postmerge release
-qualification (PR195), bounded schema-driven API campaigns (PR198/200), a
-digest-bound final-image vulnerability gate (PR202), and typed Promise analysis
-(PR204). These advance D9/own-CI proof; they do not establish live release or
-production readiness. PR201 implements bounded historical step import/read and
-runtime detail expiry under [History Review Convergence](docs/features/history-review-convergence.md).
-Its destructive administration and operational packages remain open.
-[History Detail Boundary Closure](docs/features/history-detail-boundary-closure.md)
-addresses provider job ordering and the nonempty recheck/replay/HTTP oracles
-without changing statistics, retention or authority. The existing 18-direction
-delivery inventory still requires live pilot target acceptance and E1-E3 evidence.
+CI-001 qualification checkpoint (2026-09-23): hosted jobs execute in the new
+private repository; no self-hosted runners are registered. The recovered PR's
+[native run](https://github.com/research-engineering/ci-coordinator/actions/runs/35851411775)
+exposed a stale exact job-inventory assertion and an unresolved nested-process
+cancellation timeout. The assertion repair preserves the independent expected
+set; bounded fixture diagnostics preserve the original timeout and cleanup
+oracles. Both require fresh native execution after repair. Static checks are
+not a substitute for this evidence.
 
-The 2026-09-14 PostgreSQL catalog audit covered an inventory of 225 scenarios
-against frozen source `25a4090f`. Its three confirmed mechanisms are scheduled
-as follows; inventory coverage is not workload or production conformance:
+On 2026-09-23 the owner authorized public source visibility to remove the
+private-plan restrictions. GitHub now reports PUBLIC; anonymous repository
+access, Dependency Review comparison and branch-rules API access are verified.
+The history secret scan covered all 11 observed commits, including PR refs,
+without findings. Public feature availability is not active branch protection,
+a passed Dependency Review job, an attested release or production admission.
+Do not skip required checks or replace provider enforcement with a local scan.
 
-1. [Coherent database observations](docs/features/database-observation-snapshots.md)
-   and its [plan](docs/features/database-observation-snapshots-plan.md) repair
-   readiness head/maximum drift and the pre-fence Workbench snapshot. Native
-   controlled interleavings and all-family projection checks precede acceptance.
-2. [Total collection-state admission](docs/features/total-collection-state-admission.md)
-   and its [plan](docs/features/total-collection-state-admission-plan.md) close
-   nullable collection CHECK predicates through a fenced contract/expand pair.
-   Preserve published migrations and valid states; reject invalid retained rows.
-   Native qualification and the maintenance rollout are separate acceptance steps.
-3. Unknown workload, query-plan, maintenance, memory and failure-capacity evidence
-   remains D9/E1 work. Do not infer tuning or index changes from catalog membership.
+The successor native run at `82c2e68` also found the restored Qodana preflight
+missing from the standalone shell-input owner and a PostgreSQL activity
+diagnostic timeout. The shell repair extends the existing ShellCheck inventory
+and its independent oracles, without a new scanner or exclusion. The database
+timeout remains an investigation, not permission to increase its budget.
 
-The [2026-09-13 snapshot-review validation](docs/adoption/snapshot-review-validation-2026-09-13.md)
-rebinds the supplied 20 claims and all clarified rejections from `7e4ef975` to
-master `36b6c286`. PR #162 closes its three confirmed source defects through
-[control-plane audit closure](docs/features/control-plane-audit-closure.md):
-private domain imports from two scanning services, missing `no-store` on ordinary
-operator-override responses, and matched HTTP templates incorrectly labelled
-`unmatched`. It also closes TEST-05 with an exact empty four-lane turn witness.
-New-run history recovery and its real-PostgreSQL bridge are already delivered;
-do not recreate them or conflate them with old-run rerun coverage.
+### B2: Durable Observation And Recovery
 
-PR #161 delivers [automatic mutation discovery](docs/features/automatic-mutation-testing.md)
-beside the curated witnesses. The [narrow dependency override](pnpm-workspace.yaml)
-selects patched `qs` only on its development-tool parent edge. The development
-toolchain also moves to Playwright 1.63.0 and retains browser failure traces
-separately from mandatory screenshots; product imports remain unchanged. Native
-qualification, not the SDK version, determines browser compatibility. Passing the configured
-dependency-audit severity threshold does not establish absence of advisories;
-lower-severity findings still require explicit triage.
+State: open; existing storage and worker slices require current qualification, not blind reimplementation.
 
-Retain the existing 18-workstream program. This intake schedules repairs and
-proof work; it does not authorize deployment, waive rejected topics forever,
-or require a new error framework.
+| ID | Work And Closure | Depends On |
+| --- | --- | --- |
+| CI-007 | **open** all-available Actions-history discovery, not a recent-window substitute. Qualify capped/dense pagination, changing pages, bounded/resumable scope, checkpoint coverage, partial populations and honest gaps through API/UI. [Population contract](docs/features/actions-history-population.md). | Current authorized inventory; CI-014 budgets |
+| CI-008 | **qualify** webhook-to-archive ingestion, bounded missed-event reconciliation and new attempts of old runs. Prove duplicate/replay/crash and independent recent/history lanes, without rereading unchanged history unnecessarily or assuming automatic GitHub redelivery. [Recent recovery](docs/features/actions-history-recent-recovery.md). | CI-007 for historical coverage; CI-014 |
+| CI-009 | **qualify** stable partial attempts, jobs/steps, recorded-gap retry, concurrent reads and original-generation recovery. Preserve permanent statistics, immutable import clocks, quotas and source/detail independence. [Convergence](docs/features/history-review-convergence.md), [detail boundaries](docs/features/history-detail-boundary-closure.md). | CI-007, CI-008 |
+| CI-010 | **open** complete retention administration: permanent compact job/attempt statistics; optional detail default 365 days from first successful import; global defaults, repository overrides and retroactive-shortening preview. Expiry cannot reset on rescan, double-count or extend 90-day CI evidence. [Retention](docs/features/actions-history-retention.md). | CI-009 |
+| CI-011 | **open** explicitly authorized destructive erasure with scope, generation/fencing, deletion intent, backup/WAL/quarantine/key policy and restore reconciliation. A rescan is non-destructive. Preserve immutable deletion evidence and current authorization; data access loss is not an erasure instruction. | CI-010, CI-067 |
+| CI-012 | **conditional** lazy workflow/run source-availability presentation and budgeted reconciliation where useful. Distinguish definition/run/attempt/job/artifact deletion, unavailable/denied/unknown and positive deletion proof; retained statistics stay readable. A 404 or missing page entry proves no deletion. | CI-009; demonstrated operator need |
+| CI-013 | **open** repository lineage across reinstall/transfer, preserving exact historical workload identity separately from current installation authority. Adopt archival continuity only with explicit authorized mapping; never inherit grants or erase history automatically. | CI-009, CI-062 |
+| CI-014 | **open** bounded, fair asynchronous ingress/worker processing across installations, repositories, recent/history work and foreground requests. Native controls cover bytes, CPU/RSS, connections, queue age, provider limits, cancellation, retry/poison and drain; durable acceptance precedes acknowledgement. Prefer the existing store/inbox unless measured requirements justify another broker. Live capacity qualification is separately owned by CI-069. | Current owner design and declared budgets |
+| CI-015 | **open** the explicit [T9 policy decision](docs/adoption/temporal-and-oracle-audit-2026-09-06.md): may evidence acquired before logout create a later session? If forbidden, require a durable sid/subject revocation fence checked atomically on insertion; otherwise document the allowed residual window and falsifiers. Do not tighten policy silently. Qualify login, expiry/refresh, logout/revocation, bounded failure and [view continuity](docs/features/workspace-session-continuity.md) without replaying commands/drafts or widening authority. | CI-062 for deployed qualification; policy design can proceed independently |
+| CI-016 | **open** complete security/administrator Activity coverage beyond the existing product slice: sensitive machine/CLI/read/export events, IdP correlation and actual log retention. Preserve atomic mutation evidence, unknown actors, attempted/committed/rejected/uncertain outcomes, bounded reads and privacy. [Activity](docs/features/administrator-activity-product.md). | CI-015; live storage/log custody CI-067/CI-068 |
 
-The [2026-09-06 temporal and oracle adjudication](docs/adoption/temporal-and-oracle-audit-2026-09-06.md)
-revalidates the later supplied report without treating its score as authority.
-Its T1-T16 register adds response-age/URI repair, causal DB/mutation/Node
-oracles, FIFO admission, documentation drift and explicit recovery/retention
-decisions to the existing B2/B3/B5 phases. No mass refactor or additional
-service is inferred from an unmeasured risk. The earlier planning estimate of
-approximately 70% is historical, not a refreshed effort-weighted acceptance or
-production percentage.
+### B3: API-First Adoption And Operator Experience
 
-The [2026-09-05 independent adjudication](docs/adoption/independent-sota-adjudication-2026-09-05.md)
-binds the two supplied reports to `master` at
-`e791fad2ed9e68ccc73a130ded6f517f0109310e`. It dispositions all 71 numbered
-reassessment findings and all 33 original compound bullets. Neither the external
-score nor its suggested architecture becomes authority by inclusion here.
+State: open; bring forward only the prerequisites of the chosen pilot path.
 
-Retained source capabilities, not scheduled for blind reimplementation, include
-CommonJS ownership signals, the singleton Python 3.13.15 profile, compact
-Proofkit v2 routes, identity runtime, configuration lifecycle APIs, CI economics
-v1 and thin four-artifact target control. Exact-head public CI and independently
-admitted fallback/selected canaries remain required. No former private canary,
-publication, five-minute completion or CPU-saving receipt is carried forward.
+| ID | Work And Closure | Depends On |
+| --- | --- | --- |
+| CI-017 | **open** whole-workflow discovery including the admitted GitHub.com `$/` and `./` same-repository call forms, caller-commit resolution, missing/cyclic/deep/unknown edges and provider-profile boundaries. Present entrypoints and components, not underscore-based classification. [Adoption acceptance](docs/features/recovered-work-admission.md). | Current provider semantics; no inferred GHES support |
+| CI-018 | **open** review of an already registered custom policy epoch, distinct from rediscovered proposals. Bind exact epoch, actor/reviewer, source/inventory, active baseline and one-use handoff through callback, registration, activation, replay and races. Never activate by direct database writes or drop rules/default-branch semantics. [Adoption acceptance](docs/features/recovered-work-admission.md). | CI-017 when its graph is needed; CI-055 before incompatible signing |
+| CI-019 | **open** complete API-first configuration and equivalent UI journeys: import/export, files, validation, dry-run, semantic diff, registration, review, hot activation, rollback and bounded status. Separate visibility, observation and command authority; no hidden UI-only policy. [Configuration lifecycle](docs/features/api-first-configuration-lifecycle.md). | CI-018 for custom epochs |
+| CI-020 | **open** deterministic workflow-adaptation recommendations under explicit support profiles, including already unmodified workflows. Explain unsupported/unknown semantics and minimal consumer changes; optional agent advice cannot invent safe coverage or modify a consumer without approval. [Universal adoption](docs/features/universal-workflow-adoption.md). | CI-017, CI-019 |
+| CI-021 | **open** current installation/organization discovery qualification and O1 capability diagnostics: exact grants, webhook observation, reconciliation freshness/gaps, provider limits, trust keys and next action through API/UI. No mutable duplicate readiness flag; denial is not empty inventory or broken webhook proof. [O1](docs/features/ci-operator-capability-completion-plan.md#o1-capability-diagnostics). | CI-062 for live provider facts |
+| CI-022 | **open** O2 reusable/action dependency passport with exact caller/callee/action/tool revisions, authorized reverse consumers and distinct observed usage. Moving tags cannot rewrite past resolution; incomplete graphs cannot report no consumers. [O2](docs/features/ci-operator-capability-completion-plan.md#o2-reusable-dependency-passport). | CI-017; no second parser |
+| CI-023 | **qualify** task navigation, catalog/repository views, collapsible sidebar and user control, icon/text spacing, symmetric viewport padding and long/similar identities visible beside actions. Preserve drafts appropriately, stale-response barriers, keyboard focus and mobile return paths. [Operator navigation](docs/features/operator-navigation.md), [layout](docs/features/operator-console-layout.md). | CI-015 for renewed-session journeys |
+| CI-024 | **open** polished repository/history scanning progress from actual lifecycle/checkpoints, with active scope, counters, gap/failure states, pause/resume/cancel and reduced motion. No percentage or ETA without a valid denominator; no presentation-owned success. | CI-007/CI-009 for historical population; CI-023 |
+| CI-025 | **open** consistent visual system, accessible loading/empty/partial/stale/denied/error recovery and useful task-level UX. Verify real browser, screenshots and supported mobile/desktop scope; synthetic README imagery stays synthetic, including Bart Simpson. Charts belong to CI-032/CI-033, not an independent metrics system. | Current backend capabilities; CI-023 |
+| CI-026 | **open** complete Diataxis tutorial/how-to/API/CLI/reference and architecture overview for real administrator journeys. Qualify Mermaid semantics, native rendering and actual GitHub display separately; no stale manual setup steps or additional task queue in documentation. | CI-019; follow implemented scenarios incrementally |
 
-The 2026-09-05 adjudication identified stale pre-lock lease time, missing
-economics runtime schema attestation, history-dependent override admission,
-probe/ingress/revocation recovery, bounded failure diagnostics and UI recovery.
-B1 below records the implemented lease-time and attestation repair. Current
-remaining work is scoped by the batch and phase rows, rather than replaying
-that historical finding list as a new implementation queue.
-CodeQL absence and GitHub PKCE non-support are refuted. Port counts, large
-files, library names and historical versions do not prove architectural defects.
-Keep the modular monolith and same-store CQRS unless measured constraints
-justify a stronger boundary.
+### B4: Analytics And External Collaboration
 
-### Immediate repair batches
+State: open; telemetry and advice never authorize omission or credential broadening.
 
-The [evidence-led closure plan](docs/features/evidence-led-operational-closure-implementation-plan.md)
-owns changed files, protected behavior, alternatives and acceptance witnesses:
+| ID | Work And Closure | Depends On |
+| --- | --- | --- |
+| CI-027 | **open** complete logically useful measurement and provenance: actual CPU, runner occupancy, wall/queue/setup time, retry/shard/cache and collection coverage. Bind units, source, population, denominator, missing/reset counters and finite query/retention costs; workflow completion is observed via durable events plus provider reconciliation, not trusted arbitrary reports. | Existing collection; optional instrumentation admitted separately |
+| CI-028 | **qualify** requested/admitted/completed route separation and exact completion-bound comparison contracts through native positive/negative cases. Preserve compatible source/runner/cache/window cohorts, negative/unknown results and distinct CPU/billing/estimates. CI-005 separately owns real paired experiments and measured saving claims. [Measured comparisons](docs/features/ci-economics-measured-comparisons.md). | CI-027 |
+| CI-029 | **open** permanent job statistics and usable period/workflow/logical-job/purpose filters, including linter trends. Version bounded category mappings, preserve unknown/mixed jobs and definition/matrix/runner changes; overlaps cannot double-count duration. [Purpose configuration](docs/features/analytics-purpose-configuration.md). | CI-010, CI-027 |
+| CI-030 | **open** useful cost/usage forecasts: qualify and reuse the existing [occupancy forecast](docs/features/archive-analytics-product.md), then separately admit and implement only the missing monetary/tariff/currency/quota delta. Preserve configurable periods, uncertainty and time-ordered backtests; suppress unsupported estimates and distinguish spend from causal savings or fixed-runner cost reduction. A delivered occupancy model does not prove tariff support. | CI-027, CI-029 |
+| CI-031 | **open** calibrated gradual/abrupt duration-regression and budget signals: stable cohorts, effect/sample/persistence thresholds, hysteresis, deduplication and recovery. Distinguish code and runner hypotheses using matched inputs and independent controls; correlation alone is not diagnosis. | CI-027, CI-029 |
+| CI-032 | **open** O3 organization/repository optimization overview, useful graphs and drill-down to contributing runs, filters, attention list and table equivalents. Expose source, uncertainty, coverage and denominators; bound queries/rendering and prevent cross-repository cohort mixing. [O3](docs/features/ci-operator-capability-completion-plan.md#o3-optimization-portfolio). | CI-027; CI-029/CI-030/CI-031 only for their respective views |
+| CI-033 | **open** read-only pipeline visualization separating declared graph, selected plan and observed timeline. Expand reusable/matrix/retry nodes without duplicated totals, show unknown edges and provide keyboard/table equivalents. Choose HTML/SVG/library/canvas from measured need; do not render provider-supplied SVG/HTML or invent an editor. | CI-017, CI-022, CI-027 |
+| CI-034 | **open** O4 bounded test-result acquisition and reliable test-history semantics, initially one needed native/JUnit format. Bind test/parameter/run/attempt/tool/environment identities, reject unsafe parsing, keep retries and missing coverage distinct, and prove any flake attribution before presenting it as a fact. [O4](docs/features/ci-operator-capability-completion-plan.md#o4-test-reliability). | CI-027, CI-010 |
+| CI-035 | **open** O5 actionable durable subscriptions/notifications with scope, idempotent delivery, acknowledgement, retry/recovery, bounded cost and source freshness. Qualify actual delivery and history-specific alert fixtures; preserve service-level paging versus replica drilldown semantics. [O5](docs/features/ci-operator-capability-completion-plan.md#o5-actionable-notifications). | Existing signals; CI-031 for new regression signals |
+| CI-036 | **open** optional external review-bot command and read API: any admitted block/depth, exact revision/registry, scoped identity, idempotency, rate limits and repository/economics evidence. Bot absence leaves normal CI unchanged; commands only increase checks and never widen credentials or bypass target ownership. | CI-019, CI-027; admitted command registry |
+| CI-037 | **open** O6 source-bound analysis adapters and optional outgoing requests for informational assistance. Study the actual agent endpoint, opt in per scope, allowlist destinations, bound egress/context/time/results, redact secrets and prevent recursion. Advice is inert and stale-aware; execution uses CI-036. [O6](docs/features/ci-operator-capability-completion-plan.md#o6-external-analysis-adapters). | CI-036 for suggested execution, not read-only display |
+| CI-038 | **open** truthful PR-visible check/evidence summaries and agent-readable reports. Match exact source/run/attempt, distinguish skipped/missing/cancelled/N-A, and admit provider-write authority separately. Before mutation, implement reserved/uncertain/reconciled-or-reissued outcomes with generation fencing and audit; read-only integration needs no dormant effect framework. | CI-027, CI-036; explicit write profile |
 
-| Batch            | Objective                                                                         | Completion boundary                                                                                                               |
-|------------------|-----------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
-| B1 (implemented) | Restore exact lease-time authority and complete runtime capability attestation    | PR #125 merged after exact-head PostgreSQL race/tamper witnesses and Full Check; no new omission authority or live rollout claim. |
-| B2               | Recoverable bounded ingress, liveness, revocation and diagnostics                 | Code-level overload/crash/cancellation proofs; live Swarm/provider validation remains E1.                                         |
-| B3               | Measure and reduce database, duplicate-test, mutation and toolchain cost          | Comparable before/after measurements with complete oracle, canonical-byte and drift-detection preservation.                       |
-| B4               | Rendering recovery, accessibility, API-first operator journeys and visual quality | Risk-based component/browser witnesses and usable UI/API/CLI documentation.                                                       |
-| B5               | Current documentation/profile routing, security intelligence and maintenance      | Incremental touched-scope closure; preserve historical designs and zero-approval sole-maintainer policy.                          |
+### B5: Sound Dynamic Execution And Enforcement
 
-B1 precedes hot-path optimization. B2 and B3 precede broad pilot expansion.
-B5 accompanies touched batches instead of creating a separate endless cleanup
-chain. B4 shares delivery with D5-D7 below. A finding marked risk or improvement
-requires validation before implementation; it is not a mandatory new mechanism.
+State: open; selected execution and production omission have separate admission.
 
-The [response-owned freshness slice](docs/features/refresh-result-freshness.md)
-and its [plan](docs/features/refresh-result-freshness-implementation-plan.md)
-own T1/T7: a cancelled waiter cannot renew old discovery/key evidence, and
-post-refresh Keycloak admission retains the cache-hit current-URI rule.
-PRs #131-133 close the bounded FIFO/retention liveness, causal DB-lock and
-mutation/Node oracle, and failed-refresh retry-budget slices with native proof.
-PR #134 adds the [webhook recovery contract](docs/features/webhook-recovery-boundaries.md),
-bounded delivery warning and operator procedure; its exact candidate and
-post-merge Full Checks passed. These slices do not close B2's pending
-late-login/logout decision or live provider-delivery qualification,
-nor B3's measured database/sharding/toolchain cost work.
-The multi-repository pilot must also qualify overlapping webhook bursts,
-including eight simultaneous developers across two repositories. Current
-process admission permits one CPU-bound preparation and rejects overlap; async
-background workers do not prove ingress capacity. Preserve bounded memory and
-durable acknowledgement while evaluating bounded buffering/admission,
-cross-repository fairness and explicit failed-delivery recovery. GitHub does
-not automatically redeliver failed webhooks. Measure acceptance, recovery,
-queue age and latency before claiming loss-free or efficient burst handling;
-do not widen process concurrency without its payload-memory budget.
-The [asynchronous processing workstream](#webhook-concurrency-and-asynchronous-processing)
-owns this design and its performance qualification.
-T6's stale version copy is replaced by a link to the exact dependency owner;
-T12's DB cost and T16's shared-input completeness still require their existing
-B3/E1 and D2/E2 evidence.
+| ID | Work And Closure | Depends On |
+| --- | --- | --- |
+| CI-039 | **open** pre-CI unsigned candidate preparation where measured benefit exceeds context-only preparation. Key every policy/input/graph operand, share bounded storage, re-admit current authority/overrides/capacity at consumption and fall back immediately on miss/expiry/failure. No fabricated run identity or duplicate cache. | CI-044; [preparation contract](docs/features/pre-ci-context-preparation.md) |
+| CI-040 | **open** independently justified input/dependency closure for deploy builds, Compose rendering, scripts/generated inputs, tools/actions/data and transitive external revisions. A digest is not completeness proof; remove a real known-path edge as a negative control. Unknown or incomplete closure keeps FullCI. | CI-017, CI-022; current semantic owners |
+| CI-041 | **open** sound result reuse bound to exact subject, epoch, task, tool/environment/input and admitted compatibility. Separate omission/reuse/execution proof and preserve independent fallback; no global receipt from another subject or lifetime extension by archive retention. | CI-040, CI-044, CI-045 |
+| CI-042 | **open** eligible-runner adaptive shards under exact labels/groups/shared-pool capacity, setup cost and bounded scheduler overhead. Compare small cases with an exact oracle; LPT is a heuristic, not globally optimal. Preserve complete disjoint work and no inferred CPU from predicted duration. | CI-027, CI-040; current capacity contracts |
+| CI-043 | **open** qualify thin clients and an optional reusable-block library with caller/callee trust, packaging, secrets/environment restrictions, final-gate identity and definition-resolution fallback. Before extraction, prove one portable block on two distinct synthetic profiles; keep consumer policy local and do not create external repositories without authorization. | CI-004, CI-017, CI-022, CI-040 |
+| CI-044 | **open** independent planner/omission verification and declared adapter applicability. A replay sharing the same defect is not an independent oracle; unsupported topology remains full-only or rejected. Preserve fixed-coordinate protocol boundaries until a supported-profile successor is admitted. [Selective safety](docs/features/selective-planning-safety.md). | CI-001; current requirements and causal controls |
+| CI-045 | **open** bounded structured decision provenance through planner, verifier, stored evidence and replay: repository/request/diff/config/compiled-effective policy/graph/decision/reasons. Mutating any independent coordinate must alter identity or reject; admit codec migration and fallback consistency explicitly. | CI-044; [adoption acceptance](docs/features/recovered-work-admission.md) |
+| CI-046 | **qualify** additional explicitly consenting consumer archetypes after the own-CI pilot: application, extension and reporting workloads as needed. Obtain fresh App/source/workflow/profile/runner evidence and paired observations; no former private installation or consumer edit is authorized by this list. | CI-003, CI-004, CI-005; CI-043 for reusable profiles |
+| CI-047 | **qualify** limited production omission through exact external receipts, non-vacuous shadow/paired evidence, independent target-authority relation, generation cutover and old authority/execution/replica drain. Verify explicit activation, rollback and kill switch. Unknown evidence never becomes readiness through a score. | CI-002, CI-004, CI-040-CI-046 for admitted scope; CI-059, CI-062, CI-067-CI-069 |
 
-The [target-local requester slice](docs/features/target-local-plan-requester.md)
-and [plan](docs/features/target-local-plan-requester-implementation-plan.md)
-address D2's independent external-repository resolution dependency without
-granting target code OIDC authority. Exact caller/callee identity and packaged
-requester bytes remain required; target-owned FullCI is conditional on the own
-workflow graph, runner admission and absence of cancellation. This slice does
-not close pre-CI plan preparation, reuse, deploy-input closure or live pilots.
+### B6: Repository And Environment Lifecycle
 
-PR #135 delivered that requester slice; exact-head and post-merge Full Checks
-passed. The next [pre-CI context preparation](docs/features/pre-ci-context-preparation.md)
-and [plan](docs/features/pre-ci-context-preparation-implementation-plan.md)
-use webhook lead time for bounded speculative acquisition. Cache loss and
-misses preserve request-time acquisition; no cache entry authorizes omission.
-This remains distinct from complete pre-CI plans, input closure, reuse and
-measured savings. Shared durable preparation needs measured replica/retention
-benefit before adding storage and lifecycle cost.
+State: open; lifecycle policy does not override provider facts or required gates.
 
-The [recoverable service boundaries slice](docs/features/recoverable-service-boundaries.md)
-implements B2 liveness, private diagnostics, missing-telemetry alerts and local
-provisioning secret custody. Its [plan](docs/features/recoverable-service-boundaries-implementation-plan.md)
-does not close B2 webhook recovery, revocation, edge-policy or live drain work.
+| ID | Work And Closure | Depends On |
+| --- | --- | --- |
+| CI-048 | **open** revision-bound draft stages beyond the provider draft flag, with explicit stage transitions, permissions and checks. Preserve provider draft state, branch protection and exact merge readiness; do not introduce bypasses disguised as workflow flexibility. | Existing governance/identity; [lifecycle design](docs/features/governance-drift-release-evidence.md) |
+| CI-049 | **open** related/stacked PR dependency ordering, changed-base invalidation and independently admitted transitions. Make cycles, missing dependencies, stale evidence and downstream changes explicit without merging on another PR's receipt. | CI-048 |
+| CI-050 | **open** continuous governance drift against approved durable baselines, current provider rules and exact comparison. Reuse observation/baseline/comparison source, qualify scheduling and operator recovery, and route meaningful notifications through CI-035. | CI-021; current governance owners |
+| CI-051 | **open** least-privilege credential and incident-risk profiles for forks, privileged blocks and external effects. Deterministic AllPermissions is not least privilege; bind necessity, custody, revocation, uncertainty and explicit incident actions. | Current credential planes; CI-036/CI-038 for their extensions |
+| CI-052 | **open** release/environment bindings and multi-environment ownership. One shared control plane may coordinate many environments; independent test coordinators need separate data, credentials and authority, not a label alone. Apply per-copy/full-row transfer safeguards only to actual authority transfers. | CI-002, CI-051; CI-065 for changed boundary contracts |
+| CI-053 | **open** remaining local developer lifecycle and safe multi-worktree `dev:list`/`dev:prune`: dynamic/conflict-free resources, explicit ownership, dry-run, approved destruction and usable mise/dev-container commands. Preserve credentials/volumes across normal upgrades; add Make only for demonstrated value. | Current developer environment contracts |
 
-The [covered persistence single pass](docs/features/covered-persistence-single-pass.md)
-removes duplicated PostgreSQL execution from the GitHub job while retaining the
-complete coverage run and distinct aggregate command environments. Its
-[plan](docs/features/covered-persistence-single-pass-implementation-plan.md)
-keeps native oracle parity and measured elapsed time separate from CPU savings;
-it does not close the remaining B3 database, sharding or toolchain work.
+### B7: Engineering And Operational Qualification
 
-The [cleanup fixture preparation](docs/features/cleanup-fixture-preparation.md)
-and its [plan](docs/features/cleanup-fixture-preparation-plan.md) reduce repeated
-test-only transaction admission while retaining the maximum cleanup population
-and its runtime-principal oracle. Native equivalence and separately measured
-preparation/cleanup cost remain required before claiming acceleration. This
-shares operational-validation delivery with history alerts, not their semantics.
+State: open; hypothesis validation, source repair and external qualification remain separate.
 
-The [coverage cost attribution](docs/features/coverage-cost-attribution.md)
-and its [plan](docs/features/coverage-cost-attribution-implementation-plan.md)
-continue B3 with complete native test-phase timings before selecting a causal
-optimization. The first complete report selects equivalent native byte counting,
-isolated copies of one expensive test seed and bounded overflow-case names.
-Native before/after validation remains required; neither reporting nor a
-source-level equivalence argument proves measured speedup or CPU savings.
+| ID | Work And Closure | Depends On |
+| --- | --- | --- |
+| CI-054 | **validate** all residual admitted audit findings, including the 180 unresolved predicate mappings from two retained legacy inputs. Match current owner and falsifier, merge duplicates and preserve scoped rejection triggers; do not recreate retired TypeScript. Regenerate current SARIF when needed; deleted report `3ed45d...` is retired-unadjudicated, not a passing review. [Audit acceptance](docs/features/assurance-audit-hardening-plan.md). | Exact current snapshot; no required reconstruction of deleted reports |
+| CI-055 | **open** confirmed plan lifetime mismatch: producer settings admit 3600 seconds while the target accepts at most 300 absent a tighter authority clamp. Admit a compatible producer/consumer intersection, preserve the security window and exercise settings -> signer -> actual target at 1/300/301/over-limit, with/without clamp. | Current signing/target owners; before affected selected execution |
+| CI-056 | **validate** unjustified abstractions, ownership/co-location, test duplication and contract size. Check the unused `ReconciliationPublisher` against real consumers before removal; prefer existing Pydantic/FastAPI/standard-library capabilities where behavior is preserved. Metrics select review, not god-file verdicts; no indiscriminate DTO/repository classes or whole rewrite. | CI-054; exact invariants and protected observations |
+| CI-057 | **validate** the current shared dynamic-CI blueprint against own-CI requirements and native consumed-input/evidence inventories. Freeze the candidate, disposition every applicable validation class, implement only real gaps, preserve independent baseline and profile coverage before self-optimization. Existing CF01/CF03 source repairs are not the entire comparison. | CI-001; [input coverage](docs/features/own-ci-input-coverage.md) |
+| CI-058 | **qualify** PostgreSQL contracts and the 225-scenario intake on current source: coherent observations, total collection-state checks/forward migrations and native query-plan/cardinality/concurrency controls. Source repairs do not prove deployment workloads, maintenance or memory; those measurements belong to CI-067/CI-069. Tune only measured counterexamples. | CI-014 for changed concurrent paths |
+| CI-059 | **qualify** project-specific FastAPI Production context/conformance against the exact selected sealed profile. Keep applicable, N/A and unknown distinct, include edge/proxy/abuse control, cancellation, serialization and capacity evidence; not implementing financial FAPI does not reject this profile. | [Profile owner](docs/architecture/cross-cutting/fastapi-production-assurance.md); CI-062, CI-068, CI-069 |
+| CI-060 | **qualify** delivered userspace and minimal runtime image: bounded in-image pytest subset, exact Python/libc/native libraries, functional/performance/memory comparison and fast reproducible rebuild. Renew narrow digest/file/patch/test/expiry-bound security repairs; new unsupported High/Critical/Unknown stays blocking. Size is an outcome, not a speed/correctness waiver. | [Runtime qualification](docs/features/runtime-base-qualification.md); current source/security evidence |
+| CI-061 | **open** residual proof-integrity qualification: actual analyzer/database snapshot, cost-hint provenance, complete library-copy inventory, admitted import root under optimization/path variations, consumed input versus assigned command, critical negative controls and final-artifact scanning. Preserve independent expected manifests, exact error causes and malformed/missing/truncated rejection. Only the applicable required image/admission subset blocks CI-002; closure of the whole legacy-audit task CI-054 is not a prerequisite. [Audit criteria](docs/features/assurance-audit-hardening-plan.md). | Current accepted source-bound predicates and native routes |
+| CI-062 | **qualify** a freshly authorized non-enforcing environment for this repository: ingress/webhook, App/installations, least-privilege grants, OIDC/JWKS, Keycloak administrator login, database access, package/attestation trust and immutable task digest. Reconcile live versus saved stack before update/rollback. Bounded pilot admission is not the full operational qualification separately owned by CI-067-CI-069. | CI-002; administrator access |
+| CI-063 | **qualify** current stable dependencies and pinned runtime/toolchain, including seven consumed Proofkit commands, malformed/unsupported inputs, platform locks and actual Pydantic/FastAPI use. Evidence of an update must preserve consumer behavior; no global SOTA from recency or library presence. | Current dependency profiles and policy; scoped native compatibility |
+| CI-064 | **qualify** open-source privacy/licensing/security: neutral source/docs/fixtures/screenshots, Apache-2.0 and third-party obligations, secret scans, appropriate telemetry/data retention and absence of private artifacts in export. Historical identifiers in private recovery are not distributable assets. | [Portability contract](docs/features/open-source-portability.md); CI-010/CI-011 for data guarantees |
+| CI-065 | **validate** boundary-specific contract/lineage/authority-epoch and browser-proof architecture candidates against local ownership and existing enforcement. Compare cheaper alternatives, per-copy durable conservation, full-row independent inventories and fenced uncertain effects only where applicable. Adopt real deltas with user-visible business choices, migrations and falsifiers. | [Contract comparison](#d9-c1-contract-and-testing-architecture-comparison); no foreign-project change |
+| CI-066 | **open** useful bounded private diagnostics with source coordinates/build identity/correlation while excluding messages, arguments, locals, secrets and raw provider data. Distinguish same-type failures without log storms or unbounded labels; no new generic error framework merely for aesthetics. | Current diagnostic owner; redaction and distinguishability controls |
+| CI-067 | **qualify** database platform, TLS/primary/ACL/schema and existing-data migration, explicit text semantics, safe provisioner credentials, backup/restore and independent integrity/access/RPO/RTO evidence. A CLI, fresh database or artificial downgrade is not restore proof. | Current DB platform baseline; admitted operational environment |
+| CI-068 | **qualify** all-replica secret/signing/emergency-bearer rotation, custody, expiry/revocation, shutdown, bounded cleanup, rollout and compatible rollback. Live state and saved declarations must agree; no neighboring application data may be changed by qualification. | CI-062, CI-067 |
+| CI-069 | **qualify** composed failure and capacity envelope: independent offered arrivals, COMMIT/ack response loss, crashes/cancellation/reclaim, saturated pools/queues, dependent-service outage, rolling deploy and recovery. Measure all outcomes, queue age, CPU/RSS and drain; eight developers/two repositories is a scenario, not a proven ceiling. | CI-014, CI-058, CI-066; authorized workload and independent state reads |
+| CI-070 | **open** final release qualification of the owner-authorized public source, with current exact-source CI, package/release/deployment authority and explicit residual limits. Source visibility was authorized and enabled on 2026-09-23; it does not close this release task. Verify no private history, caches, external reports or former receipts escape. Do not waive unresolved release blockers with a score. | Required scoped product/qualification tasks, CI-064; excludes conditional/optional extensions |
 
-The [immutable evidence fixture lifetime](docs/features/immutable-evidence-fixture-lifetime.md)
-and its [plan](docs/features/immutable-evidence-fixture-lifetime-implementation-plan.md)
-extend that measured B3 work to four production-evidence test cohorts. Module
-seeds retain per-case isolated copies and real admission calls. Exact native
-phase comparison and complete oracle preservation remain acceptance gates;
-this does not change product behavior or establish CPU savings.
+### B8: Conditional Extensions And Chat Last
 
-The [HTTP import-startup repair](docs/features/http-import-startup.md) and its
-[plan](docs/features/http-import-startup-implementation-plan.md) remove eager
-application imports from the transport namespace after repeated HA01 baseline
-watchdog failures. Preserve all native and mutation oracles and their budgets;
-isolated import-closure proof and exact native timing qualify the change, not a
-successful retry alone. Remaining pytest, router, setup and teardown costs stay
-open if measured failures continue.
+State: conditional; none of these items blocks the required product's independent operation.
 
-The [operator recovery slice](docs/features/operator-recovery-and-feedback.md)
-implements B4 render recovery, field-specific scope errors and accessible full
-identifiers. Its [plan](docs/features/operator-recovery-and-feedback-implementation-plan.md)
-does not close the remaining API-first journeys, product UI or documentation.
+| ID | Work And Closure | Depends On |
+| --- | --- | --- |
+| CI-071 | **conditional** typed DSL, central dispatch or an embedded model executor/evaluator only after demonstrated unmet demand and cheaper-alternative comparison. Reusable libraries do not require central dispatch. Qualify new failure/authority/credential boundaries or explicitly reject the extension with revision triggers. | Required deterministic product; no assumed new repository or service |
+| CI-072 | **optional-last** UI configuration chat after the other agreed product, repair, pilot and qualification work. Prefer existing external assistance; allow explanations and schema-constrained drafts with explicit confirmation and deterministic admission, never model-owned mutation. | All required tasks; CI-037 where sufficient |
 
-### Remaining product sequence
+## Detailed Acceptance References
 
-The user's live UI feedback advances the bounded D7/B4
-[task-navigation repair](docs/features/operator-navigation.md) and its
-[implementation plan](docs/features/operator-navigation-implementation-plan.md):
-replace the all-capability feed with catalog and repository task views, related
-evidence tabs, readable sidebar/mobile navigation and preserved draft/retry
-state. This source-only UI batch is independent of D4 economics storage work;
-neither batch is complete until its own native evidence closes. The UI chat
-remains the final optional item.
+The sections below preserve source requirements that are not replaceable by a
+short task title. They are contracts and falsifiers for the register, not a
+second schedule. Historical PRs, dates and legacy B/D/E labels are context only;
+their successful observations do not qualify the new source. Current task state
+and order always come from the `CI-` rows above. A new obligation discovered here
+must be assigned to an existing task or admitted explicitly into that register.
 
-The [successor authority design](docs/features/generation-fenced-production-authority.md)
-and [implementation plan](docs/features/generation-fenced-production-authority-implementation-plan.md)
-define D3's atomic authority transition, separate registration from activation
-and retain independent FullCI. The source includes receipts, bounded staging,
-persistence, local drain, current-provider binding, generation fencing and API
-contracts. Former private merge, CI, release and deployment receipts are removed.
-The public source still needs exact-target qualification; operational activation,
-external drain and measured capacity remain separately admitted obligations.
+Core controls apply throughout: exact identity/freshness and replay; bounded
+resources and deadlines; fail-closed unknowns; least privilege/fork isolation;
+separate provider facts and policy stages; rollback before enforcement;
+independent expectation and negative controls; no claimed speedup, optimality,
+CPU savings or readiness from LOC, green counts or architectural names alone.
 
-The economics and session-recovery source owners retain their implementation
-requirements and remaining work. Former private merge, run, migration, login,
-release and rollout receipts are removed; public qualification is pending.
-Preserve independent source registration, scoped command CPU reports, exact-ID
-reads, explicit pair comparison, budgets, safe session recovery and non-replay
-of mutations. Capacity, consumer savings, durable alerting/subscriptions,
-cohort browsing and queue/cache/shard/retry statistics remain open D4/D7 work.
-
-Source routes: [deployment entrypoint repair](docs/features/deployment-entrypoint-admission.md), [plan](docs/features/deployment-entrypoint-admission-implementation-plan.md), [measured comparisons](docs/features/ci-economics-measured-comparisons.md), [ordered implementation plan](docs/features/ci-economics-measured-comparisons-implementation-plan.md), [economics operator console](docs/features/economics-operator-console.md), [plan](docs/features/economics-operator-console-implementation-plan.md), [console layout repair](docs/features/operator-console-layout.md), [plan](docs/features/operator-console-layout-implementation-plan.md), [bounded recovery design](docs/features/browser-session-recovery.md), [plan](docs/features/browser-session-recovery-implementation-plan.md).
-
-The successor [workspace session continuity](docs/features/workspace-session-continuity.md)
-and [plan](docs/features/workspace-session-continuity-plan.md) preserve finite
-Economics/Activity tab coordinates through renewal and use UTC Activity labels.
-Old authority, commands and drafts remain invalidated; this does not lengthen
-sessions or restore arbitrary form state. Native and live qualification remain
-separate from source delivery.
-
-The [isolated Node admission slice](docs/features/isolated-node-executable-admission.md)
-addresses B3's context-sensitive shim defect before target execution; its
-[plan](docs/features/isolated-node-executable-admission-implementation-plan.md)
-preserves consumer authority and does not close database or sharding work.
-
-| Phase                             | Remaining work                                                                                                                                                                                                                                                                                                          | Exit condition                                                                                                                                                                                                        |
-|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| D1: Current foundation            | Preserve implemented B1 and complete remaining B2 work, synchronize `deployment-admitted CI Coordinator` App/profile routes, validate dependency-bot updates and residual audit status.                                                                                                                                                 | Correctness witnesses close; current projections agree; no deployment claims from code alone.                                                                                                                         |
-| D2: Effective dynamic execution   | Pre-CI planning; independent timeout-bound FullCI even when a remote reusable component cannot resolve; deploy/Compose input closure; sound reuse; exact target inventory and eligible-runner adaptive shards.                                                                                                          | Unknown inputs run FullCI or explicitly fail; selected union covers every required target; local laboratory distinguishes synthetic from executed lanes.                                                              |
-| D3: Successor authority           | Source delivery complete through PR #137 and exact post-merge proof for `REQ-CI-RUNTIME-030`; preserve its contracts during later changes.                                                                                                                                                                              | E3 still requires live old-authority, execution and replica drain before activation; code delivery does not discharge these obligations.                                                                              |
-| D4: Economics and regressions     | B3 plus actual CPU or explicitly labelled estimates, paired saved-compute evidence, queue/cache/shard/retry statistics, budgets and regression alerts; D4-H1 historical import and source availability; D4/D7-V1 dashboards and pipeline views; D4/D7-F1 decision-useful forecasts and degradation attribution below.   | Every metric has provenance, finite cost/cardinality, privacy and uncertainty; telemetry cannot weaken planning.                                                                                                      |
-| D5: API-first adoption            | Complete operation parity, deterministic workflow-adaptation recommendations, files/dry-run/diff/registration/hot activation/rollback/export and bounded scoped reads.                                                                                                                                                  | Repositories can be configured without UI; ambiguous workflows produce explicit unknowns, not invented safe plans.                                                                                                    |
-| D6: Optional external bot         | Authenticated monotonic commands for any admitted block/depth, bounded repository/economics read API, truthful PR evidence reports and optional outbound requests for informational assistance from an external review bot/agent.                                                                                       | Bot absence changes nothing; stale/replayed commands cannot reduce validation or broaden credentials. Remote writes receive uncertainty recovery and generation fencing. Advisory responses cannot authorize effects. |
-| D7: Operator product              | B4: practical attractive responsive UI, accessible errors/navigation, clear evidence hierarchy, D4/D7-V1 dashboard and pipeline visualization, glossary, Diataxis tutorial/how-to/reference and current visual architecture.                                                                                            | Complete journeys share backend policy and work without hidden manual steps; supported browser/accessibility scope is tested.                                                                                         |
-| D8: Remaining capability coverage | Draft lifecycle/stages and related-PR ordering; continuous governance drift; credential/incident-risk profiles; release evidence; environment bindings; bounded `dev:list`/`dev:prune`.                                                                                                                                 | Each admitted capability has native contracts/oracles; resource cleanup requires full identity/label ownership, dry-run and explicit destructive approval.                                                            |
-| D9: Release qualification closure | B5 and residual port/abstraction/test/specification review; D9-C1 pilot target contract/testing architecture comparison; TypeScript signal precision; library compatibility; product SLOs; FastAPI Production context/conformance; tenancy, privacy/deletion, licensing, platform, language, browser and data-residency scope. | No unresolved release-blocking defect in the admitted scope; unknown external receipts remain explicit, never converted to readiness by a score.                                                                      |
-
-Complete independent code work while external access is blocked. Do not add
-another whole-repository rewrite to close an unmeasured optimization candidate.
-When touching a proven co-ownership defect, include a safe owner-scoped
-decomposition; otherwise retain the boundary until an alternative is proved
-preferable. Coverage, route count, LOC and review-agent count are not progress
-or production-readiness measures.
-
-### Snapshot Audit Follow-Up
-
-| Existing phase               | Next scoped work                                                                                                                                                                                                                                                                          | Acceptance boundary                                                                                                                                                                                                                      |
-|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| D1/D9 (delivered in PR #162) | Retain public worker-identity admission and private-import enforcement, personalized override cache policy and actual registered-template labels.                                                                                                                                         | Constructor rejection, authentication, HTTP bodies and public-asset caching are preserved. Native witnesses compare an independent mounted public catalog with exported labels and reject a missing capture without admitting raw paths. |
-| D1/D4                        | TEST-05 empty callable-lane oracle is delivered in PR #162. Complete named temporal budgets with explicit clock origins, cooperative abort/read/write boundaries and drain stop reasons.                                                                                                  | No 16-claim empty spin; no false theorem from `20 < 45 < 55 < 60`; SQL-time fencing remains mandatory. Normal bounded-turn completion is not provider success or backlog completion.                                                     |
-| D4-H1/D9                     | Existing detail/read/erasure and old-rerun recovery; precise inbox/source versus detail/attempt race tests; evaluate physical lease/FK strengthening.                                                                                                                                     | Do not couple ephemeral-source deletion to permanent details, assume raw DDL implies application misdelivery, or add wide indexes without an owner need/cost comparison. Use forward migrations after merged revision `0011`.            |
-| D7/API                       | Non-default unequal-scope happy paths and field-specific timestamp oracles; explicit provenance before any independently composed status fragments.                                                                                                                                       | Existing coherent server status does not require duplicated epoch fields merely for appearance of independent validation. No change to status semantics without a new consumer/trust/lifecycle requirement.                              |
-| D4/E1                        | [History operational warnings and alert fixtures](docs/features/history-operational-alerts.md) supply source for five warnings, the seven missing named alert oracles and target drilldown. Native qualification, threshold calibration and actual notification delivery remain separate. | Existing rules and fixtures are retained. Service-level paging is unchanged; sampled observations do not prove exact backlog or loss, and exporter labels remain distinct from target labels.                                            |
-| D9/E1                        | Portable claim/evidence references, exact final-image advisory policy and combined workload/failure qualification.                                                                                                                                                                        | Missing provenance or measurements stays explicit; SBOM, source gates and bounded local loops do not prove production capacity or complete security.                                                                                     |
-
-Runtime-cycle review must distinguish TYPE_CHECKING edges from executable
-imports while retaining real source/type coupling. Revalidate conditional rows
-when owners, readers/writers, representations, clocks, alert routing or resource
-budgets change; do not promote this intake into a broad suppression register.
+The [audit acceptance](docs/features/assurance-audit-hardening-plan.md) and
+[adoption acceptance](docs/features/recovered-work-admission.md) retain exact
+source findings, already-delivered repairs and counterexamples. Preserve their
+clauses; do not replay completed private repair batches as new work.
 
 ### Webhook Concurrency And Asynchronous Processing
+
+Task owners: CI-014 (source/native behavior) and CI-069 (operational qualification).
 
 Required design and qualification, researched against authoritative Python,
 FastAPI, AnyIO, PostgreSQL and GitHub contracts current on2026-09-12. Complete
@@ -738,6 +318,8 @@ separate obligations, not a claim that burst capacity is already qualified.
    native CI proof from authorized Swarm load/operation evidence.
 
 ### D4-H1: Historical Import And Source Availability
+
+Task owners: CI-007-CI-013, with CI-029 for statistical categories.
 
 The [recorded gap recovery design](docs/features/history-gap-recovery.md) and
 [plan](docs/features/history-gap-recovery-plan.md) add explicit bounded retries
@@ -871,6 +453,8 @@ and [authentication-related 404 responses](https://docs.github.com/en/rest/using
 
 ### D4/D7-S1: Scanning Progress
 
+Task owner: CI-024; history denominators are supplied by CI-007/CI-009.
+
 Design and implement a polished scan animation for repository discovery and
 Actions-history import. Its state must follow retained or current operation
 evidence: queued, scanning, paused, retrying, interrupted, completed with gaps
@@ -884,6 +468,8 @@ before the UI can claim all-history progress. Animation is presentation, never
 an independent lifecycle authority.
 
 ### D4/D7-V1: Dashboard And Pipeline Views
+
+Task owners: CI-025, CI-032 and CI-033; no separate visualization backlog.
 
 The [analytics exploration increment](docs/features/analytics-exploration.md)
 and [delivery plan](docs/features/analytics-exploration-plan.md) group visible
@@ -939,6 +525,8 @@ the renderer or chart when a simpler representation answers the same question
 with lower operational and accessibility cost. No global UI optimum is claimed.
 
 ### D4/D7-F1: Forecasts And Degradation Attribution
+
+Task owners: CI-027-CI-031; presentation consumes those contracts through CI-032.
 
 Planned design and validation before justified implementation. Extend D4's
 measurement and budget owners and D7's analytics views; do not create a second
@@ -1002,6 +590,8 @@ savings, or causal runner diagnosis before these obligations are discharged.
 
 ### Administrator Activity And Authentication Audit
 
+Task owners: CI-015 and CI-016, with CI-067/CI-068 for external retention/custody.
+
 The 2026-09-09 source check found durable actor/time evidence for selected
 business mutations in the existing PostgreSQL audit ledger, but no complete
 administrator activity history. Browser login writes token-free session state;
@@ -1048,6 +638,8 @@ Swarm log retention; this slice does not close the whole security workstream.
 
 ### External Advisory Assistance
 
+Task owners: CI-036-CI-038; embedded chat remains CI-072.
+
 After the D6 scoped command/read contracts, design the reverse direction:
 Coordinator can request help from an operator-configured external review
 bot/agent through a protected internal API and receive an informational
@@ -1074,6 +666,8 @@ supply a future UI assistance surface; embedded UI chat stays last and may be
 unnecessary if the external service satisfies its requirements.
 
 ### D9-C1: Contract And Testing Architecture Comparison
+
+Task owners: CI-056 and CI-065; adopted deltas enter the existing capability task.
 
 Study candidate contract and testing improvements against Coordinator-owned
 invariants. This extends D9/B5 and informs D2 contract/effect work, D5 API
@@ -1134,6 +728,8 @@ explicit comparison scope. Preserve unresolved and deployment-only obligations.
 
 ### Own-CI Coverage And Measured Self-Optimization
 
+Task owners: CI-001-CI-006 and CI-057; enforcement remains CI-047.
+
 The current external blueprint is frozen at
 `a5c4d775207a6de30ab392bbd7ed9c70c427f596a5d5c849889dd6e83d05556f`.
 Its CF01/CF03 gaps are implemented by the bounded
@@ -1145,8 +741,11 @@ profile mapping, shadow measurement and operational omission remain open;
 this slice is not completion of the blueprint or self-optimization.
 
 Before D9/B5 closes own-CI validation, re-read and freeze the current external
-`dynamic-ci-review-architecture-blueprint.md` in the repository's parent
-directory. Treat it as candidate methodology, not canonical project authority.
+`dynamic-ci-review-architecture-blueprint.md`. Its historical location is not a
+checkout requirement; the private companion catalog records the input path and
+digest. Keep accepted predicates in repository-owned plans without publishing
+private historical payloads. Treat it as candidate methodology, not canonical
+project authority.
 Compare its applicable validation classes with current requirements, source
 risks and native CI witnesses. Record each class as covered, a confirmed gap,
 not applicable with rationale, or unresolved; include proof limits and cost.
@@ -1170,6 +769,9 @@ authority, unavailable planning or contradictory evidence must not produce a
 green result by omission. This work precedes the final optional UI chat.
 
 ### Administrator and deployment gates
+
+Task owners: CI-062/CI-067-CI-069 for environment qualification, CI-003/CI-046
+for pilots and CI-047 for enforcement. E1-E3 are evidence classes, not extra tasks.
 
 Former private ingress, signed deliveries, login sessions, App installations,
 allowlists, database observations and deployment receipts are not exported.
@@ -1218,6 +820,9 @@ authority transfer, not speculatively to every ordinary configuration edit.
 
 ### Active Delivery: Automatic Inventory And CI Efficiency
 
+Task owners: CI-021 and CI-006. The following source references do not identify
+a second current batch or carry forward previous qualification.
+
 The [inventory design](docs/features/automatic-app-inventory.md) and its
 [plan](docs/features/automatic-app-inventory-implementation-plan.md) define
 App-wide read discovery, bounded organization pages and deny-all command
@@ -1234,7 +839,9 @@ CPU-saving claims. Preserve database cleanup and temporal oracles; cheaper
 execution requires its own equivalence proof. Remaining product, pilot,
 release, deployment and optional-chat work stays open.
 
-### Conditional extensions
+### Observation And Access Qualification
+
+Task owners: CI-003, CI-007-CI-010, CI-015, CI-021, CI-027-CI-035.
 
 Current D4/D7 source work is [persistent per-report budgets](docs/features/economics-budget-policies.md)
 and its [plan](docs/features/economics-budget-policies-implementation-plan.md):
@@ -1277,6 +884,8 @@ implemented part of D4 storage.
 
 ### Failure Recovery Qualification
 
+Task owners: CI-066 and CI-069; isolated repairs do not close composed recovery.
+
 The additional2026-09-13 reliability review targets fefdeb38. Its unbounded
 overload/timeout response finding duplicates D04, repaired in PR160 with an
 absolute application deadline and permit release before failure sending.
@@ -1309,6 +918,28 @@ layers. Security redaction and reliable settlement remain higher priority than
 diagnostic convenience.
 
 ### Cross-Repository Reusable Workflows And Model Limits
+
+Task owners: CI-022, CI-040-CI-044, CI-046 and conditional CI-071.
+
+The [O2 dependency passport](docs/features/ci-operator-capability-completion-plan.md#o2-reusable-dependency-passport)
+projects exact caller/callee/action identities and authorized reverse-consumer
+references. It does not create a second parser or omission authority.
+
+The proposed organization-wide CI library belongs to B3/B5, after the current
+portability repairs. Extract portable check implementations, typed inputs and
+versioned result contracts, not this repository's complete matrix as a mandatory
+organizational policy. Consumer-owned manifests retain applicable checks, native
+test roots, required outcomes, budgets and coverage/security thresholds. Keep
+the catalog flat for selection and the execution DAG dependency-aware.
+
+Before repository extraction, qualify one shared block against two different
+synthetic consumer profiles with immutable caller/callee commits, minimal
+permissions, no inherited deployment secrets, native evidence artifacts and
+explicit missing/failed/cancelled/not-applicable outcomes. Test inaccessible
+library, changed library with unchanged application, fork PRs and final-gate
+identity. Bootstrap the coordinator first; create no external repository or
+consumer workflow changes merely from this planning entry. Reconsider extraction
+if the second consumer needs broad special cases or duplicates local policy.
 
 The2026-09-13 review intake is validated against the unchanged planning owners
 at fefdeb38 and the current archive repair. Its six observations are not six
@@ -1370,6 +1001,8 @@ requiring demonstrated demand and its own failure model. Neither delays D6's
 external bot APIs or moves UI chat ahead of its final priority.
 
 ### Final Optional Item: UI Configuration Chat
+
+Task owner: CI-072, last and optional.
 
 By the user's 2026-09-07 priority decision, implement the UI chat assistant only
 after all other agreed product, repair, quality, pilot and deployment work.

@@ -21,6 +21,7 @@ from ci_coordinator.audit_replay.replay import (
     AuditEventIdReplayFilter,
     SubjectAuditReplayFilter,
 )
+from ci_coordinator.persistence.errors import PersistenceInvariantViolation
 from ci_coordinator.replay_cli import (
     ReplayCliConfigurationError,
     ReplayCommand,
@@ -204,6 +205,46 @@ def test_storage_failure_closes_unit_of_work_and_engine() -> None:
     assert stderr.getvalue() == '{"code":"configuration_or_storage_failure"}\n'
     assert len(unit_of_work_factory.units) == 1
     assert unit_of_work_factory.units[0].exited
+    assert engine.disposed
+
+
+@pytest.mark.parametrize("failing_page", (0, 1, 2))
+def test_persisted_corruption_is_invalid_and_never_publishes_partial_output(
+    failing_page: int,
+) -> None:
+    failure = PersistenceInvariantViolation("private persisted evidence")
+
+    class CorruptRepository(_FakeAuditEventRepository):
+        async def load_page(
+            self, *, after_sequence: int, through_sequence: int, limit: int
+        ) -> tuple[AuditEventRecord, ...]:
+            page = await super().load_page(
+                after_sequence=after_sequence, through_sequence=through_sequence, limit=limit
+            )
+            if len(self.page_requests) == failing_page:
+                raise failure
+            return page
+
+    engine = _FakeEngine()
+    repository = CorruptRepository(
+        (_valid_event(),), snapshot_error=failure if failing_page == 0 else None
+    )
+    units = _FakeUnitOfWorkFactory(repository)
+    stdout, stderr = StringIO(), StringIO()
+    result = asyncio.run(
+        run_replay(
+            ("--database-dsn", "postgresql+psycopg://example/db", "--all"),
+            stdout=stdout,
+            stderr=stderr,
+            engine_factory=lambda _dsn: cast(AsyncEngine, engine),
+            unit_of_work_factory=units,
+        )
+    )
+    assert result == 4
+    assert stdout.getvalue() == ""
+    assert stderr.getvalue() == '{"code":"persisted_audit_invalid"}\n'
+    assert len(units.units) == (2 if failing_page == 2 else 1)
+    assert all(unit.exited for unit in units.units)
     assert engine.disposed
 
 

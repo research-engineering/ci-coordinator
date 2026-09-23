@@ -31,6 +31,7 @@ export function BudgetPolicyEditor({
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string>();
   const controller = useRef<AbortController | undefined>(undefined);
+  const submitted = useRef(false);
   useEffect(() => () => controller.current?.abort(), []);
   const [operation] = useState(() => crypto.randomUUID());
   const candidate = budgetCommandSchema.safeParse({
@@ -52,13 +53,15 @@ export function BudgetPolicyEditor({
     },
   });
   async function submit() {
-    if (!candidate.success || controller.current || notice) return;
+    if (!candidate.success || submitted.current || notice) return;
+    submitted.current = true;
     const active = new AbortController();
     controller.current = active;
     setPending(true);
     onPendingChange(true);
     try {
       const result = await configureBudgetPolicy(candidate.data, session.csrfToken, active.signal);
+      controller.current = undefined;
       if (active.signal.aborted) return;
       if (result.kind === "ready" && result.value.policy !== null) {
         onSaved();
@@ -83,6 +86,7 @@ export function BudgetPolicyEditor({
       if (!active.signal.aborted)
         setNotice("The write outcome is unknown. Reload policies before making another change.");
     } finally {
+      controller.current = undefined;
       if (!active.signal.aborted) {
         setPending(false);
         onPendingChange(false);

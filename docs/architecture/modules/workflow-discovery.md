@@ -189,6 +189,15 @@ environment protection, secret existence, credential contents, runner
 availability, fork exposure, check identity, and generated runtime matrices
 are not executed or inferred.
 
+Opaque scalar values, including `run` and `with.script` bodies, may use the
+existing 256 KiB workflow-file byte budget without entering returned evidence.
+Mapping keys remain bounded to 4,096 UTF-8 bytes during event preflight, before
+node composition. Reflected text and unknown syntax retain their existing
+4,096-byte or narrower field bounds. This distinction does not relax the source
+file, 50,000-event, 20,000-node, or depth-64 limits.
+Parser provenance is `github-actions-static/v2` for this admission change;
+regenerate discovery reports rather than relabeling earlier parser evidence.
+
 ## 6. Call Graph
 
 Local reusable-workflow references are resolved only when their normalized

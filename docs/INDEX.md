@@ -14,9 +14,10 @@ routing remain owned by the [architecture index](architecture/INDEX.md).
 - [Find HTTP operations](reference/http-surface.md)
 - [Find architecture and contract owners](architecture/INDEX.md)
 
-Capability state and remaining work are owned by the [roadmap](../ROADMAP.md).
-The catalog below keeps direct routes for deeper tasks; dated assessments and
-implementation history are not prerequisites for a first local evaluation.
+The [single task register](../ROADMAP.md#8-next-work) owns remaining work,
+stable task IDs, state, prerequisites and closure. Start there to choose work;
+the catalog below is reference navigation, not another backlog. Dated
+assessments and implementation history are not prerequisites for evaluation.
 
 ## Architecture
 
@@ -102,12 +103,16 @@ The [analytics exploration design](features/analytics-exploration.md) and
 [delivery plan](features/analytics-exploration-plan.md) cover readable historical
 graphs, metric selection and source inspection using existing archive data.
 
-These are designs and implementation plans for product and technical
-changes. A design explains the intended relation; its plan orders delivery.
-Neither listing alone asserts that the capability is currently available.
+These documents are designs and execution/acceptance references. A design
+explains the intended relation; a retained plan supplies local sequencing,
+protected behavior and falsifiers for a task in ROADMAP. Its steps are not a
+second queue, independent priority or current completion claim. Preserve useful
+contracts when removing redundant task prose; a filename ending in `plan.md`
+does not by itself make the document obsolete.
 
 - [CI assurance convergence](features/ci-assurance-convergence.md)
 - [CI assurance convergence plan](features/ci-assurance-convergence-plan.md)
+- [Operator capability completion plan](features/ci-operator-capability-completion-plan.md)
 - [Runtime admission cost](features/runtime-admission-cost.md)
 - [Runtime base qualification and security repairs](features/runtime-base-qualification.md)
 - [Assurance audit hardening and finding dispositions](features/assurance-audit-hardening.md)
@@ -123,6 +128,12 @@ Neither listing alone asserts that the capability is currently available.
 - [Partial history capture plan](features/partial-history-capture-plan.md)
 - [Database observation snapshots](features/database-observation-snapshots.md)
 - [Database observation snapshot plan](features/database-observation-snapshots-plan.md)
+- [Total collection-state admission](features/total-collection-state-admission.md)
+- [Collection-state admission acceptance](features/total-collection-state-admission-plan.md)
+- [Coverage cost attribution](features/coverage-cost-attribution.md)
+- [Coverage measurement acceptance](features/coverage-cost-attribution-implementation-plan.md)
+- [Immutable evidence fixture lifetime](features/immutable-evidence-fixture-lifetime.md)
+- [Evidence fixture acceptance](features/immutable-evidence-fixture-lifetime-implementation-plan.md)
 
 - [Automatic App inventory](features/automatic-app-inventory.md)
 - [Bounded browser session recovery](features/browser-session-recovery.md)
@@ -342,6 +353,8 @@ and the [supported runtime decision](decisions/lts-dependency-consolidation.md).
 - [Evaluate locally](how-to/evaluate-locally.md)
 - [Developer workflows and adoption](how-to/development-workflows.md)
 - [Editor dictionaries, table formatting and inspection exceptions](how-to/editor-documentation-quality.md)
+- [Configure JetBrains inspections](how-to/jetbrains-inspections.md)
+- [Adoption and assurance completion](features/recovered-work-admission.md)
 - [Test API contracts](how-to/test-api-contracts.md)
 - [Automatic mutation discovery](features/automatic-mutation-testing.md)
 - [Update the toolchain](how-to/toolchain-updates.md)

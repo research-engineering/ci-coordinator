@@ -82,10 +82,10 @@ jobs:
     with:
       manual_base_sha: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_scope == 'range' && inputs.proofkit_base_sha || '' }}
 
-  repository-quality:
-    name: Repository quality
+  provider-dependency-review:
+    name: Provider dependency review
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 5
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,6 +97,17 @@ jobs:
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
+
+  repository-quality:
+    name: Repository quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -1039,6 +1050,7 @@ jobs:
       - container-runtime-smoke
       - trusted-plan-request-entrypoint
       - repository-quality
+      - provider-dependency-review
       - secret-scan
       - postgres-witness
       - serial-qualification
@@ -1064,6 +1076,7 @@ jobs:
           API_CONTRACT_RESULT: ${{ needs.api-contract-exploration.result }}
           API_CONTRACT_REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.api_contract_deep }}
           QUALITY_RESULT: ${{ needs.repository-quality.result }}
+          DEPENDENCY_RESULT: ${{ needs.provider-dependency-review.result }}
           SECRET_RESULT: ${{ needs.secret-scan.result }}
           SERIAL_RESULT: ${{ needs.serial-qualification.result }}
           SERIAL_REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.serial_qualification }}
@@ -1091,6 +1104,7 @@ jobs:
             test "$API_CONTRACT_RESULT" = skipped
           fi
           test "${QUALITY_RESULT}" = success
+          test "${DEPENDENCY_RESULT}" = success
           test "${SECRET_RESULT}" = success
           test "${POSTGRES_RESULT}" = success
           if [ "$SERIAL_REQUESTED" = true ]; then

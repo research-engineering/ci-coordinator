@@ -75,6 +75,12 @@ def test_current_input_universe_has_predicate_specific_native_or_owned_dispositi
     assert rows["tooling/quality/uv.lock"].command_id == "dependency.audit"
     assert rows["docker/runtime/verify.py"].command_id == "python.lint"
     assert rows["docker/runtime/security/build.sh"].command_id == "workflow.lint"
+    preflight = rows[".qodana/preflight.sh"]
+    assert (preflight.command_id, preflight.role, preflight.owner_path) == (
+        "workflow.lint",
+        "native-input",
+        "scripts/workflow_lint.py",
+    )
     assert rows["docker/runtime/security/check_zlib.c"].command_id == "container.smoke"
     assert rows["docker/runtime/ubuntu-snapshot.conf"].command_id == "container.smoke"
     assert rows["docs/images/repository-overview.png"].predicate.endswith(

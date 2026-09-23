@@ -87,8 +87,8 @@ def test_dependency_proposals_are_paused_without_repository_merge_authority() ->
 def test_provider_workflow_reviews_dependency_diffs_with_an_immutable_action() -> None:
     document = _yaml_mapping(_repo_path(".github/workflows/python-persistence.yml"))
     jobs = cast(dict[str, object], document["jobs"])
-    quality = cast(dict[str, object], jobs["repository-quality"])
-    steps = cast(list[object], quality["steps"])
+    provider = cast(dict[str, object], jobs["provider-dependency-review"])
+    steps = cast(list[object], provider["steps"])
     review = next(
         cast(dict[str, object], step)
         for step in steps
@@ -141,6 +141,7 @@ def test_standalone_shell_lint_inventory_has_no_unowned_source() -> None:
         ".github/actions/secret-scan/run.sh",
         ".devcontainer/post-create.sh",
         ".githooks/pre-push",
+        ".qodana/preflight.sh",
         "docker/development/secret-entrypoint.sh",
         "docker/runtime/assemble.sh",
         "docker/runtime/install.sh",
@@ -151,6 +152,7 @@ def test_standalone_shell_lint_inventory_has_no_unowned_source() -> None:
         (".github/actions/secret-scan/run.sh", "bash"),
         (".devcontainer/post-create.sh", "bash"),
         (".githooks/pre-push", "sh"),
+        (".qodana/preflight.sh", "sh"),
         ("docker/development/secret-entrypoint.sh", "sh"),
         ("docker/runtime/assemble.sh", "bash"),
         ("docker/runtime/install.sh", "sh"),

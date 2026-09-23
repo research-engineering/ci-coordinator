@@ -22,7 +22,9 @@ checks, and deployment SLOs remain governed by
 ## 1. Freeze The Artifact
 
 Dispatch the repository-owned `Release Artifact` workflow on exact `master`
-after its push-triggered `Full Check` succeeds. The workflow builds the root
+after an explicitly dispatched `Full Check` succeeds for that same commit.
+Both events must satisfy the current publication contract; an older push or
+PR result is not a substitute. The release workflow builds the root
 `Dockerfile`, embeds the production build identity, publishes maximum BuildKit
 SLSA v1 provenance and an SPDX 2.3 SBOM, validates their exact registry bytes
 against the pinned release profiles, and verifies GitHub attestations. Record
@@ -45,6 +47,16 @@ A local `docker build` remains useful for development but does not establish a
 registry digest, provider attestation, or production artifact. Enforcing
 startup rejects a development build identity even when all process settings
 are present.
+
+When using Swarm with a declarative stack manager such as Portainer, observe
+both the live service image/configuration and the saved stack declaration
+before an update, redeploy or rollback. An image-only service update does not
+update the declaration and a later full-stack redeploy can restore its old
+image. Reconcile the intended digest, environment, secret references, networks
+and placement with the deployment owner; do not overwrite unexplained drift.
+Afterwards verify the saved declaration and the actually running task digest
+agree. Record the same checks for rollback; an updated service alone does not
+prove declarative synchronization.
 
 ## 2. Migrate With The Migration Principal
 

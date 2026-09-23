@@ -32,6 +32,7 @@ from ci_coordinator.audit_replay.replay import (
 from ci_coordinator.audit_replay.subjects import is_audit_subject_type
 from ci_coordinator.kernel import canonical_json
 from ci_coordinator.persistence.connection import create_postgres_engine
+from ci_coordinator.persistence.errors import PersistenceInvariantViolation
 from ci_coordinator.persistence.unit_of_work import PostgresUnitOfWork
 from ci_coordinator.runtime.environment import snapshot_process_environment
 from ci_coordinator.runtime_settings import admit_python_runtime
@@ -181,6 +182,9 @@ async def run_replay(
     except ReplayCliConfigurationError:
         _write_json(stderr, {"code": _FAILURE_CODE})
         return 2
+    except PersistenceInvariantViolation:
+        _write_json(stderr, {"code": "persisted_audit_invalid"})
+        return 4
     except Exception:
         _write_json(stderr, {"code": _FAILURE_CODE})
         return 2

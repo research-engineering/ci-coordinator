@@ -69,6 +69,17 @@ An unspecified limit is an unresolved obligation, not an infinite budget.
 7. Stop the service under admitted peak in-flight work and prove termination
    within the container grace period without a partial durable effect.
 
+The overload experiment must schedule offered arrivals independently of response
+completion. A closed-loop client that waits for each response lowers its own
+offered rate as the service slows and cannot prove the intended burst envelope.
+Record scheduled, actually sent, rejected, timed-out, durably accepted and
+completed useful work separately, including generator-side lateness or unsent
+arrivals. Preserve the
+complete latency/error population, per-scope queue age, drain duration and
+recovery outcome; neither successful responses alone nor omitted load samples
+qualify capacity. Bind generator capacity and timing to the workload protocol,
+without replacing current metric definitions or inventing accepted work.
+
 ## Retain Evidence
 
 Retain immutable raw measurements, command versions, workload input digest,

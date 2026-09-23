@@ -55,6 +55,49 @@ def _native() -> JsonObject:
     return workflow_value(read_regular(ROOT, NATIVE_PATH), NATIVE_PATH)
 
 
+@pytest.mark.parametrize("result", ["success", "failure", "cancelled", "skipped", "missing"])
+def test_provider_review_cannot_suppress_native_quality_or_escape_the_gate(result: str) -> None:
+    workflow = YAML(typ="safe").load(read_regular(ROOT, NATIVE_PATH))
+    jobs = workflow["jobs"]
+    provider = jobs["provider-dependency-review"]
+    review = next(
+        step for step in provider["steps"] if "dependency-review-action@" in step.get("uses", "")
+    )
+    assert review["if"] == "github.event_name == 'pull_request'"
+    assert review["with"]["fail-on-severity"] == "high"
+    assert not review.get("continue-on-error")
+    assert not provider.get("continue-on-error")
+    assert "if" not in provider
+    assert "needs" not in jobs["repository-quality"]
+    assert all(
+        "dependency-review-action@" not in step.get("uses", "")
+        for step in jobs["repository-quality"]["steps"]
+    )
+    gate = jobs[GATE_ID]
+    assert "provider-dependency-review" in gate["needs"]
+    step = gate["steps"][0]
+    assert step["env"]["DEPENDENCY_RESULT"] == "${{ needs.provider-dependency-review.result }}"
+    environment = {name: "success" for name in step["env"]}
+    environment.update(
+        API_CONTRACT_REQUESTED="false",
+        API_CONTRACT_RESULT="skipped",
+        SERIAL_REQUESTED="false",
+        SERIAL_RESULT="skipped",
+        TRUSTED_PLAN_REQUEST_REASON="plan_url_invalid",
+        DEPENDENCY_RESULT=result,
+    )
+    if result == "missing":
+        del environment["DEPENDENCY_RESULT"]
+    outcome = subprocess.run(
+        ["/bin/bash", "-c", step["run"]],
+        env=environment,
+        check=False,
+        capture_output=True,
+        timeout=5,
+    )
+    assert (outcome.returncode == 0) is (result == "success")
+
+
 @pytest.mark.parametrize("yaml_version", [(1, 1), (1, 2)])
 def test_workflow_emitter_preserves_ambiguous_string_types(yaml_version: tuple[int, int]) -> None:
     fixture = {

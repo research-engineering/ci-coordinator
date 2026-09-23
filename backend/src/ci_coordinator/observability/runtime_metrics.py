@@ -92,7 +92,9 @@ _PLAN_RESULTS: Final = (
 )
 _FALLBACK_REASONS: Final = frozenset(
     {
+        "deterministic_plan_mismatch",
         "dynamic_enforcement_disabled",
+        "omission_proof_mismatch",
         "operator_override",
         "production_admission_expired",
         "production_admission_mismatch",

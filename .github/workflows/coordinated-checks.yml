@@ -89,7 +89,7 @@ jobs:
       env:
         PLAN_PATH: ${{ runner.temp }}/dynamic-ci-plan.json
         CI_TARGET_REGISTRY_PATH: .ci-coordinator/execution-registry.v1.json
-        CI_STATIC_JOB_IDS_JSON: '["connected-administrator","connected-development-stack","container-runtime-smoke","developer-bootstrap","developer-container","developer-host-lifecycle","native-test-plan","native-test-shards","operator-workbench","persistence-mutation","postgres-witness","repository-quality","secret-scan","trusted-plan-request-entrypoint","trusted-requester-contract","utility-config","utility-docker","utility-go-static","utility-go-vulnerabilities","utility-spelling"]'
+        CI_STATIC_JOB_IDS_JSON: '["connected-administrator","connected-development-stack","container-runtime-smoke","developer-bootstrap","developer-container","developer-host-lifecycle","native-test-plan","native-test-shards","operator-workbench","persistence-mutation","postgres-witness","provider-dependency-review","repository-quality","secret-scan","trusted-plan-request-entrypoint","trusted-requester-contract","utility-config","utility-docker","utility-go-static","utility-go-vulnerabilities","utility-spelling"]'
         CI_COORDINATOR_PLAN_TRUST_ROOT_PATH: .ci-coordinator/plan-trust-root.v1.json
         CI_INSTALLATION_ID: ${{ vars.CI_COORDINATOR_INSTALLATION_ID || github.event.installation.id }}
         CI_REPOSITORY_ID: ${{ github.repository_id }}
@@ -656,10 +656,10 @@ jobs:
       PROOFKIT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || (github.event_name == 'workflow_dispatch' && inputs.proof_scope == 'range' && inputs.proofkit_base_sha) || '' }}
       PROOFKIT_HEAD_REF: ${{ github.sha }}
       RYUK_CONTAINER_IMAGE: testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
-  repository-quality:
-    name: Repository quality
+  provider-dependency-review:
+    name: Provider dependency review
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 5
     steps:
     - name: Check out source
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -671,6 +671,23 @@ jobs:
       uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
       with:
         fail-on-severity: high
+    needs:
+    - plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.plan_valid != 'true' || needs.plan.outputs.fallback != 'false' || contains(fromJSON(needs.plan.outputs.selected_jobs || '[]'), 'provider-dependency-review')) }}
+    env:
+      PROOFKIT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || (github.event_name == 'workflow_dispatch' && inputs.proof_scope == 'range' && inputs.proofkit_base_sha) || '' }}
+      PROOFKIT_HEAD_REF: ${{ github.sha }}
+      RYUK_CONTAINER_IMAGE: testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0
+  repository-quality:
+    name: Repository quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+    - name: Check out source
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
@@ -1040,6 +1057,7 @@ jobs:
     - persistence-mutation
     - plan
     - postgres-witness
+    - provider-dependency-review
     - repository-quality
     - secret-scan
     - trusted-plan-request-entrypoint
@@ -1073,8 +1091,8 @@ jobs:
         CI_PLAN_VALID: ${{ needs.plan.outputs.plan_valid }}
         CI_FALLBACK: ${{ needs.plan.outputs.fallback }}
         CI_SELECTED_JOBS_JSON: ${{ needs.plan.outputs.selected_jobs }}
-        CI_STATIC_JOB_RESULTS_JSON: "{\"connected-administrator\":\"${{ needs['connected-administrator'].result }}\",\"connected-development-stack\":\"${{ needs['connected-development-stack'].result }}\",\"container-runtime-smoke\":\"${{ needs['container-runtime-smoke'].result }}\",\"developer-bootstrap\":\"${{ needs['developer-bootstrap'].result }}\",\"developer-container\":\"${{ needs['developer-container'].result }}\",\"developer-host-lifecycle\":\"${{ needs['developer-host-lifecycle'].result }}\",\"native-test-plan\":\"${{ needs['native-test-plan'].result }}\",\"native-test-shards\":\"${{ needs['native-test-shards'].result }}\",\"operator-workbench\":\"${{ needs['operator-workbench'].result }}\",\"persistence-mutation\":\"${{ needs['persistence-mutation'].result }}\",\"postgres-witness\":\"${{ needs['postgres-witness'].result }}\",\"repository-quality\":\"${{ needs['repository-quality'].result }}\",\"secret-scan\":\"${{ needs['secret-scan'].result }}\",\"trusted-plan-request-entrypoint\"\
-          :\"${{ needs['trusted-plan-request-entrypoint'].result }}\",\"trusted-requester-contract\":\"${{ needs['trusted-requester-contract'].result }}\",\"utility-config\":\"${{ needs['utility-config'].result }}\",\"utility-docker\":\"${{ needs['utility-docker'].result }}\",\"utility-go-static\":\"${{ needs['utility-go-static'].result }}\",\"utility-go-vulnerabilities\":\"${{ needs['utility-go-vulnerabilities'].result }}\",\"utility-spelling\":\"${{ needs['utility-spelling'].result }}\"}"
+        CI_STATIC_JOB_RESULTS_JSON: "{\"connected-administrator\":\"${{ needs['connected-administrator'].result }}\",\"connected-development-stack\":\"${{ needs['connected-development-stack'].result }}\",\"container-runtime-smoke\":\"${{ needs['container-runtime-smoke'].result }}\",\"developer-bootstrap\":\"${{ needs['developer-bootstrap'].result }}\",\"developer-container\":\"${{ needs['developer-container'].result }}\",\"developer-host-lifecycle\":\"${{ needs['developer-host-lifecycle'].result }}\",\"native-test-plan\":\"${{ needs['native-test-plan'].result }}\",\"native-test-shards\":\"${{ needs['native-test-shards'].result }}\",\"operator-workbench\":\"${{ needs['operator-workbench'].result }}\",\"persistence-mutation\":\"${{ needs['persistence-mutation'].result }}\",\"postgres-witness\":\"${{ needs['postgres-witness'].result }}\",\"provider-dependency-review\":\"${{ needs['provider-dependency-review'].result }}\",\"repository-quality\":\"${{ needs['repository-quality'].result }}\",\"\
+          secret-scan\":\"${{ needs['secret-scan'].result }}\",\"trusted-plan-request-entrypoint\":\"${{ needs['trusted-plan-request-entrypoint'].result }}\",\"trusted-requester-contract\":\"${{ needs['trusted-requester-contract'].result }}\",\"utility-config\":\"${{ needs['utility-config'].result }}\",\"utility-docker\":\"${{ needs['utility-docker'].result }}\",\"utility-go-static\":\"${{ needs['utility-go-static'].result }}\",\"utility-go-vulnerabilities\":\"${{ needs['utility-go-vulnerabilities'].result }}\",\"utility-spelling\":\"${{ needs['utility-spelling'].result }}\"}"
         CI_TARGET_REGISTRY_PATH: .ci-coordinator/execution-registry.v1.json
         CI_OWNER: ${{ github.repository_owner }}
         CI_REPO: ${{ github.event.repository.name }}

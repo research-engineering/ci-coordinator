@@ -1,0 +1,21 @@
+profile:
+  base:
+    name: qodana.recommended
+  inspections:
+    - group: "category:Python"
+      enabled: true
+    - group: "category:JavaScript and TypeScript"
+      enabled: true
+    - group: ALL
+      ignore:
+        - ".idea/**"
+        - "**/.venv/**"
+        - "**/node_modules/**"
+        - "**/__pycache__/**"
+        - "**/.mypy_cache/**"
+        - "**/.pytest_cache/**"
+        - "**/.ruff_cache/**"
+        - "frontend/dist/**"
+        - "frontend/coverage/**"
+        - "frontend/playwright-report/**"
+        - "frontend/test-results/**"
