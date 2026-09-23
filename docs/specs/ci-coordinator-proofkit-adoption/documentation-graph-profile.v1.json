@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "profileId": "ci-coordinator.documentation-graph",
+  "markdownGlobs": ["README.md", "ROADMAP.md", "docs/**/*.md"],
+  "rootPaths": ["README.md", "ROADMAP.md"],
+  "readinessClaim": {
+    "marker": "State:",
+    "ownerPath": "ROADMAP.md",
+    "subjectHeadingLevel": 3
+  },
+  "allowedExternalSchemes": ["https"],
+  "limits": {
+    "maxDocumentCount": 352,
+    "maxDocumentBytes": 1048576,
+    "maxInventoryBytes": 16777216,
+    "maxTotalBytes": 16777216,
+    "maxLinkCount": 4096,
+    "maxRepositoryPathCount": 100000
+  },
+  "nonClaims": [
+    "The profile does not detect semantic duplication in unrestricted natural-language prose.",
+    "The profile does not prove branch-head identity, provider execution, or production readiness.",
+    "The profile does not prove external-link availability or provider rendering parity."
+  ]
+}

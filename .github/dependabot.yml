@@ -1,0 +1,118 @@
+version: 2
+
+updates:
+  - package-ecosystem: gomod
+    directory: /tooling/actionlint
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
+    groups:
+      workflow-analyzer:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: uv
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: uv
+    directory: /tooling/quality
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:15"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: node
+        versions: [">=25"]
+      - dependency-name: python
+        versions: [">=3.14"]
+    cooldown:
+      default-days: 7
+    groups:
+      container-images:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:45"
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "@types/node"
+        versions: [">=25"]
+    cooldown:
+      default-days: 7
+    groups:
+      frontend-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

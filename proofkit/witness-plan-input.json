@@ -1,0 +1,2512 @@
+{
+  "schemaVersion": 1,
+  "vocabulary": {
+    "artifactKinds": [],
+    "credentialClasses": [
+      "none"
+    ],
+    "environmentClasses": [
+      "local-node",
+      "local-node-container-external",
+      "local-node-external",
+      "local-python",
+      "local-python-container-external",
+      "local-python-external",
+      "local-python-go",
+      "local-python-go-external",
+      "local-python-node",
+      "local-python-node-external",
+      "local-python-postgres-external"
+    ],
+    "environmentClassPolicies": [
+      {
+        "cachePolicies": [
+          "read-only",
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-node",
+        "networkPolicies": [
+          "none"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-node-container-external",
+        "networkPolicies": [
+          "external"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-node-external",
+        "networkPolicies": [
+          "external"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "read-only",
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-python",
+        "networkPolicies": [
+          "none"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-python-container-external",
+        "networkPolicies": [
+          "external"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "read-only",
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-python-external",
+        "networkPolicies": [
+          "external"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-python-go",
+        "networkPolicies": [
+          "none"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-python-go-external",
+        "networkPolicies": [
+          "external"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "read-only",
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-python-node",
+        "networkPolicies": [
+          "none"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "read-only",
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-python-node-external",
+        "networkPolicies": [
+          "external"
+        ]
+      },
+      {
+        "cachePolicies": [
+          "write-local"
+        ],
+        "credentialClasses": [
+          "none"
+        ],
+        "environmentClass": "local-python-postgres-external",
+        "networkPolicies": [
+          "external"
+        ]
+      }
+    ],
+    "maxTimeoutMs": 32126000,
+    "nonCacheableCredentialClasses": [],
+    "parallelGroups": [
+      "build",
+      "quality",
+      "static",
+      "test"
+    ]
+  },
+  "commands": [
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "scripts/tests/test_diagram_process.py",
+        "--qualify"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "HOME",
+          "PATH",
+          "PLAYWRIGHT_BROWSERS_PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "documentation.diagrams-process",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.diagram_check",
+        "--inventory-only"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "documentation.diagrams-inventory",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.diagram_check"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "HOME",
+          "PATH",
+          "PLAYWRIGHT_BROWSERS_PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "documentation.diagrams",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 660000
+    },
+    {
+      "argv": [
+        "node",
+        "tools/diagrams-checks.mjs"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": "frontend",
+      "environment": {
+        "allowlist": [
+          "HOME",
+          "PATH",
+          "PLAYWRIGHT_BROWSERS_PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "documentation.diagrams-falsifiers",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 600000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.automatic_mutation",
+        "python"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "discovery.mutation-python",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 500000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.automatic_mutation",
+        "frontend"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "discovery.mutation-frontend",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 260000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.container_runtime_smoke"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-container-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "container.smoke",
+      "networkPolicy": "external",
+      "parallelGroup": "build",
+      "schemaVersion": 1,
+      "timeoutMs": 600000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_dependency"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "dependency.check",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.dependency_audit"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-node-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "dependency.audit",
+      "networkPolicy": "external",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 240000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_requirements"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "requirements.admission",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.module_ownership_policy"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "architecture.ownership",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.documentation_graph"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "documentation.graph",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "scripts/tests/test_documentation_graph.py"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "documentation.graph-falsifiers",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_plan_check"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH",
+          "PROOFKIT_BASE_REF",
+          "PROOFKIT_HEAD_REF"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "selective.plan",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "ci_coordinator.target_artifacts.cli",
+        "check",
+        "--source",
+        "fixtures/target-repository/.ci-coordinator/target-artifacts-source.v1.json",
+        "--output-directory",
+        "fixtures/target-repository/.ci-coordinator"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "target-artifacts.check",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 60000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.target_control_bundle",
+        "check"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "target-control-bundle.check",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 60000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "ci_coordinator.target_artifacts.cli",
+        "check",
+        "--source",
+        "fixtures/native-target-repository/.ci-coordinator/target-artifacts-source.v1.json",
+        "--output-directory",
+        "fixtures/native-target-repository/.ci-coordinator"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "native-target-artifacts.check",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 60000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.repository_json"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "repository.json",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.workflow_lint"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-container-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "workflow.lint",
+      "networkPolicy": "external",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.prometheus_rules"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-container-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "observability.rules",
+      "networkPolicy": "external",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "audit-json-resource-limits"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.audit-json-resources",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 480000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "audit-persistence-byte-limits"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-postgres-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.audit-persistence-bytes",
+      "networkPolicy": "external",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 1800000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-capacity-evidence"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.python-capacity-evidence",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 276000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-config-policy-admission"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.python-config-policy-admission",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 4620000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-database-compatibility"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-postgres-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.python-database-compatibility",
+      "networkPolicy": "external",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 4380000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-http-admission"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.python-http-admission",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 250000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "frontend-safety-kernels"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.frontend-safety-kernels",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-persistence"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-postgres-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.python-persistence",
+      "networkPolicy": "external",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 2100000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "import-boundary"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.import-boundary",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "scripts.python_witness",
+        "install-check"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.install-check",
+      "networkPolicy": "external",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "lint"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.lint",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "python3",
+        "-m",
+        "scripts.python_witness",
+        "lock-check"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.lock-check",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "package-check"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.package-check",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "test"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GITLEAKS_TEST_BINARY",
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.test",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 960000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/app/test_capacity_planning.py",
+        "backend/tests/unit/app/test_dynamic_plan_service.py",
+        "backend/tests/unit/execution_orchestration/test_provider_signal.py",
+        "backend/tests/unit/execution_orchestration/test_target_registry.py",
+        "backend/tests/unit/identity_admission/test_actions_oidc.py",
+        "backend/tests/unit/integrations/test_github_capacity_context.py",
+        "backend/tests/unit/integrations/test_github_workflow_discovery.py",
+        "backend/tests/unit/persistence/test_shadow_reconciliation_state_codecs.py",
+        "backend/tests/unit/repo_context/test_workflow_inventory.py",
+        "backend/tests/unit/runner_capacity/test_admission.py",
+        "backend/tests/unit/runtime/test_bootstrap_validator.py",
+        "backend/tests/unit/runtime/test_bootstrap_workflow.py",
+        "backend/tests/unit/runtime/test_native_workflow.py",
+        "backend/tests/unit/target_artifacts/test_target_artifacts.py",
+        "backend/tests/unit/test_plan_issuance.py",
+        "backend/tests/unit/workflow_discovery/test_workflow_discovery.py"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "runtime026.test",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/app/test_capacity_planning.py",
+        "backend/tests/unit/app/test_dynamic_plan_service.py",
+        "backend/tests/unit/api/http/test_plan_authentication.py",
+        "backend/tests/unit/execution_orchestration/test_target_registry.py",
+        "backend/tests/unit/identity_admission/test_actions_oidc.py",
+        "backend/tests/unit/integrations/test_github_capacity_context.py",
+        "backend/tests/unit/integrations/test_github_git_snapshot.py",
+        "backend/tests/unit/integrations/test_github_workflow_discovery.py",
+        "backend/tests/unit/plan_consumer_support.py",
+        "backend/tests/unit/production_admission/test_production_admission.py",
+        "backend/tests/unit/repo_context/test_workflow_inventory.py",
+        "backend/tests/unit/runtime/test_bootstrap_validator.py",
+        "backend/tests/unit/runtime/test_bootstrap_workflow.py",
+        "backend/tests/unit/runtime/test_consumer_contract_lab.py",
+        "backend/tests/unit/runtime/test_native_workflow.py",
+        "backend/tests/unit/runtime/test_plan_consumer.py",
+        "backend/tests/unit/runtime/test_runtime_dependency_composition.py",
+        "backend/tests/unit/runtime/test_trusted_plan_request_workflow.py",
+        "backend/tests/unit/runtime_settings/test_runtime_settings.py",
+        "backend/tests/unit/target_artifacts/test_owner_codec_conformance.py",
+        "backend/tests/unit/target_artifacts/test_target_artifact_models.py",
+        "backend/tests/unit/target_artifacts/test_target_artifacts.py",
+        "backend/tests/unit/trusted_plan_request_support.py"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "runtime027.test",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_consumer_contract_models_reject_values_outside_the_finite_language",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_consumer_contract_codecs_reject_structural_and_algebraic_escape",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_git_tree_admission_rejects_malformed_or_special_entries",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bootstrap_rejects_untrusted_package_inventory",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bootstrap_rejects_noncanonical_commit_identity",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bootstrap_main_classifies_unavailable_repository",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bounded_process_rejects_invalid_resource_contract",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bounded_process_classifies_spawn_failure",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_regular_contract_reader_rejects_unsafe_or_nontext_evidence",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_real_path_round_trips_exact_generated_consumer_controls",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_runtime_admission_precedes_target_image_creation",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_consumer_controls_reject_target_expectation_divergence",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_receipt_is_content_addressed_and_denies_provider_claims",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_profile_codec_rejects_noncanonical_and_unknown_event",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_plan_key_identity_is_unique_per_scenario",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_regular_file_reader_rejects_symlinked_parent",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_profile_path_preserves_symlink_for_file_kind_admission",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_external_schemas_admit_codec_owned_values",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_scenario_schema_rejects_cross_field_contradictions",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_structural_schema_does_not_claim_exact_codec_admission",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_control_io_failure_is_classified",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_bounded_process_enforces_aggregate_output_limit",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_bounded_process_terminates_descendants_on_timeout",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_execution_uses_sealed_target_bytes_after_source_swap",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_regular_file_reader_keeps_open_descriptor_during_path_swap",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_regular_file_reader_rejects_fifo_without_waiting_for_a_writer",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_node_permission_model_denies_child_process_authority",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_each_node_control_process_loads_exact_runtime_guard",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_node_runtime_guard_rejects_executing_process_version_drift",
+        "backend/tests/unit/consumer_contract_lab/test_node_executable.py",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_bootstrap_capture_enforces_output_limit_before_process_completion",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_bounded_process_deadline_closes_detached_inherited_pipes",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_round_trips_clean_source_epochs_to_one_stable_receipt",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_ignores_unchecked_worktree_bytecode_and_executes_commit_image",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_rejects_source_epoch_mutations",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_rejects_coherently_resealed_workflow_authority_drift",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_post_execution_source_check_rejects_changed_contract_bytes",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_uses_commit_image_despite_worktree_changes_hidden_by_index_flags",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_post_execution_source_check_rejects_hidden_coordinator_changes",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_source_epoch_rejects_bytes_changed_after_parsing",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_git_snapshot_rejects_head_change_during_inspection",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_ignored_contract_file_marks_target_as_worktree",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_opaque_target_binding_admits_the_complete_bounded_byte_domain",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_unrelated_worktree_file_is_outside_contract_source_status",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_classifies_invalid_default_branch",
+        "scripts/tests/test_python_import_boundary_policy.py::test_consumer_contract_lab_has_no_provider_or_production_runtime_edge",
+        "scripts/tests/test_python_import_boundary_policy.py::test_consumer_contract_lab_os_capability_is_owned_by_exact_files",
+        "scripts/tests/test_python_import_boundary_policy.py::test_offline_node_selection_does_not_grant_environment_authority_to_siblings",
+        "scripts/tests/test_python_import_boundary_policy.py::test_rule_catalog_preserves_source_order"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "runtime028.test",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/integration/persistence/test_selected_issuance_state.py::test_native_selected_issuance_round_trips_exact_execution_authority",
+        "backend/tests/integration/persistence/test_shadow_reconciliation_state.py::test_native_gate_contract_round_trips_through_durable_reconciliation"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-postgres-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "runtime026.persistence-test",
+      "networkPolicy": "external",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "coverage"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "CI",
+          "GITHUB_ACTIONS",
+          "GITLEAKS_TEST_BINARY",
+          "PATH",
+          "PROOFKIT_BASE_REF",
+          "PROOFKIT_HEAD_REF"
+        ],
+        "classes": [
+          "local-python-postgres-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.coverage",
+      "networkPolicy": "external",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 2460000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "persistence-test"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-postgres-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.persistence-test",
+      "networkPolicy": "external",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 600000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "typecheck"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.typecheck",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_admission",
+        "text-policy"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "text.policy",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_admission",
+        "verify"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "proofkit.verify",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_branch_head_quality"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "CI",
+          "GITHUB_ACTIONS",
+          "GITHUB_RUN_ATTEMPT",
+          "GITHUB_RUN_ID",
+          "GITHUB_SHA",
+          "GITLEAKS_TEST_BINARY",
+          "HOME",
+          "PATH",
+          "PLAYWRIGHT_BROWSERS_PATH",
+          "PROOFKIT_BASE_REF",
+          "PROOFKIT_HEAD_REF",
+          "RUNNER_ENVIRONMENT",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-postgres-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "quality.branch-head",
+      "networkPolicy": "external",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 32126000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.devcontainer_witness"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-node-container-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "devcontainer.verify",
+      "networkPolicy": "external",
+      "parallelGroup": "build",
+      "schemaVersion": 1,
+      "timeoutMs": 1980000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.dev_environment.ci_witness"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "CI",
+          "HOME",
+          "PATH"
+        ],
+        "classes": [
+          "local-python-container-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "development.stack",
+      "networkPolicy": "external",
+      "parallelGroup": "build",
+      "schemaVersion": 1,
+      "timeoutMs": 1200000
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@ci-coordinator/operator-ui",
+        "build"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "frontend.build",
+      "networkPolicy": "none",
+      "parallelGroup": "build",
+      "schemaVersion": 1,
+      "timeoutMs": 180000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.browser_test_execution",
+        "--output",
+        ".ci-native/browser"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "CI",
+          "GITHUB_RUN_ATTEMPT",
+          "GITHUB_RUN_ID",
+          "GITHUB_SHA",
+          "HOME",
+          "PATH",
+          "PLAYWRIGHT_BROWSERS_PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "frontend.browser",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 1440000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.frontend_contract",
+        "check"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "frontend.contract-python",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@ci-coordinator/operator-ui",
+        "contract:check"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "frontend.contract-types",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-node-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "frontend.install",
+      "networkPolicy": "external",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "pnpm",
+        "--filter",
+        "@ci-coordinator/operator-ui",
+        "check"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-node"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "frontend.quality",
+      "networkPolicy": "none",
+      "parallelGroup": "quality",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "yaml"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.yaml",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "schemas"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.schemas",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "hadolint"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.hadolint",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "build-checks"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-container-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.build-checks",
+      "networkPolicy": "external",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 600000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "gofmt"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-go"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.gofmt",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "go-vet"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-go-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.go-vet",
+      "networkPolicy": "external",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 600000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "staticcheck"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-go-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.staticcheck",
+      "networkPolicy": "external",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 600000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "govulncheck"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-go-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.govulncheck",
+      "networkPolicy": "external",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 600000
+    },
+    {
+      "argv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "spelling"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GOCACHE",
+          "GOMODCACHE",
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "utility.spelling",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.ci_matrix",
+        "check"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "matrix.admission",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.self_ci_generate",
+        "--check"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "self-ci.check",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "dependency-usage"
+      ],
+      "cachePolicy": "read-only",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.dependency-usage",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.secret_scan"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "GITLEAKS_TEST_BINARY",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "secret.scan",
+      "networkPolicy": "none",
+      "parallelGroup": "static",
+      "schemaVersion": 1,
+      "timeoutMs": 300000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "scripts/conformance/vitest_mutation_identity_test.py"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "HOME",
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "frontend.mutation-identity",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 180000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.ci_business_witness"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "CI",
+          "GITHUB_ACTIONS",
+          "GITHUB_RUN_ATTEMPT",
+          "GITHUB_RUN_ID",
+          "GITHUB_SHA",
+          "HOME",
+          "PATH",
+          "RUNNER_ENVIRONMENT",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python-container-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "frontend.connected",
+      "networkPolicy": "external",
+      "parallelGroup": "build",
+      "schemaVersion": 1,
+      "timeoutMs": 1980000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "scripts/conformance/native_test_timeout_test.py"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH",
+          "TMPDIR"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "python.native-timeout",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 120000
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+"""Target-authority producer witnesses."""

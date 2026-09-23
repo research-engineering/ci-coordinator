@@ -1,0 +1,673 @@
+{
+  "schemaVersion": "ci-python-capacity-evidence-mutation-suite/v1",
+  "suiteId": "ci-python-capacity-evidence/v1",
+  "timeoutMs": 4000,
+  "outerTimeoutMs": 276000,
+  "expectedKilled": 27,
+  "canonicalInventoryIds": [
+    "CE01",
+    "CE02",
+    "CE03",
+    "CE04",
+    "CE05",
+    "CE06",
+    "CE07",
+    "CE08",
+    "CE09",
+    "CE10",
+    "CE11",
+    "CE12",
+    "CE13",
+    "CE14",
+    "CE15",
+    "CE16",
+    "CE17",
+    "CE18",
+    "CE19",
+    "CE20",
+    "CE21",
+    "CE22",
+    "CE23",
+    "CE24",
+    "CE25",
+    "CE26",
+    "CE27"
+  ],
+  "expectedMutantIds": [
+    "CE01",
+    "CE02",
+    "CE03",
+    "CE04",
+    "CE05",
+    "CE06",
+    "CE07",
+    "CE08",
+    "CE09",
+    "CE10",
+    "CE11",
+    "CE12",
+    "CE13",
+    "CE14",
+    "CE15",
+    "CE16",
+    "CE17",
+    "CE18",
+    "CE19",
+    "CE20",
+    "CE21",
+    "CE22",
+    "CE23",
+    "CE24",
+    "CE25",
+    "CE26",
+    "CE27"
+  ],
+  "expectedInvalidMutantIds": [],
+  "ownerClassCoverage": {
+    "audit-checkpoint-authenticity": ["CE08", "CE09", "CE14"],
+    "audit-checkpoint-model": ["CE17"],
+    "audit-storage-closure": ["CE11", "CE12", "CE13"],
+    "audit-successor-integrity": ["CE10"],
+    "capacity-budget-domain": ["CE03", "CE04", "CE05"],
+    "capacity-receipt-authenticity": ["CE01", "CE02"],
+    "capacity-receipt-time": ["CE06", "CE07", "CE15", "CE16"],
+    "capacity-resource-admission": ["CE18", "CE19", "CE20"],
+    "runner-capacity-eligibility": ["CE21", "CE22", "CE23", "CE24"],
+    "runner-capacity-provider-completeness": ["CE25", "CE26", "CE27"]
+  },
+  "mutants": [
+    {
+      "id": "CE01",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "accept-invalid-capacity-signature",
+      "original": "        return CapacityNotQualified(\"capacity_signature_invalid\")",
+      "replacement": "        pass",
+      "witnessId": "capacity-evidence.signature-required",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "rejects_unsigned_or_noncanonical_evidence"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE02",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "ignore-capacity-epoch-identity",
+      "original": "        or receipt.identity != expectation.identity",
+      "replacement": "        or False",
+      "witnessId": "capacity-evidence.exact-epoch",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "another_environment_is_foreign"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE03",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "accept-incomplete-capacity-domain",
+      "original": "        return CapacityNotQualified(\"capacity_evidence_incomplete\")",
+      "replacement": "        pass",
+      "witnessId": "capacity-evidence.complete-metric-domain",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "requires_the_complete_metric_domain"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE04",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "allow-signer-to-weaken-fixed-budget",
+      "original": "        measurement_by_id[metric_id].budget_value != required_budget",
+      "replacement": "        False",
+      "witnessId": "capacity-evidence.owner-fixed-budgets",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "cannot_weaken_profile_owned_zero_violation_budget"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE05",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "accept-observation-above-budget",
+      "original": "    if any(item.observed_value > item.budget_value for item in receipt.measurements):",
+      "replacement": "    if False:",
+      "witnessId": "capacity-evidence.derive-budget-result",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "derives_budget_failure"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE06",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "accept-capacity-receipt-before-validity",
+      "original": "    if receipt.issued_at > now + skew or now < receipt.valid_from:",
+      "replacement": "    if receipt.issued_at > now + skew:",
+      "witnessId": "capacity-evidence.validity-start",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "not_admitted_before_its_validity_interval"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE07",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "accept-stale-capacity-observation",
+      "original": "    ) or now - receipt.observed_at > timedelta(seconds=limits.maximum_evidence_age_seconds):",
+      "replacement": "    ) or False:",
+      "witnessId": "capacity-evidence.observation-age",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "rejects_stale_measurements"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE08",
+      "requirementIds": ["REQ-CI-RUNTIME-037"],
+      "file": "backend/src/ci_coordinator/audit_replay/checkpoint_admission.py",
+      "operator": "accept-invalid-checkpoint-signature",
+      "original": "        return AuditCheckpointRejection(\"audit_checkpoint_signature_invalid\")",
+      "replacement": "        pass",
+      "witnessId": "audit-checkpoint.signature-required",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_checkpoint.py",
+        "-q",
+        "-k",
+        "signature_and_exact_environment"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE09",
+      "requirementIds": ["REQ-CI-RUNTIME-037"],
+      "file": "backend/src/ci_coordinator/audit_replay/checkpoint_admission.py",
+      "operator": "ignore-checkpoint-database-identity",
+      "original": "        envelope.statement.database_identity_digest != expected_database_identity_digest",
+      "replacement": "        False",
+      "witnessId": "audit-checkpoint.exact-environment",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_checkpoint.py",
+        "-q",
+        "-k",
+        "signature_and_exact_environment"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE10",
+      "requirementIds": ["REQ-CI-RUNTIME-037"],
+      "file": "backend/src/ci_coordinator/audit_replay/checkpoint.py",
+      "operator": "ignore-successor-checkpoint-link",
+      "original": "        if record.previous_event_hash != expected_previous_hash:",
+      "replacement": "        if False:",
+      "witnessId": "audit-checkpoint.successor-link",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_checkpoint.py",
+        "-q",
+        "-k",
+        "successor_rejects_a_broken_checkpoint_link"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE11",
+      "requirementIds": ["REQ-CI-RUNTIME-037"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/audit_storage.py",
+      "operator": "ignore-capacity-to-inventory-binding",
+      "original": "        or identity.audit_storage_inventory_digest != inventory.inventory_digest",
+      "replacement": "        or False",
+      "witnessId": "audit-retention.exact-inventory",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_audit_storage.py",
+        "-q",
+        "-k",
+        "inventory_not_bound_by_the_capacity_receipt"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE12",
+      "requirementIds": ["REQ-CI-RUNTIME-037"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/audit_storage.py",
+      "operator": "ignore-inventory-capacity-envelope",
+      "original": "    if not _capacity_covers_inventory(capacity, inventory):",
+      "replacement": "    if False:",
+      "witnessId": "audit-retention.capacity-covers-inventory",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_audit_storage.py",
+        "-q",
+        "-k",
+        "storage_larger_than_the_qualified_observation"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE13",
+      "requirementIds": ["REQ-CI-RUNTIME-037"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/audit_storage.py",
+      "operator": "ignore-restored-backup-content-identity",
+      "original": "            or self.restore_evidence.content_digest != source_backup.content_digest",
+      "replacement": "            or False",
+      "witnessId": "audit-retention.restore-content-identity",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_audit_storage.py",
+        "-q",
+        "-k",
+        "inventory_rejects_restore_bytes_from_another_backup"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE14",
+      "requirementIds": ["REQ-CI-RUNTIME-037"],
+      "file": "backend/src/ci_coordinator/audit_replay/checkpoint_admission.py",
+      "operator": "drop-checkpoint-clock-skew-from-returned-validity",
+      "original": "        valid_from=envelope.signed_at - MAX_AUDIT_CHECKPOINT_CLOCK_SKEW,",
+      "replacement": "        valid_from=envelope.signed_at,",
+      "witnessId": "audit-checkpoint.admission-validity-equivalence",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_checkpoint.py",
+        "-q",
+        "-k",
+        "clock_skew_is_consistent_with_returned_validity"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE15",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "widen-qualified-value-before-issuance-skew",
+      "original": "        valid_from=max(receipt.valid_from, receipt.issued_at - skew),",
+      "replacement": "        valid_from=receipt.valid_from,",
+      "witnessId": "capacity-evidence.returned-lower-time-bound",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "reuses_the_admitted_issuance_skew_boundary"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE16",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/admission.py",
+      "operator": "ignore-measurement-age-after-admission",
+      "original": "            and canonical <= self.__evidence_valid_through",
+      "replacement": "            and True",
+      "witnessId": "capacity-evidence.returned-upper-time-bound",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "expires_with_the_measurement_age_boundary"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE17",
+      "requirementIds": ["REQ-CI-RUNTIME-037"],
+      "file": "backend/src/ci_coordinator/audit_replay/checkpoint.py",
+      "operator": "admit-non-json-safe-checkpoint-sequence",
+      "original": "            or not is_safe_json_integer(self.retained_sequence)",
+      "replacement": "            or False",
+      "witnessId": "audit-checkpoint.sequence-representability",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_checkpoint.py",
+        "-q",
+        "-k",
+        "non_json_safe_retained_sequence"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE18",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/codec.py",
+      "operator": "widen-capacity-envelope-byte-bound",
+      "original": "    maximum_payload_bytes = CAPACITY_QUALIFICATION_PROFILE.limits.maximum_envelope_bytes - 1",
+      "replacement": "    maximum_payload_bytes = CAPACITY_QUALIFICATION_PROFILE.limits.maximum_envelope_bytes * 10",
+      "witnessId": "capacity-evidence.encoder-byte-bound",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "encoder_enforces_the_profile_byte_bound"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE19",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/model.py",
+      "operator": "admit-oversized-capacity-metric-identity",
+      "original": "            or len(self.metric_id.encode(\"utf-8\")) > MAX_CAPACITY_METRIC_ID_BYTES",
+      "replacement": "            or False",
+      "witnessId": "capacity-evidence.metric-identity-byte-bound",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "metric_identity_enforces_its_byte_bound"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE20",
+      "requirementIds": ["REQ-CI-RUNTIME-036"],
+      "file": "backend/src/ci_coordinator/capacity_qualification/model.py",
+      "operator": "admit-intermediate-capacity-source-commit-length",
+      "original": "_GIT_SHA: Final = re.compile(r\"[0-9a-f]{40}|[0-9a-f]{64}\")",
+      "replacement": "_GIT_SHA: Final = re.compile(r\"[0-9a-f]{40,64}\")",
+      "witnessId": "capacity-evidence.exact-source-commit-length",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+        "-q",
+        "-k",
+        "source_commit_admits_only_exact_git_object_lengths"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE21",
+      "requirementIds": ["REQ-CI-RUNTIME-039"],
+      "file": "backend/src/ci_coordinator/runner_capacity/evidence.py",
+      "operator": "weaken-runner-label-conjunction",
+      "original": "            if required_labels.issubset(runner_labels[runner_id])",
+      "replacement": "            if any(label in runner_labels[runner_id] for label in required_labels)",
+      "witnessId": "runner-capacity.label-conjunction",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/runner_capacity/test_evidence.py",
+        "-q",
+        "-k",
+        "label_eligibility_is_conjunctive_normalized_and_free_only"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE22",
+      "requirementIds": ["REQ-CI-RUNTIME-039"],
+      "file": "backend/src/ci_coordinator/runner_capacity/evidence.py",
+      "operator": "admit-workflow-restricted-runner-group",
+      "original": "            matching_groups and matching_groups[0].restricted_to_workflows",
+      "replacement": "            False",
+      "witnessId": "runner-capacity.group-restriction",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/runner_capacity/test_evidence.py",
+        "-q",
+        "-k",
+        "group_selector_is_exact_and_restricted_group_is_unknown"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE23",
+      "requirementIds": ["REQ-CI-RUNTIME-039"],
+      "file": "backend/src/ci_coordinator/runner_capacity/evidence.py",
+      "operator": "ignore-runner-busy-state",
+      "original": "                runners[runner_id].online and not runners[runner_id].busy",
+      "replacement": "                runners[runner_id].online",
+      "witnessId": "runner-capacity.free-state",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/runner_capacity/test_evidence.py",
+        "-q",
+        "-k",
+        "label_eligibility_is_conjunctive_normalized_and_free_only"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE24",
+      "requirementIds": ["REQ-CI-RUNTIME-039"],
+      "file": "backend/src/ci_coordinator/runner_capacity/evidence.py",
+      "operator": "admit-overlapping-capacity-classes",
+      "original": "        if capacity_class_id not in intersecting",
+      "replacement": "        if True",
+      "witnessId": "runner-capacity.disjoint-classes",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/runner_capacity/test_evidence.py",
+        "-q",
+        "-k",
+        "every_intersecting_capacity_class_is_omitted"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE25",
+      "requirementIds": ["REQ-CI-RUNTIME-039"],
+      "file": "backend/src/ci_coordinator/integrations/github/runner_capacity.py",
+      "operator": "accept-unstable-runner-total",
+      "original": "        elif decoded.total_count != expected_total:",
+      "replacement": "        elif False:",
+      "witnessId": "runner-capacity.stable-total",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/integrations/test_github_runner_capacity.py::test_provider_rejects_incomplete_or_malformed_runner_evidence[unstable-total]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE26",
+      "requirementIds": ["REQ-CI-RUNTIME-039"],
+      "file": "backend/src/ci_coordinator/integrations/github/reconciliation_observer_pagination.py",
+      "operator": "accept-foreign-runner-next-path",
+      "original": "        or not repository_path_matches(target.path, expected_path, repository_id=repository_id)",
+      "replacement": "        or False",
+      "witnessId": "runner-capacity.next-link-identity",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/integrations/test_github_runner_capacity.py::test_provider_rejects_incomplete_or_malformed_runner_evidence[foreign-next-link]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CE27",
+      "requirementIds": ["REQ-CI-RUNTIME-039"],
+      "file": "backend/src/ci_coordinator/integrations/github/runner_capacity.py",
+      "operator": "issue-request-beyond-runner-page-budget",
+      "original": "        if not budget.admits_another_page():",
+      "replacement": "        if False:",
+      "witnessId": "runner-capacity.pre-io-page-bound",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/integrations/test_github_runner_capacity.py::test_provider_withholds_capacity_when_a_read_bound_is_exceeded[pages]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    }
+  ],
+  "invalidMutants": [],
+  "nonClaims": [
+    "The finite inventory proves only that the named witness rejects the named patch.",
+    "This suite does not prove measurement truth, signer custody, mutation completeness, external storage, or destructive retention safety."
+  ]
+}

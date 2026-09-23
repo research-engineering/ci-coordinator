@@ -1,0 +1,252 @@
+{
+  "schemaVersion": "ci-audit-json-resource-corpus/v1",
+  "profileId": "ci-audit-event-json-resources/v1",
+  "profileDigest": "211e5a32e49adcf48c3101dd116265e76cba6ddc7b3e0a314693801cc09d40a7",
+  "limits": {
+    "maxDepth": 64,
+    "maxNodes": 10000
+  },
+  "cases": [
+    {
+      "id": "null-root",
+      "recipe": { "kind": "null" },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      }
+    },
+    {
+      "id": "empty-array-root",
+      "recipe": { "kind": "empty-array" },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "id": "empty-object-root",
+      "recipe": { "kind": "empty-object" },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+      }
+    },
+    {
+      "id": "depth-at-limit",
+      "recipe": { "kind": "nested-array", "depth": 64 },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "90446a22034badcd5eaf4de52f6f1572f844d27acfffb38bbdc8fa1a34e65429"
+      }
+    },
+    {
+      "id": "depth-over-limit",
+      "recipe": { "kind": "nested-array", "depth": 65 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_depth_exceeded",
+          "instancePointer": "/payload/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0",
+          "limit": 64,
+          "observed": 65
+        }
+      }
+    },
+    {
+      "id": "hostile-depth",
+      "recipe": { "kind": "nested-array", "depth": 12000 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_depth_exceeded",
+          "instancePointer": "/payload/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0",
+          "limit": 64,
+          "observed": 65
+        }
+      }
+    },
+    {
+      "id": "nodes-at-limit",
+      "recipe": { "kind": "wide-array", "itemCount": 9999 },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "94037cb8adef5933e79a3383233a2545c43f29786d24b4739b579e401601aa2f"
+      }
+    },
+    {
+      "id": "nodes-over-limit",
+      "recipe": { "kind": "wide-array", "itemCount": 10000 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "nodes-and-invalid-scalar",
+      "recipe": { "kind": "wide-array-invalid-tail", "itemCount": 10000 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "future-depth-and-nodes",
+      "recipe": {
+        "kind": "deep-tail-after-wide-prefix",
+        "prefixCount": 9998,
+        "depth": 65
+      },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload/9998",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "object-keys-at-limit",
+      "recipe": { "kind": "wide-object", "memberCount": 9999, "order": "ascending" },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "c35a9e104bde60186477214048ced94b025a0dbe6b6c9aa1c4105e96210a90f9"
+      }
+    },
+    {
+      "id": "object-keys-over-limit",
+      "recipe": { "kind": "wide-object", "memberCount": 10000, "order": "ascending" },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "object-order-over-limit",
+      "recipe": { "kind": "wide-object", "memberCount": 10000, "order": "descending" },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "mixed-depth-at-limit",
+      "recipe": { "kind": "mixed-depth", "depth": 64 },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "4f4308c99dd5c3becd5a211ef6d89d334c27a09d611f191fd6dbff1727a58e08"
+      }
+    },
+    {
+      "id": "mixed-depth-over-limit",
+      "recipe": { "kind": "mixed-depth", "depth": 65 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_depth_exceeded",
+          "instancePointer": "/payload/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0",
+          "limit": 64,
+          "observed": 65
+        }
+      }
+    },
+    {
+      "id": "alias-within-limit",
+      "recipe": { "kind": "repeated-alias", "itemCount": 4998 },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "1cc958ae61e3f39516d9d18d40397011ac3c226801223f7bcf9b00a3485e91f3"
+      }
+    },
+    {
+      "id": "alias-over-limit",
+      "recipe": { "kind": "repeated-alias", "itemCount": 4999 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload/1",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "pointer-dot-key",
+      "recipe": { "kind": "wide-array-under-key", "key": "a.b", "itemCount": 9999 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload/a.b",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "pointer-slash-key",
+      "recipe": { "kind": "wide-array-under-key", "key": "a/b", "itemCount": 9999 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload/a~1b",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "pointer-tilde-key",
+      "recipe": { "kind": "wide-array-under-key", "key": "m~n", "itemCount": 9999 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload/m~0n",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    },
+    {
+      "id": "pointer-empty-key",
+      "recipe": { "kind": "wide-array-under-key", "key": "", "itemCount": 9999 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "json_max_nodes_exceeded",
+          "instancePointer": "/payload/",
+          "limit": 10000,
+          "observed": 10001
+        }
+      }
+    }
+  ],
+  "nonClaims": [
+    "This corpus is a bounded structural falsifier, not an exhaustive JSON graph proof.",
+    "This corpus does not bound canonical bytes, string length, transport bodies, ledger cardinality, or storage."
+  ]
+}

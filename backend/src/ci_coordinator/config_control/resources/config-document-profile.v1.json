@@ -1,0 +1,512 @@
+{
+  "schemaVersion": "ci-config-document-profile/v1",
+  "profileId": "ci-config-document/v1",
+  "ownerId": "ci-coordinator.config-control",
+  "structuralSchemaPath": "docs/specs/ci-coordinator-core/repository-policy.schema.v1.json",
+  "semanticProfilePath": "docs/specs/ci-coordinator-core/repository-policy-semantics.v1.json",
+  "compiledSchemaPath": "docs/specs/ci-coordinator-core/compiled-repository-policy.schema.v1.json",
+  "resultProfilePath": "docs/specs/ci-coordinator-core/policy-admission-result-profile.v1.json",
+  "producerFeasibilityProfilePath": "docs/specs/ci-coordinator-core/config-producer-feasibility-profile.v1.json",
+  "source": {
+    "acceptedFormats": ["json", "yaml-1.2"],
+    "formatSelection": "explicit",
+    "encoding": "utf-8",
+    "allowByteOrderMark": false,
+    "maxUtf8Bytes": 2097152
+  },
+  "documentAlgebra": {
+    "objectKeyType": "string",
+    "scalarTypes": ["null", "boolean", "safe-number", "unicode-scalar-string"],
+    "numberDomain": {
+      "finite": true,
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991,
+      "sourceProjection": "JSON and YAML numeric tokens denote their nearest IEEE-754 binary64 value; safe integer tokens preserve their exact value",
+      "integerClassification": "the projected binary64 value has zero fractional part",
+      "appliesTo": ["integer", "non-integer"],
+      "nonFiniteFailure": "parse.non_finite_number",
+      "outOfRangeFailure": "parse.unsafe_integer"
+    },
+    "maxDepth": 64,
+    "maxNodes": 32768
+  },
+  "collectionLimits": {
+    "maxRules": 32,
+    "maxBranchesPerRule": 64,
+    "maxOmittedSignalsPerRule": 32,
+    "maxRiskClasses": 128,
+    "maxAgentModelIds": 64,
+    "maxAgentPromptHashes": 64,
+    "maxGlobalRiskPaths": 256,
+    "maxValidationObligations": 128,
+    "maxExecutableWitnesses": 128,
+    "maxExecutionProfiles": 64,
+    "maxResponsibilityPathsPerObligation": 32,
+    "maxResponsibilityRiskClassesPerObligation": 32,
+    "maxRequiredWitnessesPerObligation": 32,
+    "maxSupportedDepthsPerWitness": 5,
+    "maxServicesPerExecutionProfile": 16,
+    "derivedMaximumNormalizedNodes": 26042,
+    "nodeLimitSlack": 6726
+  },
+  "normalization": {
+    "algorithm": "recursive-default-projection/v1",
+    "propertyDefaultLookup": "use a direct default annotation on the property subschema, otherwise follow only terminal local $ref targets; oneOf and allOf do not synthesize an absent-property default",
+    "allOfProjection": "for every present or inserted value, recurse through allOf subschemas in array order",
+    "steps": [
+      "validate parsed input against structuralSchemaPath without applying defaults",
+      "resolve only local schema references",
+      "for each absent optional property with a default annotation, deep-copy that exact JSON value",
+      "recurse into every present or inserted object property and array item",
+      "select the unique oneOf branch against the pre-default value before recursing",
+      "validate the projected result against structuralSchemaPath",
+      "require every pointer pattern in requiredNormalizedPointers to exist unless an ancestor is null"
+    ],
+    "requiredNormalizedPointers": [
+      "/repository/dynamicCi",
+      "/repository/rules/*/timing",
+      "/repository/rules/*/timing/absencePollLookbackSeconds",
+      "/repository/rules/*/omittedSignals",
+      "/repository/dynamicCi/planningEnabled",
+      "/repository/dynamicCi/riskClasses",
+      "/repository/dynamicCi/agentAdvice",
+      "/repository/dynamicCi/agentAdvice/enabled",
+      "/repository/dynamicCi/agentAdvice/modelIdAllowlist",
+      "/repository/dynamicCi/agentAdvice/promptHashAllowlist",
+      "/repository/dynamicCi/agentAdvice/minConfidence",
+      "/repository/dynamicCi/agentAdvice/promptInjectionEvalRequired",
+      "/repository/dynamicCi/dependencyGraph",
+      "/repository/dynamicCi/dependencyGraph/source",
+      "/repository/dynamicCi/dependencyGraph/globalRiskPaths",
+      "/repository/dynamicCi/fallbackTimeoutSeconds",
+      "/repository/dynamicCi/obligations/*/responsibility/paths",
+      "/repository/dynamicCi/obligations/*/responsibility/riskClasses",
+      "/repository/dynamicCi/executionProfiles/*/serviceProfileIds",
+      "/repository/dynamicCi/executionProfiles/*/shardingPolicy/cpuWeight",
+      "/repository/dynamicCi/executionProfiles/*/shardingPolicy/wallWeight",
+      "/repository/dynamicCi/executionProfiles/*/shardingPolicy/operatorWeight"
+    ]
+  },
+  "yamlRestrictions": {
+    "defaultVersion": "1.2",
+    "versionDirectivePolicy": "omitted or exactly 1.2",
+    "versionDirectiveMismatchFailure": "parse.invalid_syntax",
+    "emptyStreamProjection": "null",
+    "allowMultipleDocuments": false,
+    "allowDuplicateKeys": false,
+    "allowAnchors": false,
+    "allowAliases": false,
+    "allowMergeKeys": false,
+    "allowCustomTags": false,
+    "allowNonStringKeys": false,
+    "admittedResolvedTags": ["null", "bool", "int", "float", "str", "seq", "map"],
+    "nonJsonStandardTagFailure": "parse.custom_tag_forbidden",
+    "unicodeEscapeProjection": "fold valid UTF-16 surrogate pairs to one Unicode scalar before duplicate-key comparison and construction; reject every unpaired surrogate"
+  },
+  "pipeline": ["source", "decode", "parse", "structure", "semantics", "feasibility", "compile"],
+  "diagnostics": {
+    "identityFields": ["code", "phase", "ruleId", "instancePointer", "parameters"],
+    "messageIsIdentity": false,
+    "sourceDisclosurePolicy": {
+      "rawSourceInDiagnosticFields": false,
+      "rawValuesInParameters": false,
+      "unknownOrDuplicateKeyProjection": "instancePointer names the containing object; key text is omitted",
+      "instancePointerVocabulary": "schema-known property names plus array indices only",
+      "messageProjection": "static template selected by code and ruleId; no source interpolation"
+    },
+    "shape": {
+      "requiredFields": ["code", "phase", "ruleId", "instancePointer", "parameters"],
+      "additionalProperties": false,
+      "fieldTypes": {
+        "code": { "enumRef": "diagnostics.codes" },
+        "phase": { "enumRef": "diagnostics.phaseOrder" },
+        "ruleId": { "jsonType": "string", "minLength": 1 },
+        "instancePointer": { "jsonType": "string", "encoding": "rfc6901" },
+        "parameters": {
+          "jsonType": "object",
+          "schemaByCodeRef": "diagnostics.parameterSchemas",
+          "unlistedCodePolicyRef": "diagnostics.unlistedCodeParameters"
+        }
+      }
+    },
+    "phaseOrder": ["source", "decode", "parse", "structure", "semantics", "feasibility", "compile"],
+    "failureSelection": {
+      "resultCardinality": 1,
+      "phase": "lowest phaseOrder index with any failure",
+      "sourceRuleOrder": ["source.too_large", "source.unsupported_format"],
+      "decodeRuleOrder": ["decode.invalid_utf8", "decode.byte_order_mark_forbidden"],
+      "parseRule": "lowest source offset reported by the deterministic token or event preflight; ties use codes order",
+      "structureRule": "first failure from structuralFailureAlgorithm",
+      "semanticsRule": "minimum diagnosticOrdering tuple after evaluating every rule in semanticProfilePath",
+      "feasibilityRule": "minimum diagnosticOrdering tuple after evaluating every feasibility rule",
+      "compileRule": "minimum diagnosticOrdering tuple after compilation and output admission",
+      "diagnosticOrdering": [
+        "phaseOrder-index",
+        "instancePointer",
+        "codes-index",
+        "ruleId",
+        "kernel.canonical-json(parameters)"
+      ]
+    },
+    "parsePointerProjection": {
+      "parse.invalid_syntax": "root",
+      "parse.multiple_documents_forbidden": "root",
+      "parse.duplicate_key": "containing object",
+      "parse.graph_feature_forbidden": "deepest schema-known containing value",
+      "parse.custom_tag_forbidden": "deepest schema-known containing value",
+      "parse.non_string_key": "containing object",
+      "parse.non_finite_number": "deepest schema-known value pointer",
+      "parse.unsafe_integer": "deepest schema-known value pointer",
+      "parse.unpaired_surrogate": "deepest schema-known value pointer",
+      "resource.max_depth_exceeded": "deepest schema-known value pointer",
+      "resource.max_nodes_exceeded": "deepest schema-known value pointer",
+      "unknownObjectKeyRule": "omit the unknown key token and retain the containing object pointer",
+      "arrayIndexRule": "append the canonical non-negative decimal index"
+    },
+    "parseLocationProjection": {
+      "offsetUnit": "zero-based decoded Unicode scalar index",
+      "lineColumnUnit": "one-based Unicode scalar positions",
+      "lineTerminators": "LF, CR, and CRLF each terminate one line; CRLF is one terminator",
+      "nonBmpWidth": "one column",
+      "parse.invalid_syntax": "first unexpected or missing token position",
+      "parse.multiple_documents_forbidden": "second document start",
+      "parse.duplicate_key": "second key token start",
+      "parse.graph_feature_forbidden": "forbidden event start",
+      "parse.custom_tag_forbidden": "tagged event start",
+      "parse.non_string_key": "key event start",
+      "parse.non_finite_number": "scalar token or event start",
+      "parse.unsafe_integer": "scalar token or event start",
+      "parse.unpaired_surrogate": "string token or event start",
+      "resource.max_depth_exceeded": "candidate value token or event start",
+      "resource.max_nodes_exceeded": "candidate value token or event start",
+      "sameOffsetSelection": "lowest diagnostics.codes index"
+    },
+    "structuralFailureAlgorithm": {
+      "referenceResolution": "resolve only local refs before evaluation",
+      "oneOfSelection": "select the unique branch whose resolved JSON type matches the instance before evaluating that branch",
+      "allOfSelection": "evaluate subschemas in array order",
+      "traversal": "pre-order",
+      "objectChildOrder": "schema property names in Unicode scalar order",
+      "arrayChildOrder": "ascending index",
+      "keywordOrder": [
+        "type",
+        "const",
+        "enum",
+        "required",
+        "additionalProperties",
+        "minimum",
+        "maximum",
+        "minLength",
+        "maxLength",
+        "pattern",
+        "minItems",
+        "maxItems",
+        "oneOf",
+        "allOf",
+        "properties",
+        "items"
+      ],
+      "requiredSelection": "lowest missing property in Unicode scalar order",
+      "additionalPropertiesSelection": "lowest unknown property in Unicode scalar order; instancePointer remains the containing object and key text is not projected",
+      "requiredAndAdditionalPropertiesPointer": "containing object",
+      "otherKeywordPointer": "offending value",
+      "failure": "return immediately on the first failed keyword or child",
+      "libraryValidationRole": "a Draft 2020-12 validator confirms validity only; library error enumeration is not diagnostic authority"
+    },
+    "codePhase": {
+      "source.too_large": "source",
+      "source.unsupported_format": "source",
+      "decode.invalid_utf8": "decode",
+      "decode.byte_order_mark_forbidden": "decode",
+      "parse.invalid_syntax": "parse",
+      "parse.multiple_documents_forbidden": "parse",
+      "parse.duplicate_key": "parse",
+      "parse.graph_feature_forbidden": "parse",
+      "parse.custom_tag_forbidden": "parse",
+      "parse.non_string_key": "parse",
+      "parse.non_finite_number": "parse",
+      "parse.unsafe_integer": "parse",
+      "parse.unpaired_surrogate": "parse",
+      "resource.max_depth_exceeded": "parse",
+      "resource.max_nodes_exceeded": "parse",
+      "structure.invalid": "structure",
+      "semantics.non_canonical_string": "semantics",
+      "semantics.invalid": "semantics",
+      "feasibility.audit_projection_exceeded": "feasibility",
+      "compile.output_invalid": "compile",
+      "compile.output_too_large": "compile"
+    },
+    "ruleIdProjection": {
+      "fixedByCode": {
+        "source.too_large": "source.max-utf8-bytes",
+        "source.unsupported_format": "source.accepted-format",
+        "decode.invalid_utf8": "decode.utf8",
+        "decode.byte_order_mark_forbidden": "decode.byte-order-mark",
+        "parse.invalid_syntax": "parse.syntax",
+        "parse.multiple_documents_forbidden": "parse.single-document",
+        "parse.duplicate_key": "parse.unique-key",
+        "parse.graph_feature_forbidden": "parse.no-graph-features",
+        "parse.custom_tag_forbidden": "parse.no-custom-tags",
+        "parse.non_string_key": "parse.string-keys",
+        "parse.non_finite_number": "parse.finite-number",
+        "parse.unsafe_integer": "parse.safe-integer",
+        "parse.unpaired_surrogate": "parse.unicode-scalar",
+        "resource.max_depth_exceeded": "resource.max-depth",
+        "resource.max_nodes_exceeded": "resource.max-nodes",
+        "semantics.non_canonical_string": "string.canonical-whitespace",
+        "feasibility.audit_projection_exceeded": "feasibility.audit-projection",
+        "compile.output_too_large": "compile.output-bytes"
+      },
+      "structure.invalid": "schema:<draft-2020-12-keyword>",
+      "semantics.invalid": "one exact rule id declared by semanticProfilePath",
+      "compile.output_invalid": "schema:<draft-2020-12-keyword>"
+    },
+    "codes": [
+      "source.too_large",
+      "source.unsupported_format",
+      "decode.invalid_utf8",
+      "decode.byte_order_mark_forbidden",
+      "parse.invalid_syntax",
+      "parse.multiple_documents_forbidden",
+      "parse.duplicate_key",
+      "parse.graph_feature_forbidden",
+      "parse.custom_tag_forbidden",
+      "parse.non_string_key",
+      "parse.non_finite_number",
+      "parse.unsafe_integer",
+      "parse.unpaired_surrogate",
+      "resource.max_depth_exceeded",
+      "resource.max_nodes_exceeded",
+      "structure.invalid",
+      "semantics.non_canonical_string",
+      "semantics.invalid",
+      "feasibility.audit_projection_exceeded",
+      "compile.output_invalid",
+      "compile.output_too_large"
+    ],
+    "parameterSchemas": {
+      "source.too_large": {
+        "required": ["limit", "observed"],
+        "properties": { "limit": "non-negative-integer", "observed": "non-negative-integer" }
+      },
+      "source.unsupported_format": {
+        "required": ["accepted"],
+        "properties": { "accepted": "sorted-string-array" }
+      },
+      "decode.invalid_utf8": {
+        "required": ["offset"],
+        "properties": { "offset": "non-negative-integer" }
+      },
+      "parse.invalid_syntax": {
+        "required": ["format", "line", "column"],
+        "properties": {
+          "format": "accepted-source-format",
+          "line": "positive-integer",
+          "column": "positive-integer"
+        }
+      },
+      "resource.max_depth_exceeded": {
+        "required": ["limit", "observed"],
+        "properties": { "limit": "non-negative-integer", "observed": "non-negative-integer" }
+      },
+      "resource.max_nodes_exceeded": {
+        "required": ["limit", "observed"],
+        "properties": { "limit": "non-negative-integer", "observed": "non-negative-integer" }
+      },
+      "structure.invalid": {
+        "required": ["schemaKeyword", "schemaPointer"],
+        "properties": { "schemaKeyword": "string", "schemaPointer": "rfc6901-json-pointer" }
+      },
+      "compile.output_invalid": {
+        "required": ["schemaKeyword", "schemaPointer"],
+        "properties": { "schemaKeyword": "string", "schemaPointer": "rfc6901-json-pointer" }
+      },
+      "feasibility.audit_projection_exceeded": {
+        "required": ["profileId", "limit", "observed", "projectionId"],
+        "properties": {
+          "profileId": "string",
+          "limit": "non-negative-integer",
+          "observed": "non-negative-integer",
+          "projectionId": "string"
+        }
+      },
+      "compile.output_too_large": {
+        "required": ["projection", "limit", "observed"],
+        "properties": {
+          "projection": "normalized-document-or-compiled-policy",
+          "limit": "non-negative-integer",
+          "observed": "non-negative-integer"
+        }
+      }
+    },
+    "parameterObjectAdditionalProperties": false,
+    "unlistedCodeParameters": "empty-object",
+    "orderingRelations": {
+      "instancePointer": {
+        "decode": "RFC 6901 tokens",
+        "commonPrefix": "compare the first unequal token against the instance document selected by phase",
+        "arrayTokens": "canonical non-negative decimal integer order",
+        "objectTokens": "lexicographic Unicode-scalar-sequence order",
+        "prefix": "a pointer precedes every strict descendant",
+        "phaseDocuments": {
+          "source": "raw source envelope",
+          "decode": "raw source envelope",
+          "parse": "partially recognized source document",
+          "structure": "parsed policy document",
+          "semantics": "normalized policy document",
+          "feasibility": "normalized policy document",
+          "compile": "compiled policy document"
+        }
+      },
+      "ruleId": "lexicographic Unicode-scalar-sequence order",
+      "canonicalParameters": "unsigned byte lexicographic order",
+      "equalIdentityTuples": "deduplicate before selecting the minimum"
+    },
+    "compiledStructuralFailureAlgorithm": {
+      "baseAlgorithm": "diagnostics.structuralFailureAlgorithm",
+      "schema": "compiledSchemaPath",
+      "instance": "compiled policy before canonical serialization or hashing",
+      "code": "compile.output_invalid",
+      "ruleId": "schema:<failed-keyword>",
+      "parameters": "schemaKeyword and resolved schemaPointer under compiledSchemaPath",
+      "requiredAndAdditionalPropertiesPointer": "containing compiled object",
+      "otherKeywordPointer": "offending compiled value",
+      "nextPhaseOnFailure": "none"
+    },
+    "parameterTypeVocabulary": {
+      "non-negative-integer": { "jsonType": "integer", "minimum": 0 },
+      "positive-integer": { "jsonType": "integer", "minimum": 1 },
+      "non-empty-string": { "jsonType": "string", "minLength": 1 },
+      "string": { "jsonType": "string" },
+      "unicode-scalar-string": { "jsonType": "string", "unicodeScalarsOnly": true },
+      "sorted-string-array": {
+        "jsonType": "array",
+        "items": "string",
+        "order": "ECMAScript-UTF16"
+      },
+      "accepted-source-format": { "enumRef": "source.acceptedFormats" },
+      "rfc6901-json-pointer": { "jsonType": "string", "encoding": "rfc6901" },
+      "normalized-document-or-compiled-policy": {
+        "enum": ["normalized-document", "compiled-policy"]
+      }
+    },
+    "monotonicStrengtheningIdentity": ["code", "ruleId", "pointerClass"]
+  },
+  "hashes": {
+    "algorithm": "sha256",
+    "canonicalJsonOwner": "kernel.canonical-json/v1",
+    "digestEncoding": "lowercase-hex-64",
+    "sourceHashProjection": "utf8(ci-policy-source/v1) + nul + utf8(explicit-format) + nul + exact-admitted-source-bytes",
+    "documentHashProjection": "utf8(ci-policy-document/v1) + nul + canonical-normalized-policy-document-v1",
+    "epochHashProjection": "utf8(ci-compiled-repository-policy/v1) + nul + canonical-compiled-repository-policy-v1",
+    "dynamicPolicyCompatibilityHashes": ["policyHash", "configuredValidationCatalogHash"]
+  },
+  "compilation": {
+    "schemaVersion": "ci-compiled-repository-policy/v1",
+    "scope": {
+      "installationId": "/repository/installationId",
+      "repositoryId": "/repository/repositoryId"
+    },
+    "directFields": {
+      "owner": "/repository/owner",
+      "name": "/repository/name",
+      "defaultBranch": "/repository/defaultBranch"
+    },
+    "rules": {
+      "source": "/repository/rules",
+      "order": "preserve-input",
+      "fieldProjection": {
+        "name": "name",
+        "event": "on/event",
+        "branches": "on/branches:preserve-input",
+        "mode": "mode",
+        "timing": "timing:all-normalized-fields",
+        "expectedSignals": "expectedSignals:preserve-input",
+        "omittedSignals": "omittedSignals:preserve-input"
+      }
+    },
+    "dynamicCi": {
+      "nullWhen": "repository.dynamicCi is null or planningEnabled is false",
+      "compatibilityHashes": {
+        "algorithm": "sha256",
+        "canonicalJsonOwner": "kernel.canonical-json/v1",
+        "domainSeparator": null,
+        "configuredValidationCatalogHash": {
+          "objectFieldOrderIsCanonical": true,
+          "fields": {
+            "obligations": "compiled-dynamicCi.obligations:all-fields",
+            "witnesses": "compiled-dynamicCi.witnesses:all-fields",
+            "executionProfiles": "compiled-dynamicCi.executionProfiles:all-fields"
+          }
+        },
+        "policyHash": {
+          "objectFieldOrderIsCanonical": true,
+          "fields": {
+            "policyVersion": "/repository/dynamicCi/policyVersion",
+            "configuredValidationCatalogHash": "computed:configuredValidationCatalogHash",
+            "riskClasses": "compiled-dynamicCi.riskClasses",
+            "agentAdvice": "compiled-dynamicCi.agentAdvice:all-fields",
+            "dependencyGraphSource": "compiled-dynamicCi.dependencyGraphSource",
+            "globalRiskPaths": "compiled-dynamicCi.globalRiskPaths",
+            "fallbackTimeoutSeconds": "compiled-dynamicCi.fallbackTimeoutSeconds"
+          }
+        }
+      },
+      "directFields": ["dependencyGraph.source", "fallbackTimeoutSeconds"],
+      "sortedUniqueFields": [
+        "riskClasses",
+        "agentAdvice.modelIdAllowlist",
+        "agentAdvice.promptHashAllowlist",
+        "dependencyGraph.globalRiskPaths"
+      ],
+      "entityOrder": {
+        "obligations": "obligationId:ECMAScript-UTF16",
+        "witnesses": "witnessId:ECMAScript-UTF16",
+        "executionProfiles": "profileId:ECMAScript-UTF16"
+      },
+      "sortedUniqueNestedFields": [
+        "obligations.responsibility.paths",
+        "obligations.responsibility.riskClasses",
+        "obligations.requiredWitnessIds",
+        "witnesses.supportedDepths",
+        "executionProfiles.serviceProfileIds"
+      ],
+      "compiledFieldNames": {
+        "dependencyGraph.source": "dependencyGraphSource",
+        "dependencyGraph.globalRiskPaths": "globalRiskPaths"
+      }
+    },
+    "setOrder": "ECMAScript-UTF16",
+    "validateOutputAgainst": "compiledSchemaPath"
+  },
+  "outputs": {
+    "maxNormalizedDocumentCanonicalBytes": 4194304,
+    "maxCompiledPolicyCanonicalBytes": 4194304,
+    "byteAdmission": {
+      "measure": "canonical-json-utf-8-octets/v1",
+      "candidateProjections": ["normalized-document", "compiled-policy"],
+      "evaluation": "measure both projections and create one compile.output_too_large candidate for each overflow",
+      "overflowObserved": "the applicable limit plus one",
+      "encoderTermination": "stop a projection after proving its limit plus one overflow sentinel",
+      "failureSelection": "minimum candidate under diagnostics.failureSelection.diagnosticOrdering",
+      "hashPrecondition": "sourceHash, documentHash, epochHash, and epochId are not computed until both projections are admitted"
+    },
+    "scopeProjection": "kernel.canonical_json({installationId,repositoryId})",
+    "epochIdProjection": "sha256(utf8(ci-config-epoch/v1) + nul + scopeProjection + nul + asciiLowerHex(sourceHash) + nul + asciiLowerHex(documentHash) + nul + asciiLowerHex(epochHash))"
+  },
+  "resourceLimitRationale": {
+    "maxUtf8Bytes": "Operational admission ceiling for repository policy source before decoding or parser allocation.",
+    "maxDepth": "Finite recursion ceiling shared by every accepted source format.",
+    "maxNodes": "The schema cardinality maximum is 26042 nodes under the kernel tree measure; 32768 admits that complete domain with explicit slack and rejects structurally larger documents."
+  },
+  "compatibility": {
+    "limitsAreRuntimeTunable": false,
+    "domainChangeRequiresNewProfileAndDocumentSchemaVersion": true
+  },
+  "nonClaims": [
+    "This profile does not define transport request-body limits.",
+    "This profile does not claim that every document within its resource limits is structurally or semantically valid.",
+    "This profile does not make policy admission sufficient for every runtime audit payload.",
+    "This profile does not authorize activation, provider access, or production dynamic omission."
+  ]
+}

@@ -1,0 +1,135 @@
+min_version = "2026.9.11"
+
+[settings]
+activate_aggressive = true
+auto_install = false
+
+[tools]
+gitleaks = "8.30.1"
+node = "24.21.0"
+pnpm = "12.5.1"
+python = "3.13.15"
+uv = "0.12.17"
+
+[tasks.install]
+description = "Install exact tools and locked backend and frontend dependencies"
+run = [
+  "mise install --locked python uv node pnpm gitleaks",
+  "mise exec -- sh -c 'scanner_version=$(gitleaks version) && test \"$scanner_version\" = \"8.30.1\"'",
+  "mise exec -- python -S -m scripts.dev_environment.task install",
+]
+
+[tasks."install:backend"]
+description = "Install locked Python dependencies without host frontend tools"
+run = [
+  "mise install --locked python uv",
+  "mise exec -- python -S -m scripts.dev_environment.task install:backend",
+]
+
+[tasks."install:frontend"]
+description = "Install locked frontend dependencies"
+run = [
+  "mise install --locked python node pnpm",
+  "mise exec -- python -S -m scripts.dev_environment.task install:frontend",
+]
+
+[tasks."browser:install"]
+description = "Install the Chromium provider used by browser witnesses"
+depends = ["install"]
+run = "python -S -m scripts.dev_environment.task browser:install"
+
+[tasks."browser:prepare"]
+description = "Prepare frontend dependencies and Chromium for synthetic browser sessions"
+depends = ["install:frontend"]
+run = "python -S -m scripts.dev_environment.task browser:prepare"
+
+[tasks."dev:doctor"]
+description = "Diagnose local prerequisites without installing dependencies"
+run = "python -S -m scripts.dev_environment.task dev:doctor"
+
+[tasks."dev:prepare"]
+description = "Prepare and validate the isolated local instance"
+depends = ["install:backend"]
+run = "python -S -m scripts.dev_environment.task dev:prepare"
+
+[tasks."dev:up"]
+description = "Build and start the isolated connected stack"
+depends = ["install:backend"]
+run = "python -S -m scripts.dev_environment.task dev:up"
+
+[tasks."dev:status"]
+description = "Report owned services and dynamically assigned endpoints"
+run = "python -S -m scripts.dev_environment.task dev:status"
+
+[tasks."dev:smoke"]
+description = "Verify the running connected stack and secret boundary"
+run = "python -S -m scripts.dev_environment.task dev:smoke"
+
+[tasks."dev:logs"]
+description = "Follow bounded-tail logs for the active worktree instance"
+raw = true
+run = "python -S -m scripts.dev_environment.task dev:logs"
+
+[tasks."dev:watch"]
+description = "Start the isolated stack and apply admitted source changes"
+depends = ["install:backend"]
+raw = true
+run = "python -S -m scripts.dev_environment.task dev:watch"
+
+[tasks."dev:down"]
+description = "Stop the active instance while preserving its data"
+run = "python -S -m scripts.dev_environment.task dev:down"
+
+[tasks."dev:reset"]
+description = "Remove the active instance and its persistent local data"
+confirm = "Remove the current worktree's containers, network, volumes, and local credentials?"
+run = "python -S -m scripts.dev_environment.task dev:reset"
+
+[tasks."dev:open"]
+description = "Open the admitted local UI endpoint or print its headless fallback"
+run = "python -S -m scripts.dev_environment.task dev:open"
+
+[tasks."dev:debug-backend"]
+description = "Start the optional backend debugger on a dynamic loopback port"
+raw = true
+run = "python -S -m scripts.dev_environment.task dev:debug-backend"
+
+[tasks."dev:demo"]
+description = "Explore isolated synthetic UI scenarios after browser:prepare"
+raw = true
+run = "python -S -m scripts.dev_environment.task dev:demo"
+
+[tasks."browser:ui"]
+description = "Open Playwright UI with isolated synthetic scenarios"
+raw = true
+run = "python -S -m scripts.dev_environment.task browser:ui"
+
+[tasks."browser:debug"]
+description = "Debug an isolated synthetic browser session"
+raw = true
+run = "python -S -m scripts.dev_environment.task browser:debug"
+
+[tasks."browser:record"]
+description = "Record interactions in an isolated synthetic browser session"
+raw = true
+run = "python -S -m scripts.dev_environment.task browser:record"
+
+[tasks.check]
+description = "Run the deterministic repository quality plan"
+run = "python -S -m scripts.dev_environment.task check"
+
+[tasks."test:api"]
+description = "Run the bounded API contract campaign"
+run = "python -S -m scripts.dev_environment.task test:api"
+
+[tasks."test:api:deep"]
+description = "Explore more API contract inputs within a five-minute process budget"
+run = "python -S -m scripts.dev_environment.task test:api:deep"
+
+[tasks."check:portable"]
+description = "Run provisioned quality witnesses without Docker or network access"
+run = "python -S -m scripts.dev_environment.task check:portable"
+
+[tasks."toolchain:check"]
+description = "Verify the declared toolchain without installing dependencies"
+run = "python -S -m scripts.dev_environment.task toolchain:check"

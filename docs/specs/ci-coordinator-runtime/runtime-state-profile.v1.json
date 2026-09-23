@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "ci-runtime-state-profile/v1",
+  "profileId": "ci-runtime-ingress-issuance-state/v1",
+  "ownerId": "ci-coordinator.runtime",
+  "limits": {
+    "deliveryIdUtf8Bytes": 256,
+    "issuanceIdempotencyKeyUtf8Bytes": 128,
+    "issuedPlanRecordIdUtf8Bytes": 64,
+    "productionAdmissionAuthorityIdUtf8Bytes": 53,
+    "productionAdmissionEnvelopeCanonicalBytes": 262144,
+    "productionAdmissionKeyIdUtf8Bytes": 128,
+    "productionAdmissionPublicKeyDerBytes": 44,
+    "signedEnvelopeCanonicalBytes": 1048576
+  },
+  "nonClaims": [
+    "This profile does not admit shadow evidence, operator controls, reconciliation state, retention, or deployment capacity."
+  ]
+}

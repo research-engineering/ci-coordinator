@@ -1,0 +1,189 @@
+{
+  "schemaVersion": "ci-coordinator.runtime-repair-policy/v1",
+  "validFrom": "2026-09-21T00:00:00Z",
+  "validUntil": "2026-10-05T00:00:00Z",
+  "sourceInputs": {
+    "Dockerfile": "09cfd8744652b9268f67859eab96d74fac38ced51b28d86477dde11e9ee401f9",
+    "docker/runtime/application_layer.py": "0426900dce8aa693b24b74b211188f6c5303d924e7636f3ff6df574548334e60",
+    "docker/runtime/assemble.sh": "bfc807c032a075a143f0ecdd0fc2dfcbf15d4b177248a402683b6cf6d7bc84b7",
+    "docker/runtime/install.sh": "9ed9beb8dc3c25f6489498cea29373a4225383382f8a2e4d0f83e3ccba5a5ad7",
+    "docker/runtime/package_metadata.py": "27926ff599fb40c9d2d7c1619009c464bf0d5e13896cd859a76862c45a970b7a",
+    "docker/runtime/security/apply_stdlib.py": "388394c095b3bffa89dbe52cab82b1341d2ea71f3fbf1118d5942046214d463f",
+    "docker/runtime/security/build.sh": "d26ee99044f98a2eb74130c94cdfb0effea473016098ab509f8d4a49da260026",
+    "docker/runtime/security/check_stdlib.py": "4b75f3ba5e9fb65def16b386833221c78f9cabb55fd615121ae86e9cf10466ea",
+    "docker/runtime/security/check_tarfile.py": "8ab5d7dae92c5366f578ba313f18b0e2b2b71e948bdf04ec96fc0f6e252706dd",
+    "docker/runtime/security/check_zlib.c": "64cbcabf5013a39eef83f3eabf0fe9e39e1889bce798bcd7ed7fa378ae958c6c",
+    "docker/runtime/security/manifest.py": "21fa4dfff68779a56d4713d2a3af1517d34830745afac16196a32e6db7db5886",
+    "docker/runtime/security/python-poplib.patch": "35a35c2d9c04fdd41ce14ceb0d2847d1eeee4b054884430b787c6977a40c777e",
+    "docker/runtime/security/python-stringprep.patch": "a808d9e2e650c7723878cb888315f90953a8c7de62e0fcbb257edd2251df15b9",
+    "docker/runtime/security/python-tarfile.patch": "7821f7f4ce31ff699f81120fc0d959dc077ed829a413352307a3db8c02112fb8",
+    "docker/runtime/security/python-urllib-request.patch": "6d55bde691b5f03d3991d1618fb0b8193c432d36820dc59b9aabffae65f2b3ac",
+    "docker/runtime/security/python-zipfile-__init__.patch": "bc9158b7adac1f0ae364fc00caaead4dfb5a90a3a828eb211cd4e2a0ec6b037c",
+    "docker/runtime/security/stdlib-backports.json": "f2435faa4056c979159bf695559cd96bddfc366e853bd322a385372e122e557b",
+    "docker/runtime/security/zlib-control": "3c1850356da749113131f3b925dfbaa9b442d9880f60155759209d2a748e0472",
+    "docker/runtime/security/zlib.patch": "27c5e355568b0ddcbb563abde0bd2d6e3d3c135d9249236cec4339493919b310",
+    "docker/runtime/ubuntu-snapshot.conf": "72d9271c32f1b4743d7a39301ba62ce3893b7db0f9cb8b47ddfb37936878ea9b"
+  },
+  "installedFiles": {
+    "/usr/lib/x86_64-linux-gnu/libz.so.1.3.2": "d6d3f740a1474d964b5ae287e25413879cc699132fd08f399a82157f980e9699",
+    "/usr/local/bin/python3.13": "73efccb6aa17a74869ef6f11e0a0118b0f27693ea85f36c7a3758c307fd8914f",
+    "/usr/local/lib/libpython3.13.so.1.0": "085a2b2227f39be171d5fd68967fba933adb37b7ab8b879d2a2565d4f7bb6b41",
+    "/usr/local/lib/python3.13/__pycache__/poplib.cpython-313.pyc": "bfda1f605e068fa1368f5815860ba45d220edf31b817fb0e7146f8d2c15830cd",
+    "/usr/local/lib/python3.13/__pycache__/stringprep.cpython-313.pyc": "1cfde1f2aee922f735d0d8101ad61be0a0fc398788bf8e056e325d100392998a",
+    "/usr/local/lib/python3.13/__pycache__/tarfile.cpython-313.pyc": "5d563f2052ae342293c239b459be5dc2ada3856a64cfefb0722aef8fed9fd982",
+    "/usr/local/lib/python3.13/poplib.py": "a6ffff188814b56d95b043c31d9e0dfee51ac6d6e92afe74ab070cb6136b076f",
+    "/usr/local/lib/python3.13/stringprep.py": "fc42fedb2a828a34a70cb0ff1b9a17039ca148b4f561fa7db98ce49bb2141c7a",
+    "/usr/local/lib/python3.13/tarfile.py": "8f46eb2064b20420b8126508a3524cd684830ed97a860992283a5074d1793743",
+    "/usr/local/lib/python3.13/urllib/__pycache__/request.cpython-313.pyc": "c0d696ffad823da3808833cb1dddbac73bf546558990c5dd0aee1665c370052e",
+    "/usr/local/lib/python3.13/urllib/request.py": "e3bf4446c45300c800f62e869ce1ee89fa745fa073c03e6655f4f4e20fde6eb2",
+    "/usr/local/lib/python3.13/zipfile/__init__.py": "4067e573036149c17b2a80c288c392e1f574a9566c1d94332b2576b0c2b0a0d4",
+    "/usr/local/lib/python3.13/zipfile/__pycache__/__init__.cpython-313.pyc": "d58a48656c7761e3776baa09be684ff7db984ac39cc22ec94066e9a1269a0ce9",
+    "/usr/share/ci-coordinator/security-repairs.json": "fd7afde00f17a1d668177684d286612a4c2384cf8ed5c4bf1f3f1cdd440af01d"
+  },
+  "occurrences": [
+    {
+      "cve": "CVE-2026-17084",
+      "severity": "Medium",
+      "package": "python",
+      "version": "3.13.15",
+      "packageType": "binary",
+      "purl": "pkg:generic/python@3.13.15",
+      "locations": [
+        {
+          "path": "/usr/local/bin/python3.13",
+          "evidence": "primary"
+        },
+        {
+          "path": "/usr/local/lib/libpython3.13.so.1.0",
+          "evidence": "supporting"
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-19672",
+      "severity": "Medium",
+      "package": "python",
+      "version": "3.13.15",
+      "packageType": "binary",
+      "purl": "pkg:generic/python@3.13.15",
+      "locations": [
+        {
+          "path": "/usr/local/bin/python3.13",
+          "evidence": "primary"
+        },
+        {
+          "path": "/usr/local/lib/libpython3.13.so.1.0",
+          "evidence": "supporting"
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-87910",
+      "severity": "Medium",
+      "package": "python",
+      "version": "3.13.15",
+      "packageType": "binary",
+      "purl": "pkg:generic/python@3.13.15",
+      "locations": [
+        {
+          "path": "/usr/local/bin/python3.13",
+          "evidence": "primary"
+        },
+        {
+          "path": "/usr/local/lib/libpython3.13.so.1.0",
+          "evidence": "supporting"
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-15806",
+      "severity": "Medium",
+      "package": "python",
+      "version": "3.13.15",
+      "packageType": "binary",
+      "purl": "pkg:generic/python@3.13.15",
+      "locations": [
+        {
+          "path": "/usr/local/bin/python3.13",
+          "evidence": "primary"
+        },
+        {
+          "path": "/usr/local/lib/libpython3.13.so.1.0",
+          "evidence": "supporting"
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-85091",
+      "severity": "Medium",
+      "package": "zlib1g",
+      "version": "1:1.3.2-0+ci1",
+      "packageType": "deb",
+      "purl": "pkg:deb/ubuntu/zlib1g@1%3A1.3.2-0%2Bci1?arch=amd64&distro=ubuntu-26.04&upstream=zlib",
+      "locations": [
+        {
+          "path": "/var/lib/dpkg/status",
+          "evidence": "primary"
+        },
+        {
+          "path": "/usr/share/doc/zlib1g/copyright",
+          "evidence": "supporting"
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2025-15367",
+      "severity": "Medium",
+      "package": "python",
+      "version": "3.13.15",
+      "packageType": "binary",
+      "purl": "pkg:generic/python@3.13.15",
+      "locations": [
+        {
+          "path": "/usr/local/bin/python3.13",
+          "evidence": "primary"
+        },
+        {
+          "path": "/usr/local/lib/libpython3.13.so.1.0",
+          "evidence": "supporting"
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-82049",
+      "severity": "High",
+      "package": "python",
+      "version": "3.13.15",
+      "packageType": "binary",
+      "purl": "pkg:generic/python@3.13.15",
+      "locations": [
+        {
+          "path": "/usr/local/bin/python3.13",
+          "evidence": "primary"
+        },
+        {
+          "path": "/usr/local/lib/libpython3.13.so.1.0",
+          "evidence": "supporting"
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-15310",
+      "severity": "Low",
+      "package": "python",
+      "version": "3.13.15",
+      "packageType": "binary",
+      "purl": "pkg:generic/python@3.13.15",
+      "locations": [
+        {
+          "path": "/usr/local/bin/python3.13",
+          "evidence": "primary"
+        },
+        {
+          "path": "/usr/local/lib/libpython3.13.so.1.0",
+          "evidence": "supporting"
+        }
+      ]
+    }
+  ]
+}

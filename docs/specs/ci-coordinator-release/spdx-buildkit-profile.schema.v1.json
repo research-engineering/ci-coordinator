@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-engineering.github.io/ci-coordinator/schemas/spdx-buildkit-profile/v1",
+  "title": "CI Coordinator BuildKit SPDX 2.3 admission profile",
+  "type": "object",
+  "required": [
+    "creationInfo",
+    "documentNamespace",
+    "packages"
+  ],
+  "properties": {
+    "creationInfo": {
+      "type": "object",
+      "required": [
+        "created",
+        "creators"
+      ],
+      "properties": {
+        "created": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "creators": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "documentNamespace": {
+      "type": "string",
+      "pattern": "^https?://",
+      "minLength": 1
+    },
+    "packages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "SPDXID",
+          "downloadLocation",
+          "name"
+        ],
+        "properties": {
+          "SPDXID": {
+            "type": "string",
+            "pattern": "^SPDXRef-[A-Za-z0-9.-]+$"
+          },
+          "downloadLocation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

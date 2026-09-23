@@ -1,0 +1,575 @@
+{
+  "schemaVersion": 1,
+  "profileId": "ci-coordinator.module-ownership.v1",
+  "ownerId": "ci-coordinator.core",
+  "reviewSignals": {
+    "signalOnly": true,
+    "metrics": [
+      {
+        "metricId": "physical-lines",
+        "operator": "gt",
+        "threshold": 400,
+        "applicableSuffixes": ["*"],
+        "applicableFileKinds": [
+          "composition-root",
+          "production-authority",
+          "production-like-script",
+          "test"
+        ]
+      },
+      {
+        "metricId": "recognized-public-declarations",
+        "operator": "gt",
+        "threshold": 12,
+        "applicableSuffixes": [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".py", ".ts", ".tsx"],
+        "applicableFileKinds": [
+          "composition-root",
+          "production-authority",
+          "production-like-script"
+        ]
+      },
+      {
+        "metricId": "first-party-import-contexts",
+        "operator": "gte",
+        "threshold": 3,
+        "applicableSuffixes": [".cjs", ".cts", ".js", ".jsx", ".mjs", ".mts", ".py", ".ts", ".tsx"],
+        "applicableFileKinds": [
+          "composition-root",
+          "production-authority",
+          "production-like-script",
+          "test"
+        ]
+      }
+    ],
+    "grammarId": "ci-coordinator.module-ownership-signals.v2",
+    "runtimeIds": ["cpython-3.13.15"],
+    "unknownDisposition": "review-required",
+    "verdictCeiling": "review-required"
+  },
+  "candidateQueue": {
+    "cappedDeferredVerdict": "abstain",
+    "defaultMaximumCandidates": null,
+    "requiresCompletenessAccounting": true,
+    "separateTestCohort": true
+  },
+  "traversalLimits": {
+    "maximumDepth": 16,
+    "maximumEntries": 4096,
+    "maximumOwnedFiles": 2048,
+    "maximumCandidateFileBytes": 8388608,
+    "gitPathDiscoveryTimeoutSeconds": 30,
+    "maximumRelativePathBytes": 2048,
+    "maximumTotalCandidateBytes": 268435456,
+    "maximumTotalPathBytes": 4194304
+  },
+  "fileKinds": [
+    "composition-root",
+    "declarative",
+    "documentation",
+    "generated",
+    "migration",
+    "other",
+    "production-authority",
+    "production-like-script",
+    "test",
+    "vendor-build-cache"
+  ],
+  "fileKindClassification": {
+    "resolution": "first-match",
+    "defaultKind": "other",
+    "rules": [
+      {
+        "kind": "test",
+        "pathPatterns": [
+          "backend/tests/**",
+          "fixtures/**",
+          "frontend/tests/**",
+          "frontend/tools/*.test.ts",
+          "frontend/tools/diagrams*-checks.mjs",
+          "scripts/**/*_test.py",
+          "scripts/tests/**",
+          "test_*.py"
+        ]
+      },
+      {
+        "kind": "migration",
+        "pathPatterns": ["backend/alembic/**"]
+      },
+      {
+        "kind": "generated",
+        "pathPatterns": ["frontend/src/api/generated.ts"]
+      },
+      {
+        "kind": "composition-root",
+        "pathPatterns": [
+          "backend/src/ci_coordinator/api/http/app.py",
+          "backend/src/ci_coordinator/runtime/composition.py",
+          "backend/src/ci_coordinator/runtime/control_plane_composition.py"
+        ]
+      },
+      {
+        "kind": "documentation",
+        "pathPatterns": ["*.md", "docs/**/*.md"]
+      },
+      {
+        "kind": "vendor-build-cache",
+        "pathPatterns": [
+          "**/.mypy_cache/**",
+          "**/.pytest_cache/**",
+          "**/.ruff_cache/**",
+          "**/.venv/**",
+          "**/__pycache__/**",
+          "**/coverage/**",
+          "**/dist/**",
+          "**/node_modules/**",
+          "**/vendor/**"
+        ]
+      },
+      {
+        "kind": "production-like-script",
+        "pathPatterns": [
+          ".devcontainer/*.sh",
+          ".githooks/*",
+          ".github/actions/**/*.py",
+          ".github/actions/**/*.sh",
+          "docker/**/*.sh",
+          "frontend/*.config.ts",
+          "frontend/tools/*.mjs",
+          "frontend/tools/*.ts",
+          "scripts/**/*.py",
+          "scripts/**/*.sql",
+          "scripts/*.py"
+        ]
+      },
+      {
+        "kind": "declarative",
+        "pathPatterns": [
+          "**/*.Dockerfile",
+          "**/*.ini",
+          "**/*.json",
+          "**/*.lock",
+          "**/*.patch",
+          "**/*.toml",
+          "**/*.yaml",
+          "**/*.yml",
+          "**/.dockerignore",
+          "**/.env.example",
+          "**/.gitignore",
+          "**/.npmrc",
+          "**/Dockerfile",
+          "**/Dockerfile.*",
+          "*.Dockerfile",
+          "*.ini",
+          "*.json",
+          "*.lock",
+          "*.patch",
+          "*.toml",
+          "*.yaml",
+          "*.yml",
+          ".devcontainer/**",
+          ".dockerignore",
+          ".env.example",
+          ".github/**",
+          ".gitignore",
+          ".npmrc",
+          "Dockerfile",
+          "Dockerfile.*"
+        ]
+      },
+      {
+        "kind": "production-authority",
+        "pathPatterns": ["backend/src/**", "frontend/index.html", "frontend/src/**"]
+      }
+    ]
+  },
+  "exclusiveOwnershipRoots": [
+    {
+      "root": "frontend/src/api",
+      "suffixes": [".cts", ".mts", ".ts", ".tsx"],
+      "responsibilityIds": [
+        "frontend-api.activity",
+        "frontend-api.ci-economics",
+        "frontend-api.config-activation",
+        "frontend-api.config-lifecycle",
+        "frontend-api.control-plane-identity",
+        "frontend-api.development",
+        "frontend-api.generated",
+        "frontend-api.governance-baseline",
+        "frontend-api.governance-comparison",
+        "frontend-api.governance-observation",
+        "frontend-api.provider-inventory",
+        "frontend-api.repository-attestation",
+        "frontend-api.shared-transport",
+        "frontend-api.workbench",
+        "frontend-api.workflow-discovery"
+      ]
+    }
+  ],
+  "responsibilities": [
+    {
+      "responsibilityId": "audit-checkpoint-admission",
+      "description": "Pure authenticated audit-checkpoint and bounded successor-chain admission",
+      "pathPatterns": ["backend/src/ci_coordinator/audit_replay/checkpoint*.py"]
+    },
+    {
+      "responsibilityId": "capacity-qualification",
+      "description": "Pure admission of externally signed capacity and audit-storage evidence",
+      "pathPatterns": ["backend/src/ci_coordinator/capacity_qualification/*.py"]
+    },
+    {
+      "responsibilityId": "ci-economics-evidence",
+      "description": "Pure CI evidence identity, collection lifecycle, measurement, and query contracts",
+      "pathPatterns": ["backend/src/ci_coordinator/ci_economics/*.py"]
+    },
+    {
+      "responsibilityId": "domain-planning",
+      "description": "Pure deterministic planning policy",
+      "pathPatterns": ["backend/src/ci_coordinator/planning_core/*.py"]
+    },
+    {
+      "responsibilityId": "frontend-api.activity",
+      "description": "Authorized administrator activity query, reference admission and export transport",
+      "pathPatterns": [
+        "frontend/src/api/activity/*.ts"
+      ]
+    },
+    {
+      "responsibilityId": "frontend-api.ci-economics",
+      "description": "CI attempt economics evidence admission and transport",
+      "pathPatterns": ["frontend/src/api/ciEconomics/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.config-activation",
+      "description": "Attested repository configuration activation admission and transport",
+      "pathPatterns": ["frontend/src/api/configActivation/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.config-lifecycle",
+      "description": "Repository configuration source validation, registration, retained epochs, export and rollback admission and transport",
+      "pathPatterns": [
+        "frontend/src/api/configLifecycle/*.ts"
+      ]
+    },
+    {
+      "responsibilityId": "frontend-api.control-plane-identity",
+      "description": "Keycloak control-plane session admission and transport",
+      "pathPatterns": ["frontend/src/api/controlPlaneIdentity/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.development",
+      "description": "Development proxy admission and target resolution",
+      "pathPatterns": ["frontend/src/api/development/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.generated",
+      "description": "Generated OpenAPI type projection",
+      "pathPatterns": ["frontend/src/api/generated.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.governance-baseline",
+      "description": "Approved expected-governance baseline admission and transport",
+      "pathPatterns": ["frontend/src/api/governanceBaseline/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.governance-comparison",
+      "description": "Exact baseline-to-observation governance comparison admission and transport",
+      "pathPatterns": ["frontend/src/api/governanceComparison/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.governance-observation",
+      "description": "Effective default-branch governance observation admission and transport",
+      "pathPatterns": ["frontend/src/api/governanceObservation/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.provider-inventory",
+      "description": "Provider installation and repository inventory admission and transport",
+      "pathPatterns": ["frontend/src/api/providerInventory/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.repository-attestation",
+      "description": "Proposal-bound GitHub repository-authority attestation admission and transport",
+      "pathPatterns": ["frontend/src/api/repositoryAttestation/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.shared-transport",
+      "description": "Capability-neutral bounded HTTP transport mechanics",
+      "pathPatterns": ["frontend/src/api/shared/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.workbench",
+      "description": "Scoped workbench snapshot admission and transport",
+      "pathPatterns": ["frontend/src/api/workbench/*.ts"]
+    },
+    {
+      "responsibilityId": "frontend-api.workflow-discovery",
+      "description": "Exact-revision workflow discovery admission, policy proof, manifest identity, and transport",
+      "pathPatterns": ["frontend/src/api/workflowDiscovery/*.ts"]
+    },
+    {
+      "responsibilityId": "github-actions-jwks-transport",
+      "description": "GitHub Actions JWKS transport and decoding",
+      "pathPatterns": ["backend/src/ci_coordinator/integrations/oidc_jwks.py"]
+    },
+    {
+      "responsibilityId": "github-api-transport",
+      "description": "GitHub API transport and decoding",
+      "pathPatterns": ["backend/src/ci_coordinator/integrations/github/*.py"]
+    },
+    {
+      "responsibilityId": "http-admission",
+      "description": "FastAPI request and response admission",
+      "pathPatterns": ["backend/src/ci_coordinator/api/http/**/*.py"]
+    },
+    {
+      "responsibilityId": "process-environment-read",
+      "description": "Process environment acquisition at the runtime boundary",
+      "pathPatterns": ["backend/src/ci_coordinator/runtime/environment.py"]
+    },
+    {
+      "responsibilityId": "runtime-settings-admission",
+      "description": "Pure runtime settings admission",
+      "pathPatterns": ["backend/src/ci_coordinator/runtime_settings/*.py"]
+    },
+    {
+      "responsibilityId": "sql-persistence",
+      "description": "PostgreSQL persistence and attestation",
+      "pathPatterns": ["backend/src/ci_coordinator/persistence/*.py"]
+    },
+    {
+      "responsibilityId": "target-authority-evidence-publication",
+      "description": "No-follow offline input and atomic private evidence publication",
+      "pathPatterns": [
+        "backend/src/ci_coordinator/target_authority_evidence/cli.py",
+        "backend/src/ci_coordinator/target_authority_evidence/file.py"
+      ]
+    },
+    {
+      "responsibilityId": "target-authority-evidence-replay",
+      "description": "Closed owner-codec aggregation and unactivated cross-owner replay",
+      "pathPatterns": [
+        "backend/src/ci_coordinator/target_authority_evidence/codec.py",
+        "backend/src/ci_coordinator/target_authority_evidence/model.py",
+        "backend/src/ci_coordinator/target_authority_evidence/replay.py"
+      ]
+    },
+    {
+      "responsibilityId": "target-authority-producers",
+      "description": "Independent registration and observation projections over owner capabilities",
+      "pathPatterns": ["backend/src/ci_coordinator/target_authority_producers/*.py"]
+    },
+    {
+      "responsibilityId": "target-authority-relation",
+      "description": "Pure finite target-authority transition and equality policy",
+      "pathPatterns": ["backend/src/ci_coordinator/target_authority_relation/*.py"]
+    },
+    {
+      "responsibilityId": "wall-clock-read",
+      "description": "Runtime wall-clock acquisition",
+      "pathPatterns": ["backend/src/ci_coordinator/kernel/clock.py"]
+    },
+    {
+      "responsibilityId": "workflow-source-authority",
+      "description": "Pure exact Git-object workflow manifest and source-binding evidence",
+      "pathPatterns": ["backend/src/ci_coordinator/workflow_authority/*.py"]
+    }
+  ],
+  "forbiddenCoownership": [
+    {
+      "ruleId": "frontend-api.capability-isolation",
+      "applicabilityPatterns": ["frontend/src/api/**/*.ts"],
+      "responsibilitySets": [
+        ["frontend-api.activity", "frontend-api.ci-economics"],
+        ["frontend-api.activity", "frontend-api.config-activation"],
+        ["frontend-api.activity", "frontend-api.config-lifecycle"],
+        ["frontend-api.activity", "frontend-api.control-plane-identity"],
+        ["frontend-api.activity", "frontend-api.development"],
+        ["frontend-api.activity", "frontend-api.governance-baseline"],
+        ["frontend-api.activity", "frontend-api.governance-comparison"],
+        ["frontend-api.activity", "frontend-api.governance-observation"],
+        ["frontend-api.activity", "frontend-api.provider-inventory"],
+        ["frontend-api.activity", "frontend-api.repository-attestation"],
+        ["frontend-api.activity", "frontend-api.shared-transport"],
+        ["frontend-api.activity", "frontend-api.workbench"],
+        ["frontend-api.activity", "frontend-api.workflow-discovery"],
+        ["frontend-api.ci-economics", "frontend-api.config-activation"],
+        ["frontend-api.ci-economics", "frontend-api.config-lifecycle"],
+        ["frontend-api.ci-economics", "frontend-api.control-plane-identity"],
+        ["frontend-api.ci-economics", "frontend-api.development"],
+        ["frontend-api.ci-economics", "frontend-api.governance-baseline"],
+        ["frontend-api.ci-economics", "frontend-api.governance-comparison"],
+        ["frontend-api.ci-economics", "frontend-api.governance-observation"],
+        ["frontend-api.ci-economics", "frontend-api.provider-inventory"],
+        ["frontend-api.ci-economics", "frontend-api.repository-attestation"],
+        ["frontend-api.ci-economics", "frontend-api.shared-transport"],
+        ["frontend-api.ci-economics", "frontend-api.workbench"],
+        ["frontend-api.ci-economics", "frontend-api.workflow-discovery"],
+        ["frontend-api.config-activation", "frontend-api.config-lifecycle"],
+        ["frontend-api.config-activation", "frontend-api.control-plane-identity"],
+        ["frontend-api.config-activation", "frontend-api.development"],
+        ["frontend-api.config-activation", "frontend-api.governance-baseline"],
+        ["frontend-api.config-activation", "frontend-api.governance-comparison"],
+        ["frontend-api.config-activation", "frontend-api.governance-observation"],
+        ["frontend-api.config-activation", "frontend-api.provider-inventory"],
+        ["frontend-api.config-activation", "frontend-api.repository-attestation"],
+        ["frontend-api.config-activation", "frontend-api.shared-transport"],
+        ["frontend-api.config-activation", "frontend-api.workbench"],
+        ["frontend-api.config-activation", "frontend-api.workflow-discovery"],
+        ["frontend-api.config-lifecycle", "frontend-api.control-plane-identity"],
+        ["frontend-api.config-lifecycle", "frontend-api.development"],
+        ["frontend-api.config-lifecycle", "frontend-api.governance-baseline"],
+        ["frontend-api.config-lifecycle", "frontend-api.governance-comparison"],
+        ["frontend-api.config-lifecycle", "frontend-api.governance-observation"],
+        ["frontend-api.config-lifecycle", "frontend-api.provider-inventory"],
+        ["frontend-api.config-lifecycle", "frontend-api.repository-attestation"],
+        ["frontend-api.config-lifecycle", "frontend-api.shared-transport"],
+        ["frontend-api.config-lifecycle", "frontend-api.workbench"],
+        ["frontend-api.config-lifecycle", "frontend-api.workflow-discovery"],
+        ["frontend-api.control-plane-identity", "frontend-api.development"],
+        ["frontend-api.control-plane-identity", "frontend-api.governance-baseline"],
+        ["frontend-api.control-plane-identity", "frontend-api.governance-comparison"],
+        ["frontend-api.control-plane-identity", "frontend-api.governance-observation"],
+        ["frontend-api.control-plane-identity", "frontend-api.provider-inventory"],
+        ["frontend-api.control-plane-identity", "frontend-api.repository-attestation"],
+        ["frontend-api.control-plane-identity", "frontend-api.shared-transport"],
+        ["frontend-api.control-plane-identity", "frontend-api.workbench"],
+        ["frontend-api.control-plane-identity", "frontend-api.workflow-discovery"],
+        ["frontend-api.development", "frontend-api.governance-baseline"],
+        ["frontend-api.development", "frontend-api.governance-comparison"],
+        ["frontend-api.development", "frontend-api.governance-observation"],
+        ["frontend-api.development", "frontend-api.provider-inventory"],
+        ["frontend-api.development", "frontend-api.repository-attestation"],
+        ["frontend-api.development", "frontend-api.shared-transport"],
+        ["frontend-api.development", "frontend-api.workbench"],
+        ["frontend-api.development", "frontend-api.workflow-discovery"],
+        ["frontend-api.governance-baseline", "frontend-api.governance-comparison"],
+        ["frontend-api.governance-baseline", "frontend-api.governance-observation"],
+        ["frontend-api.governance-baseline", "frontend-api.provider-inventory"],
+        ["frontend-api.governance-baseline", "frontend-api.repository-attestation"],
+        ["frontend-api.governance-baseline", "frontend-api.shared-transport"],
+        ["frontend-api.governance-baseline", "frontend-api.workbench"],
+        ["frontend-api.governance-baseline", "frontend-api.workflow-discovery"],
+        ["frontend-api.governance-comparison", "frontend-api.governance-observation"],
+        ["frontend-api.governance-comparison", "frontend-api.provider-inventory"],
+        ["frontend-api.governance-comparison", "frontend-api.repository-attestation"],
+        ["frontend-api.governance-comparison", "frontend-api.shared-transport"],
+        ["frontend-api.governance-comparison", "frontend-api.workbench"],
+        ["frontend-api.governance-comparison", "frontend-api.workflow-discovery"],
+        ["frontend-api.governance-observation", "frontend-api.provider-inventory"],
+        ["frontend-api.governance-observation", "frontend-api.repository-attestation"],
+        ["frontend-api.governance-observation", "frontend-api.shared-transport"],
+        ["frontend-api.governance-observation", "frontend-api.workbench"],
+        ["frontend-api.governance-observation", "frontend-api.workflow-discovery"],
+        ["frontend-api.provider-inventory", "frontend-api.repository-attestation"],
+        ["frontend-api.provider-inventory", "frontend-api.shared-transport"],
+        ["frontend-api.provider-inventory", "frontend-api.workbench"],
+        ["frontend-api.provider-inventory", "frontend-api.workflow-discovery"],
+        ["frontend-api.repository-attestation", "frontend-api.shared-transport"],
+        ["frontend-api.repository-attestation", "frontend-api.workbench"],
+        ["frontend-api.repository-attestation", "frontend-api.workflow-discovery"],
+        ["frontend-api.shared-transport", "frontend-api.workbench"],
+        ["frontend-api.shared-transport", "frontend-api.workflow-discovery"],
+        ["frontend-api.workbench", "frontend-api.workflow-discovery"]
+      ]
+    },
+    {
+      "ruleId": "planning-mechanism-isolation",
+      "applicabilityPatterns": ["backend/src/ci_coordinator/**/*.py"],
+      "responsibilitySets": [
+        ["domain-planning", "github-actions-jwks-transport"],
+        ["domain-planning", "github-api-transport"],
+        ["domain-planning", "http-admission"],
+        ["domain-planning", "process-environment-read"],
+        ["domain-planning", "runtime-settings-admission"],
+        ["domain-planning", "sql-persistence"],
+        ["domain-planning", "wall-clock-read"]
+      ]
+    },
+    {
+      "ruleId": "target-authority-evidence-boundary-isolation",
+      "applicabilityPatterns": ["backend/src/ci_coordinator/**/*.py"],
+      "responsibilitySets": [
+        ["github-actions-jwks-transport", "target-authority-evidence-publication"],
+        ["github-actions-jwks-transport", "target-authority-evidence-replay"],
+        ["github-api-transport", "target-authority-evidence-publication"],
+        ["github-api-transport", "target-authority-evidence-replay"],
+        ["http-admission", "target-authority-evidence-publication"],
+        ["http-admission", "target-authority-evidence-replay"],
+        ["process-environment-read", "target-authority-evidence-publication"],
+        ["process-environment-read", "target-authority-evidence-replay"],
+        ["runtime-settings-admission", "target-authority-evidence-publication"],
+        ["runtime-settings-admission", "target-authority-evidence-replay"],
+        ["sql-persistence", "target-authority-evidence-publication"],
+        ["sql-persistence", "target-authority-evidence-replay"],
+        ["target-authority-evidence-publication", "target-authority-evidence-replay"],
+        ["target-authority-evidence-publication", "wall-clock-read"],
+        ["target-authority-evidence-replay", "wall-clock-read"]
+      ]
+    },
+    {
+      "ruleId": "target-authority-mechanism-isolation",
+      "applicabilityPatterns": ["backend/src/ci_coordinator/**/*.py"],
+      "responsibilitySets": [
+        ["github-actions-jwks-transport", "target-authority-relation"],
+        ["github-api-transport", "target-authority-relation"],
+        ["http-admission", "target-authority-relation"],
+        ["process-environment-read", "target-authority-relation"],
+        ["runtime-settings-admission", "target-authority-relation"],
+        ["sql-persistence", "target-authority-relation"],
+        ["target-authority-relation", "wall-clock-read"]
+      ]
+    },
+    {
+      "ruleId": "target-authority-producer-mechanism-isolation",
+      "applicabilityPatterns": ["backend/src/ci_coordinator/**/*.py"],
+      "responsibilitySets": [
+        ["github-actions-jwks-transport", "target-authority-producers"],
+        ["github-api-transport", "target-authority-producers"],
+        ["http-admission", "target-authority-producers"],
+        ["process-environment-read", "target-authority-producers"],
+        ["runtime-settings-admission", "target-authority-producers"],
+        ["sql-persistence", "target-authority-producers"],
+        ["target-authority-producers", "wall-clock-read"]
+      ]
+    },
+    {
+      "ruleId": "workflow-source-authority-mechanism-isolation",
+      "applicabilityPatterns": ["backend/src/ci_coordinator/**/*.py"],
+      "responsibilitySets": [
+        ["github-actions-jwks-transport", "workflow-source-authority"],
+        ["github-api-transport", "workflow-source-authority"],
+        ["http-admission", "workflow-source-authority"],
+        ["process-environment-read", "workflow-source-authority"],
+        ["runtime-settings-admission", "workflow-source-authority"],
+        ["sql-persistence", "workflow-source-authority"],
+        ["wall-clock-read", "workflow-source-authority"]
+      ]
+    }
+  ],
+  "requiredColocation": [],
+  "decision": {
+    "heuristicOnly": "review-required",
+    "unknownOrConflict": "abstain",
+    "preexistingClosedViolation": "warn",
+    "newOrWorsenedClosedViolation": "fail",
+    "requiresApplicableRule": true,
+    "requiresExactProfileEpoch": true,
+    "requiresSafeDecomposition": true,
+    "requiresObservablePreservation": true,
+    "requiresHardConstraintPreservation": true,
+    "requiresNoApplicableRequiredColocation": true,
+    "requiresStableResponsibilitySet": true,
+    "requiresTypedCurrentEvidence": true
+  },
+  "waiver": {
+    "requiresOwner": true,
+    "requiresExactRuleAndPath": true,
+    "requiresReason": true,
+    "requiresExpiry": true
+  },
+  "nonClaims": [
+    "A unique path owner does not prove behavioral substitutability or internal cohesion.",
+    "Metrics do not prove semantic concentration or an architecture violation.",
+    "Profile admission does not perform semantic review or authenticate external evidence.",
+    "Static traversal admission is not a sandbox against concurrent workspace mutation."
+  ]
+}

@@ -1,0 +1,7 @@
+---
+# Preserve all diagnostics for exact source-bound exception adjudication.
+# The wrapper rejects every unadmitted diagnostic, including style and info.
+format: json
+ignored: []
+no-color: true
+disable-ignore-pragma: true

@@ -1,0 +1,211 @@
+{
+  "schemaVersion": "ci-coordinator-ty-evaluation/v1",
+  "checker": {
+    "distribution": "ty",
+    "version": "0.0.61"
+  },
+  "evaluation": {
+    "baseGitSha": "54d904ebc856e30a61bf206e8a5218229e1b1259",
+    "workingDirectory": "backend",
+    "command": [
+      "mise",
+      "exec",
+      "--",
+      "uvx",
+      "--from",
+      "ty==0.0.61",
+      "ty",
+      "check",
+      "--python",
+      ".venv/bin/python",
+      "--python-version",
+      "<target>",
+      "--output-format",
+      "gitlab",
+      "--exit-zero",
+      "src"
+    ],
+    "pythonLanguageTargets": ["3.13", "3.14"],
+    "baseline": {
+      "diagnosticCount": 99,
+      "reportSha256": "d7a797b1e1e6f9a252069cd15c7d766dcdff02b2999de6cc8c1e77c9b7b80f7c"
+    },
+    "candidate": {
+      "diagnosticCount": 31,
+      "reportSha256": "ef3ba8d62eff7d491b6afbad986b09a8c57573801c68ce2053be915d8a1b4f33"
+    },
+    "reportsAreByteIdenticalAcrossTargets": true
+  },
+  "classes": [
+    {
+      "id": "dynamic-json-container-narrowing",
+      "disposition": "change-proof-bridge",
+      "baselineFingerprints": [
+        "141d10b2eaad401c",
+        "171e3547927e7212",
+        "1f74dce7c97e957c",
+        "256e5c44b9e2997a",
+        "2a9b210c3cf9125",
+        "313ff93cd2360c31",
+        "3349fcefc502f2bb",
+        "39d3cf8a989645ac",
+        "3e77bd8bd9a0a916",
+        "3f0a512674e8c86",
+        "3f293e35a8fa8251",
+        "41d08d75e66c3b2a",
+        "44c6bdc9aa95ca5f",
+        "4590b4e5e53973ea",
+        "4944c1148aa1644f",
+        "4e9bbabd553e2e47",
+        "5595155fead1077f",
+        "63aa764b2cca4ef6",
+        "67dcd9f205457436",
+        "68533cc4cec46448",
+        "7976edf02b69fa3f",
+        "7a235f44175e4dd2",
+        "7c6118b81306a1a5",
+        "7d080b2e4ddf4d06",
+        "82852d2d050df5bd",
+        "895dcc281dbda7db",
+        "992917e5869e9926",
+        "a3c16678a203ce3a",
+        "a52b7a23c33b091e",
+        "aa0e226a3123a988",
+        "aac8dcbaef6f5b07",
+        "b574120b7825482b",
+        "b70feedeb90559eb",
+        "b9a854c8346eb9d3",
+        "ba6c342e12ad0797",
+        "bf0628ee7b14324a",
+        "bf89440bf0f08644",
+        "cb17d4ed97a082c9",
+        "d610a7d2c90702aa",
+        "d70e3eadfc038e11",
+        "d9fb4fbf8494deb",
+        "def88ba4d2406897",
+        "e4ecf5a349e6316b",
+        "e5edcc71cba567fd",
+        "e731b33c113bb754",
+        "f1b5a5d68e0a65d5",
+        "f37b3979844919ec"
+      ]
+    },
+    {
+      "id": "callable-contract",
+      "disposition": "change-static-contract",
+      "baselineFingerprints": ["32ff75bc1b7de32b", "549e363bf4b0c373"]
+    },
+    {
+      "id": "collection-element-narrowing",
+      "disposition": "retain-checker-limitation",
+      "baselineFingerprints": [
+        "15720a3ee88fc34b",
+        "56ddcc2c1a19762e",
+        "5b60538e733318fc",
+        "c85f98784d8c6fa3",
+        "cc2ce225f61a5463",
+        "de5cc3593a04a601",
+        "e944acfd3dccf63b"
+      ]
+    },
+    {
+      "id": "yaml-impossible-key-state",
+      "disposition": "change-static-contract",
+      "baselineFingerprints": ["1ecd69f9a64ce12"]
+    },
+    {
+      "id": "positional-only-stream-protocol",
+      "disposition": "change-static-contract",
+      "baselineFingerprints": [
+        "24f2df7e27c2aa71",
+        "721989bb4771dc4a",
+        "7cbf668a7ba889ec",
+        "d881793afbd6f247",
+        "e596572651abb1d4",
+        "ee05733626ff1faa"
+      ]
+    },
+    {
+      "id": "relational-optional-narrowing",
+      "disposition": "retain-checker-limitation",
+      "baselineFingerprints": [
+        "177a4a247eb24ba3",
+        "1f1d171ce9e0e047",
+        "2e2a0cce89adc57f",
+        "b74131693d442318",
+        "cc16c785cff432aa",
+        "cf09086df27815f5",
+        "eddbd82fe3d91f7c"
+      ]
+    },
+    {
+      "id": "nested-generic-inference",
+      "disposition": "retain-checker-limitation",
+      "baselineFingerprints": ["e9fc809c03597520"]
+    },
+    {
+      "id": "strict-mypy-required-casts",
+      "disposition": "retain-mypy-contract",
+      "baselineFingerprints": [
+        "9171a9f15bc0d469",
+        "bab78da95ccbd4fa",
+        "c7badcbcfa305802",
+        "d2e49148090bd44d",
+        "f8eee2a26322ed49"
+      ]
+    },
+    {
+      "id": "nested-log-mapping",
+      "disposition": "change-static-contract",
+      "baselineFingerprints": ["dc53ccb6eafd77be"]
+    },
+    {
+      "id": "literal-membership-narrowing",
+      "disposition": "retain-checker-limitation",
+      "baselineFingerprints": [
+        "18182f2bdd2b2b1d",
+        "25aaad8a685d044a",
+        "25de38aaeef26f4b",
+        "268326a3c2ce0feb",
+        "3041d8d1659cab86",
+        "3713e12a4098458c",
+        "4cffe8ab76f1bbe",
+        "8deef86b9f5bafc2",
+        "c00dd34fafd031ce"
+      ]
+    },
+    {
+      "id": "sql-keyword-provenance",
+      "disposition": "change-static-contract",
+      "baselineFingerprints": ["4fb18be49877a9f5", "f39ac7eecbc1a0ed"]
+    },
+    {
+      "id": "postgresql-row-shape",
+      "disposition": "change-static-contract",
+      "baselineFingerprints": [
+        "1aaf69ffa57802d0",
+        "1f0b87af9c01c0b3",
+        "3fb6c4159c8a8c7f",
+        "65c7de95d3db6b76",
+        "8bfc0d2849a08b2e",
+        "ba499ad540ddbda7",
+        "d2cd924c937ddf80"
+      ]
+    },
+    {
+      "id": "sqlalchemy-select-typing",
+      "disposition": "retain-dependency-gap",
+      "baselineFingerprints": ["c563320f08af9d51"]
+    },
+    {
+      "id": "workflow-evidence-category",
+      "disposition": "change-static-contract",
+      "baselineFingerprints": ["2acca8203497bc84", "aeb56c739cf5e6db"]
+    },
+    {
+      "id": "generic-exact-type-narrowing",
+      "disposition": "retain-checker-limitation",
+      "baselineFingerprints": ["d72cafb658d6a498"]
+    }
+  ]
+}

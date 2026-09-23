@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 1,
+  "ledgerId": "ci-coordinator.agentic-proofkit-adoption-feedback",
+  "evaluatedDependency": "agentic-proofkit==0.14.18",
+  "records": [
+    {
+      "id": "APF-CI-001",
+      "category": "adoption_friction",
+      "status": "open",
+      "observedOn": "2026-07-13",
+      "summary": "Historical observation (2026-07-13): One logical witness or execution-envelope change requires synchronized edits across command, timeout, environment, binding, profile, package, workflow, and route catalogs. Revalidated on 2026-09-20 against 0.14.18: The current matrix derives its executable commands from the existing witness catalog, but independent route, matcher, workflow and environment declarations still require coordinated edits; the complete single-source projection oracle remains open.",
+      "evidenceRefs": [
+        ".github/workflows/python-persistence.yml",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/quality-plan.v1.json",
+        "proofkit/repo-profile.json",
+        "proofkit/required-binding-tuples.v1.json",
+        "proofkit/requirement-bindings.json",
+        "proofkit/witness-plan-input.json",
+        "scripts/mutation/mutation_suite_specs.py",
+        "scripts/proofkit_inputs.py"
+      ],
+      "closureOracle": "A single canonical command declaration projects every consumer catalog, and deleting any projection makes native admission fail with the missing relation."
+    },
+    {
+      "id": "APF-CI-002",
+      "category": "consumer_integration_defect",
+      "status": "resolved",
+      "observedOn": "2026-07-13",
+      "summary": "Historical observation (2026-07-13): The consumer text-policy wrapper previously ignored unsupported trailing arguments while reporting success. Revalidated on 2026-09-20 against 0.14.18: The current input wrapper still rejects unexpected arguments before output; this is a consumer-owned resolution, with behavioral regression execution reserved for native CI.",
+      "evidenceRefs": [
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "scripts/proofkit_inputs.py"
+      ],
+      "closureOracle": "Every input mode rejects unsupported trailing arguments before emitting a Proofkit input document."
+    },
+    {
+      "id": "APF-CI-003",
+      "category": "missing_primitive",
+      "status": "open",
+      "observedOn": "2026-07-13",
+      "summary": "Historical observation (2026-07-13): Independent requirement-source and path-level binding admission does not prove caller-required requirement, path, and command tuple closure. Revalidated on 2026-09-20 against 0.14.18: The installed requirement-bindings root and its referenced definition are unchanged from 0.14.12. Required tuple closure remains enforced by the consumer validator and required-binding-tuples.v1.json, not by a new producer primitive.",
+      "evidenceRefs": [
+        "backend/src/ci_coordinator/persistence/runtime_issuance_repository.py",
+        "backend/tests/integration/persistence/test_selected_issuance_expiry.py",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/required-binding-tuples.v1.json",
+        "proofkit/requirement-bindings.json",
+        "scripts/proofkit_requirements.py"
+      ],
+      "closureOracle": "Removing any required requirement-path-command tuple fails one native aggregate admission even when unrelated bindings retain the same path."
+    },
+    {
+      "id": "APF-CI-004",
+      "category": "schema_discovery_gap",
+      "status": "partially_resolved",
+      "observedOn": "2026-07-12",
+      "summary": "Historical observation (2026-07-12): Version 0.10.1 embeds the versioned root input and output contracts in its Python wheel. Complete nested schemas and contract-derived minimal passing examples remain unavailable; installed root-contract discovery is no longer the missing part. Revalidated on 2026-09-20 against 0.14.18: The installed 0.14.18 carrier includes cli-contract.v2.json; its contractDefinitions explicitly identify root-shape-only coverage, and release notes retain SCHEMA-01 for complete nested contracts. The installed witness-plan help does not provide nested minimal examples.",
+      "evidenceRefs": [
+        "backend/uv.lock",
+        "docs/architecture/cross-cutting/proofkit-adoption.md",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/repo-profile.json",
+        "proofkit/witness-plan-input.json",
+        "scripts/proofkit_inputs.py",
+        "scripts/proofkit_selective_contract.py"
+      ],
+      "closureOracle": "Every required-input command exposes one versioned schema reference and one contract-derived minimal passing example."
+    },
+    {
+      "id": "APF-CI-005",
+      "category": "unclear_prompt",
+      "status": "retained",
+      "observedOn": "2026-07-12",
+      "summary": "Historical observation (2026-07-12): The adoption surface does not yet present library-only, repository-proof, provider-enforcement, and degraded local-proof modes as one explicit capability ladder. Revalidated on 2026-09-20 against 0.14.18: Public adoption and README guidance improved across 0.14.13 through 0.14.18. The original requested four-mode capability ladder was not established by the bounded consumed-command review; retain the historical request without asserting that current public guidance is defective.",
+      "evidenceRefs": [
+        "docs/architecture/cross-cutting/proofkit-adoption.md",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md"
+      ],
+      "closureOracle": "The public adoption flow emits distinct proposals and non-claims for library use, repository proof configuration, provider enforcement, and local-proof-only degradation."
+    },
+    {
+      "id": "APF-CI-006",
+      "category": "adoption_friction",
+      "status": "resolved",
+      "observedOn": "2026-07-16",
+      "summary": "Historical observation (2026-07-16): A behavioral feedback-ledger requirement was previously routed only to its own requirement source, creating a circular structural witness. Revalidated on 2026-09-20 against 0.14.18: The current independent feedback validator still checks exact dependency identity, categories, unique ordered records and current tracked regular-file evidence references. This remains consumer structural admission, not proof of every historical observation.",
+      "evidenceRefs": [
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/adoption-feedback.v1.json",
+        "proofkit/requirement-bindings.json",
+        "scripts/proofkit_feedback.py"
+      ],
+      "closureOracle": "Requirement admission validates an independent tracked ledger and rejects missing categories, duplicate identities, dependency-version drift, malformed records, and non-canonical ordering."
+    },
+    {
+      "id": "APF-CI-007",
+      "category": "missing_primitive",
+      "status": "resolved",
+      "observedOn": "2026-07-16",
+      "summary": "Historical observation (2026-07-16): The consumer-owned Python distribution witness resolves this repository's admission need. This resolution does not claim that the producer's npm-shaped package-runtime-dependency-admission supports Python. Revalidated on 2026-09-20 against 0.14.18: Python distribution identity remains owned by scripts/proofkit_dependency.py. The producer package-runtime-dependency-admission still exposes packageResolution and admissibleLocations including nodeModulesRoot in its versioned native owner, so no producer Python admission is claimed.",
+      "evidenceRefs": [
+        "backend/pyproject.toml",
+        "backend/uv.lock",
+        "docs/decisions/python-proof-tooling.md",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "scripts/proofkit_dependency.py"
+      ],
+      "closureOracle": "A package-manager-neutral admission command validates an exact Python distribution identity, locked artifact hashes, installed metadata, executable containment, and platform compatibility without npm or node_modules facts."
+    },
+    {
+      "id": "APF-CI-008",
+      "category": "schema_discovery_gap",
+      "status": "partially_resolved",
+      "observedOn": "2026-07-16",
+      "summary": "Historical observation (2026-07-16): Version 0.10.1 exposes output contract identities and root definitions in its installed Python carrier. Successful commands still have heterogeneous result algebras without one generic report-versus-projection discriminator; our exact command-specific admission remains necessary. Revalidated on 2026-09-20 against 0.14.18: Installed command records identify input and output contract IDs and root variants. The seven consumed commands still require their exact consumer result admission: report roots and witness-plan normalized projection are distinct. A universal explicit report-versus-projection discriminator was not established.",
+      "evidenceRefs": [
+        "backend/uv.lock",
+        "docs/architecture/cross-cutting/proofkit-adoption.md",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/witness-plan-input.json",
+        "scripts/proofkit_admission.py",
+        "scripts/proofkit_selective_contract.py"
+      ],
+      "closureOracle": "Every command declares its output kind in the public contract, and callers can distinguish a state-bearing report from a validated normalized projection without command-specific inference."
+    },
+    {
+      "id": "APF-CI-009",
+      "category": "adoption_friction",
+      "status": "resolved",
+      "observedOn": "2026-07-17",
+      "summary": "Historical observation (2026-07-17): Requirement-source secret-like detection rejects natural-language authentication terminology and credential-prefix substrings embedded across token boundaries, including risk-owned, even when no credential value exists. Revalidated on 2026-09-20 against 0.14.18: The installed 0.14.18 requirement-source-admission accepts bounded natural-language bearer, risk-owned and authorization-token invariants. A separate complete synthetic credential-shaped literal is rejected with a field-level diagnostic that omits the literal. This closes the recorded finite oracle; it does not establish the release that fixed it or exhaustive secret detection.",
+      "evidenceRefs": [
+        "docs/features/production-quality-closure.md",
+        "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+        "scripts/proofkit_requirements.py"
+      ],
+      "closureOracle": "A requirement fixture containing natural-language discussion of an authentication scheme is admitted, while a complete credential-shaped literal in the same field is rejected with a redacted field-level diagnostic."
+    },
+    {
+      "id": "APF-CI-010",
+      "category": "schema_discovery_gap",
+      "status": "open",
+      "observedOn": "2026-07-17",
+      "summary": "Historical observation (2026-07-17): Witness-plan help does not expose the environment inheritance enum or the relation between none, allowlist, and allowed variable names. Revalidated on 2026-09-20 against 0.14.18: The installed witness-plan help explicitly limits itself to a root-shape summary and exposes neither the environment inheritance enum nor minimal examples for both modes. The consumer still owns the complete nested environment contract.",
+      "evidenceRefs": [
+        "docs/architecture/cross-cutting/proof-command-execution.md",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/witness-plan-input.json"
+      ],
+      "closureOracle": "The public witness-plan contract and command help expose inherit=none and inherit=allowlist, require an empty allowlist for none and a non-empty allowlist for allowlist, and provide one minimal passing example of each mode."
+    },
+    {
+      "id": "APF-CI-011",
+      "category": "missing_primitive",
+      "status": "open",
+      "observedOn": "2026-07-18",
+      "summary": "Historical observation (2026-07-18): Version 0.6.0 provides bounded native-evidence guidance for operation identity, authority, falsifiers, bounds, and receipts, but command bindings still cannot declare or verify distinct operations, quantifier scopes, action-bootstrap reachability, shared topology, or physical provider observations. Revalidated on 2026-09-20 against 0.14.18: Releases 0.14.14 and 0.14.17 add lazy native-evidence and currentness recipes, not native discovery or execution. The admitted consumer binding projection still supplies requirement, scenario, witness, path, command and environment relations; typed shared facets and independent physical observations remain outside this consumer integration. This is not a claim that all unconsumed producer receipt commands lack such vocabulary.",
+      "evidenceRefs": [
+        ".github/workflows/trusted-plan-request.yml",
+        "backend/src/ci_coordinator/integrations/github/adapter_snapshot.py",
+        "backend/src/ci_coordinator/integrations/github/app_http.py",
+        "backend/src/ci_coordinator/integrations/github/app_transport_profile.py",
+        "backend/src/ci_coordinator/repo_context/workflow_control_plane.py",
+        "backend/src/ci_coordinator/target_artifacts/control_source/consume_plan.cjs",
+        "backend/tests/unit/integrations/_adapter_snapshot_support.py",
+        "backend/tests/unit/integrations/test_github_app_transport_protocol.py",
+        "backend/tests/unit/integrations/test_github_capacity_context.py",
+        "backend/tests/unit/repo_context/test_workflow_inventory.py",
+        "backend/tests/unit/runtime/test_native_workflow.py",
+        "backend/tests/unit/runtime/test_plan_consumer.py",
+        "backend/tests/unit/runtime/test_trusted_plan_request_workflow.py",
+        "backend/uv.lock",
+        "compose.yaml",
+        "docs/features/revision-bound-adapter-admission.md",
+        "docs/features/universal-workflow-adoption.md",
+        "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+        "frontend/Dockerfile.dev",
+        "proofkit/required-binding-tuples.v1.json",
+        "proofkit/requirement-bindings.json",
+        "proofkit/witness-plan-input.json",
+        "scripts/dev_environment/watch_witness.py"
+      ],
+      "closureOracle": "Requirements can declare shared atomic behavioral facets with exact quantifier scopes and operation-level witness selectors; admission fails when shared facets conflict or any required facet lacks an independently executable physical or static witness, even if the same command remains bound to every requirement."
+    },
+    {
+      "id": "APF-CI-012",
+      "category": "missing_primitive",
+      "status": "open",
+      "observedOn": "2026-07-28",
+      "summary": "Historical observation (2026-07-28): Version 0.6.0 can guide receipt identity and trust decisions and strengthens its own cross-carrier release evidence, but the consumer witness vocabulary still cannot represent an OCI publication, registry digest, GitHub attestation, credential class, and retained provider receipt without treating them as local command evidence. Revalidated on 2026-09-20 against 0.14.18: The admitted consumer witness-plan retains no expected artifact declarations and native utility receipts are unauthenticated local descriptors. The bounded upgrade does not integrate the producer receipt or release commands with OCI publication and provider attestation; the external-artifact oracle remains open in this consumer.",
+      "evidenceRefs": [
+        ".github/workflows/release-artifact.yml",
+        "backend/uv.lock",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "docs/specs/ci-coordinator-release/requirements.v1.json",
+        "proofkit/requirement-bindings.json",
+        "proofkit/witness-plan-input.json"
+      ],
+      "closureOracle": "A requirement binding can declare a provider-executed artifact witness with exact artifact kind, credential class, immutable subject identity, provider receipt type, and freshness relation, while local admission remains explicitly local proof only until that receipt is supplied and verified."
+    },
+    {
+      "id": "APF-CI-013",
+      "category": "missing_primitive",
+      "status": "open",
+      "observedOn": "2026-07-31",
+      "summary": "Historical observation (2026-07-31): Exact pytest selectors can remain structurally admitted after their target test is removed; the mismatch is discovered only when the witness command executes. Revalidated on 2026-09-20 against 0.14.18: The consumed requirement-bindings command contract and source fingerprint remain unchanged. It does not execute or inspect pytest; exact selector existence still needs the native test owner. Current native tests are not claimed by static route admission.",
+      "evidenceRefs": [
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/repo-profile.json",
+        "proofkit/requirement-bindings.json",
+        "proofkit/witness-plan-input.json",
+        "scripts/proofkit_requirements.py"
+      ],
+      "closureOracle": "Replacing one admitted pytest node id with a syntactically valid nonexistent node id makes pre-execution admission fail with a bounded selector-resolution diagnostic."
+    },
+    {
+      "id": "APF-CI-014",
+      "category": "missing_primitive",
+      "status": "open",
+      "observedOn": "2026-08-30",
+      "summary": "Historical observation (2026-08-30): Requirement sources and witness bindings cannot declare or validate typed required-premise, context-premise, law, requirement, and canonical-contract parentage, so the consumer must maintain a parallel architecture-trace profile and validator. Revalidated on 2026-09-20 against 0.14.18: The consumer architecture traceability profile and validator still supply the typed premise, law, requirement and contract relation. The seven consumed command roots and all fourteen referenced root definitions are unchanged, and no replacement architecture-parent integration is admitted by this upgrade.",
+      "evidenceRefs": [
+        "docs/architecture/00-system-axioms.md",
+        "docs/architecture/01-meta-specification.md",
+        "docs/specs/ci-coordinator-core/architecture-traceability-profile.v1.json",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/requirement-bindings.json",
+        "scripts/architecture_traceability.py"
+      ],
+      "closureOracle": "Requirement sources can declare typed versioned required-premise, context-premise, law, and canonical-contract parent edges; admission rejects unknown, dangling, or cyclic edges, proves every premise participates in an owner-declared route, every active requirement participates in exactly one closed reference route, and every declared law has a requirement descendant, distinguishes reference closure from semantic entailment, and requires no consumer-owned trace validator."
+    },
+    {
+      "id": "APF-CI-015",
+      "category": "missing_primitive",
+      "status": "open",
+      "observedOn": "2026-08-31",
+      "summary": "Historical observation (2026-08-31): Requirement admission can remain green when a newly current successor design is unbound because a historical predecessor already supplies the requirement's required witness tuples. Revalidated on 2026-09-20 against 0.14.18: The consumer still enforces current authoritative path tuples through its required tuple manifest; plain historical path bindings do not establish successor authority. No producer document-lifecycle integration replaces that owner in this upgrade.",
+      "evidenceRefs": [
+        "docs/features/exact-workflow-invocation-admission.md",
+        "docs/features/revision-bound-adapter-admission.md",
+        "docs/specs/ci-coordinator-core/architecture-traceability-profile.v1.json",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/required-binding-tuples.v1.json",
+        "proofkit/requirement-bindings.json",
+        "scripts/proofkit_requirements.py"
+      ],
+      "closureOracle": "Binding admission accepts explicit document lifecycle and authority identities, requires every document marked current and authoritative for a requirement to satisfy its caller-required tuples, permits historical predecessors only as non-current evidence, and rejects an unbound current successor or overlapping current authority even when predecessor witnesses remain."
+    },
+    {
+      "id": "APF-CI-016",
+      "category": "missing_primitive",
+      "status": "open",
+      "observedOn": "2026-09-02",
+      "summary": "Historical observation (2026-09-02): Requirement proof source-set fragments cannot reference a shared witness-command catalog, so the v3 representation repeats full command strings and positive/falsification selectors per route; on this 1,876-route graph, the admitted candidate grew from 1,041,217 to 1,847,649 bytes instead of reducing agent-context cost. Revalidated on 2026-09-20 against 0.14.18: The repository continues to use compact ID-based route sources with one shared witness catalog and a consumer projection. The 0.14.18 release explicitly keeps the new requirement-source codec internal; no public source-format cutover or producer migration to the consumer representation is admitted.",
+      "evidenceRefs": [
+        "docs/features/compact-proof-route-authority.md",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/requirement-bindings.json",
+        "proofkit/routes/proofkit-adoption.v2.json",
+        "proofkit/witness-plan-input.json",
+        "scripts/proofkit_route_contract.py"
+      ],
+      "closureOracle": "A source-set fragment can bind routes to an admitted shared command catalog by stable command IDs, a native migration command proves the complete v1-to-source-set route relation, and the canonical tracked representation is no larger than the equivalent minified ID-based relation while retaining owner-local review boundaries."
+    },
+    {
+      "id": "APF-CI-017",
+      "category": "adoption_friction",
+      "status": "open",
+      "observedOn": "2026-09-02",
+      "summary": "Historical observation (2026-09-02): Requirement authoring for seven control-plane candidates passed source and transition admission, but the result repeated complete candidate invariants in the change set, composed next source, and owner-review plan; the approximately 13,000-token response exceeded direct tool display even though the owner needed only the verdict, questions, obligations, and materializable source. Revalidated on 2026-09-20 against 0.14.18: Installed requirement-authoring-plan exposes only --input and --input-pointer at command scope. Global compact JSON changes serialization whitespace, not the repeated semantic payload or a content-addressed authoring projection. The bounded semantic projection oracle remains open.",
+      "evidenceRefs": [
+        "docs/architecture/cross-cutting/organization-control-plane.md",
+        "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+        "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+        "proofkit/adoption-feedback.v1.json",
+        "scripts/proofkit_requirements.py"
+      ],
+      "closureOracle": "Requirement authoring offers a bounded compact projection that emits candidate verdicts, owner questions, obligations, and either one materializable next source or content-addressed references without repeating invariant text; the full diagnostic graph remains available through an explicit detail mode or pointer, and compact versus full projections round-trip to the same candidate source digest."
+    }
+  ]
+}

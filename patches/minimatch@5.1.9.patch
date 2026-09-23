@@ -1,0 +1,8 @@
+diff --git a/minimatch.js b/minimatch.js
+index 8545b3ab506a3185107a8f24a4c150a7b7b585f8..34501094bacf0ecb0ac496a60876268e134caa40 100644
+--- a/minimatch.js
++++ b/minimatch.js
+@@ -18,2 +18,2 @@ const GLOBSTAR = Symbol('globstar **')
+ minimatch.GLOBSTAR = GLOBSTAR
+-const expand = require('brace-expansion')
++const { expand } = require('brace-expansion')

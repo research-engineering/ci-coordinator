@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "ci-coordinator.release.requirements",
+  "specPackagePath": "docs/specs/ci-coordinator-release",
+  "requirementsPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
+  "overviewPath": "docs/specs/ci-coordinator-release/overview.md",
+  "requirements": [
+    {
+      "requirementId": "REQ-CI-RELEASE-001",
+      "ownerId": "ci-coordinator.release",
+      "invariant": "The repository-owned manual release workflow admits only its exact path, master ref, workflow commit, and current master source commit in the source-owned publisher research-engineering/ci-coordinator bound to the exact operator-admitted immutable repository identifier CI_COORDINATOR_RELEASE_REPOSITORY_ID after exactly one completed successful workflow_dispatch run of the repository-owned Full Check workflow identified by CI_COORDINATOR_FULL_CHECK_WORKFLOW_ID and its exact source-owned path for the same repository, branch, and commit; missing or noncanonical identifier configuration fails closed and neither provider nor scan results select the trusted publisher identity; derives one canonical release-attempt identity from the complete repository, source, gate-run, and release-run coordinates; builds and pushes one production-eligible linux/amd64 OCI image with maximum BuildKit SLSA v1 provenance and an SPDX 2.3 SBOM using job-local least privilege; treats only the registry push result as the content digest and preserves that OCI index digest as the attestation subject; binds exactly one immutable linux/amd64 child manifest and its Docker-attached attestation manifests from registry inspection, then binds Grype source.target.manifestDigest to that child while retaining the index in repoDigests; scans the squashed final filesystem of that exact registry digest with the pinned Grype release under the release vulnerability-gate policy, requiring linux/amd64 subject and distro evidence, a successful fresh checksum-identified Grype database no older than 24 hours with auto-update disabled during scanning and exact emitted descriptor database status binding, validated effective caller-controlled suppression configuration, no ignore, only-fixed, only-notfixed, VEX, or exclusion suppressions, explicit unknown-severity handling, and failure for every unknown or unproved High/Critical occurrence; permits only exact expiring repaired occurrences under the separately hash-pinned runtime repair policy, binding source/patch inputs, installed interpreter/module/bytecode/library/manifest bytes, before/after/final causal witnesses, registry index, config digest, source commit, and exact advisory/severity/package/version/PURL/locations/evidence-role/runtime-layer identity without hiding raw matches or scanner exit status; validates the exact registry predicate bytes against the pinned official SPDX 2.3 schema and repository-owned BuildKit admission profiles in the non-OIDC build job; and in a separate no-checkout OIDC job pulls that exact digest, verifies the canonical packaged build identity, exact validated predicate hashes, and exact bounded sanitized vulnerability-evidence and admitted repair-evidence hashes without executing the image, publishes provenance, SBOM and dedicated runtime-repairs/v1 attestations to GitHub and the OCI registry, and verifies both stores against the exact hosted signer workflow, signer and source commit, source ref, subject digest, and predicate type. Upstream matcher corrections remain scanner-defined; an empty ignoredMatches list does not prove their absence. Only bounded allowlisted admission/rejection and successful repair-evidence receipts are uploaded, including bounded actionable rejected-finding facts when available; raw scan, effective configuration, database status, manifests, and logs are not published. Any missing, malformed, duplicate, stale, ambiguous, cross-repository, wrong-ref, wrong-event, wrong-workflow, non-successful, noncanonical, unsigned, empty, structurally vacuous, caller-suppressed, or mismatched evidence fails closed. Periodic image advisory requalification selects the latest completed successful release workflow run from bounded provider evidence, resolves its discovery tag once to an immutable index, verifies provenance and SBOM through both attestation stores with exact source, workflow, repository identity and certificate run/attempt binding, admits its packaged production build identity without executing it, requires an identical canonical repair predicate verified through both stores for that exact run, attempt, source and subject, and reapplies the current vulnerability and unexpired repair policies with a fresh database; repair evidence never renews its fixed validity window. This read-only requalification never publishes an image and does not claim to inventory every deployed or historical image.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": [
+        "proofkit/requirement-bindings.json"
+      ],
+      "nonClaimRefs": [
+        "NC-CI-RELEASE-001"
+      ],
+      "nonClaims": [
+        "This requirement does not prove a provider publication until the exact workflow run succeeds, and it does not prove deployment, database migration, rollback, live target-repository GitHub App or OIDC behavior, FullCI fallback, stable required checks, shadow safety, owner approval, CI omission, production-admission receipt truth, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.release",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    }
+  ],
+  "nonClaims": [
+    "This requirement source does not claim provider execution, deployment, rollback, shadow safety, CI omission, or production authority."
+  ]
+}

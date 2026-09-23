@@ -1,0 +1,1114 @@
+name: Full Check
+
+on:
+  pull_request:
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch:
+    inputs:
+      proof_scope:
+        description: "Proof scope"
+        required: true
+        default: full
+        type: choice
+        options:
+          - full
+          - range
+      serial_qualification:
+        description: "Compare the same complete native universe serially"
+        required: false
+        type: boolean
+        default: false
+      api_contract_deep:
+        description: "Run the bounded extended API contract campaign"
+        required: false
+        type: boolean
+        default: false
+      proofkit_base_sha:
+        description: "Required lowercase ancestor commit SHA when proof_scope is range"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-persistence-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROOFKIT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || (github.event_name == 'workflow_dispatch' && inputs.proof_scope == 'range' && inputs.proofkit_base_sha) || '' }}
+  PROOFKIT_HEAD_REF: ${{ github.sha }}
+  RYUK_CONTAINER_IMAGE: "testcontainers/ryuk:0.14.0@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0"
+
+jobs:
+  api-contract-exploration:
+    name: Extended API contracts
+    if: github.event_name == 'workflow_dispatch' && inputs.api_contract_deep
+    uses: $/.github/workflows/api-contract.yml
+    with:
+      profile: deep
+
+  trusted-plan-request-entrypoint:
+    name: Trusted plan requester entrypoint
+    permissions:
+      id-token: write # Exercise the requester with no repository token capability.
+    uses: $/.github/workflows/trusted-plan-request.yml
+    with:
+      installation_id: "1"
+      plan_url: invalid
+
+  container-runtime-smoke:
+    name: Container runtime smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Build and verify the runtime image
+        run: python3 -m scripts.container_runtime_smoke
+
+  secret-scan:
+    name: Source and history secret scan
+    uses: $/.github/workflows/source-assurance.yml
+    permissions:
+      contents: read
+    with:
+      manual_base_sha: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_scope == 'range' && inputs.proofkit_base_sha || '' }}
+
+  repository-quality:
+    name: Repository quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: "12.5.1"
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Install locked target-control build dependency
+        run: pnpm install --frozen-lockfile --filter ci-coordinator-workspace
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Admit installed Proofkit dependency
+        run: backend/.venv/bin/python -m scripts.proofkit_dependency
+      - name: Check coherent toolchain declarations
+        run: backend/.venv/bin/python -m scripts.dev_environment.toolchain
+      - name: Audit locked dependencies
+        run: backend/.venv/bin/python -m scripts.dependency_audit
+      - name: Verify the Python package
+        run: backend/.venv/bin/python -m scripts.python_witness package-check
+      - name: Lint GitHub workflow contracts
+        run: backend/.venv/bin/python -m scripts.workflow_lint
+      - name: Validate Prometheus alert rules
+        run: backend/.venv/bin/python -m scripts.prometheus_rules
+      - name: Admit selective Proofkit routing
+        id: selective-plan
+        if: >-
+          github.event_name == 'pull_request' ||
+          github.event_name == 'merge_group' ||
+          (github.event_name == 'workflow_dispatch' && inputs.proof_scope == 'range')
+        run: backend/.venv/bin/python -m scripts.proofkit_plan_check
+      - name: Retain source-bound pending review evidence
+        if: always() && steps.selective-plan.outcome != 'skipped'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: proofkit-pending-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ci-evidence/proofkit-plan-check.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check generated target control bundle
+        run: backend/.venv/bin/python -m scripts.target_control_bundle check
+      - name: Admit the complete documentation diagram inventory
+        run: backend/.venv/bin/python -m scripts.diagram_check --inventory-only
+      - name: Falsify esbuild dynamic-loader omission
+        run: >-
+          backend/.venv/bin/python -m pytest -q
+          scripts/tests/test_target_control_source_admission.py
+          -k real_esbuild
+      - name: Check generated target artifacts
+        run: >-
+          backend/.venv/bin/python -m ci_coordinator.target_artifacts.cli check
+          --source fixtures/target-repository/.ci-coordinator/target-artifacts-source.v1.json
+          --output-directory fixtures/target-repository/.ci-coordinator
+      - name: Run branch-head and mutation harness self-tests
+        run: |
+          backend/.venv/bin/python -m pytest -q \
+            scripts/tests/test_proofkit_branch_head.py \
+            scripts/tests/test_quality_plan.py \
+            scripts/tests/test_detached_worktree_lifecycle.py \
+            scripts/tests/test_mutation_manifest.py \
+            scripts/tests/test_mutation_suite_runner.py \
+            scripts/tests/test_mutation_suite_specs.py
+      - name: Preflight mutation manifest applicability
+        run: backend/.venv/bin/python -m scripts.mutation.mutation_suite_specs preflight
+      - name: Run repository and Python quality witnesses
+        run: |
+          backend/.venv/bin/python -m scripts.proofkit_requirements
+          backend/.venv/bin/python -m scripts.proofkit_admission verify
+          backend/.venv/bin/python -m scripts.proofkit_admission text-policy
+          backend/.venv/bin/python -m scripts.python_witness lint
+          backend/.venv/bin/python -m scripts.python_witness typecheck
+          backend/.venv/bin/python -m scripts.python_witness dependency-usage
+          backend/.venv/bin/python -m scripts.python_witness import-boundary
+          backend/.venv/bin/python -m scripts.repository_json
+          backend/.venv/bin/python -m scripts.ci_matrix check
+          backend/.venv/bin/python -m scripts.self_ci_generate --check
+
+  native-test-plan:
+    name: Native test collection and scheduling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Verify exact Python identity
+        run: >-
+          backend/.venv/bin/python -c 'import platform; actual = platform.python_version();
+          raise SystemExit(0 if actual == "3.13.15" else
+          f"expected Python 3.13.15, got {actual}")'
+      - name: Freeze the complete native test universe
+        id: native_collection
+        run: >-
+          backend/.venv/bin/python -m scripts.ci_test_execution plan
+          --plan .ci-native/plan.json --diagnostics .ci-native/diagnostics/plan
+      - name: Retain native collection diagnostics
+        if: ${{ !cancelled() && steps.native_collection.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-diagnostics-plan-${{ github.run_attempt }}
+          path: .ci-native/diagnostics/plan
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Publish the frozen native plan
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-test-plan
+          path: .ci-native/plan.json
+          if-no-files-found: error
+          retention-days: 7
+
+  native-test-shards:
+    name: Native tests (${{ matrix.shard }})
+    needs: [native-test-plan]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [backend-1, backend-2, backend-3, backend-4, postgres-1, postgres-2, postgres-3, postgres-4, tooling-1]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Verify exact Python identity
+        run: >-
+          backend/.venv/bin/python -c 'import platform; actual = platform.python_version();
+          raise SystemExit(0 if actual == "3.13.15" else
+          f"expected Python 3.13.15, got {actual}")'
+      - name: Install the admitted scanner for native falsifiers
+        if: matrix.shard == 'tooling-1'
+        run: |
+          scanner_binary="$(bash .github/actions/secret-scan/install.sh "$RUNNER_TEMP/gitleaks-native")"
+          echo "GITLEAKS_TEST_BINARY=$scanner_binary" >> "$GITHUB_ENV"
+          dirname "$scanner_binary" >> "$GITHUB_PATH"
+      - name: Download the frozen native plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-test-plan
+          path: .ci-native
+      - name: Execute the exact assigned collection
+        id: native_shard
+        env:
+          NATIVE_SHARD: ${{ matrix.shard }}
+          CI_COORDINATOR_API_ARTIFACTS: ${{ github.workspace }}/.api-contract/native
+        run: >-
+          timeout --signal=INT --kill-after=5s 960s
+          backend/.venv/bin/python -m scripts.ci_test_execution run
+          --plan .ci-native/plan.json --shard "$NATIVE_SHARD"
+          --output ".ci-native/shard-$NATIVE_SHARD"
+          --diagnostics ".ci-native/diagnostics/$NATIVE_SHARD"
+      - name: Retain native shard diagnostics
+        if: ${{ !cancelled() && steps.native_shard.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-diagnostics-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: .ci-native/diagnostics/${{ matrix.shard }}
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Publish API contract counterexamples
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: api-contract-${{ matrix.shard }}
+          path: .api-contract
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Publish native outcomes and branch coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: shard-${{ matrix.shard }}
+          path: .ci-native/shard-${{ matrix.shard }}
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  postgres-witness:
+    name: Complete native population and aggregate coverage
+    needs: [native-test-plan, native-test-shards]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Verify exact Python identity
+        run: >-
+          backend/.venv/bin/python -c 'import platform; actual = platform.python_version();
+          raise SystemExit(0 if actual == "3.13.15" else
+          f"expected Python 3.13.15, got {actual}")'
+      - name: Download the frozen native plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-test-plan
+          path: .ci-native
+      - name: Download exact-run shard evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: shard-*
+          path: .ci-native/shards
+      - name: Admit every shard and enforce all coverage floors
+        run: >-
+          backend/.venv/bin/python -m scripts.ci_test_execution combine
+          --plan .ci-native/plan.json --artifacts .ci-native/shards
+          --output .ci-native/aggregate
+      - name: Publish aggregate coverage and timing
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-test-aggregate
+          path: .ci-native/aggregate
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  serial-qualification:
+    name: Same-head serial qualification
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.serial_qualification }}
+    needs: [native-test-plan, native-test-shards]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Verify exact Python identity
+        run: >-
+          backend/.venv/bin/python -c 'import platform; actual = platform.python_version();
+          raise SystemExit(0 if actual == "3.13.15" else
+          f"expected Python 3.13.15, got {actual}")'
+      - name: Install the admitted scanner for native falsifiers
+        run: |
+          scanner_binary="$(bash .github/actions/secret-scan/install.sh "$RUNNER_TEMP/gitleaks-native")"
+          echo "GITLEAKS_TEST_BINARY=$scanner_binary" >> "$GITHUB_ENV"
+          dirname "$scanner_binary" >> "$GITHUB_PATH"
+      - name: Download the frozen native plan
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-test-plan
+          path: .ci-native
+      - name: Download exact-run shard evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: shard-*
+          path: .ci-native/shards
+      - name: Execute the same complete universe serially
+        id: serial_execution
+        run: >-
+          backend/.venv/bin/python -m scripts.ci_test_execution run
+          --plan .ci-native/plan.json --shard serial --output .ci-native/serial
+          --diagnostics .ci-native/diagnostics/serial
+      - name: Retain serial diagnostics
+        if: ${{ !cancelled() && steps.serial_execution.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-diagnostics-serial-${{ github.run_attempt }}
+          path: .ci-native/diagnostics/serial
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Compare complete identities and outcomes
+        run: >-
+          backend/.venv/bin/python -m scripts.ci_test_execution compare
+          --plan .ci-native/plan.json --artifacts .ci-native/shards
+          --output .ci-native/serial
+      - name: Publish serial qualification
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-serial-qualification
+          path: .ci-native/serial
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  persistence-mutation:
+    name: Mutation witnesses (${{ matrix.suite }})
+    needs: [repository-quality]
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - python-config-policy-admission
+          - python-capacity-evidence
+          - python-http-admission
+          - python-persistence
+          - audit-persistence-byte-limits
+          - python-database-compatibility
+          - audit-json-resource-limits
+    runs-on: ubuntu-24.04
+    timeout-minutes: 258
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Install dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Run governed mutation witnesses
+        env:
+          SUITE_NAME: ${{ matrix.suite }}
+        run: backend/.venv/bin/python -m scripts.mutation.mutation_suite_specs "$SUITE_NAME"
+
+  operator-workbench:
+    name: Operator workbench
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: "12.5.1"
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          cache: pnpm
+          node-version: "24.21.0"
+      - name: Install locked frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify generated browser contracts
+        run: |
+          backend/.venv/bin/python -m scripts.frontend_contract check
+          pnpm --filter @ci-coordinator/operator-ui contract:check
+      - name: Run frontend static, unit, and production witnesses
+        run: |
+          pnpm --filter @ci-coordinator/operator-ui check
+          pnpm --filter @ci-coordinator/operator-ui build
+      - name: Run frontend safety mutation witnesses
+        run: >-
+          backend/.venv/bin/python -m scripts.mutation.mutation_suite_specs
+          frontend-safety-kernels
+      - name: Qualify native Vitest mutation identity admission
+        run: >-
+          backend/.venv/bin/python -m pytest -q
+          scripts/conformance/vitest_mutation_identity_test.py
+      - name: Install the admitted browser provider
+        run: pnpm --filter @ci-coordinator/operator-ui exec playwright install --with-deps chromium
+      - name: Qualify diagram semantic and renderer boundaries
+        working-directory: frontend
+        run: node tools/diagrams-checks.mjs
+      - name: Qualify diagram process cancellation and cleanup
+        timeout-minutes: 2
+        run: backend/.venv/bin/python scripts/tests/test_diagram_process.py --qualify
+      - name: Validate every documentation diagram
+        run: backend/.venv/bin/python -m scripts.diagram_check
+      - name: Run browser rendering and accessibility witnesses
+        id: browser_witnesses
+        run: |
+          backend/.venv/bin/python -m scripts.frontend_bundle
+          backend/.venv/bin/python -m scripts.browser_test_execution --output .ci-native/browser
+      - name: Retain native browser evidence and diagnostics
+        if: ${{ !cancelled() && steps.browser_witnesses.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ci-native/browser
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Retain operator view screenshots
+        if: >-
+          ${{ !cancelled() && (steps.browser_witnesses.outcome == 'success' ||
+          steps.browser_witnesses.outcome == 'failure') }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: operator-ui-screenshots-${{ github.run_id }}-${{ github.run_attempt }}
+          path: frontend/test-results/**/*.png
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - name: Retain browser failure diagnostics
+        if: ${{ !cancelled() && steps.browser_witnesses.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: operator-ui-failure-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            frontend/test-results/**/*.zip
+            frontend/test-results/**/error-context.md
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 0
+
+  connected-administrator:
+    name: Authenticated administrator business effect
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Install locked Python dependencies
+        timeout-minutes: 5
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Prove authenticated persistent effect and replay
+        id: administrator
+        timeout-minutes: 35
+        run: backend/.venv/bin/python -m scripts.ci_business_witness
+      - name: Retain bounded administrator evidence
+        if: ${{ !cancelled() && steps.administrator.outcome != 'skipped' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: connected-administrator-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ci-evidence/connected-administrator.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+
+  connected-development-stack:
+    name: Connected development stack (${{ matrix.compose }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compose: minimum
+            compose-version: "2.39.4"
+            compose-sha256: "7af95166a730b87e172d4fc9aefea8725d3c6c7327d59149267b452114ddb7d4"
+          - compose: current
+            compose-version: "5.5.1"
+            compose-sha256: "db1889184726840f75c4f9c001048430d4f25b3be3cb084d3ddd762bc0aed576"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Install the selected Compose client
+        env:
+          COMPOSE_VERSION: ${{ matrix.compose-version }}
+          COMPOSE_SHA256: ${{ matrix.compose-sha256 }}
+        run: |
+          mkdir -p "$HOME/.docker/cli-plugins"
+          curl --fail --silent --show-error --location \
+            "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
+            --output "$RUNNER_TEMP/docker-compose"
+          echo "$COMPOSE_SHA256  $RUNNER_TEMP/docker-compose" | sha256sum --check --strict
+          install -m 0755 "$RUNNER_TEMP/docker-compose" "$HOME/.docker/cli-plugins/docker-compose"
+      - name: Record the actual Compose client
+        run: docker compose version
+      - name: Prepare isolated SSH transport witness
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends openssh-client openssh-server
+          sudo install -d -m 0755 /run/sshd
+      - name: Set up pnpm for browser effect witnesses
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: "12.5.1"
+          run_install: false
+      - name: Set up Node.js for browser effect witnesses
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Prepare browser effect dependencies explicitly
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --dir frontend exec playwright install --with-deps chromium
+      - name: Run connected stack and source-watch witnesses
+        run: backend/.venv/bin/python -m scripts.dev_environment.ci_witness
+
+  developer-bootstrap:
+    name: Minimal developer bootstrap
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Install the pinned mise binary
+        run: |
+          curl --fail --silent --show-error --location \
+            https://github.com/jdx/mise/releases/download/v2026.9.11/mise-v2026.9.11-linux-x64 \
+            --output "$RUNNER_TEMP/mise"
+          echo "6e39ee1ffa926a1f64814efbf1d26c3f617255e2a6ba6152e3c8a5135fa5a35f  $RUNNER_TEMP/mise" | sha256sum --check --strict
+          chmod 0755 "$RUNNER_TEMP/mise"
+      - name: Verify sparse-host backend preparation
+        run: python -m scripts.dev_environment.bootstrap_witness --mise "$RUNNER_TEMP/mise"
+
+  developer-host-lifecycle:
+    name: Developer lifecycle on Apple Silicon
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Install locked Python dependencies
+        run: uv sync --project backend --frozen --all-groups
+      - name: Verify host process and dependency ownership
+        run: >-
+          backend/.venv/bin/python -m pytest -q
+          scripts/tests/test_bounded_process_inherited_locks.py
+          scripts/tests/test_dev_environment_lifecycle.py
+          scripts/tests/test_dev_environment_private_locks.py
+          scripts/tests/test_dev_environment_watch_process.py
+          scripts/tests/test_dev_environment_watch_session.py
+          scripts/tests/test_dev_environment_dependencies.py
+          scripts/tests/test_dev_environment_task.py
+
+  developer-container:
+    name: Least-privilege developer container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Install locked Python dependencies
+        run: |
+          python3 -m scripts.python_witness lock-check
+          python3 -m scripts.python_witness install-check
+      - name: Set up pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: "12.5.1"
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          cache: pnpm
+          node-version: "24.21.0"
+      - name: Install locked frontend dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify the least-privilege Dev Container
+        run: backend/.venv/bin/python -m scripts.devcontainer_witness
+
+  utility-config:
+    name: Configuration contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out complete input universe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up locked package manager
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.17"
+          enable-cache: true
+          cache-dependency-glob: tooling/quality/uv.lock
+      - name: Install locked utility environment
+        run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      - name: Execute complete utility group
+        run: tooling/quality/.venv/bin/python -m scripts.ci_matrix run --group config
+      - name: Retain exact group receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-utilities-config
+          path: .ci-evidence/config.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  utility-docker:
+    name: Dockerfile contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Check out complete input universe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up locked package manager
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.17"
+          enable-cache: true
+          cache-dependency-glob: tooling/quality/uv.lock
+      - name: Install locked utility environment
+        run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      - name: Set up pinned build checks provider
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          name: ci-utility-checks
+          version: v0.37.1
+          use: false
+          buildkitd-flags: --debug
+          driver-opts: image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+      - name: Install checksum-bound Hadolint
+        env:
+          UTILITY_BIN: ${{ runner.temp }}/ci-utility-bin
+        run: |
+          set -euo pipefail
+          mkdir -p "$UTILITY_BIN"
+          curl --fail --location --silent --show-error \
+            https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64 \
+            --output "$UTILITY_BIN/hadolint"
+          printf '%s  %s\n' \
+            c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507 \
+            "$UTILITY_BIN/hadolint" | sha256sum --check --strict
+          chmod 0755 "$UTILITY_BIN/hadolint"
+          printf '%s\n' "$UTILITY_BIN" >> "$GITHUB_PATH"
+      - name: Execute complete utility group
+        run: tooling/quality/.venv/bin/python -m scripts.ci_matrix run --group docker
+      - name: Retain exact group receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-utilities-docker
+          path: .ci-evidence/docker.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  utility-go-static:
+    name: Go static analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Check out complete input universe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up locked package manager
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.17"
+          enable-cache: true
+          cache-dependency-glob: tooling/quality/uv.lock
+      - name: Install locked utility environment
+        run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.1"
+          cache-dependency-path: tooling/actionlint/go.sum
+      - name: Prepare exact module dependencies
+        working-directory: tooling/actionlint
+        env:
+          GOTOOLCHAIN: local
+          GOWORK: "off"
+        run: go mod download && go mod verify
+      - name: Install pinned Go analyzer
+        env:
+          GOTOOLCHAIN: local
+          GOBIN: ${{ runner.temp }}/ci-utility-bin
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@v0.8.1
+          printf '%s\n' "$GOBIN" >> "$GITHUB_PATH"
+      - name: Verify native Go input rejection
+        run: tooling/quality/.venv/bin/python -m scripts.conformance.go_utility_input_witness
+      - name: Execute complete utility group
+        run: tooling/quality/.venv/bin/python -m scripts.ci_matrix run --group go-static
+      - name: Retain exact group receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-utilities-go-static
+          path: .ci-evidence/go-static.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  utility-go-vulnerabilities:
+    name: Go vulnerabilities
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out complete input universe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up locked package manager
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.17"
+          enable-cache: true
+          cache-dependency-glob: tooling/quality/uv.lock
+      - name: Install locked utility environment
+        run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.1"
+          cache-dependency-path: tooling/actionlint/go.sum
+      - name: Prepare exact module dependencies
+        working-directory: tooling/actionlint
+        env:
+          GOTOOLCHAIN: local
+          GOWORK: "off"
+        run: go mod download && go mod verify
+      - name: Install pinned Go analyzer
+        env:
+          GOTOOLCHAIN: local
+          GOBIN: ${{ runner.temp }}/ci-utility-bin
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.8.0
+          printf '%s\n' "$GOBIN" >> "$GITHUB_PATH"
+      - name: Execute complete utility group
+        run: tooling/quality/.venv/bin/python -m scripts.ci_matrix run --group go-vulnerabilities
+      - name: Retain exact group receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-utilities-go-vulnerabilities
+          path: .ci-evidence/go-vulnerabilities.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  utility-spelling:
+    name: Repository spelling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out complete input universe
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up locked package manager
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.17"
+          enable-cache: true
+          cache-dependency-glob: tooling/quality/uv.lock
+      - name: Install locked utility environment
+        run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      - name: Execute complete utility group
+        run: tooling/quality/.venv/bin/python -m scripts.ci_matrix run --group spelling
+      - name: Retain exact group receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-utilities-spelling
+          path: .ci-evidence/spelling.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  pull-request-gate:
+    name: Pull Request Gate
+    if: ${{ always() }}
+    needs:
+      - api-contract-exploration
+      - container-runtime-smoke
+      - trusted-plan-request-entrypoint
+      - repository-quality
+      - secret-scan
+      - postgres-witness
+      - serial-qualification
+      - persistence-mutation
+      - operator-workbench
+      - connected-development-stack
+      - connected-administrator
+      - developer-container
+      - developer-host-lifecycle
+      - developer-bootstrap
+      - utility-config
+      - utility-docker
+      - utility-go-static
+      - utility-go-vulnerabilities
+      - utility-spelling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Require every native witness group
+        env:
+          CONTAINER_RESULT: ${{ needs.container-runtime-smoke.result }}
+          API_CONTRACT_RESULT: ${{ needs.api-contract-exploration.result }}
+          API_CONTRACT_REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.api_contract_deep }}
+          QUALITY_RESULT: ${{ needs.repository-quality.result }}
+          SECRET_RESULT: ${{ needs.secret-scan.result }}
+          SERIAL_RESULT: ${{ needs.serial-qualification.result }}
+          SERIAL_REQUESTED: ${{ github.event_name == 'workflow_dispatch' && inputs.serial_qualification }}
+          POSTGRES_RESULT: ${{ needs.postgres-witness.result }}
+          MUTATION_RESULT: ${{ needs.persistence-mutation.result }}
+          WORKBENCH_RESULT: ${{ needs.operator-workbench.result }}
+          CONNECTED_STACK_RESULT: ${{ needs.connected-development-stack.result }}
+          ADMINISTRATOR_RESULT: ${{ needs.connected-administrator.result }}
+          DEVCONTAINER_RESULT: ${{ needs.developer-container.result }}
+          DEVELOPER_HOST_RESULT: ${{ needs.developer-host-lifecycle.result }}
+          DEVELOPER_BOOTSTRAP_RESULT: ${{ needs.developer-bootstrap.result }}
+          TRUSTED_PLAN_REQUEST_REASON: ${{ needs.trusted-plan-request-entrypoint.outputs.reason }}
+          UTILITY_CONFIG_RESULT: ${{ needs.utility-config.result }}
+          UTILITY_DOCKER_RESULT: ${{ needs.utility-docker.result }}
+          UTILITY_GO_STATIC_RESULT: ${{ needs.utility-go-static.result }}
+          UTILITY_GO_VULNERABILITIES_RESULT: ${{ needs.utility-go-vulnerabilities.result }}
+          UTILITY_SPELLING_RESULT: ${{ needs.utility-spelling.result }}
+          TRUSTED_PLAN_REQUEST_RESULT: ${{ needs.trusted-plan-request-entrypoint.result }}
+        run: |
+          set -euo pipefail
+          test "${CONTAINER_RESULT}" = success
+          if [ "$API_CONTRACT_REQUESTED" = true ]; then
+            test "$API_CONTRACT_RESULT" = success
+          else
+            test "$API_CONTRACT_RESULT" = skipped
+          fi
+          test "${QUALITY_RESULT}" = success
+          test "${SECRET_RESULT}" = success
+          test "${POSTGRES_RESULT}" = success
+          if [ "$SERIAL_REQUESTED" = true ]; then
+            test "$SERIAL_RESULT" = success
+          else
+            test "$SERIAL_RESULT" = skipped
+          fi
+          test "${MUTATION_RESULT}" = success
+          test "${WORKBENCH_RESULT}" = success
+          test "${CONNECTED_STACK_RESULT}" = success
+          test "${ADMINISTRATOR_RESULT}" = success
+          test "${DEVCONTAINER_RESULT}" = success
+          test "${DEVELOPER_HOST_RESULT}" = success
+          test "${DEVELOPER_BOOTSTRAP_RESULT}" = success
+          test "${TRUSTED_PLAN_REQUEST_RESULT}" = success
+          test "${TRUSTED_PLAN_REQUEST_REASON}" = plan_url_invalid
+          test "${UTILITY_CONFIG_RESULT}" = success
+          test "${UTILITY_DOCKER_RESULT}" = success
+          test "${UTILITY_GO_STATIC_RESULT}" = success
+          test "${UTILITY_GO_VULNERABILITIES_RESULT}" = success
+          test "${UTILITY_SPELLING_RESULT}" = success

@@ -1,0 +1,1082 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "ci-coordinator.runtime.requirements",
+  "specPackagePath": "docs/specs/ci-coordinator-runtime",
+  "overviewPath": "docs/specs/ci-coordinator-runtime/overview.md",
+  "requirementsPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+  "requirements": [
+    {
+      "requirementId": "REQ-CI-RUNTIME-001",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "GitHub webhook payloads are admitted only when Content-Encoding is absent, the exact media contract is application/json, the signature field is exactly sha256= plus 64 lowercase ASCII hexadecimal characters, and the raw-body signature is compared in constant time as bytes; malformed, duplicate, encoded, unsupported-media, or non-ASCII pre-authentication fields are typed rejections rather than exceptions. The parsed payload family must equal the exact event header. Normalized events preserve repository, ref, SHA, workflow, signed-body hash, and provider delivery identity before policy, store, or GitHub side effects consume them; changing unsigned delivery or event metadata cannot create another effect or reinterpret one authenticated body. Version-2 ingestion admits repository-independent ping only from its bounded core (string zen, positive safe hook_id, matching positive safe hook.id and absent/null action), exact event-family binding and committed delivery claim; unused metadata stays inert, and the provenance-only result creates no planning seed, workflow observation, preparation offer, registration or configuration authority. Ping/CI family relabelling or mixed-family payloads reject.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-001"],
+      "nonClaims": [
+        "This requirement does not claim provider-side webhook delivery freshness, GitHub outage absence, or authorization for dynamic omission."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-002",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Configuration admission rejects unsupported dispatch mode, missing default-branch coverage, contradictory expected or omitted workflow definitions, non-success required expected conclusions, non-required expected signals, invalid timing windows, hybrid omissions without absence verification, and unsafe production runtime options.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-002"],
+      "nonClaims": [
+        "This requirement does not claim target repository workflow files are correctly changed or that production secrets are present."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-003",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Reconciliation may publish a successful coordinator check only when the persisted decision is still authorized by current policy, the coordinator check slot is unambiguous, expected workflow success is observed or safely polled, omitted workflow absence is verified for the required window, and state persistence succeeds through compare-and-set semantics.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-003"],
+      "nonClaims": [
+        "This requirement does not claim GitHub required-check semantics are sufficient for semantic success or that skipped native workflows are safe."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-004",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Persistence preserves idempotent webhook delivery, observations, policy decisions, issued dynamic plans, coordinator-check reservations, audit events, and reconciliation state transitions, while rejecting conflicting idempotency keys and replaying audit chains before filtered inspection. Webhook delivery identity is unique by provider delivery id and independently by authenticated body SHA-256: the same delivery id with different body bytes is a conflict, while the same authenticated body under another delivery id publishes no second effect. Classification checks exact delivery id before body identity, and every duplicate result requires a complete durable state and pair-owned audit event.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-004"],
+      "nonClaims": [
+        "This requirement does not claim backup, failover, production capacity, live migration execution, or deployment approval."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-005",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Dynamic CI context ingestion binds every GitHub owner/name read to an immutable repository ID and the resolved canonical full name; records diff, graph, policy, planner, verifier, and audit evidence without enabling omission enforcement; and keeps every incomplete, stale, ambiguous, unknown, mismatched, or invalid context as FullCI fallback evidence. Repository metadata and diff JSON retain a 1 MiB admission limit, while the GitHub Contents JSON envelope has a separate 2 MiB limit so base64 transport can carry a dependency graph whose decoded artifact satisfies the separately enforced 1,000,000-byte and 100,000-node limits. Admitted path-pattern matching is bounded to 512 pattern characters and 4096 path characters, uses no regex engine, and has worst-case O(P*S) time with O(P+S) retained state.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-005"],
+      "nonClaims": [
+        "This requirement does not claim selected dynamic checks are executed or that any required validation is omitted in production."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-006",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Signed dynamic plan issuance is exposed only when signing configuration is complete and cryptographically authenticates request-bound GitHub Actions OIDC identity. Configured exact-ref and repository-workflow-path alternatives are disjunctive only within one claim namespace; caller workflow_ref authority and called job_workflow_ref authority are conjunctive when both namespaces are configured. Path admission requires a canonical immutable workflow SHA. Issuance signs bounded TTL envelopes with a configured key id, persists idempotently, and returns signed FullCI fallback while omission enforcement is disabled. Identity admission alone cannot authorize selected execution: selected execution additionally requires the exact-revision adapter, exact equality between the registry-bound immutable plan requester and authenticated job_workflow_ref and job_workflow_sha, and production authority owned by REQ-CI-RUNTIME-027.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-006"],
+      "nonClaims": [
+        "This requirement does not claim GitHub OIDC provider availability, cross-private-repository reusable-workflow access, private-key custody adequacy, or non-fallback production rollout approval."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-007",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The target-repository bootstrap fixture runs without path filters for pull requests, pushes, merge groups, and manual smoke dispatch; obtains installation identity from explicit repository configuration with event fallback; pins every third-party action and external reusable workflow to an immutable commit; grants OIDC only to the registry-bound platform reusable workflow, which executes no target-controlled bytes, emits no token, binds its audience to the exact HTTPS plan URL, and totalizes every post-resolution OIDC or plan HTTP failure into bounded outputs. The dependent target plan job has no OIDC permission, runs on every non-cancelled requester result, invokes only the consume-plan or validate-plan command of one exact generated target-control bundle, consumes only canonical bounded plan chunks or a bounded reason, and maps absent, malformed, excessive, failed, or unsupported transport to FullCI. The target validates signed plan envelopes, exact static-job bindings, multi-profile per-job matrices, and the complete UTF-16 provider-output budget before selected execution, and invokes only the validate-gate command of that same bundle to terminate in one always-run stable aggregator that succeeds only when every declared selected static job, or the FullCI path, completed successfully while every other execution path was skipped.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-007"],
+      "nonClaims": [
+        "This requirement does not claim target repositories have installed the bootstrap workflow, that cross-private-repository call resolution is configured, that a pre-execution provider resolution failure can run local FullCI, or that selected-check commands are production-approved."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-008",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Runtime operability surfaces expose health, readiness, metrics, startup reconciliation, single-flight periodic reconciliation, bounded body and request admission, absolute deadlines for body-bearing requests, one shared application-cleanup owner-task and one statically partitioned total process shutdown budget with caller-cancellation isolation, a reconciliation drain sub-budget equal to half the application-cleanup partition, explicit cleanup-pending and deadline-exceeded terminal states, and a deadline fence that initiates no later resource close, redacted diagnostics that retain no provider exception graph, production database requirements, and production rejection of noop GitHub adapters without claiming deploy readiness. Body admission is exact over HTTP method and path, retains no local waiter queue, and holds each path-isolated permit from buffering through downstream completion, so a route with lane width `b_i` and byte bound `m_i` retains at most `b_i * m_i` complete replay payload bytes; the process bound is the sum over admitted routes and does not claim allocator, upstream-buffer, transient-copy, or post-request-copy bounds. Only expiry of the middleware-owned absolute deadline selects the route's typed timeout response; a downstream `TimeoutError` without that exact expiry remains an unclassified defect. Public OAuth start and callback each have an independent finite process-local no-queue token bucket and return a typed `429`; non-finite clock samples reject without mutation, backward samples grant no refill and cannot move the watermark, and this does not claim ingress-wide or replica-wide abuse control. Uvicorn disables generic access logging and forwarded-header trust, admits one explicit process concurrency maximum, and receives only its strict partition of the total shutdown budget, while a positive reviewed-framework orchestration reserve is disjoint from server and application phase limits; application authorization derives no authority from `Host`. A connected ASGI lifespan may yield only after the first reconciliation round succeeds within the admitted startup bound and the lifecycle atomically remains in its starting state; first-round failure, scheduler failure, stop-before-outcome-publication, concurrent close, or timeout rejects startup and drains without serving a route. Framework orchestration reserve plus server drain plus application resource cleanup exactly partition the configured process shutdown budget. Later round failure degrades readiness until recovery, and readiness samples background health only after its asynchronous dependency probes settle. Typed dependency-unavailable outcomes retain their declared `503` contracts, while every unclassified route defect is one non-cacheable redacted `500` inside correlation ownership and never asserts retryability. Values outside a route's declared closed outcome algebra and internal provider contract violations are unclassified defects; they cannot fall through to typed unavailability or a second route-specific `500` schema. CPU-bound repository-policy and webhook admission each execute in at most one no-queue cancellable worker process per backend process; a busy or broken worker yields typed unavailability, and request cancellation terminates running worker computation without changing either valid domain. Parent-side process argument serialization is not claimed event-loop-free and requires an environment-bound latency and heartbeat budget before production admission. The session-bearing runtime origin serves no OpenAPI, Swagger UI, ReDoc, or Swagger OAuth redirect route, while in-process schema generation remains available for contract verification. Disabled mode mounts only health, readiness, and metrics, publishes no operator UI or capability route, and loads no connected-capability policy while composing that surface. Connected startup admits webhook authentication material only within its UTF-8 byte bounds and the break-glass bearer only as 32 to 4,096 visible ASCII bytes; the deterministic lower bounds are work-factor proxies and not entropy claims. Break-glass authentication rejects non-visible-ASCII or oversized pre-authentication bytes before constant-time fixed-length SHA-256 digest comparison. Connected settings admit at most one credential-free HTTP proxy wire value whose optional trailing slash is normalized away; HTTPS proxy URLs are rejected, disabled mode cannot retain proxy wiring, and the public projection reveals presence only. Composition passes the same canonical proxy value or absence to GitHub App API, Actions JWKS, and enabled Keycloak and GitHub reviewer OAuth clients; each keeps environment trust disabled, preserves endpoint TLS verification, and rejects simultaneous custom transport and proxy routing. Before app or installation credential acquisition or provider I/O, the GitHub App transport admits only owned read operations whose method, canonical normalization-stable path shape, exact query order and bounds, and empty body match the closed capability catalog. One shared HTTP transport factory admits no more than 64 concurrent exchanges, including credential refresh, and keeps credential-cache access, refresh admission, token acquisition, exchange, and response aggregation inside one absolute deadline without claiming a process-wide or provider-wide rate bound; independently composed factories and replicas multiply the local contribution. Provider HTTP requests require identity encoding; live responses with content encoding or invalid or oversized declared length fail before raw application-body iteration, and admitted live responses are aggregated from raw undecoded bytes within the profile maximum. A transport-injected materialized response is bounded by its exact content byte count and makes no claim about wire encoding. Every PostgreSQL UnitOfWork owns a finite monotonic finalization deadline; caller cancellation cannot extend it, and expiry preserves the primary result classification while marking cleanup failure without claiming immediate preemption of a cancellation-suppressing driver. Reconciliation classifies only a typed provider-unavailable outcome or expiry of its own poll deadline as retry-safe; unknown exceptions propagate, and every nonterminal deferral uses deterministic equal jitter within the retained backoff bound. Elapsed mutation evidence uses a monotonic clock.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-008"],
+      "nonClaims": [
+        "The asynchronous cleanup deadline does not claim preemption of CPU-bound event-loop blockage, an already active third-party close, or third-party code that suppresses cancellation indefinitely; an unsettled close is exposed as cleanup pending, and readiness does not claim a distributed atomic snapshot.",
+        "This requirement does not claim SLO satisfaction, alert configuration, horizontal scaling, provider-wide rate enforcement, break-glass-bearer in-band expiry or revocation, parent-side process serialization latency, replay temporary-storage capacity, scheduler-latency bounds beyond the reviewed framework reserve, production capacity, or deployment approval."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-009",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Every backend runtime entrypoint admits only GIL-enabled CPython 3.13.15 from one duplicate-free machine profile; free-threaded builds and every other implementation, patch, or unrecognized build variant are rejected; provider jobs, the container image, local toolchain, packaging marker, static target, and packaged profile resources remain exact projections of that singleton profile.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-009"],
+      "nonClaims": [
+        "This requirement does not claim compatibility with another Python implementation, patch release, operating system, architecture, or deployment environment."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-010",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Every owned Python, npm, GitHub Actions, and container dependency change remains exact-lock or digest reproducible, every Python dependency change routes a current vulnerability audit, every dependency diff receives pull-request dependency review when provider evidence is available, and repository-owned update automation has no merge authority and cannot bypass compatibility witnesses.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-010"],
+      "nonClaims": [
+        "This requirement does not prove registry availability, provider security settings, artifact provenance, SBOM attestation, vulnerability-database completeness, or compatibility of an unreviewed update."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-011",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Every repository-owned or distributed GitHub workflow passes exact-version syntax and offline security analysis, declares least-privilege permissions, and bounds superseded executions without granting a linter provider or deployment authority. Syntax analysis explicitly covers all regular YAML workflows in the repository and both admitted consumer fixture roots; absent, empty or symlinked inputs fail admission. Every tracked standalone shell source belongs to an explicit path/dialect profile and passes the existing digest-pinned ShellCheck without being executed.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-011"],
+      "nonClaims": [
+        "This requirement does not prove online GitHub state, required-check enforcement, provider permissions, action publisher trust, deployment readiness, or absence of defects outside the admitted actionlint and offline zizmor rule sets."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-012",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The target-artifact compiler admits one bounded source and deterministically renders exactly one canonical JSON-plus-line-feed execution registry, test manifest, and dependency graph together with one bounded byte-exact CommonJS control bundle from the installed package. The bundle is a deterministic exact-version esbuild projection of an exact closed source inventory; its source identity commits to every source byte, the esbuild version, and all build arguments; an independent tree-sitter parser rejects every source outside the closed CommonJS module-loading grammar and derives a lexical dependency graph that must exactly equal the esbuild input and output import relations; and the committed projection must equal a clean rebuild before packaging. Every data artifact satisfies its normative schema, exact owner decoder, and consumer byte bound, including separately enforced conjunctive dependency-graph limits of 1,000,000 bytes and 100,000 exact path nodes, where the schema-v1 byte cap dominates node cardinality and the explicit node cap remains defense in depth, and the control bundle is non-empty, NUL-free, newline-terminated, and at most 1 MiB before any file is replaced. Render mode stages every changed output before publication and restores the complete prior path set after any caught replacement failure; check mode performs no filesystem mutation and succeeds only when all four files are byte-exact; and every CLI invocation first admits the supported Python runtime.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-012"],
+      "nonClaims": [
+        "This requirement does not claim semantic completeness of repository metadata, that lexical source admission is a sandbox against deliberately hostile JavaScript, crash-atomic replacement of all four files, concurrent-writer serialization, provider installation, omission safety, deployment readiness, or successful execution in a target repository."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-013",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Mutable default-branch workflow inventory is observational activation evidence, not request-time selected-execution authority. When this observation is required, the provider adapter enumerates the complete bounded default-branch workflow index with stable counts, unique identities, and exact same-origin sequential pagination; retrieves every required workflow at one authenticated immutable revision; projects bounded unambiguous YAML to static top-level trigger and job identities; and observes every required workflow as active and every required job in its exact-revision workflow. Invalid revision, transport failure, incomplete or inconsistent pagination, inactive workflow, invalid or excessive YAML, missing workflow, or missing static job returns no provider activation observation. Selected execution remains governed independently by the exact adapter and invocation authority of REQ-CI-RUNTIME-026 and REQ-CI-RUNTIME-027.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-013"],
+      "nonClaims": [
+        "This requirement does not authorize selected execution, execute GitHub expressions, expand reusable workflows, prove workflow behavior, permissions, runner availability, test adequacy, provider stability after observation, target-repository installation, deployment readiness, or production omission safety."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-014",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The repository workbench endpoint authenticates before use-case execution, authorizes one exact installation-and-repository scope before persistence or replay access, admits a per-section limit from 1 through 20, and returns one typed redacted snapshot. Its PostgreSQL adapter configures profile-owned READ COMMITTED isolation before begin, sets and verifies READ ONLY, acquires the shared compatibility fence, admits the complete bounded read capability set, and observes all five stable ordered limit-plus-one projections plus metadata in one subsequent statement snapshot. Every projected plan and reconciliation scope must equal its signed or canonical authority; every audit scope must be bound by the event input and event hashes; any mismatch fails closed. Replay status is valid only when the verified ledger prefix covers the snapshot ledger revision, and the response never exposes plan signatures, raw operator authentication material, config source bytes, or reconciliation lease tokens.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-014"],
+      "nonClaims": [
+        "This requirement does not claim a browser UI, cursor pagination, provider-state refresh, accessibility acceptance, production availability, SLO attainment, or deployment approval."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-015",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Runtime observability exports the official Prometheus text protocol from one concurrency-safe process registry whose metric names and label dimensions are code-owned and bounded; projects HTTP count and duration only by admitted method, matched route template, and status class; projects readiness, plan, bounded planning-stage unavailability, GitHub, capacity, shadow, and reconciliation outcomes without permitting telemetry failure to change a domain result; propagates cancellation while every deliberately fail-safe planning exception emits one fixed-cardinality stage and reason before selected execution is withheld; and emits recursively redacted canonical JSON completion records under a fresh service-owned correlation identity. A successful plan record includes only its durable issued-plan identity, plan identity, repository id, workflow run id, and run attempt. Safety and error-budget alerts are admitted only when a digest-pinned Prometheus promtool accepts the tracked rules. History warnings distinguish item, provider and inbox-processing failures from ordinary idle or deferred progress, and describe old or expired selected samples without claiming exact backlog size or distinct data loss. Each existing and new alert has named positive and isolated negative native outcomes; target drilldown preserves existing service-level paging. Archive collection stage histograms separately measure claim, access, provider and completion using invocation-local monotonic library timers and closed lane/stage/control-flow labels. Returned, raised and cancelled are not durable-success classifications. Instrumentation exceptions use the existing failure counter without retrying the operation, replacing its error or suppressing cancellation; histogram updates are not transactional and may be missing or partial; no timing adds authority, a deadline extension or a CPU/savings claim.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-015"],
+      "nonClaims": [
+        "This requirement does not prove a production scrape, Alertmanager route, notification delivery, retention policy, distributed trace, SLO attainment, or deployment approval."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-016",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The supported container artifact includes one database-access CLI that reads the migration DSN only from the deployment environment, admits one bounded runtime-role identity, acquires the database compatibility fence, and either checks without mutation or transactionally replaces direct application-object privileges with the exact PostgreSQL 18 runtime allowlist. Success requires a distinct schema-owning migration identity, a direct LOGIN NOINHERIT role with no privileged attributes, no membership edge in either direction, no application-object ownership, no applicable default ACL grant, no grant option, and exact effective schema, table, column, sequence, routine, type, and migration-metadata privileges including denial of MAINTAIN. The command never creates a role, changes a password or role attribute, grants membership, or emits credentials or provider diagnostics.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-016"],
+      "nonClaims": [
+        "This requirement does not create or rotate a database login, approve secret custody, prove database network isolation or backup, execute a live rollout, or grant production omission authority."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-017",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "An enforcing runtime may authorize selected execution only from one bounded canonical Ed25519-signed production-admission envelope whose key identity, packaged production-eligible build identity, immutable artifact digest, source commit, environment, rollout profile, repository scopes, full release-and-scope subject digests, workflow identities, evidence freshness, and remaining lifetime all match exact admitted inputs. Before any provider client is allocated, the cryptographically verified authority, exact envelope bytes, exact Ed25519 public-key identity, expiry, and canonical scope bindings must be registered idempotently in PostgreSQL or startup fails closed. Registration creates, uses, and disposes one short-lived PostgreSQL engine inside one bootstrap event loop; only after successful disposal may composition create the distinct serving engine and provider clients, so no pooled async connection crosses into the ASGI loop. Every selected-plan persistence transaction must use the database clock and the same repository-scope lock to prove after lock acquisition that the signed plan, exact authority, and exact subject remain registered and unexpired; owner admission must canonically decode the active config epoch and complete operator-control transition history before the transaction stores the selected envelope under a composite authority-and-repository-scope foreign key. Any missing, stale, malformed, conflicting, out-of-scope, disabled, unregistered, noncanonical, or orphaned fact yields FullCI or typed unavailability and cannot publish selected execution. Non-enforcing mode never receives this authority.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-017"],
+      "nonClaims": [
+        "This requirement does not make external evidence true, approve production rollout, prove provider availability, select a secret custodian, issue the signed admission envelope, or prove target-repository required-check enforcement."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-018",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The read-only provider inventory authenticates the operator and admits an explicit restricted-ID or App-wide read grant before any provider call; uses an app JWT only for exact installation identity reads and bounded App-owned installation pages and an exact-installation token only for that installation's repository page; strictly decodes bounded organization and repository identities, mutable names, structural eligibility flags, provider totals, and admitted next-page evidence; binds every repository scope to the requested installation id and every repository owner id to that installation's immutable account id; and exposes only typed minimal projections. An empty restricted inventory grant performs no provider I/O, an installation failure remains an explicit partial catalog entry, and unavailable, suspended, unsupported-account, malformed, identity-mismatched, rate-limited, or contradictory pagination evidence never becomes an empty, complete, configured, or enforcing repository result. Workbench and mutation scope use an independent explicit restricted or App mode, defaulting to restricted. Restricted mode preserves exact static scopes. App scope requires App inventory and a current administrator, and every scoped operation independently observes the exact App-authenticated active organization installation and positive numeric-ID membership in installation-authenticated repository pages, without a mutable-name join or public-metadata shortcut. Existing strict inventory decoding and pagination apply under a maximum of 100 pages of 100 rows and one 10-second monotonic deadline; page or time exhaustion is unavailable and external cancellation propagates. It retains no positive membership cache, rejects disabled repositories, denies absent or foreign installations, and reports unavailable or malformed provider evidence as the route-owned redacted HTTP 503. Static scopes cannot bypass revoked administrative App access; break-glass retains static scopes and only validation-increasing operations without provider I/O. Workload role admission, CSRF and production omission authority remain independent. Catalog pages project this explicit mode from already admitted membership without per-row lookups; the UI explains restricted access without attributing it to a different administrator. App mode rejects a nonempty inventory allowlist. Non-enforcing App-inventory bootstrap permits absent static scopes, which are deny-all under restricted scope mode; restricted and enforcing runtimes retain their nonempty command-scope requirement.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-018"],
+      "nonClaims": [
+        "This requirement does not prove configured control-plane clients or live human identity, durable provider synchronization, workflow discovery, repository adoption approval, provider writes, or production enforcement."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-019",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The synchronous read-only workflow-discovery operation authenticates the operator and authorizes the exact installation-and-repository scope before any provider I/O; binds the requested numeric repository id to provider owner-and-name coordinates; resolves an omitted revision once to the current default-branch head or admits only an exact lowercase 40-hex historical commit id; and acquires workflow sources through a bounded non-recursive commit-to-tree-to-blob chain whose provider identities, declared sizes, decoded bytes, and recomputed Git blob hashes agree. Its non-executing bounded YAML projection closes every declared workflow-and-job predicate as exactly one proven assertion or explicit unknown, distinguishes declared syntax from effective runtime behavior, resolves only same-snapshot local reusable-workflow edges, and never fetches remote targets. Proposal bytes exist only for a complete closed current-default-head inventory with exactly one workflow-signal pair satisfying the closed predicate: the workflow has workflow_dispatch plus at least one of pull_request, push, or merge_group whose trigger has no path, tag, exclusion, expression, or unknown filter, whose optional branch filter is exactly the default branch within the conservative literal grammar, and whose effective default or explicit action types cover every coordinator-admitted action; the statically named native non-matrix signal is either its sole unconditioned dependency-free job or an admitted always() unique-sink job in a complete acyclic needs graph; and no job in any workflow has an unknown display name or the same conservative ASCII collision key. Exact Unicode-scalar signal identity remains unmodified. The proposal emits one observe rule per selected proven event, passes the existing repository-policy admission path, retains dynamicCi as null and no omitted signals, and is otherwise blocked with typed reasons; an explicit historical revision always blocks policy bytes. Provider failure, truncation, malformed syntax, ambiguity, unsupported semantics, or any identity mismatch cannot become complete evidence, cannot disappear from the unknown ledger, and cannot register, activate, dispatch, mutate provider state, or authorize omission.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-019"],
+      "nonClaims": [
+        "This requirement does not prove runtime workflow behavior, FullCI aggregate identity, remote reusable-workflow safety, secret or environment existence, owner approval, configuration activation, provider enforcement, omission safety, deployment approval, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-020",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "An affirmative workflow-proposal review is admissible only after trusted mutation authorization for the exact repository scope, exact replay resolution before proposal or workflow provider work, equality of the complete client-observed active epoch pointer including revision or exact absence, and a new current-default-head workflow discovery that reproduces the expected content-addressed reviewable proposal manifest. Mandatory fresh provider authorization evidence precedes review-store access and is not proposal or workflow provider work; after that grant, exact operation replay precedes workflow discovery, clock reads, or writes. The semantic diff compares re-admitted normalized policy documents, treats unequal arrays as atomic ordered policy sequences, emits only bounded canonical RFC 6901 pointers without policy values, and binds its version, baseline epoch, target epoch, and pointers to a domain-separated digest. The migration declaration proves the static review relation, data-domain, routine, ownership, object-ACL, and PUBLIC-absence facts and denotes the required runtime grant set, but is insufficient for repository exposure; each runtime transaction separately proves the exact session principal and effective grants after the shared fence. After proposal provider I/O, one compatibility-admitted PostgreSQL transaction acquires the repository-scope lock, revalidates the full active pointer to prevent ABA, re-admits and registers the exact proposal epoch, appends a pair-owned audit event, and inserts one immutable review record. A successful commit publishes all three effects; every rejected, failed, or cancelled attempt before commit publishes none; and a failed or cancelled commit is never classified as a known rollback and is reconciled only by exact operation retry. An exact authorized operation retry returns the retained acceptance before another proposal or workflow provider call, while any changed actor, manifest, or baseline under the same operation id is a conflict. A different authorized operation for an already accepted scope-manifest pair returns the original retained record without relabeling its actor or baseline and performs no additional write. Acceptance cannot activate policy, mutate provider state, dispatch work, or authorize omission. Any browser or machine exposure is independently governed by the credential-plane, role, origin, CSRF, repository-attestation, and transport-binding obligations of REQ-CI-RUNTIME-021 and REQ-CI-RUNTIME-022 and cannot bypass them.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-020"],
+      "nonClaims": [
+        "This requirement does not independently prove control-plane identity or repository-attestation admission, that the provider head remains current after the retained review-time observation, that a failed or cancelled commit was not published without reconciliation, provide rejection and quorum workflows, activate a policy, mutate provider state, authorize selected execution or omission, approve deployment, or establish production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-021",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "When organization control-plane identity is enabled, the runtime projects the control-plane profile into three mutually exclusive administrator credential paths: an opaque Keycloak human session, an Keycloak machine access token, or the deployment break-glass bearer. Human login is a confidential authorization-code BFF with an exact configured callback, 256-bit state, nonce, PKCE S256, a bounded authenticated-encrypted browser-cleared transaction cookie, bounded discovery and JWKS acquisition, exact ID-token verification, and a redirect allowlist fixed to the admitted Keycloak issuer. The callback admits exactly one bounded code, canonical state and issuer equal to the configured issuer; optional bounded session_state is inert metadata rather than token sid authority. Duplicate, unknown, missing or invalid query fields reject before exchange, and one strict Pydantic model owns runtime field admission and OpenAPI projection. The callback clears the transaction cookie on every classified or unclassified result, persists no Keycloak token, and issues a new 256-bit opaque session handle whose digest addresses a PostgreSQL row containing only immutable identity coordinates, canonical roles, bounded display metadata, profile digest, and issue and expiry instants. Session expiry is no later than both ID-token expiry and the configured maximum; lookup and insertion use PostgreSQL statement time after compatibility admission; profile change, expiry, replacement, local-first logout, or an admitted replay-safe back-channel logout removes authority. Machine admission requires the exact issuer, API audience, allowlisted authorized party, stable subject, bounded time claims, a positive lifetime no greater than 300 seconds, and canonical roles. Human, machine, break-glass, target-workflow, repository-reviewer, provider, and client credentials cannot be reinterpreted across planes; the break-glass credential grammar excludes the period required by compact JWT serialization, and duplicate or mixed credentials are rejected before authorization. Browser mutations additionally require the exact Origin, session-derived constant-time CSRF proof, and admitted media type. Capacity exhaustion is a typed retryable overload and cannot be reclassified as an invalid credential. Break glass is accepted only for force FullCI and omission disablement. Secrets, provider tokens, PKCE verifiers, raw session handles, and key material never enter observable output or retained evidence. HTTPS uses Secure, HttpOnly, SameSite=Lax cookies; only the explicitly admitted loopback development origin may use distinct non-Secure development cookie names.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-021"],
+      "nonClaims": [
+        "This requirement does not prove configured Keycloak clients or roles, live logout delivery, cross-replica secret rotation, deployment, production readiness, or repository action authority by itself."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-022",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Repository-owner attestation is independent from organization administration. Its start mutation requires one unexpired Keycloak human session with the configure role, exact same-origin request integrity, and a complete current-head reviewable proposal; it binds one bounded authenticated-encrypted GitHub OAuth and PKCE transaction to the exact session digest, initiating actor, installation and repository, operation id, proposal manifest and digest, provider revision, expected active pointer, authority profile, and expiry. The callback admits one code, one state, and one transaction cookie; consumes the exact pending transaction once; resolves one immutable GitHub reviewer; accepts only current maintain or admin evidence for the same installation and repository; atomically retains the bounded proposal review, attestation, operation receipt, and audit event; discards the GitHub user token; and clears the transaction cookie on every classified or unclassified result. Every GitHub reviewer response is admitted from an identity-encoded, non-compressed raw stream only after exact framing and declared-length bounds, before JSON materialization. Activation requires an administrator with the activate role, the exact unexpired receipt for the target proposal, unchanged current-head proposal and provider revision, and a fresh GitHub App recheck of the retained reviewer's current maintain or admin permission. Trusted PostgreSQL time is sampled before permission-provider I/O and defines the evidence age; a later discovery cannot postdate that evidence. The complete active pointer, including exact absence, epoch identity, and revision, is compared with the reviewed baseline before provider work and again under the repository lock before the activation compare-and-set, so a changed or ABA baseline cannot consume the receipt or publish config or audit effects. Missing, changed, redirected, rate-limited, malformed, contradictory, expired, replayed, or unavailable evidence cannot become review or activation authority. Callback query fields are transport inputs only; neither browser state nor UI presentation may treat a query-only success hint as retained authority before a server-confirmed review exists. Administrator repository reads use the control-plane read role intersected with exact GitHub App installation scope and never depend on a retained GitHub user token. Personalized session, catalog, workbench, discovery, attestation, activation, and governance responses are non-cacheable. No repository-attestation route grants provider-write, workflow-dispatch, release, or CI-omission authority.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-022"],
+      "nonClaims": [
+        "This requirement does not claim configured GitHub OAuth callbacks, live provider availability, approval quorum beyond one current manager, provider writes, workflow dispatch, CI omission authority, deployment approval, or permission freshness after the completed operation."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-023",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The synchronous read-only governance-observation operation authenticates the caller and establishes exact installation-and-repository scope authorization before any installation-credential governance-state provider read; reads the numeric repository identity and current owner id, owner/name, full-name, and default-branch assertion; follows one exact API-version-bound bounded pagination trajectory to admitted terminal evidence and preserves every active rule returned along that trajectory; strictly admits bounded Unicode-scalar, JSON-safe, depth-limited, node-limited, byte-limited rule objects; preserves each complete provider rule as canonical JSON without assigning semantics to additive fields; rejects duplicates, malformed request provenance, pagination contradictions, nonterminal or over-budget reads, any repository identity change observed by a mandatory post-read rebind, and any provider identity from which the admitted credential-plane request cannot be constructed; and produces a content digest over the exact scope, repository assertion, provider API version, branch, and canonically ordered rules while excluding observation time. A successful response is explicitly best-effort and unbaselined, never returns a prefix after traversal failure, carries no provider body or credential, and cannot persist a baseline, classify compliance or drift, mutate provider state, activate policy, dispatch work, authorize CI omission, or approve release.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-023"],
+      "nonClaims": [
+        "This requirement does not prove provider snapshot isolation, stable rule membership across pagination pages, a complete rule set at any single instant, classic branch-protection details, inactive or evaluate rulesets, bypass visibility, expected policy, durable history, compliance, drift, provider enforcement, release readiness, CI omission safety, deployment, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-024",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "A governance-baseline approval admits one bounded command only after authenticating a control-plane principal with the configure role, enforcing credential-plane-specific mutation integrity, and establishing exact installation-and-repository scope authority before any baseline-store or governance-provider access. Every completed operation id has one immutable exact-command receipt and resolves its original accepted or unchanged result before provider I/O; a changed command that reuses that id conflicts. A new command succeeds only when its complete expected active-baseline pointer or exact absence still equals the retained append-only chain head and a fresh bounded provider observation for the same scope has the requested state digest. Provider rule bytes are never accepted from the caller. Under one repository-scope lock and admitted database capability, the transaction revalidates operation and predecessor state, then either appends one byte-reconstructible complete governance state, its pair-owned audit event, and its accepted-operation receipt atomically, or records only an unchanged-operation receipt when canonical state bytes equal the active baseline. It commits before reporting either completed result. Every retained baseline and operation receipt re-admits its canonical state or command, scope, result, predecessor, and audit linkage before use; update and delete remain forbidden.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-024"],
+      "nonClaims": [
+        "This requirement does not prove provider snapshot isolation, present conformance to a retained baseline, policy-classified drift, provider enforcement, workflow integrity, release readiness, CI omission safety, deployment, backup, or production availability."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-025",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The read-only governance-comparison operation establishes fresh exact-scope read authority before baseline-store or governance-state reader access, reads the active append-only baseline pointer before and after one fresh bounded best-effort governance observation, and emits a comparison only when both pointers are exactly equal. Acquiring that authority may itself require bounded provider I/O. An absent pointer at both reads yields an unbaselined observation; any pointer transition yields stale. For an active stable baseline, the pure comparator requires identical repository scope and derives matches if and only if the existing canonical governance-state codec produces byte-identical state, otherwise differs. It separately reports only a closed canonical changed-coordinate ledger and exact added-rule and removed-rule counts over complete canonical rule bytes; it never infers semantic rule pairing. Store failure performs no governance-state reader I/O; authorization, store, provider, binding, pagination, resource, cancellation, or baseline-race failure cannot become unbaselined, matches, or differs. The operation persists nothing, holds no database lock across provider I/O, carries Cache-Control: no-store, and grants no policy classification, compliance, enforcement, remediation, release, or CI omission authority.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-025"],
+      "nonClaims": [
+        "This requirement does not prove provider snapshot isolation, stable rule membership across pagination pages, policy intent, compliance, policy-classified drift, continuous monitoring, provider enforcement, remediation authority, release readiness, CI omission safety, deployment, or production availability."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-026",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Every exact-snapshot workflow source terminates in exactly one conservative adoption assessment: in-place static job set, reusable-workflow set, existing witness shards, full-only, or invalid. In-place and reusable classifications describe only the exact target-owned execution-job shape, exclude coordinator plan and aggregate-gate infrastructure, and both compile to the single native-job-set runtime execution kind rather than creating distinct authority semantics; an exact witness-shards target receives its own non-recommending navigation state. Discovery syntax alone never establishes target semantics or omission authority. The discovery adapter reads workflow sources and the target registry from the same exact commit tree; its bounded semantic projection is content-addressed and cannot become execution authority. Selected execution admits either repository-owned witness shards or a repository-native static job set through one workflow-scoped target registry whose canonical workflow binding owns the exact execution kind, one fixed credential-free invocation-classifier job, one exact remote plan-request job whose complete dependency set equals that classifier, one plan job whose complete dependency set equals that request job, an execution-kind-specific fallback identity, an acyclic closed static execution-job dependency graph, aggregate gate job, aggregate provider signal, and mandatory static jobs, and whose profile bindings preserve exact runner, permission, credential, fixture, service, and capacity identities. The complete target-registry profile set equals the complete configured validation-catalog profile set, so neither authority source can introduce an execution profile absent from the other. The complete top-level workflow job set equals the registered classifier, request, plan, execution, kind-specific fallback, and gate roles; every role id is unique under GitHub's case-insensitive expression comparison; and every execution job directly depends on the plan job without a dependency outside the declared plan and execution graph. A witness-shard workflow owns exactly one distinct static fallback job whose complete dependency set is the plan job; a native workflow forbids a separate fallback job and uses the complete registered native execution graph as FullCI. One bounded exact Git commit/tree/blob adapter snapshot proves the complete top-level job topology, complete same-commit local reusable-workflow closure, generated classifier, request, plan, and gate control plane, immutable external action, reusable-workflow, and image identities, and one always-run aggregate gate covering every terminal route. The signed plan contains only nominal identities; every selected profile belongs to the authenticated current workflow; every declared static execution job forms an exact registry bijection; every native root selection is non-empty and the target-side validator expands it to its registry-bound transitive execution dependency closure; every witness-shard selected job set is already closed over its registry-bound execution dependencies because target-side validation cannot synthesize unverified shard payloads; and every required job is selected directly for witness shards or through the native closure. Every execution profile carries at most 16 canonical service profile identities across policy, source, registry, and target admission. Every witness-shard profile uses canonical shard identities, contains no more than its signed maxShards, and contains no more than its signed maxItemsPerShard in each shard. Witness-shard execution retains derived per-shard provider signals; native job-set execution retains one content-addressed registry-declared aggregate signal proved by the exact adapter snapshot. Native fallback executes every registered original static execution job and rejects a synthetic separate FullCI result; witness-shard fallback executes its one registry-bound target-owned FullCI job. Exact target authority is independent from kind-specific capacity evidence: an unavailable shard manifest with a proved target withholds selected execution but preserves FullCI reconciliation through the exact workflow gate, while missing target authority creates no reconciliation subject and never invents a provider identity. Provider target and capacity projection is not invoked when neither production admission nor durable reconciliation can consume its result. Reference adoption fixtures retain a separately triggered target-local FullCI workflow with no remote reusable-workflow dependency because pre-resolution failure cannot reach same-workflow fallback; provider requiredness remains external evidence. Missing target semantics, unknown or invalid syntax, kind mismatch, registry/catalog profile-set mismatch, foreign workflow profile, missing, extra, or case-aliasing classifier, request, plan, execution, fallback, gate, or mandatory job, unsafe or ambient control-plane authority, mutable dependency identity, non-regular or digest-mismatched adapter object, static-job or dependency mismatch, cyclic or dangling dependency, undeclared prerequisite, stale revision or attempt, unavailable coordinator, malformed plan, or failed identity proof cannot authorize omission and resolves to native FullCI or an explicit blocking gate failure.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-026"],
+      "nonClaims": [
+        "This requirement does not prove arbitrary workflow semantics, local action or target-entrypoint behavior, repository-variable availability, target test adequacy, production omission safety, provider default-branch activation, provider required-check configuration, deployment, credential availability, hosted-runner CPU utilization, or globally minimal CI."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-027",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "A dynamic GitHub workflow ref may authenticate through a configured exact repository workflow path only when the corresponding OIDC workflow SHA is a canonical immutable Git object id. Selected execution additionally requires one bounded exact Git commit/tree/blob snapshot at that revision. The target execution registry in that snapshot binds by canonical path and SHA-256 every registered top-level workflow, the complete acyclic same-revision closure of static `$/.github/workflows/{file}` or `./.github/workflows/{file}` local reusable-workflow calls on the GitHub.com provider profile, the exact planRequestJobId and full-SHA planRequestWorkflowRef, and the one fixed generated control bundle exposing only consume-plan, validate-plan, and validate-gate commands. Both local forms canonicalize to one repository-relative path; the dollar-root form makes no GitHub Enterprise Server compatibility claim. Every bound member is a regular Git blob with matching provider identity and digest; every external reusable workflow and action uses a full immutable Git object id; every Docker action, job container, and service image uses an immutable SHA-256 digest. Authenticated job_workflow_ref and job_workflow_sha must equal the registry-bound requester identity before selected execution. The classifier, request, plan, and gate jobs match one normalized generated safety projection tuple: the fixed classifier has no permission or dependency, compares non-empty github.workflow_ref and job.workflow_ref values with case-sensitive equality, and emits only a fixed boolean; the request job depends exactly on the classifier, has only OIDC permission, executes no target-controlled bytes, and calls the exact immutable platform workflow; the plan job has no OIDC permission, depends exactly on the request job, runs after every non-cancelled result, consumes bounded canonical chunks, and validates the signed plan; the gate retains always-run aggregate authority. Request activation is derived from the exact parsed workflow trigger set and admits only pull_request, push, or merge_group runs for which the classifier proves exact non-empty caller and defining-job workflow-ref equality, with exactly one optional variant that excludes draft pull requests. Manual, unsupported, and same-repository reusable invocations skip the requester and totalize absent plan output through the existing native FullCI route. Plan and gate checkout and validation bind job.workflow_ref and job.workflow_sha, rather than reusable caller identity, to the workflow file that defines those jobs. The projection binds runner, timeout, permissions, outputs, ordered steps, immutable action coordinates, action inputs, step identifiers, shells, commands, conditions, complete environment values, and requester call inputs; cosmetic names and independently proved static needs are excluded from its hashes. Workflow-level environment and defaults are absent from every workflow in the reachable closure, no job or step in that closure declares continue-on-error, and execution route conditions use only github and needs. The snapshot contains at most 32 workflow files and 33 adapter files, requires at most 39 cold Git reads and four concurrent blob reads, and does not depend on the mutable default-branch workflow-list endpoint. A failed adapter blob read cancels and joins every request-owned sibling read before the snapshot load returns. An optional witness-shard test manifest is capacity evidence only when a bounded regular Git blob is read through the exact request head commit; Contents API dereferencing, symlinks, submodules, special objects, and mutable refs cannot supply it. Every selected execution contains each registry-declared mandatory static job, directly for witness shards or through the registered native dependency closure. targetRegistryHash transitively commits to the complete adapter. Missing, malformed, excessive, dynamic, mutable, foreign, cyclic, unreachable, non-regular, stale, unavailable, digest-mismatched, requester-identity-mismatched, control-invalid, failure-weakening, or mandatory-job-incomplete evidence cannot authorize selected execution and preserves FullCI after the remote call starts. Exact workflow-ref identities remain supported but do not bypass adapter or requester verification. Production path authority is exact by repository and workflow path and can authorize only the targetRegistryHash named by its verified production-admission subject.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-027"],
+      "nonClaims": [
+        "This requirement does not prove local action or target-entrypoint behavior, repository-variable availability, target test adequacy, third-party action behavior, cross-private-repository reusable-workflow fallback, GitHub Enterprise Server support for defining-job workflow identity, provider default-branch activation, provider required-check configuration, live credential availability, deployment, production omission safety, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-028",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The provider-independent consumer contract laboratory admits one target only after its non-runtime bootstrap pins one exact coordinator commit, bounds and materializes that commit's complete non-cache Python package tree into a private source image, starts isolated Python with a fresh external bytecode-cache root, and proves before and after execution that the complete loaded image inventory and bytes equal the same commit. Mutable coordinator worktree, index, and cache bytes are not execution inputs. Admission additionally requires a target-owned versioned profile, an independently authored content-bound scenario corpus, and one sealed target contract byte set and manifest covering every profile-bound input, lock-bound artifact, and registry-bound workflow and control file. Every sealed registry-bound workflow is parsed by the production workflow-capability admission and must satisfy the registry's exact reusable-workflow closure, aggregate gate, complete direct job topology, and generated control-plane semantics before any scenario executes; digest-consistent but semantically inconsistent workflow and registry claims are rejected. Structured inputs remain non-empty and NUL-free under their exact codecs; additional opaque target bindings admit the complete bounded regular-file byte domain, including zero-length and NUL-bearing content. Planning and generated controls read only the sealed values or their private execution image; target paths are not reopened as execution authority. Mixed generator, source, lock, profile, corpus, workflow, event, digest, file-kind, or source-epoch evidence is rejected before execution, and non-blocking leaf opens reject FIFO and other special-file paths without waiting for an outer timeout. Every admitted scenario uses the real configuration admission, DynamicPlanService, deterministic candidate planning and verification, SignedPlanIssuer, generated plan consumer, generated plan validator, and generated aggregate gate; selected scenarios additionally use exactly one native capacity projection and reconciliation registration, while fallback scenarios use neither selected-only path. The laboratory supplies bounded synthetic transport chunks and never claims to mint provider OIDC or execute the remote reusable workflow. Selected issuance is enabled only by a verifier-admitted consumer-lab receipt bound to the exact candidate and registry, fixed time, in-memory state, and separately domain-bound deterministic keys derived from the exact source epoch and scenario and never persisted or admitted by a production entrypoint. Expected selected or fallback outcomes remain target-owned and are never generated by the compiler under test. Synthetic job outcomes are explicitly labelled. Persistent target-source changes at the post-run observation are rejected; restored transient pathname changes are not claimed detectable because they cannot alter the sealed execution image. Direct Git and Node processes are bounded by aggregate output and wall time, original process-group identity remains anchored through cleanup and reap, an early exact Node.js 24.21.0 probe precedes generated controls, every generated-control process independently checks its own process.version before loading target code, and the Node permission model grants only required file access without child-process, worker, addon, or WASI authority. The canonical receipt always states providerEnforcement=false and targetJobsExecuted=false. Unknown, stale, changing, malformed, incomplete, or mismatched evidence cannot produce a passing receipt.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-028"],
+      "nonClaims": [
+        "A worktree execution-authority coordinate is a domain-separated laboratory fixture bound to the complete source epoch; it is explicitly not a GitHub workflow revision or provider identity evidence.",
+        "The local Python interpreter, Git executable and object database, Node runtime, operating system, and installed bootstrap are trust roots. This requirement does not claim hostile same-user confinement or generic cleanup of a separately trusted executable that creates a new detached session; generated Node controls receive no process-creation authority.",
+        "The published JSON Schemas are necessary structural preflight projections, not sufficient exact-admission authorities; the runtime codec additionally enforces canonical bytes, byte bounds, ordering, and cross-record identity constraints.",
+        "The target source status covers the closed sealed contract-path universe and does not claim global cleanliness of unrelated worktree files.",
+        "This requirement does not prove GitHub event delivery, REST, OIDC, workflow-expression, scheduler, concurrency, cancellation, merge-queue, hosted-runner, action, container, service, credential, repository-setting, organization-policy, required-check, target-test-adequacy, lane-execution, production-admission, deployment, omission-safety, or production-readiness behavior."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-029",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Every public HTTP representation model derives from exactly one runtime-owned request or response policy. When a request field's canonical wire name differs from its Python name, only an explicit validation alias admits that wire name and the Python-name alternative is rejected. Requests also reject extra keys, undeclared scalar coercion, invalid defaults, non-finite numbers, and post-validation assignment. Request serialization aliases exist only on the plan request whose canonical parser consumes that serialized projection. The existing force-full-CI expiry field is the sole declared JSON text-to-datetime conversion. It requires the exact string type and canonical extended grammar YYYY-MM-DDTHH:MM:SS[.ffffff][Z|+HH:MM|-HH:MM], with one to six fractional digits and an optional offset, before datetime.fromisoformat; domain policy retains timezone and temporal admission. A response admits only internal Python field names, strictly revalidates nested model instances, is shallow frozen without claiming deep immutability, rejects invalid defaults and non-finite numbers, and emits one JSON-mode mapping through a serialization-only injective lower-camel alias projection. Trusted attribute reads are enabled only by a bounded response subtype and an exhaustive class inventory. The historical readiness key unavailable_dependencies is an explicit serialization exception. Exactly two response discriminator fields retain explicit executionKind aliases because FastAPI requires field alias metadata for the OpenAPI discriminator property name; validate_by_alias remains false. Serialization schemas mark emitted defaults required. Direct BaseModel, Pydantic imports outside the closed non-owner vocabulary, aliased or module-form Pydantic imports, escape or shadowing of admitted Pydantic policy callables, per-module model_config or class keyword policy, populate_by_name, Field alias outside the discriminator inventory, field-local strict policy, call-level model_validate policy overrides, every Strict scalar wrapper, and direct model_dump use outside the owning policy are rejected by the exhaustive source/runtime witness pair. Generated OpenAPI and TypeScript must equal the deterministic served projection of the runtime model graph. A recursive value may use a documented conservative static projection only when the browser runtime schema restores its exact bounded algebra before semantic use.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-029"],
+      "nonClaims": [
+        "This requirement does not prove route authorization, body bounds before parsing, domain invariants, canonical signing bytes, provider behavior, deployment, production capacity, production availability, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-030",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Before the first target can receive production omission authority, an independently reviewable target-authority relation must close for the exact subject, epoch, and durable cutover generation. Closure requires a content-addressed, owner-admitted, independently inventoried, non-empty Phase-0 native-authority baseline captured before target adaptation; an owner-approved transition relation that gives every baseline row exactly one retained, replaced, or retired disposition, attributes every successor to a predecessor or approved introduction, and admits no unknown or collision; and a non-empty expected post-transition relation. Registration and observation producers must have different identities and independent key enumeration, independently prove completeness against the expected relation, and agree with it by exact key set and canonical full-row bytes. The observation producer must derive its raw candidate domain without accepting baseline, delta, expected, or registration keys as enumeration input; every workflow, policy, catalog, registry, profile, and provider candidate must project to exactly one expected row classified as authority or explicit owner-approved non-authority. The observation producer must enumerate the complete `.github/workflows` tree through a bounded, versioned, domain-separated stable-manifest codec that verifies exact regular-blob bytes, declared and observed sizes, SHA-256, recursively recomputed Git tree objects, modes, types, traversal completeness, and nullable-field semantics while rejecting symlinks, gitlinks, special or unknown modes and types, duplicate paths, and missing descendants. The stable manifest excludes source commit, root-tree, and ancestor-tree identities; a separate source-binding provenance receipt must bind an authenticated, version-pinned, bounded provider commit response to the exact requested source commit and root-tree identity, and must verify the complete provider-bound root/workflows-subtree object chain to that stable manifest digest. The relation receipt binds the baseline, transition, expected relation, raw candidate domain and projection ledger, both producers, stable workflow-manifest digest, initial source-binding provenance, retained evidence bytes, provider observation, policy, catalog, registry, owner, signer, production subject, and cutover generation without treating the source commit as the stable authority identity. Activation must first latch the v1 `disable_omission` transactional guard, revoke v1 grants, drain issued v1 plans, leases, and target executions, and prove old replicas unroutable; one transaction may then activate the successor generation and exact relation receipt and clear the latch. Every selected-plan decision must verify a current source-binding receipt for the same stable workflow manifest and a bounded live provider-governance observation equal to the receipt; failure, timeout, or uncertainty preserves FullCI. Every authorized provider-governance mutation must latch and drain selected authority before provider state changes, then activate a post-change relation receipt and generation before clearing the latch. Empty or post-adaptation-derived baseline, agreed omission, unclassified raw candidate, unauthorized retirement or introduction, incomplete producer domain, mixed-version runtime, stale grant, plan, lease, receipt, non-terminal old execution, missing, extra, mismatched, malformed, unattributed, unknown, cross-subject, or cross-epoch evidence preserves FullCI and cannot mint selected-plan authority. This requirement becomes blocking only in the same merge unit that installs the successor receipt schema and codec, persistence binding, runtime admission, generation fencing, and native falsifiers; the implemented v1 receipt remains governed by REQ-CI-RUNTIME-017 until that code cutover and cannot survive the later production-generation cutover.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-030"],
+      "nonClaims": [
+        "Blocking native acceptance does not establish external evidence truth, signer deployment, operational drain, live provider conformance, production activation, rollout approval, measured savings, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-031",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The dormant target-authority relation capability is a pure, finite, versioned, content-addressed algebra that cannot activate omission. Its sole public closure operation receives the exact non-empty unknown-free native Phase-0 baseline and owner-approved transition delta, derives the non-empty adapted expected relation internally, and rejects a missing or extra baseline disposition, invalid retention or replacement, introduction reuse of a baseline key, duplicate successor key, empty result, subject mismatch, or baseline-digest mismatch. Every row belongs to one closed family schema, uses exact present, not-applicable, or unknown field states, and compares by canonical full-row bytes. Registration and observation identities differ; registration is digest/count-bound to the derived expected relation; observation, its raw candidate domain, and projection ledger share one producer and are digest/count-bound to that raw domain. Subject, adapted epoch, stable workflow-manifest digest, completeness, exact key set, full-row bytes, and every candidate-to-observed-row projection must close; `workflow_blob` projects only to `workflow`, and every other raw candidate kind projects only to its same-named row family. Unknown, missing, extra, mismatched, unclassified, multiply classified, cross-family, foreign, or unprojected evidence returns a canonical typed rejection. Aggregate constructors and canonical codecs enforce exact schemas, exact container types, duplicate-key rejection, byte and structural bounds, domain-separated identities, exact round trips, and an immutable unactivated authority state. The package may import only itself, the exact canonical JSON, strict JSON, hashing, and ordering primitives that it uses from the kernel, and the exact repository-scope value owner; broad facades, provider, HTTP, persistence, runtime, environment, clock, planning, and activation dependencies are forbidden.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-031"],
+      "nonClaims": [
+        "This requirement does not prove pre-adaptation capture, independent producer key enumeration, stable Git workflow-manifest or current-source binding, provider-governance truth, retained evidence, signer authority, persistence, generation fencing, runtime admission, cutover, deployment, production omission, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-032",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The dormant Stage B target-authority evidence capability must keep stable workflow authority separate from exact source provenance and must produce owner registration and observed authority through the accepted asymmetric derivation. The pure workflow-authority package must construct a complete bounded `.github/workflows` manifest from retained regular-blob and recursively closed tree evidence, recompute every admitted SHA-1 Git blob and tree identity, reject incomplete traversal, duplicate or unreachable paths, symlinks, gitlinks, special or incoherent objects, size mismatch, object-id mismatch, and non-canonical artifacts, and expose strict domain-separated manifest and source-binding codecs. The stable manifest must bind exact repository identity and every descendant path, mode, type, object id, exact integer size, and blob SHA-256 while excluding commit and ancestor identities; the separate source binding must retain the exact successful provider commit request rather than reconstruct it and must bind its operation, method, path, API version, empty query, absent body, bounded provider commit response, requested commit, root and ancestor tree identities, and the stable manifest digest. The GitHub adapter must use API-version-pinned bounded GET requests, non-recursive complete tree traversal, bounded blob concurrency and bytes, exact operation/path provenance, and repository rebinding, returning only complete evidence or typed unavailability. Target artifact sources must close policy, catalog, registry, consumer profile, scenario corpus, repository, workflow, generator, event, and fallback/selected mode identities in one epoch. Provider workflow and governance evidence must bind exact repository subject and API version, distinguish stable authority from revision provenance, and identify its governance evidence as best-effort unbaselined; the workflow-inventory provider loader must construct that subject binding from the same repository value used for provider requests, and unavailable fields remain unknown. Registration must derive the full owner-intended inventory from the expected relation and owner policy while independently enumerating and exactly validating every target-artifact declaration inside the producer from its accepted target-artifact sources rather than accepting a caller-supplied declaration set. Observation enumeration must accept no baseline, transition, expected-relation, registration, or registration-key input; it must independently enumerate every regular workflow blob, parsed workflow and job, target declaration, provider repository, and provider gate from exact subject- and epoch-closed sources before total owner-policy projection. The owner policy must bind the complete registration-declaration domain and the stable observation-authority domain, so a candidate deletion cannot pass under the same owner epoch while commit-only provenance changes do not invalidate stable authority. Safety-critical discovery unknowns and provider-undisclosed fields must remain unknown. Candidate, declaration, owner-policy, producer, source, manifest, and binding values must be bounded, canonical, content-addressed, exact-type values. Pure package import policy must enforce closed external allowlists and forbid provider transport, persistence, HTTP, runtime, environment, process, filesystem, randomness, and clock mechanisms. The capability must remain in-memory and unactivated.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-032"],
+      "nonClaims": [
+        "This requirement does not prove pre-adaptation baseline capture, complete live provider governance, target test adequacy, retained production evidence, signer authority, persistence, shadow safety, generation fencing, runtime admission, cutover, deployment, production omission, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-033",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The Stage C evidence capability must retain exactly one internally replayable, unactivated target-authority proof for one exact subject and complete adapted epoch without itself creating runtime, provider, persistence, signer, or omission authority. Its closed canonical JSON bundle contains exactly thirteen role-ordered owner documents: Phase-0 baseline, transition delta, expected relation, stable workflow manifest, exact source binding, registration candidates, observation candidates, owner projection policy, registration inventory, observation inventory, raw candidate domain, projection ledger, and unactivated relation closure. Every item binds its exact owner schema, canonical re-encoded bytes, byte count, SHA-256, and role-domain identity; the bundle binds exact subject, epoch, immutable unactivated state, aggregate byte and structural bounds, and a domain-separated digest over the body without its digest field. Strict admission rejects duplicate or extra JSON keys, unsafe scalars, non-canonical bytes, missing, duplicate, extra, reordered, relabelled, schema-crossed, count-mismatched, digest-mismatched, or owner-codec-rejected items. Byte admission precedes UTF-8 decoding, and lexical depth and value-node preflight precedes JSON object-tree materialization while counting object keys outside the value-node budget. Replay must reproduce the transition, stable manifest and source provenance relation, owner policy and complete producer domains, both producer outputs, exact full-row relation closure, subject, and epoch before returning an affirmative value. Registration replay uses the registration owner's projection over independently retained declaration candidates; observation replay uses the observation owner's production over its independently retained candidate set. Offline file admission requires an absolute traversal-free no-follow regular input whose device, inode, mode, size, mtime, and ctime remain stable across one bounded read. Publication requires an owner-controlled non-group/world-writable destination reached without following path-component symlinks, a mode-0600 same-directory temporary file, complete write and file fsync, atomic no-overwrite hard-link to the bundle-digest filename, directory fsync, temporary unlink, and final directory fsync. A failure after temporary creation but before ownership return attempts both descriptor close and name removal; unsupported filesystem semantics, collision, short read or write, mutation, link, fsync, cleanup, or uncertainty returns no affirmative publication receipt. Invalid or unknown command arguments return only a redacted canonical JSON rejection without echoing the argument vector. Production admission may consume the pure codec, model, and replay only under the separately signed and generation-fenced REQ-CI-RUNTIME-030 boundary; offline file and CLI operations remain outside the runtime dependency graph. An unactivated bundle or successful replay alone is never a production authority receipt or selected-execution permission.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-033"],
+      "nonClaims": [
+        "This requirement does not prove pre-adaptation capture, sample-service owner approval, raw provider or target-source completeness, live provider truth, target test adequacy, production persistence, backup conservation, signer authority, shadow safety, generation fencing, deployment, production omission, measured CI savings, a five-minute workflow SLO, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.runtime",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-034",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Runtime diagnostics remain non-authoritative while every structured event is deterministically projected to strict RFC 8259 JSON under exact depth, node, collection-width, key-byte, scalar-byte, and record-byte limits. Container cycles, unsupported values, budget exhaustion, and oversized values produce stable non-secret sentinels rather than recursion, object repr, or event loss. Caller events cannot own or override observedAt, level, service, or correlation identity; non-finite numbers are rejected; system metadata is written by the service after caller admission; and defence-in-depth secret-name normalization covers credential, authorization, password, passphrase, key, token, signature, DSN, cookie, session, verifier, and authorization-code classes without treating arbitrary substring matches as semantic authority. An unexpected HTTP or deliberately fail-closed planning exception preserves cancellation and its existing redacted public outcome while emitting exactly one bounded private diagnostic containing only service-owned correlation identity, a closed owner stage, a closed reason, and bounded exception-class identity, never exception text, arguments, traceback locals, provider bodies, or credentials. Instrumentation failure cannot change a domain result and is exposed through one non-recursive bounded fallback or fixed-cardinality failure counter rather than disappearing silently.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-034"],
+      "nonClaims": [
+        "This requirement does not prove log transport, external retention, alert delivery, distributed tracing, operator access control for retained logs, or production readiness."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-035",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Every non-liveness request in connected runtime is governed by one owner-selected absolute deadline and a no-queue work-class admission before expensive database or provider work; disabled diagnostic runtime retains only dependency-free health projections and owns no connected timeout claim. Body-bearing connected requests additionally require both their exact method-and-path lane and one process-wide weighted retained-body reservation, using the admitted Content-Length when present and the route maximum when absent, and release every acquired capability exactly once under success, rejection, disconnect, timeout, cancellation, or exception. Path overload and middleware-owned deadline expiry remain fail-closed but return distinct stable typed outcomes. Session lookup, readiness, and workflow discovery have separate finite bulkheads; readiness includes single-flight lock acquisition inside its absolute deadline and does not multiply DB or JWKS probes for one concurrent wave. Direct workflow discovery and proposal review consume the same capability-owned no-queue snapshot-reader admission before credential or provider I/O; any route-local admission is only earlier load shedding, and the shared reader limit multiplied by its per-snapshot blob limit remains strictly below the shared GitHub exchange budget. Connected metrics require one bounded header-safe bearer whose value cannot reuse any configured credential secret; compare only fixed-length token digests; and mark both successful and rejected projections no-store before rendering while deployment still requires network isolation. Public readiness discloses only ready or not-ready, marks both outcomes no-store, and retains dependency classes only in private bounded metrics. PostgreSQL pool size, overflow, and wait timeout are explicit admitted values with zero implicit overflow. These local bounds make no source-fairness, replica-wide, ingress, allocator, zero-copy, or capacity-adequacy claim.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-035"],
+      "nonClaims": [
+        "This requirement does not prove trusted client source identity, distributed rate enforcement, replica-wide fairness, allocator peak memory, live database or provider capacity, deployment network policy, or production readiness."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-036",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Capacity qualification is an externally signed, bounded, canonical receipt whose model, signature payload, encoder, and decoder enforce one resource contract for one exact artifact, source commit, environment, capacity-profile digest, replica topology, resource-limit set, frozen workload digest, measurement protocol, sample set, and validity interval. It measures every profile-owned hard budget including retained and transient body bytes, browser response memory, event-loop latency, database pool wait, provider bulkhead wait, readiness latency, shutdown, audit growth, replay temporary storage, and FullCI fallback completion. Admission rejects missing, stale, foreign, unsigned, incomplete, noncanonical, threshold-violating, or identity-mismatched evidence and returns only not-qualified; local tests, static configuration, and a receipt for another epoch cannot imply CapacityQualified. Non-enforcing runtime does not require this receipt. Any enforcing production admission that claims deployment capacity must bind the exact capacity-receipt digest through its deployment evidence for the same subject.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-036"],
+      "nonClaims": [
+        "This requirement defines receipt admission but does not produce truthful measurements, choose a production signer, prove a live environment, authorize deployment, or establish production readiness by itself."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-037",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Audit replay can export one bounded canonical content-addressed chain-tip statement bound to exact ledger schema, database identity, positive JSON-safe retained revision, last event identity and hash, artifact identity, and observation time, where the last event identity must equal `audit_` followed by the first 32 hexadecimal characters of the last event hash. A separately owned external signature may authenticate and retain that statement; its admitted clock-skew interval is identical in admission and the returned validity predicate, and the service cannot claim external custody merely by producing it. Terminal truncation, full suffix rewrite, archive, or compaction resistance is affirmative only relative to one independently authenticated retained checkpoint and a verified successor chain. Any retention or archival operation must preserve a closed conservation relation over live data, WAL, backups, quarantine, key bindings, restore evidence whose content digest exactly equals its selected retained backup, and replay temporary storage and must fail closed when that relation, storage budget, or authenticated checkpoint is absent.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-037"],
+      "nonClaims": [
+        "This requirement does not prove an external checkpoint was signed, retained, monitored, or recoverable and does not authorize destructive retention before a separate persistence implementation and migration are admitted."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-038",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "CI economics is an observational capability that atomically retains bounded completed GitHub workflow observations with their admitted deliveries, collects one complete terminal REST snapshot for an exact reconciliation subject only after two equal bounded reads, and derives versioned duration measurements only from retained evidence whose shared webhook and REST facts agree exactly. Snapshot collection is a capability-owned durable state machine from source-time-bounded pending work through a database-time revision- and generation-fenced lease to captured, deferred, terminal-unavailable, or expired state; durable state and every claim bind the exact operational collection-policy digest, terminal evidence conflict cannot enter the retryable failure algebra, every transition result is constructively consistent, every failure changes durable state or loses authority, due selection is fair under bounded terminalization, and a purged tombstone cannot make an old source subject eligible again. Provider evidence identity excludes process-local observation time; provider conclusion values remain exact in economics while reconciliation applies its separately owned conservative projection. PostgreSQL owns source-anchored finite retention, an exact migration attestation that rejects conditional or restricted retention triggers and every relation rewrite rule, least-privilege runtime access, scope-first keyset summary reads, indexed detail reads with a hard-bounded materialized result required by aggregate derivation, and bounded cleanup. One runtime lifecycle executes collection, evidence expiry, observation cleanup, and tombstone purge as independently deadline-bounded non-authoritative operations with fixed-cardinality outcomes. Telemetry failure, conflict, timeout, or absence cannot alter planning, omission authority, or FullCI fallback. Collection lease and state-shape CHECK predicates admit only TRUE, never UNKNOWN; valid optional fields remain valid. Current economics clients require the total v4 catalog. A fenced contract/expand forward upgrade preserves valid rows and unrelated capabilities, rejects invalid retained rows without repair, and rolls back both declarations and DDL if validation fails.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-038"],
+      "nonClaims": [
+        "This requirement does not prove webhook delivery completeness, provider clock accuracy, data-independent PostgreSQL scan cost, actual CPU utilization, runner allocation, billing cost, cache efficiency, saved compute, plan consumption, live provider capacity, deployment, or production readiness."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-039",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Witness-shard capacity optimization may consume GitHub self-hosted-runner evidence only after every selected execution profile is bound through the exact immutable adapter snapshot to one static runner selector and every profile sharing a capacity class resolves to the same selector. The canonical selector set is bounded and contains only capacity classes owned by witness-shard profiles in that exact target registry. Admitted selector labels are bounded ASCII strings normalized under ASCII case-insensitive equality; an optional group name retains exact identity. One request-local provider read starts the snapshot validity interval before I/O, uses the exact installation-scoped repository and organization operations under one absolute deadline, and completely admits repository runners, every runner group visible to that repository, and every runner in each visible group through stable totals, exact same-origin sequential pagination, unique identities, and fixed page, byte, group, runner, and occurrence bounds. Organization denial, including an ambiguous not-found response, withholds the entire snapshot. Eligibility labels for one runner identity must agree across sources; transient state is merged conservatively so the runner is observed free only when every occurrence is online and non-busy; each runner may belong to at most one observed group; workflow-restricted groups are excluded; and label requirements are conjunctive. Capacity classes whose observed eligible pools intersect are omitted; each remaining shared-class count is allocated once across its profiles before profile-local shard optimization. Unsupported or dynamic syntax, non-ASCII labels, missing or conflicting selectors, malformed or incomplete provider evidence, conflicting labels, ambiguous membership, restricted groups, overlap, timeout, denial, or staleness cannot increase parallelism and preserves the unchanged selected validation set and conservative fallback. Caller cancellation is propagated without issuing an execution plan and cannot be reclassified as provider unavailability.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-039"],
+      "nonClaims": [
+        "This requirement does not claim an atomic provider snapshot, reservation, future availability, queue ordering, start-time SLO, GitHub-hosted or larger-runner capacity, workflow-restricted-group eligibility, optimal allocation across overlapping pools, live permission configuration, measured savings, deployment, or production readiness."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-040",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Optional target-local plan requests use only $/.github/workflows/trusted-plan-request.yml at the caller commit. Selective execution additionally requires verified caller repository, configured caller workflow path, Git ref and immutable SHA to agree with the called workflow's exact repository, canonical requester path, same ref and same SHA. The exact-revision adapter must include the requester as a regular workflow blob whose actual bytes and registered digest both match the coordinator-packaged requester, not merely a target-recomputed digest. The package is a bounded byte-exact projection of the repository requester source, preserves isolated OIDC without target code, and is rendered or checked only through an explicit single-file output command; the existing four-file artifact operation retains its output set. Existing external full-SHA requester admission and plan/signature/production authority remain unchanged. Every failed local identity or content check withholds selected execution; bounded requester failure preserves target-owned FullCI only when the target graph resolves, a runner executes it and the run is not cancelled. Existing adapter cardinality, read and transport budgets do not increase.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-040"],
+      "nonClaims": [
+        "No unconditional GitHub or runner availability, arbitrary local requester customization, automatic target writes, implicit OIDC policy, GHES support, live consumer identity, pre-CI planning completion, deployment or measured savings is established."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-041",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Only a durably admitted exact supported webhook seed may offer best-effort repository-context preparation. The nonblocking process-local queue retains at most 32 waiting compact epochs and one active epoch, coalesces exact pending keys, and has one lifecycle-owned worker with a five-second cooperative async timeout. Missing or foreign active configuration prevents provider work. The private cache retains at most four complete inputs and 100000 graph-node/dependency-edge/diff-file units for at most 120 seconds from acquisition start. Every repository epoch and policy operand participates in identity; current installation-bound repository and applicable PR range are revalidated and monotonic freshness is checked after external awaits. Read, failed or repeated preparation cannot renew an existing entry. Expired, incomplete, oversized, mismatched or unavailable inputs use the unchanged request-time path. Cache loss, queue saturation, restart and cross-replica misses never authorize omission. Preparation has no run identity, signer, dispatch or execution authority; all current request, configuration, override, verification, workflow, capacity, production and durable issuance controls remain independent. HTTP distinguishes a best-effort offer from no downstream action without claiming durable scheduling or completion. Finite metrics contain no repository, ref, SHA, credential or payload labels. Shutdown stops offers, cancels and awaits the worker, discards pending entries and closes the cache before provider closure under existing resource cleanup authority.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-041"],
+      "nonClaims": [
+        "No guaranteed delivery order, pre-CI completion, durable preparation, cross-replica cache affinity, hard CPU preemption, secure memory erasure, measured saving, independent input completeness, test-result reuse, working webhook, deployment or production readiness is established."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-042",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "CI economics v2 admits bounded provider-run sources without fabricated reconciliation while preserving every legacy source, payload, lifetime and conflict rule through forward, fenced migrations. Containing-run creation, not attempt creation, governs provider-source eligibility and retention. Explicit resolution binds separate run and exact-attempt observations and agrees with discovery without renewing old-run eligibility. Discovery is a read; registration requires fresh configure authority and exact provider attempt evidence within a source-created window. Database-time scope quotas, full-source lease claims, immutable report slots, exact source retention and dependency-ordered cleanup prevent quota races, cross-source writes and resurrection. Report admission binds a distinct Actions audience, current repository scope, exact run/attempt/execution identity and provider-confirmed job/check-run membership; body, provider pagination, concurrency and deadlines remain finite. One optional standalone producer measures waited-child user/system CPU and monotonic elapsed time with explicit units, scope and unavailable outcomes, excludes upload from those counters, emits only an exact request-bound receipt and preserves the wrapped command exit despite telemetry failure. Authorized exact-ID reads rebind retained evidence before output. Comparisons check every declared compatibility operand and preserve negative differences, missing evidence and zero denominators without claiming causality. A caller-supplied single-report budget distinguishes equality, breach and unavailable evidence. These observational operations cannot select checks, authorize omission, mutate provider workflows or weaken FullCI fallback.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-042"],
+      "nonClaims": [
+        "No whole-workflow CPU accounting, independent honesty of producer/workload assertions, exhaustive provider population, guaranteed telemetry, cross-source deduplication, durable budget subscription, alert delivery, causal savings, production capacity, deployment or live consumer qualification is established."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-043",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "CI economics catalogs repeat repository audit authorization before storage access and return only retained independent provider sources or report pointers for the exact requested source. Each database statement applies source kind, installation, repository, identity, nonexpired state and database-time retention predicates; report pointers additionally share source retention. Source pages use strictly descending numeric run/attempt keys and report pages strictly ascending report IDs. Canonical cursors grant no authority, requested limits are exact integers in1..100, and at most limit+1 rows determine a continuation anchored to the final returned item. Report lists select only metadata, never canonical payloads. Missing or expired sources, valid empty report pages, denied scope and unavailable evidence remain distinct. Wire projections exclude lease credentials and preserve public collection state independently of measurement availability. These reads never register a source, dispatch work, renew retention or alter planning.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-043"],
+      "nonClaims": [
+        "Independent current pages are not a snapshot, complete population, proof of pointer payload validity, measured query capacity, provider freshness or production admission."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-044",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Repository budget configuration requires current configure authority, an exact scope, operation identity and expected revision before a bounded transactional store call. At most 16 durable policy identities including disabled policies exist per repository; revision zero creates, matching positive revision updates, revisions never reset or overflow and operation replay returns its original paired audit result. A selector binds sample, producer and method with an explicit nullable runner-class wildcard. First acceptance of a report snapshots every enabled matching policy and inserts the complete bounded signal set atomically with the immutable report; original report replay cannot re-evaluate a later policy. Scope-exclusive configuration and scope-shared report locks linearize these operations under the compatibility fence without reverse lock order. Signals preserve exact policy revision/digest, report/source identity, counter scope, unavailable reason, command exit and original source retention; equality is within budget and unavailable never means zero. Authorized bounded metadata pages rebind scope and filters, validate ordering and continuation, and join the live report and source. Report expiry cascades to signals without renewing retention or enabling recollection. Two immutable forward revisions retire v2 and attest v3 in one migration transaction; failure restores the predecessor, retained reports remain byte-identical, old writers fail closed, and signal writes have no update/delete privilege. These observational budgets cannot change planning, dispatch checks, authorize omission or deliver notifications.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-044"],
+      "nonClaims": ["Per-report budget signals do not prove CPU honesty, population completeness, statistical regression, causal savings, notification delivery, production capacity or deployment qualification."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-045",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Continuous repository observation is explicit durable intent, not CI authority. Fresh configure authorization admits one exact scope, actor, operation, expected revision, enabled state, all-or-selected workflow IDs and bounded initial history. Configuration and paired audit commit atomically; replay returns the original receipt and pause fences subsequent scan writes without deleting evidence. A global configuration cap and existing source quota are serialized in PostgreSQL. Two fair lanes retain bounded frozen intervals, at-most-six-hour active windows, pages, immutable cycle identity and hard leases. Every mutation rebinds scope, configuration and scan revisions, lane, owner, token, complete cursor and database time after all blocking locks; expired or stale authority commits no sources, progress or gaps. A page registers bounded exact provider sources and advances progress in one transaction without provider I/O inside that transaction. Current App membership precedes bounded provider reads; failures retain retryable progress and fixed-cardinality outcomes. Source-created eligibility and retention cannot be renewed by rediscovery. Gaps retain exact configuration/selector/cycle provenance, finite cardinality, immutable expiry and an honest bounded-detail-loss watermark. Scope-authorized status, gap and workflow-choice reads expose finite inert projections without credentials or execution authority. An additive fenced migration attests the new capability, relations and grants while preserving existing economics data and writers. Native witnesses cover causal operand mutations, real lock races, rollback, capacity and dependency-ordered cleanup; local results cannot establish production capacity.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-045"],
+      "nonClaims": ["Observation does not prove exhaustive or atomic provider history, all rerun attempts, CPU measurement, causal savings, provider deletion, production capacity or authority to change, dispatch or omit CI."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-046",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Historical Actions traversal binds a frozen repository scope and arbitrary source interval to bounded seven-day windows, exact pages and a constant-memory numeric attempt cursor with a fixed discovered ceiling. Adaptive subdivisions share closed boundaries without assuming whole-second source timestamps; irreducible saturation is an explicit gap. Exact attempt reads bracket bounded job enumeration with matching terminal headers and preserve completed-but-unknown conclusions, empty, partial, unavailable and conflicting populations. Run creation belongs to the admitted run source; attempt creation remains a separate bracketing operand and need not equal run creation. Every collection lane forwards the source instant explicitly and rejects a returned substitution. Canonical attempt/job bytes, job counts and provider pages have shared finite bounds. Permanent job admission depends on retained numeric runner identities, not discarded display names; absent or zero IDs stay unknown, strict ID domains and group-to-runner relations remain enforced, and inconsistent timestamps cannot produce exact timing. Permanent normalized statistics retain exact identity and analytical operands without raw actors, logs or credentials. Detail policy values distinguish disabled, bounded days and forever, preserve immutable first successful detail import and applied policy-source identity, and prohibit ordinary expiry resurrection. Recognized nonterminal children of a stable completed attempt contribute only admitted identities to pagination and duplicate accounting; only independently terminal jobs contribute statistical facts. Known missing children yield partial population even when no terminal jobs remain. Unknown measurements are never zero and this archive admission does not relax active CI evidence. None of these models extends the active-evidence source or retention window. Optional numbered steps use the versioned allowlisted detail schema, bind the exact attempt and head plus complete unique job population, and consume a bounded canonical-byte budget during the existing page traversal. Exceeding that budget discards the sidecar and stops further step decoding without discarding otherwise valid statistics.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-046"],
+      "nonClaims": ["Traversal does not prove snapshot-complete provider history, deliberate deletion, actual CPU use, workflow provenance, causal savings, applied retention, public archive delivery, omission safety or deployment readiness."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-047",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Archive persistence owns exact scope, dataset generation, configuration and row revisions, canonical/scalar agreement, quota and trusted database-time lease authority. Statistics, gaps, quota and checkpoint or recheck progress commit atomically; terminal SQL CAS expiry or stale authority rolls back every contribution. A bounded per-run recheck interval preserves duplicate progress and finite acquisition debits including crashes, reserves recent capacity and requires a durable gap before exhausted work advances. Current historical failure may hand off its exact attempt atomically; ordinary hints cannot rewind completed work or reset retries. Capacity deferral refunds only the current holder's own rolled-back debit. Audited configuration preserves progress for pause/policy/quota changes, restarts non-destructively for selector/rescan changes, removes excluded pending work and invalidates stale claims. Permanent facts preserve first import and known operands under refinement/conflict. An additive forward migration adds the archive capability, independently attested catalog and narrow grants without rewriting published migrations or existing active-evidence semantics. First detail import may accompany a new statistics contribution or an explicit statistics replay, and shares its transaction, quota conservation and terminal lease authority. Retained and expired detail anchors cannot be refreshed or resurrected by ordinary replay. A source child insertion and parent cascade deletion must serialize without committing an orphan or losing an admitted handoff.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-047"],
+      "nonClaims": ["Static persistence and migration declarations do not prove applied schema, production capacity, backup recovery, live delivery, public retention management or safe omission."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-048",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The archive application single-turn run operation admits at most one backfill, one recent and one repair claim concurrently per invocation through capability-owned ports. The one-item entrypoint admits exactly one requested history lane. Process-owned lane scheduling, continuation, idle waiting and lifetime are governed by REQ-CI-RUNTIME-054, replacing only this requirement's former cumulative runtime-drain policy. Current repository access and the complete provider operation share a bounded monotonic deadline shorter than the storage lease. The application binds exact request and response scope, page or attempt, workflow and source creation time before storage; final storage authority is independently rechecked. Observed abort prevents the next external effect, cancellation propagates, and one lane's handled failure does not cancel other lanes. Fixed-cardinality provider-result counters remain independent from durable transition counters, so acknowledged deferral cannot impersonate successful collection. No application import crosses into SQL/provider/runtime implementation, and no collection outcome changes planning or active-evidence eligibility. Count and deadline bounds are not measured capacity or proof of an empty backlog. Optional detail crosses the existing capability ports without adding provider requests or extending collection deadlines. Process-owned bounded detail expiry continues when collection is paused, preserves permanent statistics, and participates in structured maintenance cancellation and awaited shutdown.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-048"],
+      "nonClaims": ["The collection service alone does not establish continuous hint delivery, public archive controls, throughput, native test execution, production or live runtime activation."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-049",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "A supported retained workflow delivery, its audit and compact source-bound archive inbox commit atomically under the canonical delivery guard. Source identity and lifetime are immutable within that retained epoch; exact replay preserves its receipt, and source expiry cascades only the transient inbox. Queue admission and the delivered dataset generation commit together after current scope, selector, source and database-time validation; failed, full, paused or excluded work cannot acknowledge. Completion or deletion of queue work cannot reset the receipt. Maintenance reads at most256 active scope identities, admits at most16 cyclic scope attempts per round with at most four workers, and bounds individual transfer and whole-round time. Process-local rotation is not write authority. Observed abort prevents the next operation, cancellation propagates and handled failure of one scope does not cancel siblings. Bounded transfer counts and selected-page source age are distinct from archived runs, provider collection and planning inputs. A separate bounded pending-prefix expiry sample distinguishes observed expired sources from an empty sample without acknowledging them or starving eligible transfer. Null means unsampled; histogram values are repeated observations, not distinct losses or complete expired-source coverage.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-049"],
+      "nonClaims": ["This source contract does not prove uninterrupted processing, fairness under repeated restarts, full backlog age, capacity headroom, delivery by older producer binaries, complete provider history, public controls or live activation."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-050",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Historical administration uses a capability-owned actor-free strict request and a server-enriched command with unchanged aliases, serialization, operation identity and audit digest. Fresh exact-boolean repository authorization precedes every store effect; authorization and storage share one bounded monotonic deadline and external cancellation propagates. Configuration returns only its exact scope, expected successor revision and configuration, or a typed rejection; timeout or unavailability is not rollback evidence. Status reads defaults, an optional dataset/scan pair and bounded current-generation recheck cardinality in one PostgreSQL statement snapshot, without mutation, provider access or dataset row/advisory write locks; the enclosing UoW preserves schema admission and its shared compatibility fence. Status admits only matching scope, generation and configuration revisions, valid observation time and an overflow-checked count. Exact replay never rewinds the latest stored configuration, and archive administration does not change active CI evidence or statistical retention. HTTP configure and status routes preserve authentication, configure/audit roles, repository authorization and mutation integrity; input is bounded to4096 bytes, depth6 and256 nodes, one exact application/json content type without content encoding, no duplicate JSON keys or query parameters, and no caller-supplied actor. Writes admit at most two concurrent operations and reads share the economics read bulkhead. Explicit no-store projections bind closed outcomes to snapshot presence and expose progress without worker identities, claim tokens or provider-page payloads. Generated OpenAPI preserves exact request aliases, required fields, response branches and authentication metadata.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-050"],
+      "nonClaims": ["Administration source and static contracts do not by themselves deliver UI controls, native transport qualification, all-history completeness, runtime activation, capacity proof or production readiness."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-051",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Archive reads are repository-authorized, bounded current-generation statement snapshots with exact filters, ordered unique keys and authenticated query/actor/configuration/data-revision continuation. Header pages do not materialize every child job. Missing or conflicting evidence remains explicit and a provider404 does not prove deletion. Detail retention preview is read-only; apply binds actor, operation identity, exact selected attempts, generation, configuration/data/default revisions, immutable import cutoff and reviewed effect digest. Parent detail state, child deletion, released quota, successor revision and the paired audit event commit atomically. Replay preserves the original receipt, ordinary detail erasure preserves permanent statistics, expired detail cannot resurrect, and unknown transport outcome is not rollback evidence. HTTP routes retain audit/configure admission, mutation integrity, strict bounded bodies, private no-store outcomes and shared finite query/write budgets. Cursor key derivation is canonical, domain-separated and replica-stable; the cursor is not an authorization credential. The additive exact-attempt detail read binds scope, generation, parent head and complete conflict-free jobs in one SQL snapshot, limits canonical job aggregates before driver materialization, and exposes only recognized unexpired detail. Null content remains a valid response for unavailable detail. On-demand UI admission and the development proxy preserve exact route, identity, retention and timestamp operands.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-051"],
+      "nonClaims": ["Archive read and detail-retention source contracts do not prove provider completeness, native witness execution, full statistical erasure, global default editing, live deployment or production capacity."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-052",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Archive analytics is a read-only repository-authorized projection over an exact generation, bounded whole-UTC-day interval and optional exact workflow/job or admitted purpose mapping. SQL aggregates finite attempt/job populations under statement and application deadlines; dataset, mapping, counts and buckets must belong to one committed statement snapshot. A seeded mapping must exactly match its same-snapshot settings. Ordinary concurrent ingestion does not require write quiescence or invalidate a coherent observed revision; generation, state, canonical integrity and budget admission remain mandatory. Job samples and attempt populations partition their inputs, missing values never become zero, and runner occupancy is distinct from CPU, calendar billing and causal savings. Forecasts use chronological holdouts, calibration before evaluation, an explicit horizon, finite support and empirical coverage admission; unsupported forecasts carry no actionable estimate. Degradation uses an explicit baseline, persistence and hysteresis and never attributes a slowdown to code or runners without evidence. Response identity, mapping provenance, cutoff, horizon, units and counts remain bound to the admitted query; bounded response and query failures are not successful empty history. Neither analytics nor forecasting changes CI planning or evidence retention.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-052"],
+      "nonClaims": ["Descriptive statistics and retrospective backtests do not establish complete provider history, causal optimization savings, monetary forecasts without a tariff, prospective calibration, attribution, production capacity or alert delivery."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-053",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Descriptive purpose settings bind the exact repository and history generation. Missing settings differ from a configured empty mapping; exact workflow IDs, case-sensitive job names and finite categories never infer source or execution authority. Fresh audit/configure authorization and mutation integrity precede effects. A bounded generation/revision CAS commits the mapping with an actor-bound audit receipt; exact replay preserves its original snapshot and substitution conflicts. Analytics reads load and revalidate committed settings in their existing database context, rejecting mixed mapping or dataset revisions. Strict bounded public contracts bind scope, generation, operation, revision and entries. The forward migration, exact catalog and least-privilege grants are required before access; failure never authorizes an automatic fresh write.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-053"],
+      "nonClaims": ["Descriptive settings do not establish source authenticity, automated classification, changed CI policy, deployment, complete history or production qualification."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-054",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Archive collection uses four process-owned single-flight lanes with independent monotonic per-item deadlines, cooperative continuation after applied/recovered progress and interruptible bounded idle waits after other outcomes or own expiry. Initial authoritative reconciliation precedes worker startup. The existing public three-lane run and per-item source, authorization, generation, lease, retry, quota and transaction contracts are preserved. Cancellation propagates; unsettled work retains its owner and admits no replacement. Every attempted background startup establishes cleanup ownership before suspension; concurrent stop succeeds only when every attempted owner returns exact true. Shared resources cannot close before quiescence, and repeated drain retains the original tasks. Only the primary service owns reconciliation readiness. Finite lane-liveness metrics and a target-bound alert expose optional worker termination without granting planning or omission authority.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-054"],
+      "nonClaims": ["Work-conserving scheduling does not establish complete provider history, unrestricted cross-repository fairness, production headroom, measured speedup, alert delivery or omission safety."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-055",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "Explicit recorded-gap recovery admits 1-50 sorted unique canonical recheck gap IDs for one repository, generation and expected configuration revision. Fresh configure authorization and mutation integrity precede any effect; the server supplies the actor. Current dataset state, workflow selection, source identity/time and queue capacity are revalidated under the existing scope lock. Same-run metadata must agree; requested inclusive attempt intervals total at most 50. Existing queued work is merged without losing future attempts, and rewinding changes the child revision so a predecessor cannot complete it. Queue effects and an actor-bound audit receipt with canonical source gaps commit atomically; any refusal leaves no partial batch effects. Exact command replay recomputes source-to-interval binding and returns the historical receipt without requeueing consumed work; substitution conflicts. Gap reads preserve immutable failures and attach only matching current-generation retained headers within one bounded statement snapshot, without child materialization or mutation. UI presents original failure separately from missing, complete, incomplete or conflicting retained evidence, previews inclusive retry intervals and never equates queue admission with collected data. Unknown outcomes preserve one exact operation across tab and CSRF changes; scope, actor or generation replacement cancels stale requests and cannot display their receipt as current. HTTP shares historical write budgets, rejects actor injection and malformed bodies, and exposes no worker credential. Recovery changes neither CI planning nor evidence/retention authority.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-055"],
+      "nonClaims": ["Queue admission and retained headers do not prove fresh provider completeness, automatic recovery of page-origin gaps, success of every retry, measured capacity, native qualification, deployment or omission safety."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    }
+  ],
+  "nonClaims": [
+    "This requirement source does not claim external evidence production, provider required-check enforcement, deployment approval, or production readiness."
+  ]
+}

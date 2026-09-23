@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "requiredEnvironmentKeys": [
+    "CI_COORDINATOR_BIND_HOST",
+    "CI_COORDINATOR_BIND_PORT",
+    "CI_COORDINATOR_DEV_API_URL",
+    "CI_COORDINATOR_DEV_ENV_FILE",
+    "CI_COORDINATOR_DEV_ROOT_DIGEST",
+    "CI_COORDINATOR_DEV_SECRET_DIR",
+    "CI_COORDINATOR_GITHUB_APP_ID",
+    "CI_COORDINATOR_OIDC_ALLOWED_JOB_WORKFLOW_REFS",
+    "CI_COORDINATOR_OIDC_ALLOWED_WORKFLOW_REFS",
+    "CI_COORDINATOR_OIDC_AUDIENCE",
+    "CI_COORDINATOR_OPERATOR_ID",
+    "CI_COORDINATOR_OPERATOR_SCOPE_ALLOWLIST",
+    "CI_COORDINATOR_PLAN_SIGNING_KEY_ID",
+    "CI_COORDINATOR_PLAN_TTL_SECONDS",
+    "CI_COORDINATOR_RECONCILIATION_INTERVAL_SECONDS",
+    "CI_COORDINATOR_RECONCILIATION_SCAN_LIMIT",
+    "CI_COORDINATOR_RECONCILIATION_STARTUP_TIMEOUT_SECONDS",
+    "CI_COORDINATOR_REQUEST_TIMEOUT_SECONDS",
+    "CI_COORDINATOR_RUNTIME_MODE",
+    "CI_COORDINATOR_SHADOW_ROLLOUT_PROFILE_ID",
+    "CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS",
+    "COMPOSE_PROJECT_NAME"
+  ],
+  "optionalEnvironmentKeys": [
+    "CI_COORDINATOR_OUTBOUND_PROXY_URL"
+  ],
+  "secretFilenames": [
+    "github-private-key.pem",
+    "migration-dsn",
+    "operator-bearer-token",
+    "plan-signing-private-key.pem",
+    "postgres-migration-password",
+    "postgres-runtime-password",
+    "postgres-superuser-password",
+    "runtime-dsn",
+    "webhook-secret"
+  ],
+  "v2EnvironmentAdditions": {
+    "CI_COORDINATOR_DATABASE_POOL_SIZE": "16",
+    "CI_COORDINATOR_DATABASE_POOL_TIMEOUT_SECONDS": "5",
+    "CI_COORDINATOR_MAXIMUM_RETAINED_BODY_BYTES": "33554432"
+  },
+  "v2SecretAdditions": [
+    "metrics-bearer-token"
+  ]
+}

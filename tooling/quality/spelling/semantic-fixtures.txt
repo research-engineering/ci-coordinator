@@ -1,0 +1,2 @@
+    ["Upper", "1runner", "runner/name", "runn\u00e9r", "a\u0661", "a" * 65],
+        _expected_signal(rule)["workflowFile"] = "qualit\u00e9.yml"

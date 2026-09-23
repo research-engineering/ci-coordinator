@@ -1,0 +1,1 @@
+{"globalRiskPaths":[".github/workflows/**"],"invalidatesWhenChanged":[".ci-coordinator/**",".github/workflows/**"],"nodes":[{"dependents":["tests"],"path":"src","riskClasses":["source"]},{"dependents":[],"path":"tests","riskClasses":["source"]}],"provenance":{"generator":"target-artifacts@1","schemaVersion":"dependency-graph/v1","source":"configured"}}

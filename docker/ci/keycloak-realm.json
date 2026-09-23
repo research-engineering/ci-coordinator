@@ -1,0 +1,71 @@
+{
+  "realm": "coordinator",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "accessTokenLifespan": 300,
+  "roles": {
+    "client": {
+      "ci-coordinator-admin-api": [
+        { "name": "read" },
+        { "name": "audit" },
+        { "name": "configure" }
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "ci-coordinator-admin-api",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true
+    },
+    {
+      "clientId": "ci-coordinator-admin-ui",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["https://coordinator.test/api/v1/auth/keycloak/callback"],
+      "webOrigins": ["https://coordinator.test"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://coordinator.test/workbench"
+      },
+      "defaultClientScopes": [],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "administrator-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "ci-coordinator-admin-api",
+            "claim.name": "resource_access.ci-coordinator-admin-api.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "3c42bfcb-a928-43f6-8c81-cc10c1b6eb24",
+      "username": "ci-administrator",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "CI",
+      "lastName": "Administrator",
+      "email": "ci-administrator@example.invalid",
+      "requiredActions": [],
+      "clientRoles": { "ci-coordinator-admin-api": ["read", "audit", "configure"] }
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "algorithm": "Ed25519",
+  "envelopeSchema": "ci-coordinator-capacity-envelope/v1",
+  "fixedBudgets": {
+    "forced-termination-count": 0,
+    "safety-invariant-violation-count": 0
+  },
+  "limits": {
+    "maximumClockSkewSeconds": 300,
+    "maximumEnvelopeBytes": 262144,
+    "maximumEvidenceAgeSeconds": 2592000,
+    "maximumReceiptLifetimeSeconds": 604800,
+    "maximumSampleCount": 1000000000
+  },
+  "metrics": [
+    {"comparison": "lte", "metricId": "audit-backup-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "audit-backup-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "audit-growth-bytes-per-day", "unit": "bytes-per-day"},
+    {"comparison": "lte", "metricId": "audit-key-binding-count", "unit": "count"},
+    {"comparison": "lte", "metricId": "audit-live-data-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "audit-live-row-count", "unit": "count"},
+    {"comparison": "lte", "metricId": "audit-quarantine-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "audit-replay-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "audit-replay-temporary-storage-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "audit-restore-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "audit-wal-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "database-lock-wait-p999-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "database-pool-wait-p999-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "database-query-p999-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "database-storage-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "event-loop-delay-p999-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "forced-termination-count", "unit": "count"},
+    {"comparison": "lte", "metricId": "frontend-response-memory-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "full-ci-fallback-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "process-resident-memory-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "provider-bulkhead-wait-p999-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "readiness-latency-p999-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "reconciliation-round-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "reconciliation-stale-work-count", "unit": "count"},
+    {"comparison": "lte", "metricId": "request-latency-p999-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "retained-request-body-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "safety-invariant-violation-count", "unit": "count"},
+    {"comparison": "lte", "metricId": "shutdown-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "transient-request-body-bytes", "unit": "bytes"},
+    {"comparison": "lte", "metricId": "webhook-normalization-cpu-p999-microseconds", "unit": "microseconds"},
+    {"comparison": "lte", "metricId": "webhook-parent-serialization-p999-microseconds", "unit": "microseconds"}
+  ],
+  "nonClaims": [
+    "The profile does not produce measurements, select production budgets, or own a signing key.",
+    "A qualified receipt does not authorize deployment, retention, CI omission, or provider mutation."
+  ],
+  "profileId": "ci-coordinator-capacity-qualification/v1",
+  "receiptSchema": "ci-coordinator-capacity-receipt/v1",
+  "schemaVersion": 1
+}

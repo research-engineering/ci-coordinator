@@ -1,0 +1,199 @@
+{
+  "discovery": {
+    "containerFiles": [
+      "Dockerfile",
+      "Dockerfile.workflow-lint"
+    ],
+    "deploymentDirectories": [
+      "deploy",
+      "deployment",
+      "helm",
+      "infra",
+      "k8s"
+    ],
+    "generatedEntrypointDirectories": [
+      ".ci-coordinator",
+      "generated",
+      "scripts/generated"
+    ],
+    "pythonModuleEntrypoints": [
+      "backend/src/ci_coordinator/runtime/__main__.py"
+    ],
+    "pythonProjectManifests": [
+      "backend/pyproject.toml"
+    ],
+    "rootDeploymentFiles": [
+      "Procfile",
+      "compose.yaml",
+      "compose.yml",
+      "docker-compose.yaml",
+      "docker-compose.yml"
+    ],
+    "workflowDirectories": [
+      ".github/workflows"
+    ]
+  },
+  "dispositionId": "ci-coordinator/runtime-entrypoint-disposition/v1",
+  "schemaVersion": "ci-coordinator-runtime-entrypoint-disposition/v1",
+  "sources": [
+    {
+      "callerId": "container.command",
+      "currentTarget": "python -m ci_coordinator.runtime",
+      "disposition": "runtime_authority",
+      "kind": "container",
+      "memberIds": [
+        "Dockerfile:CMD"
+      ],
+      "path": "Dockerfile",
+      "sourceId": "container.command"
+    },
+    {
+      "callerId": "container.healthcheck",
+      "currentTarget": "[\"python\", \"-m\", \"ci_coordinator.runtime.healthcheck\"]",
+      "disposition": "runtime_authority",
+      "kind": "container",
+      "memberIds": [
+        "Dockerfile:HEALTHCHECK"
+      ],
+      "path": "Dockerfile",
+      "sourceId": "container.healthcheck"
+    },
+    {
+      "callerId": null,
+      "currentTarget": "sha256:424bf2621b1707c2ac0adbea5026a8e639b9e692c058a46a3fda6df30d4904fb",
+      "disposition": "non_runtime",
+      "kind": "container",
+      "memberIds": [
+        "Dockerfile.workflow-lint"
+      ],
+      "path": "Dockerfile.workflow-lint",
+      "sourceId": "container.workflow-lint"
+    },
+    {
+      "callerId": null,
+      "currentTarget": "sha256:580ea806fe77a0c9a9e597ef74289acbdd6e46d6cb5eae70a03d39f739000cf4",
+      "disposition": "non_runtime",
+      "kind": "deployment",
+      "memberIds": [
+        "deploy/observability/ci-coordinator.rules.test.yml",
+        "deploy/observability/ci-coordinator.rules.yml"
+      ],
+      "path": "deploy",
+      "sourceId": "deployment.documents"
+    },
+    {
+      "callerId": null,
+      "currentTarget": "sha256:7e7151c11f621ab8fc06516f21672efe911b01be89e955f772b49e9cc0667ded",
+      "disposition": "non_runtime",
+      "kind": "deployment",
+      "memberIds": [
+        "compose.yaml"
+      ],
+      "path": "compose.yaml",
+      "sourceId": "deployment.root-files"
+    },
+    {
+      "callerId": null,
+      "currentTarget": "sha256:d63eae325e4c18ce213a95af5b1b741ae0370dd83a853a20d3a26b3410de81a7",
+      "disposition": "non_runtime",
+      "kind": "generated_entrypoint",
+      "memberIds": [
+        ".ci-coordinator/ci-coordinator.cjs",
+        ".ci-coordinator/dependency-graph.v1.json",
+        ".ci-coordinator/execution-registry.v1.json",
+        ".ci-coordinator/self-ci-inventory.v1.json",
+        ".ci-coordinator/target-artifacts-source.v1.json",
+        ".ci-coordinator/test-manifest.v1.json",
+        ".ci-coordinator/validation-catalog.v1.json"
+      ],
+      "path": ".ci-coordinator",
+      "sourceId": "generated.documents"
+    },
+    {
+      "callerId": null,
+      "currentTarget": "ci-coordinator-consumer-lab = ci_coordinator.consumer_contract_lab.bootstrap:main",
+      "disposition": "non_runtime",
+      "kind": "python_console_script",
+      "memberIds": [
+        "ci-coordinator-consumer-lab"
+      ],
+      "path": "backend/pyproject.toml",
+      "sourceId": "python.consumer-contract-lab.console"
+    },
+    {
+      "callerId": "python.database-access.console",
+      "currentTarget": "ci-coordinator-database-access = ci_coordinator.database_access_cli:main",
+      "disposition": "runtime_authority",
+      "kind": "python_console_script",
+      "memberIds": [
+        "ci-coordinator-database-access"
+      ],
+      "path": "backend/pyproject.toml",
+      "sourceId": "python.database-access.console"
+    },
+    {
+      "callerId": "python.replay.console",
+      "currentTarget": "ci-coordinator-audit-replay = ci_coordinator.replay_cli:main",
+      "disposition": "runtime_authority",
+      "kind": "python_console_script",
+      "memberIds": [
+        "ci-coordinator-audit-replay"
+      ],
+      "path": "backend/pyproject.toml",
+      "sourceId": "python.replay.console"
+    },
+    {
+      "callerId": "python.runtime.module",
+      "currentTarget": "python -m ci_coordinator.runtime",
+      "disposition": "runtime_authority",
+      "kind": "python_module",
+      "memberIds": [
+        "ci_coordinator.runtime.__main__"
+      ],
+      "path": "backend/src/ci_coordinator/runtime/__main__.py",
+      "sourceId": "python.runtime.module"
+    },
+    {
+      "callerId": "python.target-artifacts.console",
+      "currentTarget": "ci-coordinator-target-artifacts = ci_coordinator.target_artifacts.cli:main",
+      "disposition": "runtime_authority",
+      "kind": "python_console_script",
+      "memberIds": [
+        "ci-coordinator-target-artifacts"
+      ],
+      "path": "backend/pyproject.toml",
+      "sourceId": "python.target-artifacts.console"
+    },
+    {
+      "callerId": null,
+      "currentTarget": "ci-coordinator-target-authority-evidence = ci_coordinator.target_authority_evidence.cli:main",
+      "disposition": "non_runtime",
+      "kind": "python_console_script",
+      "memberIds": [
+        "ci-coordinator-target-authority-evidence"
+      ],
+      "path": "backend/pyproject.toml",
+      "sourceId": "python.target-authority-evidence.console"
+    },
+    {
+      "callerId": null,
+      "currentTarget": "sha256:b164214820da5b002489b26aa666ec2169289ad0d715657025397bde81b83998",
+      "disposition": "non_runtime",
+      "kind": "workflow",
+      "memberIds": [
+        ".github/workflows/api-contract.yml",
+        ".github/workflows/automatic-mutation.yml",
+        ".github/workflows/coordinated-checks.yml",
+        ".github/workflows/python-persistence.yml",
+        ".github/workflows/release-artifact.yml",
+        ".github/workflows/runtime-base-comparison.yml",
+        ".github/workflows/runtime-image-qualification.yml",
+        ".github/workflows/scheduled-advisories.yml",
+        ".github/workflows/source-assurance.yml",
+        ".github/workflows/trusted-plan-request.yml"
+      ],
+      "path": ".github/workflows",
+      "sourceId": "workflow.documents"
+    }
+  ]
+}

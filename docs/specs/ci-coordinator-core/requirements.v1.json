@@ -1,0 +1,426 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "ci-coordinator.core.requirements",
+  "specPackagePath": "docs/specs/ci-coordinator-core",
+  "overviewPath": "docs/specs/ci-coordinator-core/overview.md",
+  "requirementsPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+  "requirements": [
+    {
+      "requirementId": "REQ-CI-CORE-001",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Every implementation preserves the governing law that deterministic proof may reduce work, agent advice may only increase validation, and uncertainty runs FullCI or produces an explicit failure.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-001"],
+      "nonClaims": [
+        "This requirement does not claim any current dynamic omission is production-approved."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-002",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Production modules preserve repository-owned dependency direction and trust boundaries: bounded-context imports do not invert authority, first-party application imports are closed to the explicitly admitted capability set, the application layer cannot depend on provider integrations or runtime composition, domain planning remains free of HTTP, SQL, GitHub SDK, wall-clock, and environment mechanisms, and every mechanically decidable boundary has an executable gate. One semantic domain invariant or capability contract has one owner unless a distinct meaning, trust, version, transaction, or lifecycle boundary is proved; consumer-local identical Protocol aliases and policy-free pass-through use cases are forbidden. Static import enforcement uses monotone flow-insensitive lexical provenance over known repository authorities; obtains executable function and class local binders from the pinned CPython symtable and generic parameters and comprehension targets from their AST declarations; rejects unmapped executable scopes; evaluates generic defaults in their defining environment; propagates generic class parameter masks, but not ordinary class locals, into nested class, callable, and comprehension scopes; treats postponed annotation lambda bodies as latent while projecting their defaults; projects exact from-import authorities without synthetic parents; exactly inventories every top-level concrete *Service definition and every transitively reachable package-facade re-export route, including its public name, against one typed same-name owner declaration; derives exact export, private implementation-module, and restricted module-object authorities from that declaration; admits exact port and data symbol imports; resolves direct attributes and literal getattr chains; projects the closed dynamic-import token set from imported names, literal member subscripts, and literal getattr members; and conservatively projects every configured descendant when a sensitive import root is used as a bare value. The HTTP package namespace is inert: importing it or its body-limit middleware must not load the application/router graph; internal consumers explicitly import existing defining modules, while explicit application import retains the one composition root.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-002"],
+      "nonClaims": [
+        "This requirement does not claim path separation alone proves semantic cohesion, behavioral substitutability, or that every abstraction is justified."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-003",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Backend work begins from admitted requirement sources, requirement proof bindings, witness commands, machine profiles, and requirement-owned regression vectors rather than from prose-only design documents or generated agent output.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-003"],
+      "nonClaims": [
+        "This requirement does not claim Proofkit owns CI Coordinator product truth or native witness execution."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-004",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Dynamic planning may omit a check only when the diff is complete, graph evidence is fresh, the check responsibility surface is known, the diff does not affect that surface, policy permits omission, and a verifier accepts a typed replayable omission proof.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-004"],
+      "nonClaims": [
+        "This requirement does not claim GitHub path filters, skipped jobs, or agent recommendations are omission proof."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-005",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Runner-capacity optimization may change scheduling, shard count, and queue strategy only after the selected validation set is fixed and only from fresh bounded eligibility-filtered evidence for the exact execution profiles. Shared capacity classes receive one aggregate budget before profile-local optimization. Unknown, stale, incomplete, ambiguous, or overlapping capacity evidence retains conservative execution; capacity can never reduce coverage, omit checks, broaden credentials, create semantic success, or disable fallback.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-005"],
+      "nonClaims": [
+        "This requirement does not claim an observed GitHub runner state is a reservation, future availability, queue position, start-time guarantee, or proof of saved compute."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-006",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Shadow mode must compare planned omissions against full validation outcomes and block limited dynamic omission expansion until candidate unsafe omissions are zero for the enabled surface and rollback, alerting, replay, and operator override are proven.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-006"],
+      "nonClaims": [
+        "This requirement does not claim historical green runs prove future omission safety."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-007",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Durable persistence provides transactional uniqueness, compare-and-set state transitions, immutable config epochs, page-bounded audit replay integrity, pre-retention downgrade proof, post-retention forward-fix recovery, backward-compatible code rollback, and explicit unavailable states. Production audit replay freezes one exact ledger head, verifies every bounded page in sequence before filtered inspection, and stages a second re-verified pass in owner-private temporary storage without retaining memory proportional to ledger cardinality, publishing only a complete JSON document; affirmative output requires exit zero, complete JSON parsing, and a terminal valid status; concurrent appends beyond the frozen head belong to another replay epoch.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-007"],
+      "nonClaims": [
+        "This requirement does not claim backup, failover, production capacity, external migration execution, or deployment authority."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-008",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "The operator workbench is read-first and proof-linked: every backend projection authenticates before access, authorizes one exact repository scope, returns only bounded stably ordered redacted facts from one compatibility-admitted read-only snapshot, binds indexed scope to signed, canonical, or hashed authority, and reports replay validity only through the verified snapshot revision. Neither the backend projection nor any future UI may create success, modify proof facts, activate policy, dispatch execution, or bypass admitted command authority.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-008"],
+      "nonClaims": [
+        "This requirement claims the bounded backend snapshot API only; it does not claim a browser UI, cursor pagination, accessibility acceptance, provider refresh, production availability, or operator approval for rollout."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-009",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "A backend surface may become authoritative only after exact conformance is proven for requirement-owned wire, canonicalization, hash, signature, OIDC, and replay contracts, and monotonic strengthening is proven for safety and validation coverage planes.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-009"],
+      "nonClaims": [
+        "Passing local conformance does not prove deployment identity, live provider behavior, rollback execution, or production authority."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-010",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "A published wire or persistence schema version has an immutable admitted domain: any narrowing or widening requires a new schema version, a versioned reader, and an explicit migration. The initial migration and first published contracts define the support baseline; no earlier product version is supported.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-010"],
+      "nonClaims": [
+        "This requirement does not authenticate deployment history or authorize mutation of a contract after publication."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-011",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Every canonical audit payload must satisfy profile ci-audit-event-json-resources/v1 from docs/specs/ci-coordinator-core/audit-json-resource-profile.v1.json before hashing or persistence, and exhaustion must return that profile's stable typed resource failure.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-011"],
+      "nonClaims": [
+        "This requirement does not bound payload bytes, string or key length, request bodies, ledger cardinality, database storage, or arbitrary malformed-input diagnostics."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-012",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Every durable use case that produces both subject state and audit evidence must commit both effects as one serialized unit: successful results retain both effects, conflicts and persistence failure publish neither attempted effect, a retry repairs a retained proper subset only when the missing counterpart is uniquely reconstructible and equivalent, and no later mutation may be lost through stale-snapshot publication.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-012"],
+      "nonClaims": [
+        "This requirement does not claim backup, failover, cross-region durability, deployment approval, or atomicity for state transitions that have no admitted paired audit contract."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-013",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Every ci-audit-event/v1 input or record eligible for hashing or durable persistence must satisfy profile ci-audit-event-persistence-bytes/v1 from docs/specs/ci-coordinator-core/audit-persistence-byte-profile.v1.json. Byte exhaustion must be rejected before any audit hash or persistence transaction begins, persisted payload bytes must equal the admitted and hashed bytes, and PostgreSQL constraints must enforce the same upper bounds as a storage backstop.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-013"],
+      "nonClaims": [
+        "This requirement does not prove transport-body bounds, host-object materialization bounds, ledger cardinality, PostgreSQL capacity, production sizing, provider execution, or production persistence admission."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-014",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Repository policy admission is one pure total deterministic operation from explicitly formatted bounded UTF-8 source bytes with no designated secret fields to either one stable typed diagnostic or an immutable compiled epoch draft. The policy event domain is exactly pull_request, push, and merge_group, matching runtime planning requests; provider signal names retain exact bounded Unicode-scalar identity without normalization while a separately named ASCII-folded collision key conservatively prevents ambiguous expected-and-omitted identities; and an admitted epoch with dynamicCi absent remains ordinary observe-only state and projects to no dynamic candidate rather than an exception. Defaults, semantic predicates, producer feasibility, canonical compilation, and every hash projection are exact versioned machine-owned contracts; any additional rejection requires an explicitly admitted monotonic safety strengthening.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-014"],
+      "nonClaims": [
+        "This requirement does not claim secret-content detection inside arbitrary policy strings, provider execution, production authority, or UI availability."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-015",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Every schema-dependent transaction of a protocol-aware database client must enforce READ COMMITTED. A bounded side-effect-free workbench projection additionally enforces READ ONLY and obtains all jointly interpreted sections and metadata from one statement snapshot after current capability admission under the shared compatibility fence. Readiness compares its final head and maximum sequence within one statement snapshot; normal concurrent append preserves the verified prefix and cannot impersonate corruption. Every admitted mode must acquire that fence before reading the current migration head, prove that its bounded non-empty operation-owned capability identifiers and descriptor hashes are provided by one continuous append-only revision declaration in the recognized lineage, and pass code-owned schema, data-domain, routine, role, default-privilege, and effective-privilege attestation before any repository or schema-dependent statement is exposed. Every forward migration must acquire the corresponding exclusive transaction fence at the online Alembic environment boundary before head inspection or compatibility-relevant DDL and attest every capability provided by the resulting declaration. First application of a revision appends exactly one bootstrap, expand, or contract successor declaration atomically with the Alembic head; re-upgrade to an already declared revision byte-exactly validates it and appends nothing. A pre-retention downgrade selects and byte-exactly validates an already declared ancestor under the exclusive fence without appending a declaration. Missing, stale, malformed, unrecognized, unbounded, incompatible, writable snapshot-read, or projection snapshot predating fence admission fails closed. Backward-code rollback is admitted only by an immutable artifact identified by the exact predecessor source commit and artifact digest against the current declared database state.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-015"],
+      "nonClaims": [
+        "This requirement does not prove prior-artifact execution, provider behavior, backup, production rollout, or protection from a superuser, migration owner, or non-cooperating client."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-016",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Every durable config epoch lifecycle operation must re-admit its configuration draft and retain only exact immutable epoch bytes. A standalone configuration registration has a client-owned operation identity; its content-addressed epoch insert or reuse, immutable registration receipt, and pair-owned audit evidence commit in one compatibility-admitted PostgreSQL transaction. A proposal-review registration instead commits the same content primitive under the proposal-review operation, receipt, and paired audit contract; it does not synthesize a second standalone registration receipt. A different operation may reuse equal epoch content, but the same operation is a duplicate only when every client-owned fact and retained pair identity is exact. A repository's active epoch changes only through an authenticated, scope-authorized expected-revision compare-and-set. A rollback is admissible only to a retained epoch whose validation coverage is equal or greater. A successful activation or rollback must commit its pointer, immutable transition record, and pair-owned audit evidence in one compatibility-admitted PostgreSQL transaction. Server-owned occurrence time does not turn an unknown-commit retry into a conflict. Stale, scope-mismatched, coverage-reducing, unproven, or conflicting commands publish no mutation.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-016"],
+      "nonClaims": [
+        "This requirement does not implement dynamic omission, provider execution, backup, failover, retention policy, or production rollout."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-017",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "A GitHub Actions OIDC verifier may receive a JWK set only from the fixed profile-owned HTTPS JWKS endpoint through a bounded no-redirect response that passes immutable JWK admission, or from its whole unexpired cached replacement. The transport uses direct routing or the single connected-settings credential-free HTTP proxy URL after optional trailing-slash normalization; an HTTPS proxy URL, ambient proxy or CA environment authority, or simultaneous custom transport and proxy is forbidden, while endpoint TLS verification remains enabled. Admission bounds the raw key array before entry processing, retains only recognized public RS256 verification members with an RSA modulus of at least 2048 bits, ignores unknown additive metadata, discards each non-object, private, unsupported, undersized, or invalid entry independently, and requires a non-empty admitted set with unique admitted key identifiers. Unknown key identifiers may cause at most one shared refresh per admitted interval. Expired, failed, cancelled, redirected, oversized, malformed, empty-admitted-set, or duplicate-admitted-key refreshes return typed unavailability and cannot establish token trust.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-017"],
+      "nonClaims": [
+        "This requirement does not prove issuer discovery, GitHub provider availability, private-key custody, plan issuance, dynamic omission, or deployment readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-CORE-018",
+      "ownerId": "ci-coordinator.core",
+      "invariant": "Module decomposition review is governed by the exact repository-owned ownership profile. A bounded deterministic inventory self-discovers every tracked or non-ignored untracked observed path through Git while rejecting ambient repository-selection redirects, evaluates every applicable declared signal under an exact versioned grammar and admitted parser runtime, selects every threshold match or unknown result, preserves separate production and test cohorts, emits zero truncation under the default uncapped queue, and binds the resulting candidate evidence to exact profile, runtime, and content identities. Caller-supplied fixture inventories cannot claim authoritative completeness. Size, recognized public-declaration count, dependency count, complexity, coupling, and churn may select a review candidate but cannot by themselves prove semantic concentration, forbidden co-ownership, or a blockable violation. Any explicit candidate cap reports completeness and leaves every deferred unit at abstention. A blocking verdict requires an applicable explicit forbidden-coownership rule, one independent primary-authority set bound across every proof phase, no defeating required-colocation rule, a complete safe strictly preferable decomposition that preserves observables and hard constraints, exact governing-profile and base/head epochs, a new-or-worsened delta, no active exact expiring waiver, and typed current conclusive evidence; unknown or conflicting evidence yields abstention. Every handwritten frontend API module with an admitted TypeScript extension has exactly one capability path owner under bounded non-blocking symlink-rejecting traversal, while generated, test, migration, declarative, composition-root, documentation, vendor/build/cache, and other observed units retain their profile-owned applicability semantics.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CORE-018"],
+      "nonClaims": [
+        "This requirement does not claim profile admission performs semantic review, every large file should be split, or an external review kit owns repository policy or merge authority."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.core",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    }
+  ],
+  "nonClaims": [
+    "This requirement source does not authorize production dynamic omission, provider admission, deployment approval, or UI readiness."
+  ]
+}

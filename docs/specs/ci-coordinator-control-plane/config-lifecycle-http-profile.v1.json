@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "ci-config-lifecycle-http-profile/v1",
+  "profileId": "ci-config-lifecycle-http/v1",
+  "ownerId": "ci-coordinator.control-plane",
+  "bounds": {
+    "maximumContractIdentityBytes": 4096,
+    "maximumJsonSafeInteger": 9007199254740991,
+    "maximumPageSize": 100,
+    "maximumPolicySourceBytes": 2097152,
+    "maximumOperationIdBytes": 256,
+    "maximumRollbackReasonBytes": 512
+  },
+  "operations": [
+    {
+      "semanticOperationId": "validate-configuration",
+      "httpOperationId": "validate_config_epoch",
+      "method": "POST",
+      "path": "/api/v1/config/validations",
+      "requiredRoles": ["configure"],
+      "effect": "pure",
+      "requestSchema": "ci-config-epoch-validation/v1",
+      "successSchema": "ci-config-epoch-validation-result/v1"
+    },
+    {
+      "semanticOperationId": "register-configuration",
+      "httpOperationId": "register_config_epoch",
+      "method": "POST",
+      "path": "/api/v1/config/epochs",
+      "requiredRoles": ["configure"],
+      "effect": "postgresql-audit",
+      "requestSchema": "ci-config-epoch-registration/v1",
+      "successSchema": "ci-config-epoch-registration-result/v1"
+    },
+    {
+      "semanticOperationId": "activate-configuration",
+      "httpOperationId": "activate_config_epoch",
+      "method": "POST",
+      "path": "/api/v1/config/activations",
+      "requiredRoles": ["activate"],
+      "effect": "postgresql-audit-provider-evidence",
+      "requestSchema": "ci-config-epoch-activation/v1",
+      "successSchema": "ci-config-epoch-activation-result/v1"
+    },
+    {
+      "semanticOperationId": "rollback-configuration",
+      "httpOperationId": "rollback_config_epoch",
+      "method": "POST",
+      "path": "/api/v1/config/rollbacks",
+      "requiredRoles": ["activate"],
+      "effect": "postgresql-audit",
+      "requestSchema": "ci-config-epoch-rollback/v1",
+      "successSchema": "ci-config-epoch-activation-result/v1"
+    },
+    {
+      "semanticOperationId": "read-configuration-status",
+      "httpOperationId": "get_config_epoch_status",
+      "method": "GET",
+      "path": "/api/v1/config/repositories/{installation_id}/{repository_id}/status",
+      "requiredRoles": ["configure"],
+      "effect": "bounded-postgresql-read",
+      "requestSchema": null,
+      "successSchema": "ci-config-epoch-status/v1"
+    },
+    {
+      "semanticOperationId": "export-configuration-source",
+      "httpOperationId": "export_config_epoch_source",
+      "method": "GET",
+      "path": "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/source",
+      "requiredRoles": ["configure"],
+      "effect": "exact-postgresql-read",
+      "requestSchema": null,
+      "successSchema": "exact-retained-source-bytes"
+    }
+  ],
+  "invariants": [
+    "operation-effect-classification-begins-after-transport-request-admission",
+    "authentication-and-role-admission-precede-use-case-execution",
+    "scope-admission-precedes-row-projection",
+    "validation-has-no-durable-or-provider-effect",
+    "registration-replay-compares-all-client-owned-facts",
+    "status-cardinality-is-page-bounded",
+    "export-revalidates-and-emits-exact-retained-bytes",
+    "success-projections-do-not-widen-runtime-value-domains"
+  ],
+  "nonClaims": [
+    "This profile does not define every CI Coordinator API operation or establish UI parity.",
+    "This profile does not prove provider deployment, production identity installation, retention, backup, failover, or dynamic CI omission."
+  ]
+}

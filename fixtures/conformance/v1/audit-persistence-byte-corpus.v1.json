@@ -1,0 +1,404 @@
+{
+  "schemaVersion": "ci-audit-persistence-byte-corpus/v1",
+  "profileId": "ci-audit-event-persistence-bytes/v1",
+  "profileDigest": "b99394dded648e4f0c009a71ca237ad6599b8c6abfa250cd186a9c3b794176fa",
+  "limits": {
+    "maxVariableTextUtf8Bytes": 4096,
+    "maxPayloadCanonicalBytes": 1048576
+  },
+  "cases": [
+    {
+      "id": "text-ascii-at-limit",
+      "target": "text",
+      "instancePointer": "/idempotencyKey",
+      "recipe": { "kind": "repeat-code-point", "codePoint": 97, "count": 4096 },
+      "expected": { "accepted": true, "utf8Bytes": 4096 }
+    },
+    {
+      "id": "text-ascii-over-idempotency-key",
+      "target": "text",
+      "instancePointer": "/idempotencyKey",
+      "recipe": { "kind": "repeat-code-point", "codePoint": 97, "count": 4097 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_text_max_utf8_bytes_exceeded",
+          "instancePointer": "/idempotencyKey",
+          "limit": 4096,
+          "observed": 4097
+        }
+      }
+    },
+    {
+      "id": "text-astral-at-limit",
+      "target": "text",
+      "instancePointer": "/subjectId",
+      "recipe": { "kind": "repeat-code-point", "codePoint": 128512, "count": 1024 },
+      "expected": { "accepted": true, "utf8Bytes": 4096 }
+    },
+    {
+      "id": "text-astral-over-subject-id",
+      "target": "text",
+      "instancePointer": "/subjectId",
+      "recipe": { "kind": "repeat-code-point", "codePoint": 128512, "count": 1025 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_text_max_utf8_bytes_exceeded",
+          "instancePointer": "/subjectId",
+          "limit": 4096,
+          "observed": 4097
+        }
+      }
+    },
+    {
+      "id": "text-decomposed-at-limit",
+      "target": "text",
+      "instancePointer": "/eventType",
+      "recipe": {
+        "kind": "repeat-sequence",
+        "codePoints": [101, 769],
+        "count": 1365,
+        "suffixCodePoints": [97]
+      },
+      "expected": { "accepted": true, "utf8Bytes": 4096 }
+    },
+    {
+      "id": "text-decomposed-over-event-type",
+      "target": "text",
+      "instancePointer": "/eventType",
+      "recipe": {
+        "kind": "repeat-sequence",
+        "codePoints": [101, 769],
+        "count": 1365,
+        "suffixCodePoints": [97, 98]
+      },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_text_max_utf8_bytes_exceeded",
+          "instancePointer": "/eventType",
+          "limit": 4096,
+          "observed": 4097
+        }
+      }
+    },
+    {
+      "id": "text-ascii-over-actor",
+      "target": "text",
+      "instancePointer": "/actor",
+      "recipe": { "kind": "repeat-code-point", "codePoint": 122, "count": 4097 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_text_max_utf8_bytes_exceeded",
+          "instancePointer": "/actor",
+          "limit": 4096,
+          "observed": 4097
+        }
+      }
+    },
+    {
+      "id": "payload-null",
+      "target": "payload",
+      "recipe": { "kind": "literal", "value": null },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 4,
+        "canonicalSha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      }
+    },
+    {
+      "id": "payload-ascii-at-limit",
+      "target": "payload",
+      "recipe": { "kind": "json-string", "codePoint": 97, "count": 1048574 },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 1048576,
+        "canonicalSha256": "ed82f33b6fb1d3cdce0d98e6ac90a1debcde2868ecabf5e63ad5e96893f2ae3e"
+      }
+    },
+    {
+      "id": "payload-ascii-over-limit",
+      "target": "payload",
+      "recipe": { "kind": "json-string", "codePoint": 97, "count": 1048575 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_payload_max_canonical_bytes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 1048576,
+          "observed": 1048577
+        }
+      }
+    },
+    {
+      "id": "payload-astral-at-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "json-string-sequence",
+        "codePoints": [128512],
+        "count": 262143,
+        "suffixCodePoints": [97, 97]
+      },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 1048576,
+        "canonicalSha256": "331000a083633108b4571fde25bbb31b03f848fdd37e9dd705d773c03209d8d8"
+      }
+    },
+    {
+      "id": "payload-astral-over-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "json-string-sequence",
+        "codePoints": [128512],
+        "count": 262143,
+        "suffixCodePoints": [97, 97, 97]
+      },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_payload_max_canonical_bytes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 1048576,
+          "observed": 1048577
+        }
+      }
+    },
+    {
+      "id": "payload-nul-escaping-at-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "json-string-sequence",
+        "codePoints": [0],
+        "count": 174762,
+        "suffixCodePoints": [97, 97]
+      },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 1048576,
+        "canonicalSha256": "2eb77e93195373294a723f7b8566df56bd1d709c9892b191a5653fb714d98b00"
+      }
+    },
+    {
+      "id": "payload-nul-escaping-over-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "json-string-sequence",
+        "codePoints": [0],
+        "count": 174762,
+        "suffixCodePoints": [97, 97, 97]
+      },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_payload_max_canonical_bytes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 1048576,
+          "observed": 1048577
+        }
+      }
+    },
+    {
+      "id": "payload-quote-escaping-at-limit",
+      "target": "payload",
+      "recipe": { "kind": "json-string", "codePoint": 34, "count": 524287 },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 1048576,
+        "canonicalSha256": "064a3ca56ede1b8578fc0342205e0dc5929584cec12ab1f4d6067f07fabe667a"
+      }
+    },
+    {
+      "id": "payload-backslash-escaping-at-limit",
+      "target": "payload",
+      "recipe": { "kind": "json-string", "codePoint": 92, "count": 524287 },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 1048576,
+        "canonicalSha256": "bf06e008c01d59d2ec63a8e9c916cb77649e5764cd48d2132208ac3efc629485"
+      }
+    },
+    {
+      "id": "payload-object-key-lower-bound",
+      "target": "payload",
+      "recipe": { "kind": "object-key", "codePoint": 107, "count": 1048577, "value": null },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_payload_max_canonical_bytes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 1048576,
+          "observed": 1048577
+        }
+      }
+    },
+    {
+      "id": "payload-object-key-nul-escaping-at-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "object-key-sequence",
+        "codePoints": [0],
+        "count": 174761,
+        "suffixCodePoints": [97],
+        "value": null
+      },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 1048576,
+        "canonicalSha256": "c9670fa2d93bb0cff9b6497035b98a7451353c04c5c16238e3bea782e7daff86"
+      }
+    },
+    {
+      "id": "payload-object-key-nul-escaping-over-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "object-key-sequence",
+        "codePoints": [0],
+        "count": 174761,
+        "suffixCodePoints": [97, 97],
+        "value": null
+      },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_payload_max_canonical_bytes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 1048576,
+          "observed": 1048577
+        }
+      }
+    },
+    {
+      "id": "payload-object-key-quote-escaping-at-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "object-key-sequence",
+        "codePoints": [34],
+        "count": 524283,
+        "suffixCodePoints": [97],
+        "value": null
+      },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 1048576,
+        "canonicalSha256": "90e1b5963358b88f79044efd339bd053dbd18223d42a5062ae210ba1c31bcfc1"
+      }
+    },
+    {
+      "id": "payload-object-key-quote-escaping-over-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "object-key-sequence",
+        "codePoints": [34],
+        "count": 524283,
+        "suffixCodePoints": [97, 97],
+        "value": null
+      },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_payload_max_canonical_bytes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 1048576,
+          "observed": 1048577
+        }
+      }
+    },
+    {
+      "id": "payload-object-key-backslash-escaping-at-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "object-key-sequence",
+        "codePoints": [92],
+        "count": 524283,
+        "suffixCodePoints": [97],
+        "value": null
+      },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 1048576,
+        "canonicalSha256": "1c6f029634781e1ff857397dd8a50cafa627a4553ee5a35dcd45f36570537824"
+      }
+    },
+    {
+      "id": "payload-object-key-backslash-escaping-over-limit",
+      "target": "payload",
+      "recipe": {
+        "kind": "object-key-sequence",
+        "codePoints": [92],
+        "count": 524283,
+        "suffixCodePoints": [97, 97],
+        "value": null
+      },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_payload_max_canonical_bytes_exceeded",
+          "instancePointer": "/payload",
+          "limit": 1048576,
+          "observed": 1048577
+        }
+      }
+    },
+    {
+      "id": "input-all-text-fields-at-limit",
+      "target": "input",
+      "textRecipe": { "kind": "repeat-code-point", "codePoint": 97, "count": 4096 },
+      "payloadRecipe": { "kind": "literal", "value": null },
+      "expected": {
+        "accepted": true,
+        "payloadHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      }
+    },
+    {
+      "id": "input-dual-text-and-payload-fault",
+      "target": "input",
+      "textOverrides": {
+        "idempotencyKey": { "kind": "repeat-code-point", "codePoint": 105, "count": 4097 },
+        "subjectId": { "kind": "repeat-code-point", "codePoint": 115, "count": 4097 }
+      },
+      "payloadRecipe": { "kind": "json-string", "codePoint": 112, "count": 1048575 },
+      "expected": {
+        "accepted": false,
+        "resourceFailure": {
+          "code": "audit_text_max_utf8_bytes_exceeded",
+          "instancePointer": "/idempotencyKey",
+          "limit": 4096,
+          "observed": 4097
+        }
+      }
+    },
+    {
+      "id": "payload-unicode-not-normalized-decomposed",
+      "target": "payload",
+      "recipe": {
+        "kind": "json-string-sequence",
+        "codePoints": [101, 769],
+        "count": 1,
+        "suffixCodePoints": []
+      },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 5,
+        "canonicalSha256": "3d68ce21f2899a475713cdbe7562ba9bdb6b1dfde8af1f221bdff4a0935b53b2"
+      }
+    },
+    {
+      "id": "payload-unicode-not-normalized-composed",
+      "target": "payload",
+      "recipe": { "kind": "json-string", "codePoint": 233, "count": 1 },
+      "expected": {
+        "accepted": true,
+        "canonicalByteLength": 4,
+        "canonicalSha256": "f2886017e9c7abacf804b54d64787dce2b611c9544ba21f3affdd126a6e50086"
+      }
+    }
+  ],
+  "nonClaims": [
+    "This finite corpus is not an exhaustive proof over Unicode or JSON values.",
+    "Recipe materialization allocates bounded test values and does not prove bounded transport parsing.",
+    "Finite corpus conformance does not prove database capacity, TOAST placement, or provider execution."
+  ]
+}

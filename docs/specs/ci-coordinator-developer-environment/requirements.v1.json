@@ -1,0 +1,260 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "ci-coordinator.developer-environment.requirements",
+  "specPackagePath": "docs/specs/ci-coordinator-developer-environment",
+  "requirementsPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+  "overviewPath": "docs/specs/ci-coordinator-developer-environment/overview.md",
+  "requirements": [
+    {
+      "requirementId": "REQ-CI-DEV-001",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "One mise configuration owns exact supported developer tool versions and task entrypoints while Python and frontend lockfiles own dependency graphs; no second checked-in task facade may silently redefine those commands or versions.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-001"],
+      "nonClaims": ["This requirement does not require mise for direct execution of the same underlying lifecycle and quality commands."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-002",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Every repository root derives a stable bounded Compose project identity from its canonical absolute path, persists that root for collision detection, and owns independent containers, network, volumes, generated environment, and metadata. An explicitly supplied CI Coordinator outbound proxy is admitted by the runtime-settings authority, canonicalized and persisted in that private instance environment, while absence remains direct and a later mismatch fails closed; generic ambient proxy variables never become route authority. Provider-backed branch-head proof executes from an owned detached source root so neither concurrent worktrees nor proof execution can share or require deletion of interactive mutable state.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-002"],
+      "nonClaims": ["This requirement does not prevent an administrator from deliberately connecting separate instances to shared external infrastructure."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-003",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Connected local services publish only to loopback using Docker-assigned ephemeral host ports, and the lifecycle owner discovers and reports the bound endpoints after startup without pre-scanning, reserving, or assuming a host port.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-003"],
+      "nonClaims": ["This requirement does not provide stable public URLs or remote access to developer services."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-004",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Local credentials and signing material are generated with cryptographic randomness under a canonical user-state directory outside every registered worktree, published as a complete atomic secret directory, retained in regular owner-owned files with owner-only permissions, reused only after structural admission, never interpolated into the Compose model or written to tracked files, and never printed by lifecycle commands.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-004"],
+      "nonClaims": ["This requirement does not make local credentials suitable for production or protect them from a compromised host account."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-005",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "A stable per-instance operation lock serializes state admission and every provider mutation without serializing another worktree; captured provider output and phase duration are bounded before allocation, the branch-head envelope reserves time for cleanup, normal shutdown preserves data volumes, and reset verifies project ownership before removing volumes so failure, timeout, and signal paths cannot broaden cleanup beyond the active instance.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-005"],
+      "nonClaims": ["This requirement does not clean resources created outside the declared Compose project or automatically prune an instance after its canonical worktree root has been deleted."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-006",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "The connected local database is PostgreSQL 18.6 from one immutable multi-architecture image identity and provisions distinct migration and NOINHERIT runtime login principals; migrations and exact ACL installation run as the migration principal, and the application connects only as the admitted restricted runtime principal.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-006"],
+      "nonClaims": ["This requirement does not prove managed-provider configuration, backup, restore, high availability, or production database admission."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-007",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "The optional Dev Container installs the exact admitted toolchain and locked dependencies into identity-owned platform-specific volumes at the actual Python, pnpm-store, and node_modules paths without replacing host dependency artifacts or creating repository-visible caches; CI launches the container, completes post-create provisioning, and executes the admitted portable proof without maintaining a second application topology. The provisioning owner requests bounded termination of the complete residual host process group only for its exact internal devcontainer up route; every other command retains the reject policy, and overall witness success additionally requires process-group quiescence, capture-pipe closure, exactly one owned container whose full ID remains equal across discovery, postcondition checks, portable proof, and cleanup, one workspace bind from the exact admitted host path plus the exact five writable identity-volume destinations whose names are derived from the exact ownership label by the pinned CLI algorithm and whose Docker volume sources are lexically canonical, exact volume metadata with the local driver and scope, no driver options, and matching mountpoints, a canonical pnpm-store path inside its verified volume, network disconnection, and the portable proof executed through a new command.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-007"],
+      "nonClaims": ["This requirement does not claim connected-stack execution inside the default container, parity for host-specific editor extensions, remote cloud workspaces, automatic cache-volume pruning, or production containers."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-008",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Every command selected by the portable quality projection has provider-free witness metadata and excludes persistence tests, dependency installation, vulnerability lookup, and browser execution; the Dev Container provider witness additionally proves that no host Docker socket is mounted and physically disconnects every container network before executing the projection.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-008"],
+      "nonClaims": ["A direct host invocation of check:portable admits command metadata and behavior but does not claim operating-system network sandboxing."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-009",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Each secret-consuming project-built development image reads host-owner-only Compose file secrets only in a bounded root bootstrap, copies them into a service-private tmpfs with exact runtime ownership, gives the admitted runtime UID access to every mutable runtime artifact, then removes every capability and privilege-escalation path before application code or its healthcheck executes as that UID. A project-built image that consumes no secret, including the frontend development image, starts application code and its healthcheck directly as its declared unprivileged runtime UID with no secret mount, root bootstrap, capability, or privilege-escalation path.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-009"],
+      "nonClaims": ["This local secret handoff does not define production secret injection, rotation, or custody."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-010",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "The provider-backed Compose Watch witness proves add, update, and delete synchronization for backend and frontend source targets and proves a backend runtime restart for sync-plus-restart, while bounding watcher lifetime and removing every host probe on success and failure. Rendered HMR retains the 90-second outer process guard, partitions child work and shared cleanup into 70 and 10 seconds, rejects late results and never admits a process timeout as success. Closed elapsed and passive transport diagnostics cannot replace the DOM, style, document, socket and clean-exit predicates; scheduler or startup overrun remains fail-closed, not guaranteed diagnostic delivery.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-010"],
+      "nonClaims": ["This requirement does not claim hot reload for paths outside the declared Compose Watch rules."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-011",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "An exact local instance at metadata schema 1 migrates under the per-instance lifecycle lock to schema 2 without changing any existing credential bytes, environment bindings, Compose identity, or persistent volume. The transition preserves predecessor restart behavior when schema 1 metadata exists before its environment, admits only absent, exact V1, or exact resumable V2 secrets for that creation prefix, admits the complete old or resumable additive shape before its first migration write, stages temporary token bytes outside the closed secret filename set, adds only one valid metrics bearer token and the three exact runtime defaults, publishes schema 2 metadata last, is idempotent after every admitted crash prefix, and rejects foreign, malformed, or unknown-version state.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-011"],
+      "nonClaims": ["This requirement does not define downgrade, production secret rotation, corrupt-state recovery, or migration from an unknown future schema."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-012",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "An exact local instance at metadata schema 2 migrates under the per-instance lifecycle lock to schema 3 by admitting the complete source environment and secret inventory before its first write, atomically replacing only the retired operator environment names and actor namespace, preserving the exact bearer bytes while atomically renaming its file to the break-glass authority, publishing metadata last, and admitting only the three ordered crash-resumable prefixes. Schema 1 converges sequentially through schema 2. The backend receives only canonical break-glass and control-plane settings, while the frontend starts as its unprivileged runtime identity with no mounted secret and cannot inject static authorization into any proxied request.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-012"],
+      "nonClaims": ["This requirement does not configure Keycloak, authorize a credential-free workbench, rotate production secrets, define downgrade, or recover malformed and unknown-version state."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-013",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Diagnostic commands emit a versioned closed reason and remedy vocabulary without provider output or secret interpolation. Status observes running and stopped owned services within one finite budget, retains available endpoint strings and exit codes on partial failure, bounds retries for changing observations, and distinguishes complete observation from readiness. Logs validate selection before Docker, stream only admitted exact container IDs without holding the instance mutation lock, and terminate owned streams on cancellation or replacement. Opening the UI rechecks its owned container identity and passes only its admitted loopback URL to an available system opener.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-013"],
+      "nonClaims": ["Observation is a bounded best-effort snapshot, not a transactional Docker snapshot or readiness proof. Container logs may contain application-written sensitive data and are only streamed on explicit request."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-014",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "One worktree serializes incompatible provider clients through its private mutation lock. A watched client has a fresh nonce, bounded control admission and stop request, inherited mutation descriptor, finite graceful-stop/escalation, and durable completion or ambiguous-completion fence. A stale request cannot cancel a later nonce. A joined Compose client may clear its own session only after zero exit or causally owner-requested graceful cancellation exit 130, without escalation and with process-group quiescence; an unadmitted exit, forced or abandoned outcome blocks subsequent mutations. Down/reset with explicit stop-watch first completes dependency-free cancellation, releases all stage locks, then independently admits its dependency lease and ordinary mutation. A newer watcher or invalid environment prevents that second stage.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-014"],
+      "nonClaims": ["Clean client completion does not prove transactional drain of Docker daemon-internal crash effects. Cancellation and down/reset are separate operations. Raw provider invocations outside the owned facade and administrator intervention are outside this coordination guarantee."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-015",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Explicit backend or frontend preparation installs only the selected frozen dependency graph under an exclusive root-specific environment lease. Successful preparation publishes private root, platform, architecture, tool and input identity after installation; foreign ownership, symlink escapes, interrupted or stale installation fail admission. Managed tasks hold a shared inherited lease for their dependency lifetime. Connected-stack bootstrap does not install the frontend host graph. Status, down and doctor never silently install dependencies, and cancellation remains available with an edited lockfile or absent venv.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-015"],
+      "nonClaims": ["Environment leases coordinate repository-managed commands, not arbitrary manual package-manager writes. Exact declarations do not prove that upstream providers are available, and graph freshness is not a claim of hermetic native artifacts."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-016",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "The explicit UI demo and browser inspection commands launch their own loopback development server and browser context, serve schema-admitted deterministic synthetic scenarios, display their synthetic identity and replace the context on scenario reset. The harness denies unhandled API and external network access including WebSocket, popup, navigation and service-worker bypasses, and does not attach to an existing authenticated context. The production application bundle excludes this harness and its fixtures.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-016"],
+      "nonClaims": ["Synthetic scenarios are repeatable UI examples, not evidence of real authentication, provider delivery, runtime integration or production readiness. Interactive UI, debug and recording remain optional local browser capabilities."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-017",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Backend attach debugging is explicit and isolated to an optional pinned debug image and override. Under instance mutation ownership it replaces only the owned backend, publishes the debugger on a discovered ephemeral loopback port, maps the exact source root and distinguishes awaiting-debugger from readiness. Normal exit, attach timeout and handled interruption restore the ordinary backend and verify removal of the debugger binding. Native qualification requires a mapped breakpoint, continuation and ordinary-mode restoration. Failed provider operations expose only closed operation and process-kind fields, bounded exit status and monotonic elapsed milliseconds. Native session qualification retains primary and restoration failures separately, attempts restoration once, preserves the primary exception when restoration succeeds and never replaces cancellation with an ordinary error.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-DEV-017"],
+      "nonClaims": ["A hard host or daemon crash can interrupt restoration and requires explicit ordinary-mode reconciliation. Debugging does not provide production attach access or qualify all editor integrations."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.developer-environment", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-DEV-018",
+      "ownerId": "ci-coordinator.developer-environment",
+      "invariant": "Native CI schedules the entire exact pytest collection as a deterministic, file-cohesive disjoint partition bound to source, run, attempt, toolchain and dependency locks. Each shard retains branch and subprocess coverage, exact collection metadata, complete setup/call/teardown outcomes, and fails on missing, extra, repeated, foreign, failed, cancelled, unexpected skipped or xfailed evidence. Only the two exact real-esbuild cases may skip with their owned reason while the required installed-toolchain job executes them. Coverage combines all and only admitted shards before enforcing the unchanged aggregate, owner and changed-critical floors. Cost hints never authorize exclusion. Preparation reuse preserves immutable input identity and isolates each test's mutable state. Optional same-head serial qualification compares complete populations and outcomes. Every collected node and tracked workflow job remains accounted for, with measured elapsed cost or explicit unknowns; elapsed time is not processor time.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": [
+        "proofkit/requirement-bindings.json"
+      ],
+      "nonClaimRefs": [
+        "NC-CI-DEV-018"
+      ],
+      "nonClaims": [
+        "This requirement does not prove a universal five-minute bound, CPU savings, p95 latency, provider capacity, or a global optimum."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.developer-environment",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    }
+  ],
+  "nonClaims": [
+    "This requirement source does not claim production deployment parity, production credential custody, provider availability, hosted-workspace readiness, native Windows support, or Intel macOS support."
+  ]
+}

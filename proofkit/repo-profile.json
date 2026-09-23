@@ -1,0 +1,1174 @@
+{
+  "schema": "proofkit.repo-profile.v1",
+  "repository": {
+    "name": "ci-coordinator",
+    "primaryLanguages": [
+      "python",
+      "typescript"
+    ],
+    "rootPackageName": "ci-coordinator-backend"
+  },
+  "documents": {
+    "policyPath": "README.md",
+    "routerPath": "ROADMAP.md",
+    "generatedArtifacts": [
+      {
+        "generator": "scripts/frontend_contract.py",
+        "path": "frontend/openapi/workbench.openapi.json",
+        "sourceOfTruth": [
+          "backend/src/ci_coordinator/api/http/activity_contracts.py",
+          "backend/src/ci_coordinator/api/http/analytics_configuration_contracts.py",
+          "backend/src/ci_coordinator/api/http/app.py",
+          "backend/src/ci_coordinator/api/http/body_limits.py",
+          "backend/src/ci_coordinator/api/http/ci_economics_budget_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_economics_catalog_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_economics_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_economics_measurement_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_economics_source_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_history_analytics_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_history_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_history_read_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_measurement_report_contracts.py",
+          "backend/src/ci_coordinator/api/http/ci_measurement_report_submission.py",
+          "backend/src/ci_coordinator/api/http/ci_observation_contracts.py",
+          "backend/src/ci_coordinator/api/http/config_lifecycle_contracts.py",
+          "backend/src/ci_coordinator/api/http/contracts.py",
+          "backend/src/ci_coordinator/api/http/control_plane_authentication.py",
+          "backend/src/ci_coordinator/api/http/control_plane_security.py",
+          "backend/src/ci_coordinator/api/http/dependencies.py",
+          "backend/src/ci_coordinator/api/http/governance_baseline_contracts.py",
+          "backend/src/ci_coordinator/api/http/governance_comparison_contracts.py",
+          "backend/src/ci_coordinator/api/http/governance_observation_contracts.py",
+          "backend/src/ci_coordinator/api/http/governance_state_contracts.py",
+          "backend/src/ci_coordinator/api/http/model_contracts.py",
+          "backend/src/ci_coordinator/api/http/public_request_limits.py",
+          "backend/src/ci_coordinator/api/http/routers/activity.py",
+          "backend/src/ci_coordinator/api/http/routers/analytics_configuration.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_economics.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_economics_budgets.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_economics_sources.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_history.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_history_analytics.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_history_read.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_measurement_report_ingestion.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_measurement_reports.py",
+          "backend/src/ci_coordinator/api/http/routers/ci_observation.py",
+          "backend/src/ci_coordinator/api/http/routers/config_lifecycle_queries.py",
+          "backend/src/ci_coordinator/api/http/routers/config_management.py",
+          "backend/src/ci_coordinator/api/http/routers/control_plane_identity.py",
+          "backend/src/ci_coordinator/api/http/routers/governance_baselines.py",
+          "backend/src/ci_coordinator/api/http/routers/governance_comparisons.py",
+          "backend/src/ci_coordinator/api/http/routers/governance_observation.py",
+          "backend/src/ci_coordinator/api/http/routers/provider_inventory.py",
+          "backend/src/ci_coordinator/api/http/routers/repository_attestations.py",
+          "backend/src/ci_coordinator/api/http/routers/workbench.py",
+          "backend/src/ci_coordinator/api/http/routers/workflow_discovery.py",
+          "backend/src/ci_coordinator/api/http/security.py",
+          "backend/src/ci_coordinator/api/http/workflow_discovery_contracts.py",
+          "backend/src/ci_coordinator/audit_replay/event.py",
+          "backend/src/ci_coordinator/ci_economics/_observation_values.py",
+          "backend/src/ci_coordinator/ci_economics/analytics_configuration.py",
+          "backend/src/ci_coordinator/ci_economics/archive_analytics_models.py",
+          "backend/src/ci_coordinator/ci_economics/archive_detail.py",
+          "backend/src/ci_coordinator/ci_economics/archive_retention.py",
+          "backend/src/ci_coordinator/ci_economics/archive_retention_payload.py",
+          "backend/src/ci_coordinator/ci_economics/archive_statistics.py",
+          "backend/src/ci_coordinator/ci_economics/budget.py",
+          "backend/src/ci_coordinator/ci_economics/budget_payload.py",
+          "backend/src/ci_coordinator/ci_economics/budget_policy.py",
+          "backend/src/ci_coordinator/ci_economics/budget_signal.py",
+          "backend/src/ci_coordinator/ci_economics/catalog.py",
+          "backend/src/ci_coordinator/ci_economics/collection.py",
+          "backend/src/ci_coordinator/ci_economics/comparison.py",
+          "backend/src/ci_coordinator/ci_economics/discovery.py",
+          "backend/src/ci_coordinator/ci_economics/history_administration.py",
+          "backend/src/ci_coordinator/ci_economics/history_commands.py",
+          "backend/src/ci_coordinator/ci_economics/history_configuration.py",
+          "backend/src/ci_coordinator/ci_economics/history_payload.py",
+          "backend/src/ci_coordinator/ci_economics/history_read.py",
+          "backend/src/ci_coordinator/ci_economics/history_rechecks.py",
+          "backend/src/ci_coordinator/ci_economics/history_retention_commands.py",
+          "backend/src/ci_coordinator/ci_economics/history_scan.py",
+          "backend/src/ci_coordinator/ci_economics/model.py",
+          "backend/src/ci_coordinator/ci_economics/observation.py",
+          "backend/src/ci_coordinator/ci_economics/observation_payload.py",
+          "backend/src/ci_coordinator/ci_economics/payload_model.py",
+          "backend/src/ci_coordinator/ci_economics/read_models.py",
+          "backend/src/ci_coordinator/ci_economics/report_payload.py",
+          "backend/src/ci_coordinator/ci_economics/reports.py",
+          "backend/src/ci_coordinator/ci_economics/sources.py",
+          "backend/src/ci_coordinator/config_control/limits.py",
+          "backend/src/ci_coordinator/config_epochs/contracts.py",
+          "backend/src/ci_coordinator/config_epochs/queries.py",
+          "backend/src/ci_coordinator/control_plane_identity/model.py",
+          "backend/src/ci_coordinator/governance_baseline/model.py",
+          "backend/src/ci_coordinator/governance_comparison/model.py",
+          "backend/src/ci_coordinator/governance_observation/model.py",
+          "backend/src/ci_coordinator/kernel/canonical_json.py",
+          "backend/src/ci_coordinator/kernel/git_reference.py",
+          "backend/src/ci_coordinator/proposal_review/model.py",
+          "backend/src/ci_coordinator/provider_inventory/model.py",
+          "backend/src/ci_coordinator/workbench_read_models/model.py",
+          "docs/specs/ci-coordinator-control-plane/config-lifecycle-http-profile.v1.json",
+          "scripts/config_lifecycle_http_profile.py",
+          "scripts/frontend_contract.py"
+        ]
+      },
+      {
+        "generator": "frontend/package.json",
+        "path": "frontend/src/api/generated.ts",
+        "sourceOfTruth": [
+          "frontend/openapi/workbench.openapi.json",
+          "frontend/package.json",
+          "pnpm-lock.yaml"
+        ]
+      }
+    ]
+  },
+  "requirements": {
+    "idPattern": "REQ-[A-Z0-9-]+",
+    "specGlobs": [
+      "README.md",
+      "ROADMAP.md",
+      "docs/**/*.md",
+      "docs/specs/**/requirements.v1.json"
+    ]
+  },
+  "proofs": {
+    "bindingPath": "proofkit/requirement-bindings.json",
+    "environmentClasses": [
+      "local-node",
+      "local-node-container-external",
+      "local-node-external",
+      "local-python",
+      "local-python-container-external",
+      "local-python-external",
+      "local-python-go",
+      "local-python-go-external",
+      "local-python-node",
+      "local-python-node-external",
+      "local-python-postgres-external"
+    ],
+    "proofLikePaths": [
+      ".ci-coordinator/**",
+      ".devcontainer/**",
+      ".dockerignore",
+      ".env.example",
+      ".githooks/**",
+      ".github/actions/**",
+      ".github/dependabot.yml",
+      ".github/workflows/**",
+      ".gitignore",
+      ".vscode/**",
+      "AGENTS.md",
+      "Dockerfile",
+      "Dockerfile.workflow-lint",
+      "LICENSE",
+      "NOTICE",
+      "README.md",
+      "ROADMAP.md",
+      "backend/**",
+      "compose.yaml",
+      "cspell.json",
+      "deploy/observability/**",
+      "docker/**",
+      "docs/INDEX.md",
+      "docs/adoption/production-readiness-review.md",
+      "docs/adoption/qodana-high-adjudication-2026-09-20.md",
+      "docs/architecture/**",
+      "docs/bootstrap-workflow-contract.md",
+      "docs/decisions/**",
+      "docs/features/**",
+      "docs/how-to/**",
+      "docs/reference/**",
+      "docs/specs/**/*.json",
+      "docs/specs/**/overview.md",
+      "docs/specs/**/requirements.v1.json",
+      "docs/specs/ci-coordinator-release/SPDX-LICENSE.txt",
+      "fixtures/conformance/**",
+      "fixtures/native-target-repository/**",
+      "fixtures/target-repository/**",
+      "frontend/**",
+      "mise.lock",
+      "mise.toml",
+      "package.json",
+      "patches/**",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "proofkit/**/*.json",
+      "proofkit/*.json",
+      "scripts/**",
+      "tooling/actionlint/**",
+      "tooling/quality/**"
+    ],
+    "retiredProofLikePaths": []
+  },
+  "commandMatchers": [
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.module_ownership_policy"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.architecture-ownership",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.container_runtime_smoke"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.container-smoke",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "build"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.dependency_audit"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.dependency-audit",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_dependency"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.dependency-check",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.devcontainer_witness"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.devcontainer-verify",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "build"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.dev_environment.ci_witness"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.development-stack",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.diagram_check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.documentation-diagrams",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "node",
+        "tools/diagrams-checks.mjs"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.documentation-diagrams-falsifiers",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.diagram_check",
+        "--inventory-only"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.documentation-diagrams-inventory",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "scripts/tests/test_diagram_process.py",
+        "--qualify"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.documentation-diagrams-process",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.documentation_graph"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.documentation-graph",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "scripts/tests/test_documentation_graph.py"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.documentation-graph-falsifiers",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.browser_test_execution",
+        "--output",
+        ".ci-native/browser"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.frontend-browser",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "pnpm",
+        "--filter",
+        "@ci-coordinator/operator-ui",
+        "build"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.frontend-build",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "build"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.ci_business_witness"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.frontend-connected",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "build"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.frontend_contract",
+        "check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.frontend-contract-python",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "pnpm",
+        "--filter",
+        "@ci-coordinator/operator-ui",
+        "contract:check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.frontend-contract-types",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "pnpm",
+        "install",
+        "--frozen-lockfile"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.frontend-install",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "scripts/conformance/vitest_mutation_identity_test.py"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.frontend-mutation-identity",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "pnpm",
+        "--filter",
+        "@ci-coordinator/operator-ui",
+        "check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.frontend-quality",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.ci_matrix",
+        "check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.matrix-admission",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "audit-json-resource-limits"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-audit-json-resources",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "audit-persistence-byte-limits"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-audit-persistence-bytes",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.automatic_mutation",
+        "frontend"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-discovery-frontend",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.automatic_mutation",
+        "python"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-discovery-python",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "frontend-safety-kernels"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-frontend-safety-kernels",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-capacity-evidence"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-python-capacity-evidence",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-config-policy-admission"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-python-config-policy-admission",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-database-compatibility"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-python-database-compatibility",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-http-admission"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-python-http-admission",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-persistence"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-python-persistence",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "ci_coordinator.target_artifacts.cli",
+        "check",
+        "--source",
+        "fixtures/native-target-repository/.ci-coordinator/target-artifacts-source.v1.json",
+        "--output-directory",
+        "fixtures/native-target-repository/.ci-coordinator"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.native-target-artifacts-check",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.prometheus_rules"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.observability-rules",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_admission",
+        "verify"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.proofkit-verify",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "coverage"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-coverage",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "dependency-usage"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-dependency-usage",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "import-boundary"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-import-boundary",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "python3",
+        "-m",
+        "scripts.python_witness",
+        "install-check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-install-check",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "lint"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-lint",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "python3",
+        "-m",
+        "scripts.python_witness",
+        "lock-check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-lock-check",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "scripts/conformance/native_test_timeout_test.py"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-native-timeout",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "package-check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-package-check",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "persistence-test"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-persistence-test",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "test"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-test",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.python_witness",
+        "typecheck"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.python-typecheck",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_branch_head_quality"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.quality-branch-head",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.repository_json"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.repository-json",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_requirements"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.requirements-admission",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/integration/persistence/test_selected_issuance_state.py::test_native_selected_issuance_round_trips_exact_execution_authority",
+        "backend/tests/integration/persistence/test_shadow_reconciliation_state.py::test_native_gate_contract_round_trips_through_durable_reconciliation"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.runtime026-persistence-test",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/app/test_capacity_planning.py",
+        "backend/tests/unit/app/test_dynamic_plan_service.py",
+        "backend/tests/unit/execution_orchestration/test_provider_signal.py",
+        "backend/tests/unit/execution_orchestration/test_target_registry.py",
+        "backend/tests/unit/identity_admission/test_actions_oidc.py",
+        "backend/tests/unit/integrations/test_github_capacity_context.py",
+        "backend/tests/unit/integrations/test_github_workflow_discovery.py",
+        "backend/tests/unit/persistence/test_shadow_reconciliation_state_codecs.py",
+        "backend/tests/unit/repo_context/test_workflow_inventory.py",
+        "backend/tests/unit/runner_capacity/test_admission.py",
+        "backend/tests/unit/runtime/test_bootstrap_validator.py",
+        "backend/tests/unit/runtime/test_bootstrap_workflow.py",
+        "backend/tests/unit/runtime/test_native_workflow.py",
+        "backend/tests/unit/target_artifacts/test_target_artifacts.py",
+        "backend/tests/unit/test_plan_issuance.py",
+        "backend/tests/unit/workflow_discovery/test_workflow_discovery.py"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.runtime026-test",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/app/test_capacity_planning.py",
+        "backend/tests/unit/app/test_dynamic_plan_service.py",
+        "backend/tests/unit/api/http/test_plan_authentication.py",
+        "backend/tests/unit/execution_orchestration/test_target_registry.py",
+        "backend/tests/unit/identity_admission/test_actions_oidc.py",
+        "backend/tests/unit/integrations/test_github_capacity_context.py",
+        "backend/tests/unit/integrations/test_github_git_snapshot.py",
+        "backend/tests/unit/integrations/test_github_workflow_discovery.py",
+        "backend/tests/unit/plan_consumer_support.py",
+        "backend/tests/unit/production_admission/test_production_admission.py",
+        "backend/tests/unit/repo_context/test_workflow_inventory.py",
+        "backend/tests/unit/runtime/test_bootstrap_validator.py",
+        "backend/tests/unit/runtime/test_bootstrap_workflow.py",
+        "backend/tests/unit/runtime/test_consumer_contract_lab.py",
+        "backend/tests/unit/runtime/test_native_workflow.py",
+        "backend/tests/unit/runtime/test_plan_consumer.py",
+        "backend/tests/unit/runtime/test_runtime_dependency_composition.py",
+        "backend/tests/unit/runtime/test_trusted_plan_request_workflow.py",
+        "backend/tests/unit/runtime_settings/test_runtime_settings.py",
+        "backend/tests/unit/target_artifacts/test_owner_codec_conformance.py",
+        "backend/tests/unit/target_artifacts/test_target_artifact_models.py",
+        "backend/tests/unit/target_artifacts/test_target_artifacts.py",
+        "backend/tests/unit/trusted_plan_request_support.py"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.runtime027-test",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_consumer_contract_models_reject_values_outside_the_finite_language",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_consumer_contract_codecs_reject_structural_and_algebraic_escape",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_git_tree_admission_rejects_malformed_or_special_entries",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bootstrap_rejects_untrusted_package_inventory",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bootstrap_rejects_noncanonical_commit_identity",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bootstrap_main_classifies_unavailable_repository",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bounded_process_rejects_invalid_resource_contract",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bounded_process_classifies_spawn_failure",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_regular_contract_reader_rejects_unsafe_or_nontext_evidence",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_real_path_round_trips_exact_generated_consumer_controls",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_runtime_admission_precedes_target_image_creation",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_consumer_controls_reject_target_expectation_divergence",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_receipt_is_content_addressed_and_denies_provider_claims",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_profile_codec_rejects_noncanonical_and_unknown_event",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_plan_key_identity_is_unique_per_scenario",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_regular_file_reader_rejects_symlinked_parent",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_profile_path_preserves_symlink_for_file_kind_admission",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_external_schemas_admit_codec_owned_values",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_scenario_schema_rejects_cross_field_contradictions",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_structural_schema_does_not_claim_exact_codec_admission",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_control_io_failure_is_classified",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_bounded_process_enforces_aggregate_output_limit",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_bounded_process_terminates_descendants_on_timeout",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_execution_uses_sealed_target_bytes_after_source_swap",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_regular_file_reader_keeps_open_descriptor_during_path_swap",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_regular_file_reader_rejects_fifo_without_waiting_for_a_writer",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_node_permission_model_denies_child_process_authority",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_each_node_control_process_loads_exact_runtime_guard",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_node_runtime_guard_rejects_executing_process_version_drift",
+        "backend/tests/unit/consumer_contract_lab/test_node_executable.py",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_bootstrap_capture_enforces_output_limit_before_process_completion",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_bounded_process_deadline_closes_detached_inherited_pipes",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_round_trips_clean_source_epochs_to_one_stable_receipt",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_ignores_unchecked_worktree_bytecode_and_executes_commit_image",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_rejects_source_epoch_mutations",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_rejects_coherently_resealed_workflow_authority_drift",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_post_execution_source_check_rejects_changed_contract_bytes",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_uses_commit_image_despite_worktree_changes_hidden_by_index_flags",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_post_execution_source_check_rejects_hidden_coordinator_changes",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_source_epoch_rejects_bytes_changed_after_parsing",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_git_snapshot_rejects_head_change_during_inspection",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_ignored_contract_file_marks_target_as_worktree",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_opaque_target_binding_admits_the_complete_bounded_byte_domain",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_unrelated_worktree_file_is_outside_contract_source_status",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_cli_classifies_invalid_default_branch",
+        "scripts/tests/test_python_import_boundary_policy.py::test_consumer_contract_lab_has_no_provider_or_production_runtime_edge",
+        "scripts/tests/test_python_import_boundary_policy.py::test_consumer_contract_lab_os_capability_is_owned_by_exact_files",
+        "scripts/tests/test_python_import_boundary_policy.py::test_offline_node_selection_does_not_grant_environment_authority_to_siblings",
+        "scripts/tests/test_python_import_boundary_policy.py::test_rule_catalog_preserves_source_order"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.runtime028-test",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.secret_scan"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.secret-scan",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_plan_check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.selective-plan",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.self_ci_generate",
+        "--check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.self-ci-check",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "ci_coordinator.target_artifacts.cli",
+        "check",
+        "--source",
+        "fixtures/target-repository/.ci-coordinator/target-artifacts-source.v1.json",
+        "--output-directory",
+        "fixtures/target-repository/.ci-coordinator"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.target-artifacts-check",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.target_control_bundle",
+        "check"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.target-control-bundle-check",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_admission",
+        "text-policy"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.text-policy",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "quality"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "build-checks"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-build-checks",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "go-vet"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-go-vet",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "gofmt"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-gofmt",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "govulncheck"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-govulncheck",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "hadolint"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-hadolint",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "schemas"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-schemas",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "spelling"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-spelling",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "staticcheck"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-staticcheck",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "tooling/quality/.venv/bin/python",
+        "-m",
+        "scripts.ci_utility_checks",
+        "yaml"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.utility-yaml",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "static"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.workflow_lint"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.workflow-lint",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "static"
+    }
+  ],
+  "nonClaims": [
+    "This repo profile does not authorize CI omission or dynamic CI enforcement.",
+    "This repo profile does not claim native witness freshness or provider execution.",
+    "This repo profile does not execute witness commands.",
+    "This repo profile does not prove changed-path completeness.",
+    "This repo profile does not replace executable package tests.",
+    "This repo profile does not replace provider secret scanning."
+  ]
+}

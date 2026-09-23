@@ -1,0 +1,171 @@
+name: ${BUSINESS_PROJECT}
+
+x-runtime: &runtime
+  read_only: true
+  privileged: false
+  logging:
+    driver: none
+  healthcheck:
+    disable: true
+  ulimits:
+    core:
+      soft: 0
+      hard: 0
+
+x-runtime-bind: &runtime-bind
+  type: bind
+  bind:
+    create_host_path: false
+
+x-app: &app
+  <<: *runtime
+  image: ${BUSINESS_APP_IMAGE}
+  networks: [isolated]
+  labels:
+    io.ci-coordinator.business-witness: ${BUSINESS_PROJECT}
+
+services:
+  postgres:
+    <<: *runtime
+    image: postgres:18.6-trixie@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-superuser-password
+    volumes:
+      - ${BUSINESS_FIXTURE}/postgres-superuser-password:/run/secrets/postgres-superuser-password:ro
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/postgres
+        target: /var/lib/postgresql
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/postgres-run
+        target: /var/run/postgresql
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/postgres-tmp
+        target: /tmp
+    networks: [isolated]
+
+  database-provision:
+    <<: *runtime
+    image: postgres:18.6-trixie@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+    networks: [isolated]
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+    volumes:
+      - ../../scripts/dev_environment/bootstrap_database.sql:/bootstrap.sql:ro
+      - ${BUSINESS_FIXTURE}/postgres-superuser-password:/run/secrets/postgres-superuser-password:ro
+      - ${BUSINESS_FIXTURE}/postgres-migration-password:/run/secrets/postgres-migration-password:ro
+      - ${BUSINESS_FIXTURE}/postgres-runtime-password:/run/secrets/postgres-runtime-password:ro
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/database-provision-postgres
+        target: /var/lib/postgresql
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/database-provision-tmp
+        target: /tmp
+    command: ["/bin/sh", "-euc", "export PGPASSWORD=\"$$(cat /run/secrets/postgres-superuser-password)\"; exec psql --no-psqlrc --dbname postgres --file=/bootstrap.sql"]
+
+  migrate:
+    <<: *app
+    volumes:
+      - ${BUSINESS_FIXTURE}/migration-dsn:/run/secrets/migration-dsn:ro
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/migrate-tmp
+        target: /tmp
+    command:
+      - python
+      - -c
+      - |
+        import os
+        import subprocess
+        from pathlib import Path
+        os.environ["CI_COORDINATOR_MIGRATION_DATABASE_DSN"] = Path("/run/secrets/migration-dsn").read_text().rstrip("\n")
+        subprocess.run(["alembic", "upgrade", "head"], check=True)
+        os.execvp("ci-coordinator-database-access", ["ci-coordinator-database-access", "apply", "--runtime-role", "ci_coordinator_runtime"])
+
+  keycloak:
+    <<: *runtime
+    image: quay.io/keycloak/keycloak:26.7.4@sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    command: ["start-dev", "--db=dev-mem", "--import-realm", "--hostname=https://auth.example.test", "--proxy-headers=xforwarded", "--http-enabled=true"]
+    environment:
+      JDK_JAVA_OPTIONS: >-
+        -XX:-HeapDumpOnOutOfMemoryError -XX:-CreateCoredumpOnCrash
+        -XX:HeapDumpPath=/tmp/keycloak-heap-%p.hprof
+        -XX:ErrorFile=/tmp/keycloak-error-%p.log -Djava.io.tmpdir=/tmp
+    volumes:
+      - ${BUSINESS_FIXTURE}/realm.json:/opt/keycloak/data/import/coordinator-realm.json:ro
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/keycloak
+        target: /opt/keycloak/data
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/keycloak-quarkus
+        target: /opt/keycloak/lib/quarkus
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/keycloak-tmp
+        target: /tmp
+    networks: [isolated]
+    mem_limit: 1g
+    pids_limit: 256
+
+  proxy:
+    <<: *runtime
+    image: nginx:1.30-alpine@sha256:ef8676b33d681f272ba429b27658bdd7e640963279714c96bddf1dc76307f7b6
+    volumes:
+      - ./connected-proxy.conf:/etc/nginx/nginx.conf:ro
+      - ${BUSINESS_FIXTURE}/tls.pem:/fixture/tls.pem:ro
+      - ${BUSINESS_FIXTURE}/tls-key.pem:/fixture/tls-key.pem:ro
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/proxy-cache
+        target: /var/cache/nginx
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/proxy-run
+        target: /var/run
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/proxy-tmp
+        target: /tmp
+    networks:
+      isolated:
+        aliases: [auth.example.test, coordinator.test]
+
+  backend:
+    <<: *app
+    env_file: ${BUSINESS_FIXTURE}/backend.env
+    volumes:
+      - ${BUSINESS_FIXTURE}/runtime-dsn:/run/secrets/runtime-dsn:ro
+      - ${BUSINESS_FIXTURE}/github-key.pem:/run/secrets/github-key.pem:ro
+      - ${BUSINESS_FIXTURE}/signing-key.pem:/run/secrets/signing-key.pem:ro
+      - ${BUSINESS_FIXTURE}/webhook-secret:/run/secrets/webhook-secret:ro
+      - ${BUSINESS_FIXTURE}/metrics-token:/run/secrets/metrics-token:ro
+      - ${BUSINESS_FIXTURE}/break-glass-token:/run/secrets/break-glass-token:ro
+      - ${BUSINESS_FIXTURE}/browser-secret:/run/secrets/browser-secret:ro
+      - ${BUSINESS_FIXTURE}/reviewer-secret:/run/secrets/reviewer-secret:ro
+      - ${BUSINESS_FIXTURE}/session-key:/run/secrets/session-key:ro
+      - ${BUSINESS_FIXTURE}/ca-bundle.pem:/etc/ssl/certs/ca-certificates.crt:ro
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/backend-tmp
+        target: /tmp
+
+  browser:
+    <<: *runtime
+    image: ${BUSINESS_BROWSER_IMAGE}
+    networks: [isolated]
+    environment:
+      CI: "true"
+      BUSINESS_FIXTURE_FILE: /fixture/browser.json
+      BUSINESS_EVIDENCE_DIR: /evidence
+    volumes:
+      - ${BUSINESS_FIXTURE}/ca.pem:/fixture/ca.pem:ro
+      - ${BUSINESS_FIXTURE}/browser.json:/fixture/browser.json:ro
+      - ${BUSINESS_FIXTURE}/evidence:/evidence
+      - <<: *runtime-bind
+        source: ${BUSINESS_FIXTURE}/runtime/browser-tmp
+        target: /tmp
+    shm_size: 512mb
+    init: true
+    mem_limit: 2g
+    pids_limit: 512
+
+networks:
+  isolated:
+    internal: true
+    labels:
+      io.ci-coordinator.business-witness: ${BUSINESS_PROJECT}

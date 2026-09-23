@@ -1,0 +1,114 @@
+{
+  "changedCriticalMinimum": {
+    "branchPercent": 50,
+    "statementPercent": 75
+  },
+  "nonClaims": [
+    "Coverage proves executed structure, not behavioral correctness or mutation sensitivity.",
+    "Owner floors do not prove provider availability, production capacity, or exhaustive test selection."
+  ],
+  "ownerGroups": [
+    {
+      "branchPercent": 65,
+      "ownerId": "audit-checkpoint",
+      "paths": [
+        "src/ci_coordinator/audit_replay/checkpoint.py",
+        "src/ci_coordinator/audit_replay/checkpoint_admission.py",
+        "src/ci_coordinator/audit_replay/paged_replay.py"
+      ],
+      "statementPercent": 85
+    },
+    {
+      "branchPercent": 65,
+      "ownerId": "capacity-qualification",
+      "paths": [
+        "src/ci_coordinator/capacity_qualification/admission.py",
+        "src/ci_coordinator/capacity_qualification/audit_storage.py",
+        "src/ci_coordinator/capacity_qualification/codec.py",
+        "src/ci_coordinator/capacity_qualification/model.py",
+        "src/ci_coordinator/capacity_qualification/profile.py"
+      ],
+      "statementPercent": 85
+    },
+    {
+      "branchPercent": 65,
+      "ownerId": "control-plane-identity",
+      "paths": [
+        "src/ci_coordinator/control_plane_identity/browser.py",
+        "src/ci_coordinator/control_plane_identity/crypto.py",
+        "src/ci_coordinator/control_plane_identity/machine.py"
+      ],
+      "statementPercent": 80
+    },
+    {
+      "branchPercent": 70,
+      "ownerId": "github-reviewer-attestation",
+      "paths": ["src/ci_coordinator/integrations/github/reviewer_attestation.py"],
+      "statementPercent": 85
+    },
+    {
+      "branchPercent": 62,
+      "ownerId": "http-admission",
+      "paths": [
+        "src/ci_coordinator/api/http/body_limits.py",
+        "src/ci_coordinator/api/http/metrics_authentication.py",
+        "src/ci_coordinator/api/http/request_admission.py"
+      ],
+      "statementPercent": 85
+    },
+    {
+      "branchPercent": 65,
+      "ownerId": "kernel-admission",
+      "paths": ["src/ci_coordinator/kernel/admission.py"],
+      "statementPercent": 90
+    },
+    {
+      "branchPercent": 70,
+      "ownerId": "kernel-cryptography",
+      "paths": ["src/ci_coordinator/kernel/ed25519.py"],
+      "statementPercent": 90
+    },
+    {
+      "branchPercent": 50,
+      "ownerId": "observability-diagnostics",
+      "paths": [
+        "src/ci_coordinator/observability/diagnostics.py",
+        "src/ci_coordinator/observability/logging.py"
+      ],
+      "statementPercent": 88
+    },
+    {
+      "branchPercent": 65,
+      "ownerId": "operator-ui-assets",
+      "paths": [
+        "src/ci_coordinator/api/http/operator_ui.py",
+        "src/ci_coordinator/api/http/operator_ui_bundle.py"
+      ],
+      "statementPercent": 82
+    },
+    {
+      "branchPercent": 50,
+      "ownerId": "persistence-capacity",
+      "paths": ["src/ci_coordinator/persistence/connection.py"],
+      "statementPercent": 75
+    },
+    {
+      "branchPercent": 50,
+      "ownerId": "readiness",
+      "paths": [
+        "src/ci_coordinator/persistence/readiness.py",
+        "src/ci_coordinator/runtime/readiness.py"
+      ],
+      "statementPercent": 75
+    },
+    {
+      "branchPercent": 80,
+      "ownerId": "runtime-settings-admission",
+      "paths": ["src/ci_coordinator/runtime_settings/admission.py"],
+      "statementPercent": 90
+    }
+  ],
+  "policyId": "ci-coordinator/python-risk-coverage/v1",
+  "schemaVersion": "ci-coordinator-python-coverage-policy/v1",
+  "sourceRoot": "backend"
+}

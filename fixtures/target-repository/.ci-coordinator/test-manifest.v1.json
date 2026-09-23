@@ -1,0 +1,1 @@
+{"generator":{"id":"target-artifacts","version":"1"},"schemaVersion":"dynamic-ci-test-manifest/v1","tests":[{"expectedSeconds":90,"testId":"backend/persistence","witnessId":"python-postgres"},{"expectedSeconds":60,"testId":"backend/quality","witnessId":"python-quality"}]}

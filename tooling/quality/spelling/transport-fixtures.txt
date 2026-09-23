@@ -1,0 +1,3 @@
+            "X-Scope": "caf\u00e9",
+        "x-scope": b"caf\xc3\xa9".decode("latin-1"),
+    assert b"x-scope: caf\xc3\xa9\r\n" in wire

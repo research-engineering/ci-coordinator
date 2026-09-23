@@ -1,0 +1,23 @@
+--- a/tarfile.py
++++ b/tarfile.py
+@@ -810,0 +811,7 @@
++    if '..' in name.replace(os.sep, '/').split('/'):
++        # Directories are created from the name as given, so a name that
++        # leaves the destination part-way through would create them
++        # outside it even if the resolved path stays inside.
++        normalized = os.path.normpath(name)
++        if normalized != name:
++            name = new_attrs['name'] = normalized
+@@ -2729 +2736,5 @@
+-                    os.link(tarinfo._link_target, targetpath)
++                    # Resolve the target so the hard link points to the file
++                    # itself. Otherwise os.link() may duplicate a symlink to a
++                    # shallower location, where it's relative target escapes the
++                    # destination directory. (CVE-2026-82049)
++                    os.link(os.path.realpath(tarinfo._link_target), targetpath)
+@@ -2751 +2762 @@
+-                filter_function(
++                filtered = filter_function(
+@@ -2753,0 +2765,2 @@
++                if filtered is None:
++                    return

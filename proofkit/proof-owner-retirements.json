@@ -1,0 +1,466 @@
+{
+  "schemaVersion": 2,
+  "requirementReplacements": [],
+  "transitions": [
+    {
+      "transitionId": "ci-coordinator.shared-editor-spelling-dictionary",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "96ba3ac56fc76a3b3d927c85b8a5dbbcd415ebd1417bbfb17d166bb04db3448b",
+          "affectedRequirementIds": ["REQ-CI-PROOFKIT-012"]
+        }
+      ],
+      "paths": ["tooling/quality/spelling-words.txt"],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-PROOFKIT-007", "REQ-CI-PROOFKIT-012"],
+        "rationale": "The shared spelling-words.dic replaces the CI-only filename, preserves its accepted terms and check commands, and connects editor consumers to one reviewed vocabulary. The successor path retains the complete requirement binding and native spelling checks."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.webhook-ingestion-profile-v2",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "51b184ff45f7b4cac72b0f8fbc44464b516d91d9bbc649918920caa43d5290df",
+          "affectedRequirementIds": ["REQ-CI-RUNTIME-001"]
+        }
+      ],
+      "paths": [
+        "backend/src/ci_coordinator/github_ingestion/resources/webhook-ingestion-profile.v1.json",
+        "docs/specs/ci-coordinator-runtime/webhook-ingestion-profile.v1.json"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-PROOFKIT-007", "REQ-CI-RUNTIME-001"],
+        "rationale": "The v2 source and bundled profile add repository-independent ping admission while preserving live ingestion, packaging and requirement witnesses. Both v1 proof paths retire together under the exact predecessor binding digest."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.completed-implementation-plan-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "79f031b6b8b4167b8632604d64bdccae967a8be16529425ef360e37bdc4ca2d0",
+          "affectedRequirementIds": [
+            "REQ-CI-CORE-004",
+            "REQ-CI-DEV-001",
+            "REQ-CI-PROOFKIT-008",
+            "REQ-CI-RUNTIME-015",
+            "REQ-CI-RUNTIME-016",
+            "REQ-CI-RUNTIME-017",
+            "REQ-CI-RUNTIME-019",
+            "REQ-CI-RUNTIME-020",
+            "REQ-CI-RUNTIME-021",
+            "REQ-CI-UI-007"
+          ]
+        }
+      ],
+      "paths": [
+        "docs/plans/browser-identity-and-proposal-review.md",
+        "docs/plans/operator-workbench-local-development.md",
+        "docs/plans/production-enforcement.md",
+        "docs/plans/production-observability.md",
+        "docs/plans/proof-command-execution.md",
+        "docs/plans/proposal-review-registration.md",
+        "docs/plans/repository-adoption-ux.md",
+        "docs/plans/runtime-database-access.md",
+        "docs/plans/typed-execution-contract.md",
+        "docs/plans/workflow-discovery-proposals.md"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-PROOFKIT-007"],
+        "rationale": "Current architecture, feature, requirement, how-to, and native witness owners supersede completed implementation plans without retaining branch history as product documentation."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.initial-migration-squash",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "28ba7274a16b4c30f6879ae0750910e4f6f9567de53dbc87a9848c593bfe577c",
+          "affectedRequirementIds": [
+            "REQ-CI-CORE-007",
+            "REQ-CI-RUNTIME-004",
+            "REQ-CI-RUNTIME-024"
+          ]
+        }
+      ],
+      "paths": [
+        "backend/alembic/versions/20260726_0002_governance_baseline.py",
+        "backend/alembic/versions/20260822_0003_webhook_body_identity.py"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-CORE-007",
+          "REQ-CI-PROOFKIT-007",
+          "REQ-CI-RUNTIME-004",
+          "REQ-CI-RUNTIME-024"
+        ],
+        "rationale": "Before the first release, one initial revision owns the complete current schema; incremental revisions would preserve deployment history that never existed."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.unearned-kernel-id-helper-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "7c57a1edaa1b7fac853c61c26288d996ab2b512decb53fe19ab5cd642d36a0bb",
+          "affectedRequirementIds": ["REQ-CI-CORE-009"]
+        }
+      ],
+      "paths": ["backend/src/ci_coordinator/kernel/ids.py"],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-CORE-009", "REQ-CI-PROOFKIT-007"],
+        "rationale": "Direct immutable value construction and owner-local validation replace an unused generic identifier wrapper without weakening any live requirement witness."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.duplicate-agent-advice-design-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "unbound",
+          "bindingSetSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "affectedRequirementIds": []
+        }
+      ],
+      "paths": ["docs/features/ai-risk-escalation.md"],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-CORE-001", "REQ-CI-PROOFKIT-007"],
+        "rationale": "The agent-risk-advice module specification now owns the implemented contract, optimality argument, deferred execution boundary, and operating modes without a duplicate feature document."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.frontend-api-owner-decomposition",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "fc264b613af7605cce3c68af30296c02945305cd52e03099b167c23b7e6393c1",
+          "affectedRequirementIds": [
+            "REQ-CI-UI-001",
+            "REQ-CI-UI-002",
+            "REQ-CI-UI-007",
+            "REQ-CI-UI-008",
+            "REQ-CI-UI-009",
+            "REQ-CI-UI-010"
+          ]
+        }
+      ],
+      "paths": [
+        "frontend/src/api/boundedFetch.ts",
+        "frontend/src/api/browserClient.ts",
+        "frontend/src/api/browserSchema.ts",
+        "frontend/src/api/client.ts",
+        "frontend/src/api/proxyPolicy.ts",
+        "frontend/src/api/proxyTarget.ts",
+        "frontend/src/api/schema.ts",
+        "frontend/src/api/workflowDiscoverySchema.ts"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-CORE-018", "REQ-CI-PROOFKIT-007"],
+        "rationale": "Capability-owned frontend API modules replace mixed root-level schema and transport owners while every affected UI requirement retains live head witnesses."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.governance-query-hook-decomposition",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "567b5e5d5bfb161797ba1911fcdee0e0ff816f2d6c4da621fb39b2f3bb693f20",
+          "affectedRequirementIds": [
+            "REQ-CI-UI-011",
+            "REQ-CI-UI-012"
+          ]
+        }
+      ],
+      "paths": [
+        "frontend/src/features/workbench/useGovernanceBaseline.ts",
+        "frontend/src/features/workbench/useGovernanceObservation.ts"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-PROOFKIT-007",
+          "REQ-CI-UI-011",
+          "REQ-CI-UI-012"
+        ],
+        "rationale": "One composed evidence query and one mutation-only approval hook replace independently loaded observation and mixed baseline read-write hooks while preserving live technical witnesses for both requirements."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.target-controlled-plan-client-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "1e2f83b231f68bf3267ad2591990fc24a904b6da3058499648c47e0ccb4e57f7",
+          "affectedRequirementIds": [
+            "REQ-CI-RUNTIME-027",
+            "REQ-CI-RUNTIME-028"
+          ]
+        }
+      ],
+      "paths": [
+        "backend/src/ci_coordinator/consumer_contract_lab/resources/fetch-harness.cjs",
+        "backend/src/ci_coordinator/target_artifacts/resources/request-plan.cjs",
+        "backend/tests/unit/plan_request_client_support.py",
+        "backend/tests/unit/runtime/test_plan_request_client.py",
+        "fixtures/native-target-repository/.ci-coordinator/request-plan.cjs",
+        "fixtures/target-repository/.ci-coordinator/request-plan.cjs"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-PROOFKIT-007",
+          "REQ-CI-RUNTIME-027",
+          "REQ-CI-RUNTIME-028"
+        ],
+        "rationale": "A centrally pinned requester and an unprivileged bounded response consumer replace target-controlled network and OIDC execution while preserving live witnesses for plan admission and the consumer contract laboratory."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.duplicate-runtime-owner-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "909342b72b7eff4013655c965314c8c0f644b323da1f730c033671919243c30e",
+          "affectedRequirementIds": [
+            "REQ-CI-CORE-006",
+            "REQ-CI-RUNTIME-001"
+          ]
+        }
+      ],
+      "paths": [
+        "backend/src/ci_coordinator/app/webhook_ingress.py",
+        "backend/src/ci_coordinator/operator_controls/rollback.py",
+        "backend/tests/unit/app/test_webhook_ingress.py"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-CORE-006",
+          "REQ-CI-PROOFKIT-007",
+          "REQ-CI-RUNTIME-001"
+        ],
+        "rationale": "Capability-owned rollback contracts and an HTTP-owned raw webhook transport port replace duplicate application and operator-control owners while live contract and falsification witnesses remain at head."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.github-administrator-authority-cutover",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "3fd3601aa57503949a437decd49509ac4e8d2ee446b985ddca28766ccc124c03",
+          "affectedRequirementIds": [
+            "REQ-CI-CORE-006",
+            "REQ-CI-RUNTIME-008",
+            "REQ-CI-RUNTIME-021",
+            "REQ-CI-RUNTIME-022",
+            "REQ-CI-RUNTIME-023",
+            "REQ-CI-RUNTIME-024",
+            "REQ-CI-RUNTIME-025",
+            "REQ-CI-UI-009",
+            "REQ-CI-UI-010"
+          ]
+        }
+      ],
+      "paths": [
+        "backend/src/ci_coordinator/api/http/browser_security.py",
+        "backend/src/ci_coordinator/api/http/operator_authentication.py",
+        "backend/src/ci_coordinator/api/http/repository_authentication.py",
+        "backend/src/ci_coordinator/api/http/routers/browser_identity.py",
+        "backend/src/ci_coordinator/api/http/routers/proposal_reviews.py",
+        "backend/src/ci_coordinator/app/browser_governance_baseline.py",
+        "backend/src/ci_coordinator/app/browser_governance_comparison.py",
+        "backend/src/ci_coordinator/app/browser_governance_observation.py",
+        "backend/src/ci_coordinator/app/browser_proposal_review.py",
+        "backend/src/ci_coordinator/app/browser_repository_reads.py",
+        "backend/src/ci_coordinator/browser_access/__init__.py",
+        "backend/src/ci_coordinator/browser_access/grant_authorizer.py",
+        "backend/src/ci_coordinator/browser_access/model.py",
+        "backend/src/ci_coordinator/browser_access/ports.py",
+        "backend/src/ci_coordinator/browser_access/service.py",
+        "backend/src/ci_coordinator/browser_identity/__init__.py",
+        "backend/src/ci_coordinator/browser_identity/crypto.py",
+        "backend/src/ci_coordinator/browser_identity/model.py",
+        "backend/src/ci_coordinator/browser_identity/ports.py",
+        "backend/src/ci_coordinator/browser_identity/service.py",
+        "backend/src/ci_coordinator/browser_identity/use_cases.py",
+        "backend/src/ci_coordinator/integrations/github/installation_access.py",
+        "backend/src/ci_coordinator/integrations/github/user_access.py",
+        "backend/src/ci_coordinator/integrations/github/user_identity.py",
+        "backend/src/ci_coordinator/integrations/github/user_inventory.py",
+        "backend/src/ci_coordinator/persistence/_schema_browser_sessions.py",
+        "backend/src/ci_coordinator/persistence/browser_session_repository.py",
+        "backend/src/ci_coordinator/persistence/browser_session_schema_attestation.py",
+        "backend/src/ci_coordinator/runtime/browser_composition.py",
+        "backend/tests/integration/persistence/test_browser_session_state.py",
+        "backend/tests/unit/api/http/test_browser_identity_route.py",
+        "backend/tests/unit/api/http/test_proposal_review_route.py",
+        "backend/tests/unit/api/http/test_repository_authentication.py",
+        "backend/tests/unit/app/test_browser_governance_baseline.py",
+        "backend/tests/unit/app/test_browser_governance_comparison.py",
+        "backend/tests/unit/app/test_browser_governance_observation.py",
+        "backend/tests/unit/app/test_browser_proposal_review.py",
+        "backend/tests/unit/app/test_browser_repository_reads.py",
+        "backend/tests/unit/browser_access/test_browser_access_service.py",
+        "backend/tests/unit/browser_identity/test_browser_identity.py",
+        "backend/tests/unit/browser_support.py",
+        "backend/tests/unit/integrations/test_github_browser_access.py",
+        "backend/tests/unit/integrations/test_github_user_identity.py",
+        "backend/tests/unit/integrations/test_github_user_inventory.py",
+        "frontend/src/api/browser/client.ts",
+        "frontend/src/api/browser/schema.ts",
+        "frontend/src/features/auth/BrowserIdentityControl.tsx",
+        "frontend/src/features/auth/useBrowserSession.ts",
+        "frontend/src/features/workbench/ProposalReviewControl.tsx",
+        "frontend/src/features/workbench/useProposalReview.ts"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-CONTROL-001",
+          "REQ-CI-PROOFKIT-007",
+          "REQ-CI-RUNTIME-021",
+          "REQ-CI-RUNTIME-022",
+          "REQ-CI-UI-009",
+          "REQ-CI-UI-010"
+        ],
+        "rationale": "Keycloak control-plane identity, ephemeral repository attestation, capability-owned application services, and secret-free frontend clients replace the pre-release GitHub administrator session and browser wrapper graph while every affected requirement retains live contract, implementation, and falsification witnesses."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.unproved-runner-capacity-owner-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "e1399ede0e4ceac13255b4c0bd33cd6437ede9460cb3438db016169a9d994c20",
+          "affectedRequirementIds": ["REQ-CI-CORE-005"]
+        }
+      ],
+      "paths": [
+        "backend/src/ci_coordinator/integrations/github/runner_snapshot.py",
+        "backend/tests/unit/integrations/test_github_runner_snapshot.py"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-CORE-005",
+          "REQ-CI-PROOFKIT-007"
+        ],
+        "rationale": "An explicit unknown-capacity provider replaces an adapter that inferred workload eligibility from free-runner state while live capacity contracts and falsifiers remain at head."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.unbound-ci-economics-collector-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "unbound",
+          "bindingSetSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "affectedRequirementIds": []
+        }
+      ],
+      "paths": ["backend/src/ci_coordinator/runtime/ci_economics_collector.py"],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-PROOFKIT-007", "REQ-CI-RUNTIME-038"],
+        "rationale": "The capability-owned collection algebra and GitHub provider replace an unbound intermediate runtime collector without retiring any baseline requirement witness."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.unused-runner-capacity-port-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "28199773549ebd3a0095ca8afcb0dd6dc5597a2a42e5256e8de7b5e9c4fee7ee",
+          "affectedRequirementIds": ["REQ-CI-CORE-005"]
+        }
+      ],
+      "paths": ["backend/src/ci_coordinator/runner_capacity/ports.py"],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-CORE-005",
+          "REQ-CI-PROOFKIT-007",
+          "REQ-CI-RUNTIME-039"
+        ],
+        "rationale": "The request-scoped application protocol and exact GitHub provider replace an unused repository-id-only port that had no caller and could not carry selector identity."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.target-control-projection-consolidation",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "5bffaaa74cab8c33d72f2184857e51981adc21e7fb723009e7a40b1f40777752",
+          "affectedRequirementIds": [
+            "REQ-CI-RUNTIME-007",
+            "REQ-CI-RUNTIME-012",
+            "REQ-CI-RUNTIME-026",
+            "REQ-CI-RUNTIME-027"
+          ]
+        }
+      ],
+      "paths": [
+        "backend/src/ci_coordinator/target_artifacts/resources/consume-plan.cjs",
+        "backend/src/ci_coordinator/target_artifacts/resources/validate-gate.cjs",
+        "backend/src/ci_coordinator/target_artifacts/resources/validate-plan-core.cjs",
+        "backend/src/ci_coordinator/target_artifacts/resources/validate-plan-envelope.cjs",
+        "backend/src/ci_coordinator/target_artifacts/resources/validate-plan-execution.cjs",
+        "backend/src/ci_coordinator/target_artifacts/resources/validate-plan.cjs",
+        "fixtures/native-target-repository/.ci-coordinator/consume-plan.cjs",
+        "fixtures/native-target-repository/.ci-coordinator/validate-gate.cjs",
+        "fixtures/native-target-repository/.ci-coordinator/validate-plan-core.cjs",
+        "fixtures/native-target-repository/.ci-coordinator/validate-plan-envelope.cjs",
+        "fixtures/native-target-repository/.ci-coordinator/validate-plan-execution.cjs",
+        "fixtures/native-target-repository/.ci-coordinator/validate-plan.cjs",
+        "fixtures/target-repository/.ci-coordinator/consume-plan.cjs",
+        "fixtures/target-repository/.ci-coordinator/validate-gate.cjs",
+        "fixtures/target-repository/.ci-coordinator/validate-plan-core.cjs",
+        "fixtures/target-repository/.ci-coordinator/validate-plan-envelope.cjs",
+        "fixtures/target-repository/.ci-coordinator/validate-plan-execution.cjs",
+        "fixtures/target-repository/.ci-coordinator/validate-plan.cjs"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-PROOFKIT-007",
+          "REQ-CI-RUNTIME-007",
+          "REQ-CI-RUNTIME-012",
+          "REQ-CI-RUNTIME-026",
+          "REQ-CI-RUNTIME-027"
+        ],
+        "rationale": "One reproducible target-control projection replaces six committed runtime files in each artifact set while decomposed sources and live bundle witnesses preserve every affected requirement."
+      }
+    },
+    {
+      "transitionId": "ci-coordinator.successor-production-envelope-resource",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "ac6db227d05b012e2f612144337ed8a7205e3a2c585da42d3b0ca3f8f0da2987",
+          "affectedRequirementIds": [
+            "REQ-CI-RUNTIME-017"
+          ]
+        }
+      ],
+      "paths": [
+        "backend/src/ci_coordinator/production_admission/resources/production-admission-envelope.schema.v1.json"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": [
+          "REQ-CI-PROOFKIT-007",
+          "REQ-CI-RUNTIME-017",
+          "REQ-CI-RUNTIME-030"
+        ],
+        "rationale": "The generation-fenced v2 runtime resource replaces v1 admission in the atomic successor cut. The old specification and published migration bytes remain historical evidence; v1 cannot confer current selected-execution authority. Existing receipt, persistence, signature and fallback witnesses remain live."
+      }
+    }
+  ]
+}

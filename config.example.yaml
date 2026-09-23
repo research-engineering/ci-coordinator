@@ -1,0 +1,74 @@
+schemaVersion: ci-repository-policy/v1
+repository:
+  installationId: 100
+  repositoryId: 200
+  owner: research-engineering
+  name: example-service
+  defaultBranch: master
+  dynamicCi:
+    planningEnabled: true
+    policyVersion: dynamic-ci-policy-v1
+    riskClasses: [source, dependency]
+    agentAdvice:
+      enabled: false
+      modelIdAllowlist: []
+      promptHashAllowlist: []
+      minConfidence: 0.7
+      promptInjectionEvalRequired: false
+    dependencyGraph:
+      source: configured
+      globalRiskPaths:
+        - .github/workflows/**
+        - backend/uv.lock
+    fallbackTimeoutSeconds: 60
+    obligations:
+      - obligationId: repository-quality
+        responsibility:
+          paths:
+            - backend/src/**
+            - backend/tests/**
+          riskClasses: [source, dependency]
+        requiredWitnessIds: [python-quality]
+        defaultDepth: standard
+        fullDepth: full
+        omitAllowed: false
+    witnesses:
+      - witnessId: python-quality
+        executionProfileId: python-linux
+        supportedDepths: [standard, full]
+    executionProfiles:
+      - profileId: python-linux
+        runnerProfileId: ubuntu-24-04
+        permissionProfileId: contents-read
+        credentialProfileId: no-credentials
+        fixtureProfileId: no-fixtures
+        serviceProfileIds: []
+        capacityClassId: self-hosted-default
+        shardingPolicy:
+          maxShards: 8
+          maxParallel: 8
+          maxItemsPerShard: 1000
+          setupSecondsPerShard: 15
+          cpuWeight: 1
+          wallWeight: 1
+          operatorWeight: 1
+  rules:
+    - name: default-branch-full-check
+      on:
+        event: push
+        branches: [master]
+      mode: observe
+      timing:
+        expectedSignalTimeoutSeconds: 3600
+        absenceVerificationWindowSeconds: 300
+        absencePollLookbackSeconds: 3600
+        lateFindingWindowSeconds: 86400
+        mutableDecisionWindowSeconds: 300
+      expectedSignals:
+        - kind: workflow
+          name: Full Check
+          workflowFile: full-check.yml
+          source: native
+          requiredConclusion: success
+          required: true
+      omittedSignals: []

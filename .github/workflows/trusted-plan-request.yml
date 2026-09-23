@@ -1,0 +1,327 @@
+name: Trusted dynamic CI plan request
+
+on:
+  workflow_call:
+    inputs:
+      installation_id:
+        description: GitHub App installation id for the caller repository.
+        required: true
+        type: string
+      plan_url:
+        description: Canonical HTTPS endpoint and OIDC audience of CI Coordinator.
+        required: true
+        type: string
+    outputs:
+      reason:
+        description: Bounded transport outcome or fallback reason.
+        value: ${{ jobs.request.outputs.reason }}
+      plan_chunk_0:
+        description: Signed plan transport chunk 0.
+        value: ${{ jobs.request.outputs.plan_chunk_0 }}
+      plan_chunk_1:
+        description: Signed plan transport chunk 1.
+        value: ${{ jobs.request.outputs.plan_chunk_1 }}
+      plan_chunk_2:
+        description: Signed plan transport chunk 2.
+        value: ${{ jobs.request.outputs.plan_chunk_2 }}
+      plan_chunk_3:
+        description: Signed plan transport chunk 3.
+        value: ${{ jobs.request.outputs.plan_chunk_3 }}
+      plan_chunk_4:
+        description: Signed plan transport chunk 4.
+        value: ${{ jobs.request.outputs.plan_chunk_4 }}
+      plan_chunk_5:
+        description: Signed plan transport chunk 5.
+        value: ${{ jobs.request.outputs.plan_chunk_5 }}
+      plan_chunk_6:
+        description: Signed plan transport chunk 6.
+        value: ${{ jobs.request.outputs.plan_chunk_6 }}
+
+permissions: {}
+
+jobs:
+  request:
+    name: Request signed dynamic CI plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      id-token: write # Mint only the coordinator-audience token in this target-free job.
+    outputs:
+      reason: ${{ steps.request.outputs.reason }}
+      plan_chunk_0: ${{ steps.request.outputs.plan_chunk_0 }}
+      plan_chunk_1: ${{ steps.request.outputs.plan_chunk_1 }}
+      plan_chunk_2: ${{ steps.request.outputs.plan_chunk_2 }}
+      plan_chunk_3: ${{ steps.request.outputs.plan_chunk_3 }}
+      plan_chunk_4: ${{ steps.request.outputs.plan_chunk_4 }}
+      plan_chunk_5: ${{ steps.request.outputs.plan_chunk_5 }}
+      plan_chunk_6: ${{ steps.request.outputs.plan_chunk_6 }}
+    steps:
+      - name: Request signed plan
+        id: request
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          CI_EVENT: ${{ github.event_name }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          CI_EXECUTION_SHA: ${{ github.sha }}
+          CI_INSTALLATION_ID: ${{ inputs.installation_id }}
+          CI_MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref || github.event.merge_group.ref }}
+          CI_OWNER: ${{ github.repository_owner }}
+          CI_PLAN_URL: ${{ inputs.plan_url }}
+          CI_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          CI_REF: ${{ github.ref }}
+          CI_REPO: ${{ github.event.repository.name }}
+          CI_REPOSITORY_ID: ${{ github.repository_id }}
+          CI_RUN_ATTEMPT: ${{ github.run_attempt }}
+          CI_RUN_ID: ${{ github.run_id }}
+        with:
+          github-token: unused
+          result-encoding: string
+          script: |
+            const { gzipSync } = require("node:zlib");
+
+            const CHUNK_COUNT = 7;
+            const CHUNK_CHARACTERS = 65_536;
+            const MAX_COMPRESSED_BYTES = 344_064;
+            const MAX_OIDC_TOKEN_BYTES = 8_192;
+            const MAX_PLAN_BYTES = 1_048_576;
+            const PLAN_TIMEOUT_MS = 45_000;
+            const GIT_OBJECT_ID = /^[0-9a-f]{40,64}$/;
+            const FALLBACK_REASON = /^[a-z][a-z0-9_]{0,127}$/;
+
+            class FallbackError extends Error {
+              constructor(reason) {
+                super(reason);
+                this.reason = reason;
+              }
+            }
+
+            function boundedText(value, maximumBytes) {
+              return (
+                typeof value === "string" &&
+                value.length > 0 &&
+                Buffer.byteLength(value, "utf8") <= maximumBytes &&
+                !/[\u0000-\u001f\u007f]/.test(value)
+              );
+            }
+
+            function positiveSafeInteger(value) {
+              if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+                return null;
+              }
+              const parsed = Number.parseInt(value, 10);
+              return Number.isSafeInteger(parsed) ? parsed : null;
+            }
+
+            function optionalPositiveSafeInteger(value) {
+              return value ? positiveSafeInteger(value) : null;
+            }
+
+            function canonicalPlanUrl(value) {
+              if (!boundedText(value, 4_096)) {
+                return null;
+              }
+              try {
+                const url = new URL(value);
+                if (
+                  url.protocol !== "https:" ||
+                  url.username ||
+                  url.password ||
+                  url.search ||
+                  url.hash ||
+                  url.href !== value
+                ) {
+                  return null;
+                }
+                return value;
+              } catch {
+                return null;
+              }
+            }
+
+            function buildRequest(env) {
+              const installationId = positiveSafeInteger(env.CI_INSTALLATION_ID);
+              const repositoryId = positiveSafeInteger(env.CI_REPOSITORY_ID);
+              const workflowRunId = positiveSafeInteger(env.CI_RUN_ID);
+              const runAttempt = positiveSafeInteger(env.CI_RUN_ATTEMPT);
+              const pullRequestNumber = optionalPositiveSafeInteger(
+                env.CI_PULL_REQUEST_NUMBER,
+              );
+              const mergeGroupHeadRef = env.CI_MERGE_GROUP_HEAD_REF || null;
+              if (
+                installationId === null ||
+                repositoryId === null ||
+                workflowRunId === null ||
+                runAttempt === null ||
+                !boundedText(env.CI_OWNER, 256) ||
+                !boundedText(env.CI_REPO, 256) ||
+                !boundedText(env.CI_REF, 1_024) ||
+                !GIT_OBJECT_ID.test(env.CI_BASE_SHA || "") ||
+                !GIT_OBJECT_ID.test(env.CI_HEAD_SHA || "") ||
+                !GIT_OBJECT_ID.test(env.CI_EXECUTION_SHA || "")
+              ) {
+                throw new FallbackError("plan_identity_unavailable");
+              }
+              if (
+                env.CI_EVENT === "pull_request" &&
+                (pullRequestNumber === null ||
+                  env.CI_REF !== `refs/pull/${pullRequestNumber}/merge` ||
+                  mergeGroupHeadRef !== null)
+              ) {
+                throw new FallbackError("plan_identity_unavailable");
+              }
+              if (
+                env.CI_EVENT === "merge_group" &&
+                (pullRequestNumber !== null ||
+                  !boundedText(mergeGroupHeadRef, 1_024))
+              ) {
+                throw new FallbackError("plan_identity_unavailable");
+              }
+              if (
+                env.CI_EVENT === "push" &&
+                (pullRequestNumber !== null || mergeGroupHeadRef !== null)
+              ) {
+                throw new FallbackError("plan_identity_unavailable");
+              }
+              if (!new Set(["merge_group", "pull_request", "push"]).has(env.CI_EVENT)) {
+                throw new FallbackError("event_not_supported_by_dynamic_plan");
+              }
+              return {
+                schemaVersion: "dynamic-ci-plan-request/v2",
+                requestId: `${repositoryId}:${workflowRunId}:${runAttempt}`,
+                installationId,
+                repositoryId,
+                owner: env.CI_OWNER,
+                repository: env.CI_REPO,
+                eventName: env.CI_EVENT,
+                ref: env.CI_REF,
+                baseSha: env.CI_BASE_SHA,
+                headSha: env.CI_HEAD_SHA,
+                executionSha: env.CI_EXECUTION_SHA,
+                workflowRunId,
+                runAttempt,
+                pullRequestNumber,
+                mergeGroupHeadRef,
+              };
+            }
+
+            async function readBoundedBody(response) {
+              if (response.body === null) {
+                throw new Error("response body is absent");
+              }
+              const declaredLength = response.headers.get("content-length");
+              if (
+                declaredLength !== null &&
+                (!/^\d+$/.test(declaredLength) ||
+                  Number.parseInt(declaredLength, 10) > MAX_PLAN_BYTES)
+              ) {
+                await response.body.cancel("response body exceeds its bound");
+                throw new Error("response body exceeds its bound");
+              }
+              const reader = response.body.getReader();
+              const chunks = [];
+              let total = 0;
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) {
+                    break;
+                  }
+                  total += value.byteLength;
+                  if (total > MAX_PLAN_BYTES) {
+                    await reader.cancel("response body exceeds its bound");
+                    throw new Error("response body exceeds its bound");
+                  }
+                  chunks.push(Buffer.from(value));
+                }
+              } finally {
+                reader.releaseLock();
+              }
+              if (total === 0) {
+                throw new Error("response body is empty");
+              }
+              return Buffer.concat(chunks, total);
+            }
+
+            function emit(reason, chunks = []) {
+              core.setOutput(
+                "reason",
+                FALLBACK_REASON.test(reason) ? reason : "plan_request_unavailable",
+              );
+              for (let index = 0; index < CHUNK_COUNT; index += 1) {
+                core.setOutput(`plan_chunk_${index}`, chunks[index] || "");
+              }
+            }
+
+            async function main() {
+              const planUrl = canonicalPlanUrl(process.env.CI_PLAN_URL);
+              if (planUrl === null) {
+                throw new FallbackError("plan_url_invalid");
+              }
+              const request = buildRequest(process.env);
+              let token;
+              try {
+                token = await core.getIDToken(planUrl);
+              } catch {
+                throw new FallbackError("oidc_token_request_failed");
+              }
+              if (!boundedText(token, MAX_OIDC_TOKEN_BYTES)) {
+                throw new FallbackError("oidc_token_response_invalid");
+              }
+              core.setSecret(token);
+              let response;
+              try {
+                response = await fetch(planUrl, {
+                  method: "POST",
+                  headers: {
+                    authorization: `Bearer ${token}`,
+                    "content-type": "application/json",
+                  },
+                  body: JSON.stringify(request),
+                  redirect: "error",
+                  signal: AbortSignal.timeout(PLAN_TIMEOUT_MS),
+                });
+              } catch {
+                throw new FallbackError("coordinator_plan_request_failed");
+              }
+              if (!response.ok) {
+                throw new FallbackError("coordinator_plan_request_failed");
+              }
+              let body;
+              try {
+                body = await readBoundedBody(response);
+                const document = JSON.parse(body.toString("utf8"));
+                if (
+                  document === null ||
+                  typeof document !== "object" ||
+                  Array.isArray(document)
+                ) {
+                  throw new Error("plan response must be a JSON object");
+                }
+              } catch {
+                throw new FallbackError("coordinator_plan_response_invalid");
+              }
+              const compressed = gzipSync(body, { level: 9 });
+              if (compressed.length > MAX_COMPRESSED_BYTES) {
+                throw new FallbackError("coordinator_plan_transport_too_large");
+              }
+              const encoded = compressed.toString("base64url");
+              const chunks = [];
+              for (let offset = 0; offset < encoded.length; offset += CHUNK_CHARACTERS) {
+                chunks.push(encoded.slice(offset, offset + CHUNK_CHARACTERS));
+              }
+              if (chunks.length === 0 || chunks.length > CHUNK_COUNT) {
+                throw new FallbackError("coordinator_plan_transport_too_large");
+              }
+              emit("signed_plan_available", chunks);
+            }
+
+            try {
+              await main();
+            } catch (error) {
+              emit(
+                error instanceof FallbackError
+                  ? error.reason
+                  : "plan_request_unavailable",
+              );
+            }

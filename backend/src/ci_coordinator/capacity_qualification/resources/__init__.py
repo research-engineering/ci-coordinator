@@ -1,0 +1,1 @@
+"""Packaged capacity-qualification resources."""

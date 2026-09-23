@@ -1,0 +1,154 @@
+{
+  "schemaVersion": "ci-policy-admission-result-profile/v1",
+  "profileId": "ci-policy-admission-result/v1",
+  "ownerId": "ci-coordinator.config-control",
+  "operation": {
+    "name": "admit_policy_document",
+    "arguments": [
+      { "name": "raw_source", "type": "exact-bytes" },
+      { "name": "format", "type": "exact-string" }
+    ],
+    "result": "validated-epoch-draft-or-one-diagnostic"
+  },
+  "types": {
+    "policy-source-format": {
+      "values": ["json", "yaml-1.2"]
+    },
+    "repository-scope": {
+      "fields": ["installationId", "repositoryId"],
+      "fieldTypes": {
+        "installationId": "positive-safe-integer",
+        "repositoryId": "positive-safe-integer"
+      }
+    },
+    "policy-diagnostic": {
+      "ownerRef": "config-document-profile.v1.json#/diagnostics/shape"
+    },
+    "validated-epoch-draft": {
+      "fields": [
+        "sourceFormat",
+        "sourceBytes",
+        "scope",
+        "normalizedDocumentBytes",
+        "compiledPolicyBytes",
+        "documentSchemaId",
+        "documentProfileId",
+        "semanticProfileId",
+        "compiledSchemaId",
+        "producerResourceProfileId",
+        "producerByteProfileId",
+        "producerFeasibilityProfileId",
+        "sourceHash",
+        "documentHash",
+        "epochHash",
+        "epochId"
+      ],
+      "fieldTypes": {
+        "sourceFormat": "policy-source-format",
+        "sourceBytes": "exact-bytes",
+        "scope": "repository-scope",
+        "normalizedDocumentBytes": "canonical-json-bytes",
+        "compiledPolicyBytes": "canonical-json-bytes",
+        "documentSchemaId": "non-empty-string",
+        "documentProfileId": "non-empty-string",
+        "semanticProfileId": "non-empty-string",
+        "compiledSchemaId": "non-empty-string",
+        "producerResourceProfileId": "non-empty-string",
+        "producerByteProfileId": "non-empty-string",
+        "producerFeasibilityProfileId": "non-empty-string",
+        "sourceHash": "sha256-lowercase-hex",
+        "documentHash": "sha256-lowercase-hex",
+        "epochHash": "sha256-lowercase-hex",
+        "epochId": "sha256-lowercase-hex"
+      },
+      "identitySources": {
+        "documentSchemaId": "repository-policy.schema.v1.json#/$id",
+        "documentProfileId": "config-document-profile.v1.json#/profileId",
+        "semanticProfileId": "repository-policy-semantics.v1.json#/profileId",
+        "compiledSchemaId": "compiled-repository-policy.schema.v1.json#/$id",
+        "producerResourceProfileId": "audit-json-resource-profile.v1.json#/profileId",
+        "producerByteProfileId": "audit-persistence-byte-profile.v1.json#/profileId",
+        "producerFeasibilityProfileId": "config-producer-feasibility-profile.v1.json#/profileId"
+      }
+    }
+  },
+  "valueConstraints": {
+    "sourceBytes": { "minimumBytes": 0, "maximumBytes": 2097152 },
+    "normalizedDocumentBytes": { "minimumBytes": 1, "maximumBytes": 4194304 },
+    "compiledPolicyBytes": { "minimumBytes": 1, "maximumBytes": 4194304 },
+    "sha256-lowercase-hex": { "pattern": "^[0-9a-f]{64}$" }
+  },
+  "resultAlgebra": {
+    "success": "validated-epoch-draft",
+    "failure": {
+      "container": "tuple",
+      "itemType": "policy-diagnostic",
+      "minimumItems": 1,
+      "maximumItems": 1
+    },
+    "exceptions": {
+      "policyInputFailures": "forbidden",
+      "programmingContractViolations": [
+        "raw_source host type is not exact bytes",
+        "format host type is not exact string"
+      ],
+      "internalInvariantFailure": "must not be reclassified as accepted policy input"
+    }
+  },
+  "immutability": {
+    "success": "transitive",
+    "failure": "transitive",
+    "byteFields": "immutable byte snapshots without caller-owned mutable aliases",
+    "diagnosticParameters": "immutable JSON object projection",
+    "parsedDocumentsExposed": false
+  },
+  "constructionAuthority": {
+    "proofCarryingValue": "only a value returned by admit_policy_document carries policy-admission authority",
+    "publicTypeConstruction": "does not independently prove relational invariants and cannot authorize persistence or activation",
+    "requiredLocalConstructorChecks": [
+      "source format enum",
+      "scope positive safe integers with booleans excluded",
+      "byte field exact host types and bounds",
+      "non-empty contract identities",
+      "lowercase SHA-256 field shape",
+      "transitive diagnostic parameter immutability"
+    ]
+  },
+  "relationalInvariants": [
+    "scope equals the installationId and repositoryId in both canonical document projections",
+    "normalizedDocumentBytes equal kernel.canonical-json/v1 of the normalized input and validate against the document schema",
+    "compiledPolicyBytes equal kernel.canonical-json/v1 of the compiled policy and validate against the compiled schema",
+    "normalizedDocumentBytes and compiledPolicyBytes satisfy their config-document-profile output limits",
+    "every contract identity equals the value selected by its exact identitySources pointer",
+    "every content identity equals the config-document-profile hash projection over the returned bytes and scope",
+    "failure contains the unique minimum diagnostic selected by the config-document-profile ordering",
+    "success exists if and only if every admission phase succeeds"
+  ],
+  "pythonProjection": {
+    "fieldNaming": "camelCase-to-snake_case",
+    "publicSymbols": [
+      "PolicySourceFormat",
+      "PolicyPhase",
+      "PolicyDiagnostic",
+      "RepositoryScope",
+      "ValidatedEpochDraft",
+      "PolicyAdmissionResult",
+      "admit_policy_document"
+    ],
+    "privateSymbols": [
+      "parser",
+      "normalizer",
+      "schema validators",
+      "semantic evaluators",
+      "feasibility evaluator",
+      "compiler",
+      "resource loaders",
+      "hash helpers",
+      "frozen JSON constructors"
+    ]
+  },
+  "nonClaims": [
+    "This profile defines the in-process policy-admission result ABI, not a persistence, HTTP, event, or UI representation.",
+    "Public dataclass construction does not authorize bypassing admit_policy_document for persistence or activation."
+  ]
+}

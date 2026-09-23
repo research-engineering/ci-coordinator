@@ -1,0 +1,2054 @@
+{
+  "schemaVersion": "ci-python-config-policy-admission-mutation-suite/v1",
+  "suiteId": "ci-python-config-policy-admission/v1",
+  "timeoutMs": 30000,
+  "outerTimeoutMs": 4620000,
+  "expectedKilled": 75,
+  "canonicalInventoryIds": [
+    "CP01",
+    "CP02",
+    "CP03",
+    "CP04",
+    "CP05",
+    "CP06",
+    "CP07",
+    "CP08",
+    "CP09",
+    "CP10",
+    "CP11",
+    "CP12",
+    "CP13",
+    "CP14",
+    "CP15",
+    "CP16",
+    "CP17",
+    "CP18",
+    "CP19",
+    "CP20",
+    "CP21",
+    "CP22",
+    "CP23",
+    "CP24",
+    "CP25",
+    "CP26",
+    "CP27",
+    "CP28",
+    "CP29",
+    "CP30",
+    "CP31",
+    "CP32",
+    "CP33",
+    "CP34",
+    "CP35",
+    "CP36",
+    "CP37",
+    "CP38",
+    "CP39",
+    "CP40",
+    "CP41",
+    "CP42",
+    "CP43",
+    "CP44",
+    "CP45",
+    "CP46",
+    "CP47",
+    "CP48",
+    "CP49",
+    "CP50",
+    "CP51",
+    "CP52",
+    "CP53",
+    "CP54",
+    "CP55",
+    "CP56",
+    "CP57",
+    "CP58",
+    "CP59",
+    "CP60",
+    "CP61",
+    "CP62",
+    "CP63",
+    "CP64",
+    "CP65",
+    "CP66",
+    "CP67",
+    "CP68",
+    "CP69",
+    "CP70",
+    "CP71",
+    "CP72",
+    "CP73",
+    "CP74",
+    "CP75"
+  ],
+  "expectedMutantIds": [
+    "CP01",
+    "CP02",
+    "CP03",
+    "CP04",
+    "CP05",
+    "CP06",
+    "CP07",
+    "CP08",
+    "CP09",
+    "CP10",
+    "CP11",
+    "CP12",
+    "CP13",
+    "CP14",
+    "CP15",
+    "CP16",
+    "CP17",
+    "CP18",
+    "CP19",
+    "CP20",
+    "CP21",
+    "CP22",
+    "CP23",
+    "CP24",
+    "CP25",
+    "CP26",
+    "CP27",
+    "CP28",
+    "CP29",
+    "CP30",
+    "CP31",
+    "CP32",
+    "CP33",
+    "CP34",
+    "CP35",
+    "CP36",
+    "CP37",
+    "CP38",
+    "CP39",
+    "CP40",
+    "CP41",
+    "CP42",
+    "CP43",
+    "CP44",
+    "CP45",
+    "CP46",
+    "CP47",
+    "CP48",
+    "CP49",
+    "CP50",
+    "CP51",
+    "CP52",
+    "CP53",
+    "CP54",
+    "CP55",
+    "CP56",
+    "CP57",
+    "CP58",
+    "CP59",
+    "CP60",
+    "CP61",
+    "CP62",
+    "CP63",
+    "CP64",
+    "CP65",
+    "CP66",
+    "CP67",
+    "CP68",
+    "CP69",
+    "CP70",
+    "CP71",
+    "CP72",
+    "CP73",
+    "CP74",
+    "CP75"
+  ],
+  "expectedInvalidMutantIds": [],
+  "ownerClassCoverage": {
+    "observation-admission": [
+      "CP71",
+      "CP72",
+      "CP73",
+      "CP74",
+      "CP75"
+    ],
+    "admission-algebra": [
+      "CP01",
+      "CP02",
+      "CP03",
+      "CP04",
+      "CP05",
+      "CP49",
+      "CP50",
+      "CP51"
+    ],
+    "source-parser-safety": [
+      "CP06",
+      "CP07",
+      "CP08",
+      "CP09",
+      "CP10",
+      "CP11",
+      "CP12",
+      "CP13",
+      "CP14",
+      "CP15",
+      "CP16",
+      "CP17",
+      "CP18",
+      "CP43",
+      "CP44",
+      "CP58",
+      "CP59",
+      "CP60",
+      "CP61"
+    ],
+    "structural-normalization": [
+      "CP19",
+      "CP20",
+      "CP21",
+      "CP22",
+      "CP45",
+      "CP62",
+      "CP63",
+      "CP64"
+    ],
+    "semantic-validation": [
+      "CP23",
+      "CP24",
+      "CP65",
+      "CP66"
+    ],
+    "compilation": [
+      "CP25",
+      "CP26",
+      "CP31",
+      "CP32",
+      "CP33",
+      "CP34",
+      "CP35",
+      "CP57",
+      "CP70"
+    ],
+    "identity": [
+      "CP27",
+      "CP28",
+      "CP29",
+      "CP30",
+      "CP52",
+      "CP53",
+      "CP54",
+      "CP55"
+    ],
+    "producer-feasibility": [
+      "CP36",
+      "CP37",
+      "CP38",
+      "CP39",
+      "CP46",
+      "CP47",
+      "CP48",
+      "CP56"
+    ],
+    "returned-contracts": [
+      "CP40",
+      "CP41",
+      "CP42",
+      "CP67",
+      "CP68",
+      "CP69"
+    ]
+  },
+  "mutants": [
+    {
+      "id": "CP01",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_admission.py",
+      "operator": "bypass-parse-failure",
+      "original": "    if isinstance(parsed, PolicyDiagnostic):\n        return (parsed,)",
+      "replacement": "    if False:\n        return (parsed,)",
+      "witnessId": "config-policy.bypass-parse-failure",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "short_circuits_after_the_first_failing_phase"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP02",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_admission.py",
+      "operator": "bypass-normalization-failure",
+      "original": "    if isinstance(normalized, PolicyDiagnostic):\n        return (normalized,)",
+      "replacement": "    if False:\n        return (normalized,)",
+      "witnessId": "config-policy.bypass-normalization-failure",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "short_circuits_after_the_first_failing_phase"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP03",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_admission.py",
+      "operator": "bypass-semantic-failure",
+      "original": "    if semantic_failure is not None:\n        return (semantic_failure,)",
+      "replacement": "    if False:\n        return (semantic_failure,)",
+      "witnessId": "config-policy.bypass-semantic-failure",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "short_circuits_after_the_first_failing_phase"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP04",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_admission.py",
+      "operator": "bypass-feasibility-failure",
+      "original": "    if feasibility_failure is not None:\n        return (feasibility_failure,)",
+      "replacement": "    if False:\n        return (feasibility_failure,)",
+      "witnessId": "config-policy.bypass-feasibility-failure",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "short_circuits_after_the_first_failing_phase"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP05",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_admission.py",
+      "operator": "bypass-compile-failure",
+      "original": "    if isinstance(compilation, PolicyDiagnostic):\n        return (compilation,)",
+      "replacement": "    if False:\n        return (compilation,)",
+      "witnessId": "config-policy.bypass-compile-failure",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "compile_failure_cannot_construct_a_validated_epoch"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP06",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_document.py",
+      "operator": "widen-source-byte-limit",
+      "original": "    if len(raw_source) > MAX_POLICY_SOURCE_BYTES:",
+      "replacement": "    if len(raw_source) > MAX_POLICY_SOURCE_BYTES + 1:",
+      "witnessId": "config-policy.widen-source-byte-limit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "source_phase_precedes_format_admission_and_accepts_exact_limit"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP07",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_document.py",
+      "operator": "decode-invalid-utf8-with-replacement",
+      "original": "        text = raw_source.decode(\"utf-8\", errors=\"strict\")",
+      "replacement": "        text = raw_source.decode(\"utf-8\", errors=\"replace\")",
+      "witnessId": "config-policy.decode-invalid-utf8-with-replacement",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "decode_precedence_and_diagnostics_do_not_disclose_source"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP08",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_document.py",
+      "operator": "admit-utf8-bom",
+      "original": "    if raw_source.startswith(_UTF8_BOM):",
+      "replacement": "    if False:",
+      "witnessId": "config-policy.admit-utf8-bom",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "decode_precedence_and_diagnostics_do_not_disclose_source"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP09",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "admit-json-duplicate-key",
+      "original": "            if key in keys:",
+      "replacement": "            if False:",
+      "witnessId": "config-policy.admit-json-duplicate-key",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "json_parser_projects_stable_failures_without_unknown_keys"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP10",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "admit-json-unsafe-integer",
+      "original": "            if integer_token_is_unsafe(token):",
+      "replacement": "            if False:",
+      "witnessId": "config-policy.admit-json-unsafe-integer",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "json_parser_projects_stable_failures_without_unknown_keys"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP11",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "admit-json-high-surrogate",
+      "original": "            if 0xD800 <= code_point <= 0xDBFF:",
+      "replacement": "            if False:",
+      "witnessId": "config-policy.admit-json-high-surrogate",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "json_parser_projects_stable_failures_without_unknown_keys"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP12",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "admit-json-low-surrogate",
+      "original": "            elif 0xDC00 <= code_point <= 0xDFFF:",
+      "replacement": "            elif False:",
+      "witnessId": "config-policy.admit-json-low-surrogate",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "json_parser_projects_stable_failures_without_unknown_keys"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP13",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "widen-json-depth-limit",
+      "original": "        if depth > MAX_DEPTH:",
+      "replacement": "        if depth > MAX_DEPTH + 1:",
+      "witnessId": "config-policy.widen-json-depth-limit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "depth_boundary_is_shared_by_both_formats"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP14",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "widen-json-node-limit",
+      "original": "        if self.nodes > MAX_NODES:",
+      "replacement": "        if self.nodes > MAX_NODES + 1:",
+      "witnessId": "config-policy.widen-json-node-limit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "node_boundary_is_shared_by_both_formats"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP15",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_yaml_document.py",
+      "operator": "admit-second-yaml-document",
+      "original": "                if documents > 1:",
+      "replacement": "                if documents > 2:",
+      "witnessId": "config-policy.admit-second-yaml-document",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "yaml_event_preflight_rejects_forbidden_language_features"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP16",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_yaml_document.py",
+      "operator": "admit-yaml-alias",
+      "original": "            if isinstance(event, AliasEvent):",
+      "replacement": "            if False:",
+      "witnessId": "config-policy.admit-yaml-alias",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "yaml_event_preflight_rejects_forbidden_language_features"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP17",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_yaml_document.py",
+      "operator": "admit-yaml-custom-tag",
+      "original": "                    if tag is not None and tag not in _YAML_JSON_TAGS",
+      "replacement": "                    if False",
+      "witnessId": "config-policy.admit-yaml-custom-tag",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "yaml_event_preflight_rejects_forbidden_language_features"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP18",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_yaml_document.py",
+      "operator": "admit-yaml-duplicate-key",
+      "original": "    if key in frame.seen_keys:",
+      "replacement": "    if False:",
+      "witnessId": "config-policy.admit-yaml-duplicate-key",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "yaml_event_preflight_rejects_forbidden_language_features"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP19",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_rules.py",
+      "operator": "disable-terminal-reference-default",
+      "original": "    return effective.get(\"default\", _NO_DEFAULT)",
+      "replacement": "    return _NO_DEFAULT",
+      "witnessId": "config-policy.disable-terminal-reference-default",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "default_lookup_follows_a_terminal_local_reference"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP20",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_rules.py",
+      "operator": "bypass-post-default-validation",
+      "original": "    failure = _validate_document_structure(normalized)\n    if failure is not None:\n        return failure",
+      "replacement": "    failure = None\n    if failure is not None:\n        return failure",
+      "witnessId": "config-policy.bypass-post-default-validation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "normalization_revalidates_the_post_default_projection"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP21",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_rules.py",
+      "operator": "bypass-required-normalized-pointers",
+      "original": "    _assert_required_normalized_pointers(admitted)",
+      "replacement": "    pass",
+      "witnessId": "config-policy.bypass-required-normalized-pointers",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "normalization_enforces_profile_required_pointer_patterns"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP22",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_rules.py",
+      "operator": "retain-normalized-input-alias",
+      "original": "    if isinstance(value, dict):\n        return {key: _clone_json(item) for key, item in value.items()}",
+      "replacement": "    if isinstance(value, dict):\n        return value",
+      "witnessId": "config-policy.retain-normalized-input-alias",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "recursive_defaults_are_complete_and_do_not_mutate_input"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP23",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_semantics.py",
+      "operator": "lexicographic-array-index-order",
+      "original": "        key=lambda candidate: (\n            _pointer_sort_key(document, candidate.pointer),",
+      "replacement": "        key=lambda candidate: (\n            candidate.pointer,",
+      "witnessId": "config-policy.lexicographic-array-index-order",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_semantics.py",
+        "-q",
+        "-k",
+        "semantic_pointer_order_compares_array_indices_numerically"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP24",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_semantics.py",
+      "operator": "disable-ascii-lower-semantic-identity",
+      "original": "def _ascii_lower(value: str) -> str:\n    return \"\".join(",
+      "replacement": "def _ascii_lower(value: str) -> str:\n    return value or \"\".join(",
+      "witnessId": "config-policy.disable-ascii-lower-semantic-identity",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_semantics.py",
+        "-q",
+        "-k",
+        "signal_collision_key_is_ascii_case_insensitive"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP25",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "bypass-compiled-schema-admission",
+      "original": "    structural_failure = _compiled_structure_diagnostic(compiled)",
+      "replacement": "    structural_failure = None",
+      "witnessId": "config-policy.bypass-compiled-schema-admission",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "compile_policy_rejects_an_invalid_compiler_projection"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP26",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "widen-compiled-output-limit",
+      "original": "        else contract.max_compiled_bytes\n    )",
+      "replacement": "        else contract.max_compiled_bytes + 1\n    )",
+      "witnessId": "config-policy.widen-compiled-output-limit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "reports_schema_and_bounded_output_failures_exactly"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP27",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "remove-source-hash-domain",
+      "original": "_SOURCE_DOMAIN = b\"ci-policy-source/v1\\0\"",
+      "replacement": "_SOURCE_DOMAIN = b\"\"",
+      "witnessId": "config-policy.remove-source-hash-domain",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP28",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "remove-document-hash-domain",
+      "original": "_DOCUMENT_DOMAIN = b\"ci-policy-document/v1\\0\"",
+      "replacement": "_DOCUMENT_DOMAIN = b\"\"",
+      "witnessId": "config-policy.remove-document-hash-domain",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP29",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "remove-compiled-hash-domain",
+      "original": "_COMPILED_DOMAIN = b\"ci-compiled-repository-policy/v1\\0\"",
+      "replacement": "_COMPILED_DOMAIN = b\"\"",
+      "witnessId": "config-policy.remove-compiled-hash-domain",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP30",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "remove-epoch-id-domain",
+      "original": "_EPOCH_ID_DOMAIN = b\"ci-config-epoch/v1\\0\"",
+      "replacement": "_EPOCH_ID_DOMAIN = b\"\"",
+      "witnessId": "config-policy.remove-epoch-id-domain",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP31",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "misproject-repository-owner",
+      "original": "        \"owner\": repository[\"owner\"],",
+      "replacement": "        \"owner\": repository[\"name\"],",
+      "witnessId": "config-policy.misproject-repository-owner",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP32",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "drop-compiled-rule-branches",
+      "original": "        \"branches\": list(_array(event[\"branches\"])),",
+      "replacement": "        \"branches\": [],",
+      "witnessId": "config-policy.drop-compiled-rule-branches",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP33",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/kernel/ordering.py",
+      "operator": "replace-utf16-order-with-utf8",
+      "original": "    return value.encode(\"utf-16-be\")",
+      "replacement": "    return value.encode(\"utf-8\")",
+      "witnessId": "config-policy.replace-utf16-order-with-utf8",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "dynamic_policy_sets_use_ecmascript_utf16_order"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP34",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_dynamic_ci_compatibility.py",
+      "operator": "retain-duplicates-in-set-projection",
+      "original": "    return tuple(sorted(dict.fromkeys(values), key=utf16_sort_key))",
+      "replacement": "    return tuple(sorted(values, key=utf16_sort_key))",
+      "witnessId": "config-policy.retain-duplicates-in-set-projection",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "dynamic_policy_sets_use_ecmascript_utf16_order"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP35",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_dynamic_ci_compatibility.py",
+      "operator": "drop-compiled-responsibility-paths",
+      "original": "            \"paths\": _sorted_strings(responsibility[\"paths\"]),",
+      "replacement": "            \"paths\": [],",
+      "witnessId": "config-policy.drop-compiled-responsibility-paths",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "compiler_projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP36",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_feasibility.py",
+      "operator": "disable-enabled-feasibility-validation",
+      "original": "    if not _boolean(dynamic[\"planningEnabled\"]):",
+      "replacement": "    if _boolean(dynamic[\"planningEnabled\"]):",
+      "witnessId": "config-policy.disable-enabled-feasibility-validation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_feasibility.py",
+        "-q",
+        "-k",
+        "complete_catalog_projection_fails_closed_at_the_audit_byte_limit"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP37",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_feasibility.py",
+      "operator": "reject-exact-feasibility-byte-limit",
+      "original": "    if measurement.canonical_bytes <= contract.limit:",
+      "replacement": "    if measurement.canonical_bytes < contract.limit:",
+      "witnessId": "config-policy.reject-exact-feasibility-byte-limit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_feasibility.py",
+        "-q",
+        "-k",
+        "exact_feasibility_byte_limit_is_admitted"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP38",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_feasibility.py",
+      "operator": "collapse-feasibility-overflow-sentinel",
+      "original": "        return _FeasibilityMeasurement(contract.limit + 1)",
+      "replacement": "        return _FeasibilityMeasurement(contract.limit)",
+      "witnessId": "config-policy.collapse-feasibility-overflow-sentinel",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_feasibility.py",
+        "-q",
+        "-k",
+        "complete_catalog_projection_fails_closed_at_the_audit_byte_limit"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP39",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_feasibility.py",
+      "operator": "reclassify-unexpected-canonical-failure",
+      "original": "        if error.code != \"canonical_json_max_bytes_exceeded\":",
+      "replacement": "        if False:",
+      "witnessId": "config-policy.reclassify-unexpected-canonical-failure",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_feasibility.py",
+        "-q",
+        "-k",
+        "unexpected_canonical_failure_is_not_reclassified_as_size_overflow"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP40",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/contracts.py",
+      "operator": "shallow-freeze-diagnostic-arrays",
+      "original": "    if type(value) is list or type(value) is tuple:\n        return tuple(_freeze_json(item) for item in value)",
+      "replacement": "    if type(value) is list or type(value) is tuple:\n        return tuple(value)",
+      "witnessId": "config-policy.shallow-freeze-diagnostic-arrays",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "policy_diagnostic_recursively_removes_mutable_aliases"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP41",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/contracts.py",
+      "operator": "make-policy-diagnostic-mutable",
+      "original": "@dataclass(frozen=True, slots=True)\nclass PolicyDiagnostic:",
+      "replacement": "@dataclass(slots=True)\nclass PolicyDiagnostic:",
+      "witnessId": "config-policy.make-policy-diagnostic-mutable",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "policy_diagnostic_is_immutable"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP42",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/contracts.py",
+      "operator": "widen-epoch-output-byte-domain",
+      "original": "_MAX_OUTPUT_BYTES: Final = 4_194_304",
+      "replacement": "_MAX_OUTPUT_BYTES: Final = 4_194_305",
+      "witnessId": "config-policy.widen-epoch-output-byte-domain",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "epoch_draft_rejects_byte_values_above_limits"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP43",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "construct-json-before-resource-preflight",
+      "original": "def parse_json_document(text: str) -> DocumentParseResult:\n    failure = _JsonPreflight(text).run()",
+      "replacement": "def parse_json_document(text: str) -> DocumentParseResult:\n    _construct_json_document(text)\n    failure = _JsonPreflight(text).run()",
+      "witnessId": "config-policy.construct-json-before-resource-preflight",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "resource_preflight_rejects_before_tree_construction and json"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP44",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_yaml_document.py",
+      "operator": "construct-yaml-before-resource-preflight",
+      "original": "def parse_yaml_document(text: str) -> DocumentParseResult:\n    yaml = _new_yaml_loader()",
+      "replacement": "def parse_yaml_document(text: str) -> DocumentParseResult:\n    _construct_yaml_document(text)\n    yaml = _new_yaml_loader()",
+      "witnessId": "config-policy.construct-yaml-before-resource-preflight",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "resource_preflight_rejects_before_tree_construction and yaml"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP45",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_schema_validation.py",
+      "operator": "swap-required-and-additional-property-precedence",
+      "original": "    \"required\",\n    \"additionalProperties\",",
+      "replacement": "    \"additionalProperties\",\n    \"required\",",
+      "witnessId": "config-policy.swap-required-and-additional-property-precedence",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "structural_failure_algorithm_uses_profile_keyword_order"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP46",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_feasibility.py",
+      "operator": "collapse-feasibility-diagnostic-observed-sentinel",
+      "original": "            \"observed\": contract.limit + 1,",
+      "replacement": "            \"observed\": contract.limit,",
+      "witnessId": "config-policy.collapse-feasibility-diagnostic-observed-sentinel",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_feasibility.py",
+        "-q",
+        "-k",
+        "complete_catalog_projection_fails_closed_at_the_audit_byte_limit"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP47",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_feasibility.py",
+      "operator": "bypass-null-dynamic-policy-admission",
+      "original": "    if dynamic_value is None:",
+      "replacement": "    if False:",
+      "witnessId": "config-policy.bypass-null-dynamic-policy-admission",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_feasibility.py",
+        "-q",
+        "-k",
+        "null_and_disabled_dynamic_policy_require_no_runtime_audit_projection"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP48",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_feasibility.py",
+      "operator": "drop-feasibility-catalog-projection",
+      "original": "    projection = compile_validation_catalog(dynamic)",
+      "replacement": "    projection = {}",
+      "witnessId": "config-policy.drop-feasibility-catalog-projection",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_feasibility.py",
+        "-q",
+        "-k",
+        "complete_catalog_projection_is_deterministic_and_non_mutating"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP49",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_admission.py",
+      "operator": "drift-failure-result-shape",
+      "original": "        return (parsed,)",
+      "replacement": "        return parsed",
+      "witnessId": "config-policy.drift-failure-result-shape",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "short_circuits_after_the_first_failing_phase"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP50",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_document.py",
+      "operator": "relax-source-host-type",
+      "original": "    if type(raw_source) is not bytes:",
+      "replacement": "    if not isinstance(raw_source, bytes):",
+      "witnessId": "config-policy.relax-source-host-type",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "public_admission_preserves_exact_source_host_contract"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP51",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_document.py",
+      "operator": "relax-format-host-type",
+      "original": "    if type(source_format) is not str:",
+      "replacement": "    if not isinstance(source_format, str):",
+      "witnessId": "config-policy.relax-format-host-type",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "public_admission_preserves_exact_format_host_contract"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP52",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "remove-epoch-scope-field",
+      "original": "        _EPOCH_ID_DOMAIN\n        + scope_bytes\n        + b\"\\0\"",
+      "replacement": "        _EPOCH_ID_DOMAIN\n        + b\"\\0\"",
+      "witnessId": "config-policy.remove-epoch-scope-field",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP53",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "remove-epoch-source-hash-field",
+      "original": "        + source_hash.encode(\"ascii\")\n        + b\"\\0\"",
+      "replacement": "        + b\"\\0\"",
+      "witnessId": "config-policy.remove-epoch-source-hash-field",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP54",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "remove-epoch-document-hash-field",
+      "original": "        + document_hash.encode(\"ascii\")\n        + b\"\\0\"",
+      "replacement": "        + b\"\\0\"",
+      "witnessId": "config-policy.remove-epoch-document-hash-field",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP55",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "remove-epoch-compiled-hash-field",
+      "original": "        + epoch_hash.encode(\"ascii\")",
+      "replacement": "        + b\"\"",
+      "witnessId": "config-policy.remove-epoch-compiled-hash-field",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP56",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_dynamic_ci_compatibility.py",
+      "operator": "replace-dynamic-policy-hash-field",
+      "original": "        \"policyHash\": policy_hash,",
+      "replacement": "        \"policyHash\": configured_catalog_hash,",
+      "witnessId": "config-policy.replace-dynamic-policy-hash-field",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "compiler_projects_the_complete_policy_and_fixed_identity_vectors"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP57",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "reject-integral-binary64-scope-projection",
+      "original": "def _scope_integer(value: object) -> int:\n    if type(value) is int:\n        return value\n    if type(value) is float and value.is_integer():\n        return int(value)",
+      "replacement": "def _scope_integer(value: object) -> int:\n    if type(value) is int:\n        return value\n    if False:\n        return int(value)",
+      "witnessId": "config-policy.reject-integral-binary64-scope-projection",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "integral_json_numbers_are_normalized_before_compilation"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP58",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_yaml_document.py",
+      "operator": "widen-yaml-depth-limit",
+      "original": "            if depth > MAX_DEPTH:",
+      "replacement": "            if depth > MAX_DEPTH + 1:",
+      "witnessId": "config-policy.widen-yaml-depth-limit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "depth_boundary_is_shared_by_both_formats"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP59",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_yaml_document.py",
+      "operator": "widen-yaml-node-limit",
+      "original": "            if nodes > MAX_NODES:",
+      "replacement": "            if nodes > MAX_NODES + 1:",
+      "witnessId": "config-policy.widen-yaml-node-limit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "node_boundary_is_shared_by_both_formats"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP60",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "admit-json-non-finite-token",
+      "original": "        for token in (\"-Infinity\", \"Infinity\", \"NaN\"):",
+      "replacement": "        for token in ():",
+      "witnessId": "config-policy.admit-json-non-finite-token",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "json_parser_projects_stable_failures_without_unknown_keys"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP61",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_json_document.py",
+      "operator": "admit-json-unsafe-float",
+      "original": "        if abs(value) > MAX_SAFE_JSON_INTEGER:",
+      "replacement": "        if False:",
+      "witnessId": "config-policy.admit-json-unsafe-float",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "json_parser_projects_stable_failures_without_unknown_keys"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP62",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_rules.py",
+      "operator": "bypass-pre-default-structural-validation",
+      "original": "def normalize_policy_document(value: object) -> StructureAdmissionResult:\n    failure = _validate_document_structure(value)",
+      "replacement": "def normalize_policy_document(value: object) -> StructureAdmissionResult:\n    failure = None",
+      "witnessId": "config-policy.bypass-pre-default-structural-validation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "invalid_document_is_rejected_before_default_projection"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP63",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_rules.py",
+      "operator": "disable-object-default-recursion",
+      "original": "                projected[key] = _project_defaults(\n                    projected[key],\n                    child_schema,\n                    child_schema_pointer,\n                )",
+      "replacement": "                projected[key] = _clone_json(projected[key])",
+      "witnessId": "config-policy.disable-object-default-recursion",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "dynamic_policy_defaults_recurse_through_objects_and_arrays"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP64",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_rules.py",
+      "operator": "disable-array-default-recursion",
+      "original": "            projected = [_project_defaults(item, items, item_pointer) for item in projected]",
+      "replacement": "            projected = [_clone_json(item) for item in projected]",
+      "witnessId": "config-policy.disable-array-default-recursion",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "dynamic_policy_defaults_recurse_through_objects_and_arrays"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP65",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_semantics.py",
+      "operator": "replace-semantic-pointer-precedence",
+      "original": "            _pointer_sort_key(document, candidate.pointer),",
+      "replacement": "            candidate.rule_id,",
+      "witnessId": "config-policy.replace-semantic-pointer-precedence",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_semantics.py",
+        "-q",
+        "-k",
+        "semantic_failure_selection_prefers_the_earliest_pointer"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP66",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_semantics.py",
+      "operator": "reverse-semantic-code-precedence",
+      "original": "            code_order[_diagnostic_code(candidate.rule_id)],",
+      "replacement": "            -code_order[_diagnostic_code(candidate.rule_id)],",
+      "witnessId": "config-policy.reverse-semantic-code-precedence",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_semantics.py",
+        "-q",
+        "-k",
+        "semantic_failure_selection_prefers_code_order_at_one_pointer"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP67",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/limits.py",
+      "operator": "widen-epoch-source-byte-domain",
+      "original": "MAX_POLICY_SOURCE_BYTES: Final = 2_097_152",
+      "replacement": "MAX_POLICY_SOURCE_BYTES: Final = 2_097_153",
+      "witnessId": "config-policy.widen-epoch-source-byte-domain",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "epoch_draft_rejects_byte_values_above_limits"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP68",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/contracts.py",
+      "operator": "make-repository-scope-mutable",
+      "original": "@dataclass(frozen=True, slots=True)\nclass RepositoryScope:",
+      "replacement": "@dataclass(slots=True)\nclass RepositoryScope:",
+      "witnessId": "config-policy.make-repository-scope-mutable",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "repository_scope_is_immutable"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP69",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/contracts.py",
+      "operator": "make-validated-epoch-mutable",
+      "original": "@dataclass(frozen=True, slots=True)\nclass ValidatedEpochDraft:",
+      "replacement": "@dataclass(slots=True)\nclass ValidatedEpochDraft:",
+      "witnessId": "config-policy.make-validated-epoch-mutable",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control",
+        "-q",
+        "-k",
+        "epoch_draft_validates_local_contract_invariants"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP70",
+      "requirementIds": [
+        "REQ-CI-CORE-014"
+      ],
+      "file": "backend/src/ci_coordinator/config_control/_compiler.py",
+      "operator": "admit-integral-binary64-machine-limit",
+      "original": "def _integer(value: object) -> int:\n    if type(value) is not int:\n        raise RuntimeError(\"compiler contract integer invariant failed\")\n    return value",
+      "replacement": "def _integer(value: object) -> int:\n    if type(value) is float and value.is_integer():\n        return int(value)\n    if type(value) is not int:\n        raise RuntimeError(\"compiler contract integer invariant failed\")\n    return value",
+      "witnessId": "config-policy.admit-integral-binary64-machine-limit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/config_control/test_compiler.py",
+        "-q",
+        "-k",
+        "compiler_contract_rejects_non_integer_machine_limits"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP71",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-045"
+      ],
+      "file": "backend/src/ci_coordinator/ci_economics/observation_scan.py",
+      "operator": "ignore-observation-revision",
+      "original": "        and state.revision == claim.expected_revision\n",
+      "replacement": "",
+      "witnessId": "observation.ignore-observation-revision",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/ci_economics/test_observation_scan.py",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP72",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-045"
+      ],
+      "file": "backend/src/ci_coordinator/ci_economics/observation_scan.py",
+      "operator": "ignore-observation-pause",
+      "original": "        snapshot.configuration.enabled\n        and snapshot.scope == state.scope == claim.scope",
+      "replacement": "        snapshot.scope == state.scope == claim.scope",
+      "witnessId": "observation.ignore-observation-pause",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/ci_economics/test_observation_scan.py",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP73",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-045"
+      ],
+      "file": "backend/src/ci_coordinator/ci_economics/observation_scan.py",
+      "operator": "admit-expired-observation-claim",
+      "original": "        and claim.lease.acquired_at <= now < claim.lease.expires_at",
+      "replacement": "        and claim.lease.acquired_at <= now",
+      "witnessId": "observation.admit-expired-observation-claim",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/ci_economics/test_observation_scan.py",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP74",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-045"
+      ],
+      "file": "backend/src/ci_coordinator/ci_economics/observation.py",
+      "operator": "observe-unselected-workflow",
+      "original": "        return self.workflow_ids is None or workflow_id in self.workflow_ids",
+      "replacement": "        return True",
+      "witnessId": "observation.observe-unselected-workflow",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/ci_economics/test_observation.py",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "CP75",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-045"
+      ],
+      "file": "backend/src/ci_coordinator/persistence/ci_observation_adapters.py",
+      "operator": "return-page-success-without-commit",
+      "original": "            if result != \"claim_lost\":\n                await transaction.commit()\n            return result",
+      "replacement": "            return result",
+      "witnessId": "observation.return-page-success-without-commit",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_ci_observation_adapters.py",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    }
+  ],
+  "invalidMutants": [],
+  "nonClaims": [
+    "The finite inventory proves only that the named witnesses reject the named patches.",
+    "Direct projection fields dominated by exact whole-object equality are not duplicated mechanically."
+  ]
+}

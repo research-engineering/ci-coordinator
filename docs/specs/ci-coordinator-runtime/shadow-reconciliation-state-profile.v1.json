@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "ci-shadow-reconciliation-state-profile/v1",
+  "profileId": "ci-shadow-reconciliation-state/v1",
+  "ownerId": "ci-coordinator.runtime",
+  "limits": {
+    "profileIdUtf8Bytes": 256,
+    "shadowRepositoryUtf8Bytes": 1024,
+    "shadowEventUtf8Bytes": 1024,
+    "shadowSurfaceUtf8Bytes": 1024,
+    "shadowRecordCanonicalBytes": 1048576,
+    "reconciliationSubjectCanonicalBytes": 16384,
+    "reconciliationContractCanonicalBytes": 1048576,
+    "reconciliationClaimTokenUtf8Bytes": 64,
+    "reconciliationMaxAttempts": 1000,
+    "reconciliationMaxBackoffSeconds": 3600,
+    "reconciliationMaxDeadlineSeconds": 86400,
+    "reconciliationMaxLeaseSeconds": 3600,
+    "reconciliationObservationIdUtf8Bytes": 1024,
+    "reconciliationObservationCanonicalBytes": 65536,
+    "reconciliationResultCanonicalBytes": 1048576
+  },
+  "nonClaims": [
+    "This profile does not admit retention, deletion, provider observation, check publication, dynamic omission, production enforcement, or deployment readiness."
+  ]
+}

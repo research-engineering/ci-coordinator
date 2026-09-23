@@ -1,0 +1,31 @@
+packages:
+  - frontend
+
+minimumReleaseAge: 1440
+engineStrict: true
+storeDir: .pnpm-store
+
+overrides:
+  # Remove when typed-rest-client's native edge admits the patched qs release.
+  "typed-rest-client@2.3.1>qs": 6.16.0
+  # Remove when Redocly admits the GHSA-2883-xcg3-v3hh fix on its native edge.
+  "@redocly/openapi-core@1.34.19>js-yaml": 4.3.2
+  # Remove with the minimatch compatibility patch when Redocly admits a patched native edge.
+  "minimatch@5.1.9>brace-expansion": 5.0.12
+  # Remove when Chevrotain admits the Lodash fixes for
+  # GHSA-r5fr-rjxr-66jc and GHSA-f23m-r3pf-42rh on these native edges.
+  "chevrotain@11.1.2>lodash-es": 4.18.1
+  "@chevrotain/cst-dts-gen@11.1.2>lodash-es": 4.18.1
+  "@chevrotain/gast@11.1.2>lodash-es": 4.18.1
+  # TypeScript 6 preserves the 5.9 API consumed by openapi-typescript.
+  "openapi-typescript@7.13.0>typescript": ">=5 <7"
+
+allowBuilds:
+  esbuild: true
+
+enableGlobalVirtualStore: false
+
+verifyDepsBeforeRun: error
+
+patchedDependencies:
+  minimatch@5.1.9: patches/minimatch@5.1.9.patch

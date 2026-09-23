@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "profileId": "github-app-transport/v1",
+  "api": {
+    "baseUrl": "https://api.github.com",
+    "version": "2026-03-10",
+    "accept": "application/vnd.github+json",
+    "acceptEncoding": "identity",
+    "userAgent": "ci-coordinator/0.1",
+    "redirects": "forbidden",
+    "trustEnvironment": false,
+    "tlsVerification": "required",
+    "outboundProxy": "explicit-admitted-or-absent",
+    "proxyScheme": "http",
+    "proxyTrailingSlash": "normalized",
+    "proxyCredentials": "forbidden",
+    "injectedTransportWithProxy": "forbidden",
+    "requestTimeoutSeconds": 10,
+    "maximumConcurrentExchanges": 64,
+    "maximumRequestBodyBytes": 1048576,
+    "maximumResponseBodyBytes": 8388608,
+    "maximumInstallationId": 9007199254740991
+  },
+  "appJwt": {
+    "algorithm": "RS256",
+    "issuedAtBackdateSeconds": 60,
+    "lifetimeSeconds": 540,
+    "maximumFutureExpirySeconds": 600
+  },
+  "installationToken": {
+    "creationPathTemplate": "/app/installations/{installationId}/access_tokens",
+    "refreshSkewSeconds": 300,
+    "refresh": "single-flight",
+    "maximumCachedInstallations": 1024,
+    "maximumConcurrentRefreshes": 64
+  },
+  "nonClaims": [
+    "This profile does not grant GitHub App permissions, authenticate a live provider response, select a GitHub Enterprise endpoint, prove secret custody, or authorize dynamic omission.",
+    "The transport-factory-local concurrency cap does not prove provider-wide concurrency, primary-rate, secondary-rate, or CPU budgets; independently composed factories and replicas multiply the local contribution."
+  ]
+}

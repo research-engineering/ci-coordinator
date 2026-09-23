@@ -1,0 +1,740 @@
+{
+  "schemaVersion": "ci-python-database-compatibility-mutation-suite/v1",
+  "suiteId": "ci-python-database-compatibility/v1",
+  "timeoutMs": 60000,
+  "outerTimeoutMs": 4380000,
+  "expectedKilled": 36,
+  "canonicalInventoryIds": [
+    "DB01",
+    "DB02",
+    "DB03",
+    "DB04",
+    "DB05",
+    "DB06",
+    "DB07",
+    "DB08",
+    "DB09",
+    "DB10",
+    "DB11",
+    "DB12",
+    "DB13",
+    "DB14",
+    "DB15",
+    "DB16",
+    "DB17",
+    "DB18",
+    "DB19",
+    "DB20",
+    "DB21",
+    "DB22",
+    "DB23",
+    "DB24",
+    "DB25",
+    "DB26",
+    "DB27",
+    "DB28",
+    "DB29",
+    "DB30",
+    "DB31",
+    "DB32",
+    "DB33",
+    "DB34",
+    "DB35",
+    "DB36"
+  ],
+  "expectedMutantIds": [
+    "DB01",
+    "DB02",
+    "DB03",
+    "DB04",
+    "DB05",
+    "DB06",
+    "DB07",
+    "DB08",
+    "DB09",
+    "DB10",
+    "DB11",
+    "DB12",
+    "DB13",
+    "DB14",
+    "DB15",
+    "DB16",
+    "DB17",
+    "DB18",
+    "DB19",
+    "DB20",
+    "DB21",
+    "DB22",
+    "DB23",
+    "DB24",
+    "DB25",
+    "DB26",
+    "DB27",
+    "DB28",
+    "DB29",
+    "DB30",
+    "DB31",
+    "DB32",
+    "DB33",
+    "DB34",
+    "DB35",
+    "DB36"
+  ],
+  "expectedInvalidMutantIds": [],
+  "ownerClassCoverage": {
+    "fence-and-order": ["DB01", "DB02", "DB03", "DB04", "DB05", "DB17"],
+    "transition-algebra": ["DB06", "DB07", "DB08", "DB09", "DB10", "DB11", "DB12", "DB16"],
+    "schema-and-data-attestation": ["DB13", "DB14", "DB15", "DB35", "DB36"],
+    "profile-and-migration-environment": ["DB18", "DB19", "DB20"],
+    "principal-and-public-authority": ["DB21", "DB22", "DB23", "DB24", "DB27"],
+    "installed-resource-and-undeclared-head-rejection": ["DB25", "DB26"],
+    "baseline-publication-and-downgrade": ["DB28", "DB29", "DB30", "DB31", "DB32", "DB33", "DB34"]
+  },
+  "invalidMutants": [],
+  "mutants": [
+    {
+      "id": "DB01",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_fence.py",
+      "operator": "collapse-participant-shared-fence-to-exclusive",
+      "original": "\"pg_catalog.pg_advisory_xact_lock_shared\"",
+      "replacement": "\"pg_catalog.pg_advisory_xact_lock\"",
+      "witnessId": "database-compatibility.collapse-participant-shared-fence-to-exclusive",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_compatibility_interleavings.py",
+        "-q",
+        "-k",
+        "two_admitted_participants_share_the_compatibility_fence"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB02",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/env.py",
+      "operator": "remove-exclusive-migration-fence",
+      "original": "text(\"SELECT pg_catalog.pg_advisory_xact_lock(:class_id, :object_id)\")",
+      "replacement": "text(\"SELECT 1\")",
+      "witnessId": "database-compatibility.remove-exclusive-migration-fence",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_migration_environment.py",
+        "-q"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB03",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/unit_of_work.py",
+      "operator": "skip-runtime-schema-admission",
+      "original": "            await admit_schema_dependent_operation(\n                self._connection,\n                self._profile,\n                self._required_capabilities,\n            )",
+      "replacement": "            pass",
+      "witnessId": "database-compatibility.skip-runtime-schema-admission",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_unit_of_work.py",
+        "-q",
+        "-k",
+        "compatibility_fence_precedes_schema_admission"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB04",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_repository.py",
+      "operator": "replace-current-head-read-with-bootstrap-literal",
+      "original": "text(\"SELECT version_num FROM public.alembic_version ORDER BY version_num LIMIT 2\")",
+      "replacement": "text(\"SELECT '20260716_0001'\")",
+      "witnessId": "database-compatibility.replace-current-head-read-with-bootstrap-literal",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_audit_persistence.py",
+        "-q",
+        "-k",
+        "readiness_requires_exact_migration_head"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB05",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/unit_of_work.py",
+      "operator": "admit-before-acquiring-fence",
+      "original": "            await acquire_compatibility_fence(\n                self._connection,\n                self._profile,\n                CompatibilityFenceMode.PARTICIPANT,\n            )\n            await admit_schema_dependent_operation(\n                self._connection,\n                self._profile,\n                self._required_capabilities,\n            )",
+      "replacement": "            await admit_schema_dependent_operation(\n                self._connection,\n                self._profile,\n                self._required_capabilities,\n            )\n            await acquire_compatibility_fence(\n                self._connection,\n                self._profile,\n                CompatibilityFenceMode.PARTICIPANT,\n            )",
+      "witnessId": "database-compatibility.admit-before-acquiring-fence",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_unit_of_work.py",
+        "-q",
+        "-k",
+        "compatibility_fence_precedes_schema_admission"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB06",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_contracts.py",
+      "operator": "accept-invalid-expand-set-relation",
+      "original": "if not previous_ids < candidate_ids:",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.accept-invalid-expand-set-relation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_compatibility_contracts.py::test_successor_laws_reject_the_smallest_invalid_transition[mixed-transition]",
+        "-q"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB07",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_contracts.py",
+      "operator": "accept-empty-contract-transition",
+      "original": "elif candidate.transition_kind == \"contract\" and not candidate_ids < previous_ids:",
+      "replacement": "elif False:",
+      "witnessId": "database-compatibility.accept-empty-contract-transition",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_compatibility_contracts.py::test_successor_laws_reject_the_smallest_invalid_transition[contract-without-removal]",
+        "-q"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB08",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_contracts.py",
+      "operator": "accept-generation-gap",
+      "original": "if candidate.generation != previous.generation + 1:",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.accept-generation-gap",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_compatibility_contracts.py::test_successor_laws_reject_the_smallest_invalid_transition[generation-gap]",
+        "-q"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB09",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_contracts.py",
+      "operator": "accept-nonparent-successor",
+      "original": "if candidate.parent_revision_id != previous.revision_id:",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.accept-nonparent-successor",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_compatibility_contracts.py::test_successor_laws_reject_the_smallest_invalid_transition[parent-mismatch]",
+        "-q"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB10",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_contracts.py",
+      "operator": "accept-retained-descriptor-rewrite",
+      "original": "if any(previous_by_id[item] != candidate_by_id[item] for item in retained_ids):",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.accept-retained-descriptor-rewrite",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_compatibility_contracts.py::test_successor_laws_reject_the_smallest_invalid_transition[descriptor-rewrite]",
+        "-q"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB11",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_contracts.py",
+      "operator": "accept-declaration-hash-mismatch",
+      "original": "if declaration.declaration_hash != expected_hash:",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.accept-declaration-hash-mismatch",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_compatibility_contracts.py",
+        "-q",
+        "-k",
+        "declaration_hash_binds_every_identity_coordinate"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB12",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_contracts.py",
+      "operator": "accept-conflicting-idempotent-replay",
+      "original": "if stored != proposed:",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.accept-conflicting-idempotent-replay",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migration_protocol.py",
+        "-q",
+        "-k",
+        "forward_append_exact_replay"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB13",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_admission.py",
+      "operator": "skip-audit-schema-attestation",
+      "original": "if \"audit-ledger/v1\" in capability_ids and not await schema_matches_contract(connection):",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.skip-audit-schema-attestation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_audit_persistence.py",
+        "-q",
+        "-k",
+        "readiness_rejects_wrong_shaped_constraint"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB14",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/data_attestation.py",
+      "operator": "accept-unvalidated-bridge-constraints",
+      "original": "return facts == tuple((name, True) for name in expected_names)",
+      "replacement": "return True",
+      "witnessId": "database-compatibility.accept-unvalidated-bridge-constraints",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_compatibility.py",
+        "-q",
+        "-k",
+        "unvalidated_required_data_bridge_constraint"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB15",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/data_attestation.py",
+      "operator": "accept-missing-audit-ledger-seed",
+      "original": "def audit_ledger_seed_is_valid_sync(connection: Connection) -> bool:\n    result = connection.scalar(\n        text(\n            \"SELECT count(*) = 1 FROM ci_coordinator.audit_ledger_head \"\n            \"WHERE head_id = 1 AND revision >= 0 AND \"\n            \"((revision = 0 AND last_sequence IS NULL AND last_event_hash IS NULL) \"\n            \"OR (revision >= 1 AND revision = last_sequence AND last_event_hash IS NOT NULL))\"\n        )\n    )\n    return result is True",
+      "replacement": "def audit_ledger_seed_is_valid_sync(connection: Connection) -> bool:\n    return True",
+      "witnessId": "database-compatibility.accept-missing-audit-ledger-seed",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_compatibility.py",
+        "-q",
+        "-k",
+        "missing_required_audit_ledger_seed"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB16",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/migration_protocol.py",
+      "operator": "append-without-resulting-capability-attestation",
+      "original": "    _validate_forward_relation(profile, predecessor, proposed)\n    attest_resulting_capabilities(proposed)\n    _insert_declaration(connection, proposed)",
+      "replacement": "    _validate_forward_relation(profile, predecessor, proposed)\n    _insert_declaration(connection, proposed)",
+      "witnessId": "database-compatibility.append-without-resulting-capability-attestation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migration_protocol.py",
+        "-q",
+        "-k",
+        "failed_resulting_capability_attestation"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB17",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/connection.py",
+      "operator": "accept-non-read-committed-transaction",
+      "original": "if effective != profile.isolation_expected_value:",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.accept-non-read-committed-transaction",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_compatibility.py",
+        "-q",
+        "-k",
+        "non_read_committed_transaction"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB18",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_profile.py",
+      "operator": "accept-zero-timeout",
+      "original": "if any(type(value) is not int or value < 1 for value in values):",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.accept-zero-timeout",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_compatibility_profile.py",
+        "-q",
+        "-k",
+        "timeout_value_object_rejects_zero"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB19",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/env.py",
+      "operator": "admit-offline-migration-environment",
+      "original": "raise RuntimeError(\"database compatibility migrations require online transactional execution\")",
+      "replacement": "return None",
+      "witnessId": "database-compatibility.admit-offline-migration-environment",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_migration_environment.py",
+        "-q"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB20",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/env.py",
+      "operator": "enable-per-migration-transactions",
+      "original": "transaction_per_migration=False",
+      "replacement": "transaction_per_migration=True",
+      "witnessId": "database-compatibility.enable-per-migration-transactions",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_migration_environment.py",
+        "-q"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB21",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/database_security_attestation.py",
+      "operator": "ignore-public-schema-privilege",
+      "original": "\"SELECT 1 FROM pg_namespace AS namespace \"\n            \"CROSS JOIN LATERAL aclexplode(\"\n            \"COALESCE(namespace.nspacl, acldefault('n', namespace.nspowner))\"\n            \") AS privilege \"\n            \"WHERE namespace.nspname = :schema AND privilege.grantee = 0\"\n            \") AND NOT EXISTS (\"",
+      "replacement": "\"SELECT 1 FROM pg_namespace AS namespace \"\n            \"CROSS JOIN LATERAL aclexplode(\"\n            \"COALESCE(namespace.nspacl, acldefault('n', namespace.nspowner))\"\n            \") AS privilege \"\n            \"WHERE false\"\n            \") AND NOT EXISTS (\"",
+      "witnessId": "database-compatibility.ignore-public-schema-privilege",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_privileges.py",
+        "-q",
+        "-k",
+        "public_schema_create_grant"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB22",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/database_security_attestation.py",
+      "operator": "ignore-security-definer-routine",
+      "original": "WHERE namespace.nspname = :schema AND routine.prosecdef",
+      "replacement": "WHERE namespace.nspname = :schema AND false",
+      "witnessId": "database-compatibility.ignore-security-definer-routine",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_privileges.py",
+        "-q",
+        "-k",
+        "routine_and_type_public_access"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB23",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/principal_attestation.py",
+      "operator": "ignore-runtime-role-membership",
+      "original": "    \"CROSS JOIN principal WHERE membership.member = principal.oid \"",
+      "replacement": "    \"CROSS JOIN principal WHERE false \"",
+      "witnessId": "database-compatibility.ignore-runtime-role-membership",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_runtime_principal.py",
+        "-q",
+        "-k",
+        "each_excess_authority_fact"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB24",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/principal_attestation.py",
+      "operator": "ignore-unexpected-sequence-usage",
+      "original": "has_sequence_privilege(principal.oid, relation.oid, 'USAGE') ",
+      "replacement": "false ",
+      "witnessId": "database-compatibility.ignore-unexpected-sequence-usage",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_runtime_principal.py",
+        "-q",
+        "-k",
+        "each_excess_authority_fact"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB25",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/pyproject.toml",
+      "operator": "omit-compatibility-profile-from-wheel",
+      "original": "\"persistence/resources/*.json\"",
+      "replacement": "\"persistence/resources/*.none\"",
+      "witnessId": "database-compatibility.omit-compatibility-profile-from-wheel",
+      "command": ["backend/.venv/bin/python", "-m", "scripts.python_witness", "package-check"],
+      "environment": {}
+    },
+    {
+      "id": "DB26",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_repository.py",
+      "operator": "admit-undeclared-current-head",
+      "original": "if declaration_row is None:",
+      "replacement": "if False:",
+      "witnessId": "database-compatibility.admit-undeclared-current-head",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "undeclared_current_head_is_rejected_before_repository_exposure"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB27",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/src/ci_coordinator/persistence/principal_attestation.py",
+      "operator": "allow-runtime-migration-head-update",
+      "original": "AND NOT has_table_privilege(principal.oid, to_regclass(:migration_head_relation), 'UPDATE') ",
+      "replacement": "AND true ",
+      "witnessId": "database-compatibility.allow-runtime-migration-head-update",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_database_runtime_principal.py",
+        "-q",
+        "-k",
+        "excess_migration_metadata"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB28",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "publish-baseline-before-attestation",
+      "original": "    _attest_baseline_catalog_and_privileges()\n    _assert_prepublication_state()\n    _publish_baseline_declaration()",
+      "replacement": "    _publish_baseline_declaration()\n    _assert_prepublication_state()\n    _attest_baseline_catalog_and_privileges()",
+      "witnessId": "database-compatibility.publish-baseline-before-attestation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/persistence/test_migration_environment.py",
+        "-q",
+        "-k",
+        "baseline_publication_cannot_run_before_attestation"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB29",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "omit-baseline-compatibility-declaration",
+      "original": "    _assert_prepublication_state()\n    _publish_baseline_declaration()",
+      "replacement": "    _assert_prepublication_state()",
+      "witnessId": "database-compatibility.omit-baseline-compatibility-declaration",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "baseline_upgrade_downgrade_round_trip_is_exact"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB30",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "cascade-baseline-schema-drop",
+      "original": "        f\"DROP SCHEMA {_SCHEMA}\",",
+      "replacement": "        f\"DROP SCHEMA {_SCHEMA} CASCADE\",",
+      "witnessId": "database-compatibility.cascade-baseline-schema-drop",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "baseline_downgrade_rejects_unclassified_schema_objects"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB31",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "omit-explicit-type-revocation",
+      "original": "                WHERE typnamespace = 'ci_coordinator'::regnamespace AND typelem = 0",
+      "replacement": "                WHERE typnamespace = 'ci_coordinator'::regnamespace AND false",
+      "witnessId": "database-compatibility.omit-explicit-type-revocation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "baseline_upgrade_downgrade_round_trip_is_exact"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB32",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "skip-exact-baseline-declaration-check",
+      "original": "    _attest_baseline_catalog_and_privileges()\n    _assert_exact_published_baseline()\n    _assert_no_retained_product_data()",
+      "replacement": "    _attest_baseline_catalog_and_privileges()\n    _assert_no_retained_product_data()",
+      "witnessId": "database-compatibility.skip-exact-baseline-declaration-check",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "baseline_downgrade_rejects_extra_declarations"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB33",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "mutate-role-global-defaults-on-upgrade",
+      "original": "        f\"REVOKE ALL ON ALL FUNCTIONS IN SCHEMA {_SCHEMA} FROM PUBLIC\",",
+      "replacement": "        \"ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC\",\n        f\"REVOKE ALL ON ALL FUNCTIONS IN SCHEMA {_SCHEMA} FROM PUBLIC\",",
+      "witnessId": "database-compatibility.mutate-role-global-defaults-on-upgrade",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "baseline_upgrade_downgrade_round_trip_is_exact"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB34",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "mutate-role-global-defaults-on-downgrade",
+      "original": "    _assert_no_retained_product_data()\n    _drop_baseline_schema()",
+      "replacement": "    _assert_no_retained_product_data()\n    _drop_baseline_schema()\n    _execute(\"ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO PUBLIC\")",
+      "witnessId": "database-compatibility.mutate-role-global-defaults-on-downgrade",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "baseline_upgrade_downgrade_round_trip_is_exact"
+      ],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB35",
+      "requirementIds": ["REQ-CI-RUNTIME-053"],
+      "file": "backend/src/ci_coordinator/persistence/ci_history_unit_of_work.py",
+      "operator": "omit-purpose-capability-requirement",
+      "original": "self._profile, (*self._required_capabilities, ANALYTICS_PURPOSE_SETTINGS.declaration())",
+      "replacement": "self._profile, self._required_capabilities",
+      "witnessId": "database-compatibility.omit-purpose-capability-requirement",
+      "command": ["backend/.venv/bin/python", "-m", "pytest", "backend/tests/integration/persistence/test_analytics_purpose_migration.py", "-q", "-k", "forward_0013_is_atomic_preserves_0012_and_requires_new_capability"],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    },
+    {
+      "id": "DB36",
+      "requirementIds": ["REQ-CI-RUNTIME-053"],
+      "file": "backend/src/ci_coordinator/persistence/compatibility_admission.py",
+      "operator": "omit-purpose-catalog-attestor",
+      "original": "await connection.run_sync(analytics_purpose_schema_matches)",
+      "replacement": "True",
+      "witnessId": "database-compatibility.omit-purpose-catalog-attestor",
+      "command": ["backend/.venv/bin/python", "-m", "pytest", "backend/tests/integration/persistence/test_analytics_purpose_migration.py", "-q", "-k", "native_catalog_rejects_each_damaged_operand"],
+      "environment": { "PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src" }
+    }
+  ]
+}

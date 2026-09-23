@@ -1,0 +1,21 @@
+FROM node:24.21.0-trixie-slim@sha256:8ec5d7557396cfe32d21c3f9c13072355ceab22b584578ca4bb28af31120cffe
+ENV COREPACK_HOME=/opt/corepack
+ENV PNPM_HOME=/home/node/.local/share/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+WORKDIR /workspace
+RUN mkdir -p "$COREPACK_HOME" "$PNPM_HOME" \
+    && npm install --global --ignore-scripts corepack@0.36.0 \
+    && corepack enable \
+    && corepack prepare pnpm@12.5.1 --activate \
+    && chown -R node:node "$COREPACK_HOME" "$PNPM_HOME" /workspace
+COPY --chown=node:node package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --chown=node:node frontend/package.json ./frontend/package.json
+COPY --chown=node:node patches ./patches
+USER node
+RUN pnpm install --frozen-lockfile
+USER root
+COPY --chown=node:node frontend/src ./frontend/src
+COPY --chown=node:node frontend/index.html frontend/vite.config.ts frontend/tsconfig*.json ./frontend/
+WORKDIR /workspace/frontend
+USER node
+CMD ["pnpm", "dev"]

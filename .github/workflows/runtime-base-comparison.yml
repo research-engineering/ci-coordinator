@@ -1,0 +1,113 @@
+name: Runtime Base Comparison
+
+on:
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: runtime-base-comparison-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compare:
+    name: Screen maintained glibc updates without release authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Set up pinned builder
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
+          driver-opts: image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+          version: v0.37.1
+      - name: Acquire maintained package updates as a measured proposal
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/runtime-bases"
+          mkdir -p "${root}/results" "${root}/context"
+          cat > "${root}/context/Dockerfile" <<'DOCKERFILE'
+          FROM python:3.13.15-slim-trixie@sha256:8d9d0b8bcf6506481eae4907c18f5e3e7902e629f5f6d684f9e7c32e85e3ddf0 AS interpreter
+          FROM ubuntu:26.04@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78
+          RUN apt-get update && apt-get upgrade --yes \
+              && DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+                ca-certificates tzdata libbz2-1.0 libdb5.3t64 libexpat1 libffi8 \
+                libgdbm6t64 libgdbm-compat4t64 liblzma5 libncursesw6 \
+                libreadline8t64 libsqlite3-0 libssl3t64 libuuid1 zlib1g \
+              && rm -rf /var/lib/apt/lists/*
+          COPY --from=interpreter /usr/local/ /usr/local/
+          RUN ldconfig
+          DOCKERFILE
+          docker buildx build --platform linux/amd64 --load --provenance=false \
+            --tag ci-coordinator:updated-glibc "${root}/context"
+          docker inspect ci-coordinator:updated-glibc --format '{{json .}}' \
+            | jq '{Id,Size,Architecture,Os}' > "${root}/image.json"
+          image_id="$(jq -r .Id "${root}/image.json")"
+          timeout 30 docker run --rm --network none --read-only --user 65532:65532 \
+            --cap-drop ALL --security-opt no-new-privileges --memory 128m --cpus 1 \
+            --entrypoint python "${image_id}" -I -B -c \
+            'import json,platform,ssl,sysconfig,zlib; print(json.dumps({
+              "python":platform.python_version(),"libc":platform.libc_ver(),
+              "openssl":ssl.OPENSSL_VERSION,"zlib":zlib.ZLIB_RUNTIME_VERSION,
+              "configureArgs":sysconfig.get_config_var("CONFIG_ARGS")
+            }))' > "${root}/runtime.json"
+      - name: Scan the exact acquired filesystem without suppressions
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/runtime-bases"
+          curl --fail --location --proto '=https' --tlsv1.2 --max-time 120 \
+            https://github.com/anchore/grype/releases/download/v0.119.0/grype_0.119.0_linux_amd64.tar.gz \
+            --output "${root}/grype.tar.gz"
+          printf '%s  %s\n' 3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b \
+            "${root}/grype.tar.gz" | sha256sum --check --strict
+          tar -xf "${root}/grype.tar.gz" -C "${root}" grype
+          jq -n --arg cache "${root}/db" '{
+            db: {"cache-dir":$cache,"auto-update":false,"validate-age":true,
+                 "validate-by-hash-on-start":true,"require-update-check":true,
+                 "max-allowed-built-age":"24h","update-url":"https://grype.anchore.io/databases/v6/latest.json"},
+            "check-for-app-update":false,"only-fixed":false,"only-notfixed":false,
+            "ignore-wontfix":"","match-upstream-kernel-headers":true,
+            ignore:[],exclude:[],"vex-documents":[],"vex-add":[],distro:""
+          }' > "${root}/config.json"
+          scan() {
+            env -i HOME="${HOME}" PATH="${PATH}" TMPDIR="${RUNNER_TEMP}" \
+              "${root}/grype" -c "${root}/config.json" "$@"
+          }
+          scan db update
+          scan db status --output json > "${root}/db-before.json"
+          image_id="$(jq -r .Id "${root}/image.json")"
+          set +e
+          scan "${image_id}" --from docker --scope squashed --output json --fail-on high \
+            > "${root}/scan.json"
+          code=$?
+          set -e
+          test "${code}" -eq 0 || test "${code}" -eq 2
+          test "$(wc -c < "${root}/scan.json")" -le 16777216
+          jq -e --arg image "${image_id}" --slurpfile db "${root}/db-before.json" \
+            '.source.target.imageID == $image and .source.target.architecture == "amd64"
+             and .source.target.os == "linux" and .descriptor.db.status == $db[0]
+             and $db[0].valid == true and .descriptor.name == "grype"
+             and .descriptor.version == "0.119.0" and (.ignoredMatches|length==0)
+             and .distro.name == "ubuntu" and .distro.version == "26.04"' \
+            "${root}/scan.json" > /dev/null
+          scan db status --output json > "${root}/db-after.json"
+          cmp "${root}/db-before.json" "${root}/db-after.json"
+          jq --arg source "${SOURCE_COMMIT}" --argjson code "${code}" \
+            --slurpfile image "${root}/image.json" --slurpfile runtime "${root}/runtime.json" '{
+              sourceCommit:$source,image:$image[0],runtime:$runtime[0],database:.descriptor.db.status,
+              scanner:.descriptor.name,scannerVersion:.descriptor.version,scannerExitCode:$code,
+              distro:.distro,matches:[.matches[]|{
+                id:.vulnerability.id,severity:.vulnerability.severity,package:.artifact.name,
+                version:.artifact.version,type:.artifact.type,purl:.artifact.purl,fix:.vulnerability.fix}],
+              nonClaim:"Maintained Ubuntu libraries with the pinned optimized CPython; not a frozen package lock, complete ABI proof, minimal application image or release admission"
+            }' "${root}/scan.json" > "${root}/results/updated-ubuntu.json"
+      - name: Preserve bounded comparison evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-base-comparison-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/runtime-bases/results/*.json
+          if-no-files-found: error
+          retention-days: 7

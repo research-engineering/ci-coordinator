@@ -1,0 +1,286 @@
+name: ${COMPOSE_PROJECT_NAME}
+
+x-instance-labels: &instance-labels
+  io.ci-coordinator.root-digest: ${CI_COORDINATOR_DEV_ROOT_DIGEST}
+
+services:
+  postgres:
+    image: postgres:18.6-trixie@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+    labels: *instance-labels
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres-superuser-password
+      POSTGRES_USER: postgres
+    healthcheck:
+      test: ["CMD", "pg_isready", "--host=127.0.0.1", "--dbname=postgres", "--username=postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    ports:
+      - "127.0.0.1::5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    secrets:
+      - postgres-superuser-password
+
+  database-provision:
+    image: postgres:18.6-trixie@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+    labels: *instance-labels
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+    command:
+      - /bin/sh
+      - -euc
+      - |
+        export PGPASSWORD="$$(cat /run/secrets/postgres-superuser-password)"
+        exec psql --no-psqlrc --dbname postgres \
+          --file=/bootstrap/bootstrap_database.sql
+    volumes:
+      - ./scripts/dev_environment/bootstrap_database.sql:/bootstrap/bootstrap_database.sql:ro
+    secrets:
+      - postgres-migration-password
+      - postgres-runtime-password
+      - postgres-superuser-password
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/development/backend.Dockerfile
+      target: development
+    labels: *instance-labels
+    depends_on:
+      database-provision:
+        condition: service_completed_successfully
+    command:
+      - /bin/sh
+      - -euc
+      - |
+        export CI_COORDINATOR_MIGRATION_DATABASE_DSN="$$(cat /run/ci-coordinator-secrets/migration-dsn)"
+        exec alembic upgrade head
+    tmpfs:
+      - /run/ci-coordinator-secrets:mode=0700
+    secrets:
+      - migration-dsn
+
+  database-access:
+    build:
+      context: .
+      dockerfile: docker/development/backend.Dockerfile
+      target: development
+    labels: *instance-labels
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command:
+      - /bin/sh
+      - -euc
+      - |
+        export CI_COORDINATOR_MIGRATION_DATABASE_DSN="$$(cat /run/ci-coordinator-secrets/migration-dsn)"
+        exec ci-coordinator-database-access apply --runtime-role ci_coordinator_runtime
+    tmpfs:
+      - /run/ci-coordinator-secrets:mode=0700
+    secrets:
+      - migration-dsn
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/development/backend.Dockerfile
+      target: development
+    labels: *instance-labels
+    depends_on:
+      database-access:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    environment:
+      CI_COORDINATOR_BIND_HOST: ${CI_COORDINATOR_BIND_HOST}
+      CI_COORDINATOR_BIND_PORT: ${CI_COORDINATOR_BIND_PORT}
+      CI_COORDINATOR_DATABASE_DSN_FILE: /run/ci-coordinator-secrets/runtime-dsn
+      CI_COORDINATOR_DATABASE_POOL_SIZE: ${CI_COORDINATOR_DATABASE_POOL_SIZE}
+      CI_COORDINATOR_DATABASE_POOL_TIMEOUT_SECONDS: ${CI_COORDINATOR_DATABASE_POOL_TIMEOUT_SECONDS}
+      CI_COORDINATOR_GITHUB_APP_ID: ${CI_COORDINATOR_GITHUB_APP_ID}
+      CI_COORDINATOR_GITHUB_PRIVATE_KEY_FILE: /run/ci-coordinator-secrets/github-private-key.pem
+      CI_COORDINATOR_OIDC_ALLOWED_JOB_WORKFLOW_REFS: ${CI_COORDINATOR_OIDC_ALLOWED_JOB_WORKFLOW_REFS:-}
+      CI_COORDINATOR_OIDC_ALLOWED_JOB_WORKFLOW_PATHS: ${CI_COORDINATOR_OIDC_ALLOWED_JOB_WORKFLOW_PATHS:-}
+      CI_COORDINATOR_OIDC_ALLOWED_WORKFLOW_REFS: ${CI_COORDINATOR_OIDC_ALLOWED_WORKFLOW_REFS:-}
+      CI_COORDINATOR_OIDC_ALLOWED_WORKFLOW_PATHS: ${CI_COORDINATOR_OIDC_ALLOWED_WORKFLOW_PATHS:-}
+      CI_COORDINATOR_OIDC_AUDIENCE: ${CI_COORDINATOR_OIDC_AUDIENCE}
+      CI_COORDINATOR_BREAK_GLASS_ACTOR_ID: ${CI_COORDINATOR_BREAK_GLASS_ACTOR_ID}
+      CI_COORDINATOR_BREAK_GLASS_BEARER_TOKEN_FILE: /run/ci-coordinator-secrets/break-glass-bearer-token
+      CI_COORDINATOR_CONTROL_PLANE_SCOPE_ALLOWLIST: ${CI_COORDINATOR_CONTROL_PLANE_SCOPE_ALLOWLIST}
+      CI_COORDINATOR_CONTROL_PLANE_INVENTORY_INSTALLATION_ALLOWLIST: ${CI_COORDINATOR_CONTROL_PLANE_INVENTORY_INSTALLATION_ALLOWLIST:-}
+      CI_COORDINATOR_MAXIMUM_RETAINED_BODY_BYTES: ${CI_COORDINATOR_MAXIMUM_RETAINED_BODY_BYTES}
+      CI_COORDINATOR_METRICS_BEARER_TOKEN_FILE: /run/ci-coordinator-secrets/metrics-bearer-token
+      CI_COORDINATOR_OUTBOUND_PROXY_URL: ${CI_COORDINATOR_OUTBOUND_PROXY_URL:-}
+      CI_COORDINATOR_PLAN_SIGNING_KEY_ID: ${CI_COORDINATOR_PLAN_SIGNING_KEY_ID}
+      CI_COORDINATOR_PLAN_SIGNING_PRIVATE_KEY_FILE: /run/ci-coordinator-secrets/plan-signing-private-key.pem
+      CI_COORDINATOR_PLAN_TTL_SECONDS: ${CI_COORDINATOR_PLAN_TTL_SECONDS}
+      CI_COORDINATOR_RECONCILIATION_INTERVAL_SECONDS: ${CI_COORDINATOR_RECONCILIATION_INTERVAL_SECONDS}
+      CI_COORDINATOR_RECONCILIATION_SCAN_LIMIT: ${CI_COORDINATOR_RECONCILIATION_SCAN_LIMIT}
+      CI_COORDINATOR_RECONCILIATION_STARTUP_TIMEOUT_SECONDS: ${CI_COORDINATOR_RECONCILIATION_STARTUP_TIMEOUT_SECONDS}
+      CI_COORDINATOR_REQUEST_TIMEOUT_SECONDS: ${CI_COORDINATOR_REQUEST_TIMEOUT_SECONDS}
+      CI_COORDINATOR_RUNTIME_MODE: ${CI_COORDINATOR_RUNTIME_MODE}
+      CI_COORDINATOR_SHADOW_ROLLOUT_PROFILE_ID: ${CI_COORDINATOR_SHADOW_ROLLOUT_PROFILE_ID}
+      CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS: ${CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS}
+      CI_COORDINATOR_WEBHOOK_SECRET_FILE: /run/ci-coordinator-secrets/webhook-secret
+    command:
+      - /bin/sh
+      - -euc
+      - |
+        if [ -z "$${CI_COORDINATOR_OUTBOUND_PROXY_URL:-}" ]; then
+          unset CI_COORDINATOR_OUTBOUND_PROXY_URL
+        fi
+        exec python -m ci_coordinator.runtime
+    tmpfs:
+      - /run/ci-coordinator-secrets:mode=0700
+    secrets:
+      - github-private-key.pem
+      - metrics-bearer-token
+      - break-glass-bearer-token
+      - plan-signing-private-key.pem
+      - runtime-dsn
+      - webhook-secret
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -m
+        - ci_coordinator.runtime.healthcheck
+      interval: 3s
+      timeout: 4s
+      retries: 40
+    ports:
+      - "127.0.0.1::3000"
+    develop:
+      # Model/environment and migration/ACL inputs require owned stop/validate/up.
+      # An image rebuild cannot apply a changed Compose model or execute migrations.
+      watch:
+        - action: sync+restart
+          path: ./backend/src
+          target: /workspace/backend/src
+          ignore:
+            - __pycache__/
+            - "**/__pycache__/"
+            - "*.pyc"
+            - "**/*.pyc"
+            - "*.egg-info/"
+            - "**/*.egg-info/"
+        - action: rebuild
+          path: ./backend/pyproject.toml
+        - action: rebuild
+          path: ./backend/uv.lock
+        - action: rebuild
+          path: ./docker/development/backend.Dockerfile
+        - action: rebuild
+          path: ./docker/development/secret-entrypoint.sh
+        - action: rebuild
+          path: ./.dockerignore
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile.dev
+    labels: *instance-labels
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      CI_COORDINATOR_DEV_API_URL: ${CI_COORDINATOR_DEV_API_URL}
+    user: "1000:1000"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          const fs=require('node:fs');
+          fs.accessSync('/workspace/frontend/node_modules',fs.constants.W_OK);
+          fetch('http://127.0.0.1:5173/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 3s
+      timeout: 4s
+      retries: 40
+    ports:
+      - "127.0.0.1::5173"
+    develop:
+      watch:
+        - action: sync
+          path: ./frontend/src
+          target: /workspace/frontend/src
+          ignore:
+            - api/development/
+            - api/workbench/limits.ts
+        # Restart transitive config imports even when the native loader cannot track them.
+        - action: sync+restart
+          path: ./frontend/src/api/development
+          target: /workspace/frontend/src/api/development
+        - action: sync+restart
+          path: ./frontend/src/api/workbench/limits.ts
+          target: /workspace/frontend/src/api/workbench/limits.ts
+        - action: sync
+          path: ./frontend/index.html
+          target: /workspace/frontend/index.html
+        - action: sync+restart
+          path: ./frontend/vite.config.ts
+          target: /workspace/frontend/vite.config.ts
+        - action: sync+restart
+          path: ./frontend/tsconfig.json
+          target: /workspace/frontend/tsconfig.json
+        - action: sync+restart
+          path: ./frontend/tsconfig.app.json
+          target: /workspace/frontend/tsconfig.app.json
+        - action: sync+restart
+          path: ./frontend/tsconfig.node.json
+          target: /workspace/frontend/tsconfig.node.json
+        - action: rebuild
+          path: ./frontend/package.json
+        - action: rebuild
+          path: ./pnpm-lock.yaml
+        - action: rebuild
+          path: ./package.json
+        - action: rebuild
+          path: ./pnpm-workspace.yaml
+        - action: rebuild
+          path: ./patches
+        - action: rebuild
+          path: ./frontend/Dockerfile.dev
+        - action: rebuild
+          path: ./.dockerignore
+
+volumes:
+  postgres-data:
+    labels: *instance-labels
+
+networks:
+  default:
+    labels: *instance-labels
+
+secrets:
+  github-private-key.pem:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/github-private-key.pem
+  migration-dsn:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/migration-dsn
+  metrics-bearer-token:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/metrics-bearer-token
+  break-glass-bearer-token:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/break-glass-bearer-token
+  plan-signing-private-key.pem:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/plan-signing-private-key.pem
+  postgres-migration-password:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/postgres-migration-password
+  postgres-runtime-password:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/postgres-runtime-password
+  postgres-superuser-password:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/postgres-superuser-password
+  runtime-dsn:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/runtime-dsn
+  webhook-secret:
+    file: ${CI_COORDINATOR_DEV_SECRET_DIR}/webhook-secret

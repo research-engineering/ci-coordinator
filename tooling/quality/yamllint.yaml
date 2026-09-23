@@ -1,0 +1,14 @@
+---
+# Semantic YAML checks cover every Git-observed YAML file, including fixtures.
+# Formatting is owned by the existing source tools; key ambiguity is not.
+rules:
+  anchors: enable
+  colons: enable
+  commas: enable
+  hyphens: enable
+  key-duplicates: enable
+  new-line-at-end-of-file: enable
+  new-lines: enable
+  trailing-spaces: enable
+  truthy:
+    check-keys: false

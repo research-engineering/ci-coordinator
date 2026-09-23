@@ -1,0 +1,114 @@
+* {
+  box-sizing: border-box;
+}
+html {
+  background: var(--bg);
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.4;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button,
+input,
+select,
+a {
+  outline-offset: 3px;
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+}
+summary {
+  cursor: pointer;
+}
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+svg {
+  flex: 0 0 auto;
+}
+
+.loading-state {
+  position: relative;
+  min-width: 0;
+  padding: 24px 16px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+}
+.loading-state h2 {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+.loading-state--compact {
+  margin-bottom: 12px;
+  padding-block: 16px;
+}
+.loading-state--compact h2 {
+  margin-bottom: 0;
+}
+.loading-progress {
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: 3px;
+  overflow: hidden;
+  background: var(--info-bg);
+  border-radius: var(--radius);
+}
+.loading-progress::after {
+  content: "";
+  display: block;
+  width: 35%;
+  height: 100%;
+  background: var(--interactive);
+  animation: loading-progress 1.6s ease-in-out infinite;
+}
+.loading-skeleton {
+  display: grid;
+  gap: 12px;
+}
+.loading-skeleton span {
+  display: block;
+  height: 24px;
+  background: var(--surface-muted);
+  border-radius: 4px;
+}
+.loading-skeleton span:last-child {
+  width: 70%;
+}
+@keyframes loading-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-progress::after {
+    animation: none;
+  }
+}

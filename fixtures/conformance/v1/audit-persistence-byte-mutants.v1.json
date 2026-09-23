@@ -1,0 +1,376 @@
+{
+  "schemaVersion": "ci-audit-persistence-byte-mutation-suite/v1",
+  "suiteId": "ci-audit-event-persistence-bytes/v1",
+  "timeoutMs": 30000,
+  "outerTimeoutMs": 1800000,
+  "expectedKilled": 17,
+  "canonicalInventoryIds": [
+    "B02",
+    "B05",
+    "B11",
+    "B12",
+    "B13",
+    "B14",
+    "B15",
+    "B16",
+    "B17",
+    "B18",
+    "B22",
+    "B26",
+    "B27",
+    "B29",
+    "B30",
+    "B31",
+    "B32"
+  ],
+  "expectedMutantIds": [
+    "B02",
+    "B05",
+    "B11",
+    "B12",
+    "B13",
+    "B14",
+    "B15",
+    "B16",
+    "B17",
+    "B18",
+    "B22",
+    "B26",
+    "B27",
+    "B29",
+    "B30",
+    "B31",
+    "B32"
+  ],
+  "expectedInvalidMutantIds": [],
+  "mutants": [
+    {
+      "id": "B02",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/audit_replay/persistence_bytes.py",
+      "operator": "replace-python-utf8-byte-length-with-code-point-length",
+      "original": "if _utf8_length_exceeds(value, MAX_AUDIT_TEXT_UTF8_BYTES_V1):",
+      "replacement": "if len(value) > MAX_AUDIT_TEXT_UTF8_BYTES_V1:",
+      "witnessId": "audit.byte.python-astral-text-boundary",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_persistence_bytes.py",
+        "-q",
+        "-k",
+        "audit_text_limit_measures_utf8_bytes"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B05",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/audit_replay/persistence_bytes.py",
+      "operator": "omit-actor-from-text-byte-admission",
+      "original": "    AuditPersistenceByteFieldProjection(\n        \"actor\",\n        \"/actor\",\n        \"actor\",\n        \"variableText\",\n        \"maxVariableTextUtf8Bytes\",\n        True,\n    ),\n",
+      "replacement": "",
+      "witnessId": "audit.byte.python-field-matrix",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_persistence_bytes.py",
+        "-q",
+        "-k",
+        "audit_text_limit_measures_utf8_bytes"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B11",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/app/audit_persistence.py",
+      "operator": "invoke-unit-of-work-factory-before-preparation",
+      "original": "    prepared = prepare_audit_event(event_input)\n    async with unit_of_work_factory() as unit_of_work:",
+      "replacement": "    unit_of_work = unit_of_work_factory()\n    prepared = prepare_audit_event(event_input)\n    async with unit_of_work as unit_of_work:",
+      "witnessId": "audit.byte.python-preparation-before-factory",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/app/test_audit_persistence.py",
+        "-q",
+        "-k",
+        "rejects_before_unit_of_work_factory"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B12",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/audit_replay/_prepared_event.py",
+      "operator": "accept-structural-prepared-lookalike",
+      "original": "    if type(prepared) is not PreparedAuditEvent:\n        raise AuditEventError(\"audit event must be an exact PreparedAuditEvent\")",
+      "replacement": "    if not hasattr(prepared, \"payload_hash\"):\n        raise AuditEventError(\"audit event must be an exact PreparedAuditEvent\")",
+      "witnessId": "audit.byte.python-prepared-forgery",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_persistence_bytes.py",
+        "-q",
+        "-k",
+        "rejects_structural_forgery"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B13",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/audit_replay/persistence_bytes.py",
+      "operator": "retain-caller-payload-alias-in-prepared-capability",
+      "original": "        payload_snapshot=payload_snapshot,",
+      "replacement": "        payload_snapshot=snapshot.payload,",
+      "witnessId": "audit.byte.python-prepared-caller-detachment",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/audit_replay/test_persistence_bytes.py",
+        "-q",
+        "-k",
+        "detaches_caller_payload"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B14",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/persistence/audit_codec.py",
+      "operator": "recanonicalize-prepared-payload-on-write",
+      "original": "        \"payload_canonical_json\": prepared.payload_canonical_bytes,",
+      "replacement": "        \"payload_canonical_json\": canonical_audit_payload_bytes(record.payload),",
+      "witnessId": "audit.byte.python-write-codec-no-recanonicalization",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "scripts/conformance/audit_persistence_byte_contract_test.py",
+        "-q",
+        "-k",
+        "write_codec_uses_prepared_bytes"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B15",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/persistence/audit_codec.py",
+      "operator": "remove-raw-payload-bound-before-decode",
+      "original": "        payload_bytes = _bounded_bytes_field(\n            row,\n            \"payload_canonical_json\",\n            MAX_AUDIT_PAYLOAD_CANONICAL_BYTES_V1,\n        )",
+      "replacement": "        payload_bytes = _bytes_field(row, \"payload_canonical_json\")",
+      "witnessId": "audit.byte.python-read-bound-before-parser",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "scripts/conformance/audit_persistence_byte_contract_test.py",
+        "-q",
+        "-k",
+        "checks_raw_bound_before_decode_or_parse"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B16",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/persistence/audit_codec.py",
+      "operator": "promote-invalid-payload-bytes-without-decode-or-canonical-check",
+      "original": "        payload = json.loads(payload_bytes.decode(\"utf-8\"))\n        if canonical_audit_payload_bytes(payload) != payload_bytes:\n            raise ValueError(\"payload bytes are not canonical JSON\")",
+      "replacement": "        payload = None",
+      "witnessId": "audit.byte.python-read-invalid-byte-domain",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "scripts/conformance/audit_persistence_byte_contract_test.py",
+        "-q",
+        "-k",
+        "rejects_length_valid_invalid_payload_bytes"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B17",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "weaken-ddl-lower-bound-to-zero",
+      "original": "CHECK (octet_length(actor) BETWEEN 1 AND 4096)",
+      "replacement": "CHECK (octet_length(actor) BETWEEN 0 AND 4096)",
+      "witnessId": "audit.byte.postgres-bootstrap-lower-bound",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "fresh_baseline_upgrade_attests_its_catalog"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B18",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "operator": "widen-ddl-upper-bound-by-one",
+      "original": "CHECK (octet_length(payload_canonical_json) BETWEEN 1 AND 1048576)",
+      "replacement": "CHECK (octet_length(payload_canonical_json) BETWEEN 1 AND 1048577)",
+      "witnessId": "audit.byte.postgres-bootstrap-upper-bound",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_migrations.py",
+        "-q",
+        "-k",
+        "fresh_baseline_upgrade_attests_its_catalog"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B22",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/persistence/audit_schema_attestation.py",
+      "operator": "ignore-postgres-storage-strategy",
+      "original": "        and storage_facts == _EXPECTED_STORAGE\n",
+      "replacement": "",
+      "witnessId": "audit.byte.postgres-readiness-storage-drift",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/integration/persistence/test_byte_limits.py",
+        "-q",
+        "-k",
+        "readiness_rejects_byte_constraint_or_storage_drift"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "B26",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "fixtures/conformance/v1/audit-persistence-byte-corpus.v1.json",
+      "operator": "tamper-corpus-case-without-fingerprint-admission",
+      "original": "\"canonicalSha256\": \"74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b\"",
+      "replacement": "\"canonicalSha256\": \"04234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b\"",
+      "witnessId": "audit.byte.corpus-fingerprint-admission",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "scripts/conformance/audit_persistence_byte_contract_test.py",
+        "-q",
+        "-k",
+        "contract_corpus_fingerprint_is_admitted"
+      ]
+    },
+    {
+      "id": "B27",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "import-audit-policy-into-generic-kernel",
+      "original": "from ci_coordinator.kernel.result import Err, Ok, ResultValue",
+      "replacement": "from ci_coordinator.audit_replay.persistence_bytes import MAX_AUDIT_PAYLOAD_CANONICAL_BYTES_V1\nfrom ci_coordinator.kernel.result import Err, Ok, ResultValue",
+      "witnessId": "audit.byte.python-kernel-import-boundary",
+      "command": ["backend/.venv/bin/python", "-m", "scripts.python_witness", "import-boundary"]
+    },
+    {
+      "id": "B29",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": ".github/workflows/python-persistence.yml",
+      "operator": "restrict-provider-trigger-domain",
+      "original": "  pull_request:\n",
+      "replacement": "  pull_request:\n    paths: [\"docs/**\"]\n",
+      "witnessId": "audit.byte.provider-owner-input-closure",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/runtime/test_python_persistence_workflow.py",
+        "-q",
+        "-k",
+        "provider_workflow_supports_only_the_admitted_python_patches"
+      ]
+    },
+    {
+      "id": "B30",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "reject-ascii-raw-byte-equality",
+      "original": "        return len(value) > limit\n",
+      "replacement": "        return len(value) >= limit\n",
+      "witnessId": "audit.byte.python-nested-raw-equality-coordinates",
+      "command": [
+        "backend/.venv/bin/python", "-m", "pytest",
+        "backend/tests/unit/kernel/test_canonical_json.py", "-q", "-k",
+        "raw_utf8_precheck_preserves_saturated_overflow"
+      ],
+      "environment": {"PYTHONPATH": "backend/src"}
+    },
+    {
+      "id": "B31",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "skip-unicode-scalar-admission-after-byte-overflow",
+      "original": "            _reject_surrogates(candidate, frame.path, \"string contains surrogate code point\")",
+      "replacement": "            if not isinstance(output, _BoundedBytesOutput) or output.overflow is None:\n                _reject_surrogates(candidate, frame.path, \"string contains surrogate code point\")",
+      "witnessId": "audit.byte.python-deferred-overflow-unicode-value",
+      "command": [
+        "backend/.venv/bin/python", "-m", "pytest",
+        "backend/tests/unit/kernel/test_canonical_json.py", "-q", "-k",
+        "ascii_prefix_or_suffix_cannot_mask_surrogate_rejection"
+      ],
+      "environment": {"PYTHONPATH": "backend/src"}
+    },
+    {
+      "id": "B32",
+      "requirementIds": ["REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "skip-unicode-key-admission-after-byte-overflow",
+      "original": "        _reject_surrogates(key, frame.path, \"object key contains surrogate code point\")",
+      "replacement": "        if not isinstance(output, _BoundedBytesOutput) or output.overflow is None:\n            _reject_surrogates(key, frame.path, \"object key contains surrogate code point\")",
+      "witnessId": "audit.byte.python-deferred-overflow-unicode-key",
+      "command": [
+        "backend/.venv/bin/python", "-m", "pytest",
+        "backend/tests/unit/kernel/test_canonical_json.py", "-q", "-k",
+        "ascii_prefix_or_suffix_cannot_mask_surrogate_rejection"
+      ],
+      "environment": {"PYTHONPATH": "backend/src"}
+    }
+  ],
+  "invalidMutants": [],
+  "nonClaims": [
+    "Active mutants prove only that their named witnesses reject their exact unique patches.",
+    "Any future invalid inventory entry is explicit missing proof and does not contribute to the killed count.",
+    "The finite inventory does not prove mutation completeness or absence of other defects."
+  ]
+}

@@ -1,0 +1,178 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ci-coordinator-backend"
+version = "0.1.0"
+description = "Conservative CI coordination control plane."
+license = "Apache-2.0"
+requires-python = "==3.13.15"
+dependencies = [
+  "alembic>=1.20.0,<2",
+  "anyio>=4.15.1,<5",
+  "authlib==1.8.0",
+  "cryptography>=50.0.1,<51",
+  "fastapi>=0.141.1,<1",
+  "httpx2>=2.13.0,<3",
+  "jsonschema>=4.26,<5",
+  "joserfc==1.7.5",
+  "pydantic>=2.13.5,<3",
+  "psycopg[binary]>=3.3.6,<4",
+  "prometheus-client>=0.26.0,<1",
+  "ruamel-yaml>=0.19.1,<1",
+  "sqlalchemy[asyncio]>=2.0.54,<3",
+  "starlette>=1.6.0,<2",
+  "uvicorn>=0.53.0,<1",
+]
+
+[project.scripts]
+ci-coordinator-audit-replay = "ci_coordinator.replay_cli:main"
+ci-coordinator-consumer-lab = "ci_coordinator.consumer_contract_lab.bootstrap:main"
+ci-coordinator-database-access = "ci_coordinator.database_access_cli:main"
+ci-coordinator-target-artifacts = "ci_coordinator.target_artifacts.cli:main"
+ci-coordinator-target-authority-evidence = "ci_coordinator.target_authority_evidence.cli:main"
+
+[dependency-groups]
+debug = ["debugpy==1.8.22"]
+dev = [
+  "agentic-proofkit==0.14.18",
+  "deptry==0.25.1",
+  "docker==7.2.0",
+  "import-linter==2.15",
+  "markdown-it-py>=4.2.0,<5",
+  "mypy>=2.3.1,<3",
+  "mutmut==3.8.0",
+  "pytest>=9.1.1,<10",
+  "pytest-cov>=7.1.0,<8",
+  "pyjwt[crypto]>=2.14.0,<3",
+  "ruff>=0.16.8,<1",
+  "schemathesis==4.27.5",
+  "setuptools==84.0.0",
+  "testcontainers[postgres]>=4.15.0,<5",
+  "tree-sitter==0.26.0",
+  "tree-sitter-javascript==0.25.0",
+  "types-jsonschema>=4.26,<5",
+  "zizmor>=1.30.1,<2",
+]
+
+[tool.mypy]
+files = ["src", "tests", "alembic"]
+mypy_path = ["src", "tests/unit"]
+plugins = ["pydantic.mypy"]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
+
+[tool.uv]
+prerelease = "disallow"
+
+[tool.deptry]
+known_first_party = ["ci_coordinator"]
+ignore_notebooks = true
+
+[tool.importlinter]
+root_package = "ci_coordinator"
+include_external_packages = true
+exclude_type_checking_imports = false
+
+[[tool.importlinter.contracts]]
+id = "python.import-boundary.http-client"
+name = "HTTP transport belongs to integration adapters"
+type = "protected"
+protected_modules = ["httpx2"]
+allowed_importers = ["ci_coordinator.integrations"]
+as_packages = true
+
+[[tool.mypy.overrides]]
+module = ["alembic.versions.20260716_0001_initial_schema"]
+disable_error_code = ["arg-type", "comparison-overlap"]
+
+[tool.pytest.ini_options]
+addopts = ["--strict-config", "--strict-markers", "-p", "no:schemathesis"]
+anyio_mode = "auto"
+filterwarnings = [
+  "error",
+  'ignore:^The anyio\.abc\.BlockingPortal alias is deprecated, use anyio\.from_thread\.BlockingPortal instead\.\Z:DeprecationWarning:^starlette\.testclient\Z:53',
+]
+markers = ["persistence: requires a real PostgreSQL provider"]
+pythonpath = ["src", "tests/unit", ".."]
+testpaths = ["tests", "../scripts/tests"]
+
+[tool.coverage.run]
+branch = true
+patch = ["subprocess"]
+source = ["ci_coordinator"]
+
+[tool.mutmut]
+source_paths = ["src/"]
+only_mutate = ["src/ci_coordinator/kernel/admission.py"]
+pytest_add_cli_args_test_selection = ["tests/unit/kernel/test_kernel_admission.py"]
+process_isolation = "forkserver"
+on_dependency_change = "rerun"
+
+[tool.coverage.paths]
+source = [
+  "src/ci_coordinator",
+  "*/pytest-of-*/pytest-*/test_*/coordinator/backend/src/ci_coordinator",
+  "*/ci-consumer-lab-source-*/source/backend/src/ci_coordinator",
+]
+
+[tool.coverage.report]
+fail_under = 84
+precision = 2
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["ASYNC", "B", "E", "F", "FURB", "I", "PERF", "PIE", "RUF", "S", "SIM", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"../docker/runtime/security/check_*.py" = ["S101"]
+"../docker/runtime/verify.py" = ["S101"]
+"../docker/runtime/benchmark.py" = ["S101"]
+"../docker/runtime/check_layer_reuse.py" = ["S101", "S603", "S607"]
+"../scripts/conformance/*_test.py" = ["S101"]
+"../scripts/tests/**/*.py" = ["S101", "S603", "S607"]
+"alembic/versions/20260716_0001_initial_schema.py" = ["S608"]
+"tests/**/*.py" = ["S101", "S105", "S106", "S603", "S607", "S608"]
+
+[tool.ruff.format]
+exclude = ["alembic/versions/*.py"]
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ci_coordinator = [
+  "py.typed",
+  "capacity_qualification/resources/*.json",
+  "ci_economics/resources/*.json",
+  "config_control/resources/*.json",
+  "consumer_contract_lab/resources/*.cjs",
+  "github_ingestion/resources/*.json",
+  "persistence/resources/*.json",
+  "production_admission/resources/*.json",
+  "runtime_settings/resources/*.json",
+  "api/http/static/*.html",
+  "api/http/static/*.json",
+  "api/http/static/assets/*",
+  "api/http/static/assets/**/*",
+  "target_artifacts/resources/*.cjs",
+  "target_artifacts/resources/*.json",
+  "target_artifacts/resources/*.yml",
+]

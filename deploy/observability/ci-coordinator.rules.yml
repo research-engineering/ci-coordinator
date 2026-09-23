@@ -1,0 +1,261 @@
+groups:
+  - name: ci-coordinator.safety
+    interval: 30s
+    rules:
+      - alert: CIUnsafeOmissionObserved
+        expr: sum(increase(ci_coordinator_shadow_unsafe_omissions_total[5m])) > 0
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: critical
+        annotations:
+          summary: Unsafe CI omission evidence was observed
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIReplayMismatchObserved
+        expr: sum(increase(ci_coordinator_shadow_replay_mismatches_total[5m])) > 0
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: critical
+        annotations:
+          summary: CI shadow replay evidence diverged
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIReconciliationTerminalFailure
+        expr: max(ci_coordinator_reconciliation_background_terminal_failure) == 1
+        for: 1m
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: page
+        annotations:
+          summary: CI reconciliation stopped after a terminal failure
+          runbook: docs/how-to/operate-production-observability.md
+
+  - name: ci-coordinator.availability
+    interval: 30s
+    rules:
+      - alert: CIWebhookDeliveryUnavailable
+        expr: |
+          sum(increase(ci_coordinator_http_requests_total{job="ci-coordinator",method="POST",route="/webhooks/github",status_class="5xx"}[5m])) > 0
+        keep_firing_for: 5m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: A GitHub webhook delivery needs recovery investigation
+          runbook: docs/how-to/recover-webhook-deliveries.md
+      - alert: CIPlanAvailabilityFastBurn
+        expr: |
+          (
+            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable"}[5m]))
+            /
+            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[5m]))
+            > 0.0144
+          )
+          and
+          (
+            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable"}[1h]))
+            /
+            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[1h]))
+            > 0.0144
+          )
+          and
+          sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[5m])) >= 20
+        for: 2m
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: page
+        annotations:
+          summary: CI plan availability is consuming its error budget rapidly
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIPlanAvailabilitySlowBurn
+        expr: |
+          (
+            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable"}[30m]))
+            /
+            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[30m]))
+            > 0.006
+          )
+          and
+          (
+            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable"}[6h]))
+            /
+            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[6h]))
+            > 0.006
+          )
+          and
+          sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[30m])) >= 100
+        for: 15m
+        keep_firing_for: 30m
+        labels:
+          service: ci-coordinator
+          severity: ticket
+        annotations:
+          summary: CI plan availability is consuming its error budget steadily
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CICoordinatorNotReady
+        expr: ci_coordinator_ready == 0
+        for: 5m
+        keep_firing_for: 5m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: A CI Coordinator replica is not ready
+          runbook: docs/how-to/operate-production-observability.md
+
+  - name: ci-coordinator.telemetry
+    interval: 30s
+    rules:
+      - alert: CICoordinatorTargetsAbsent
+        expr: absent(up{job="ci-coordinator"})
+        for: 5m
+        keep_firing_for: 5m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: No CI Coordinator scrape target is present
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CICoordinatorScrapeFailed
+        expr: up{job="ci-coordinator"} == 0
+        for: 5m
+        keep_firing_for: 5m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: A CI Coordinator target cannot be scraped
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CICoordinatorReadinessTelemetryAbsent
+        expr: |
+          (up{job="ci-coordinator"} == 1)
+          unless on(job, instance) ci_coordinator_ready
+        for: 5m
+        keep_firing_for: 5m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: A scraped CI Coordinator target has no readiness telemetry
+          runbook: docs/how-to/operate-production-observability.md
+
+  - name: ci-coordinator.latency
+    interval: 30s
+    rules:
+      - alert: CIPlanLatencyFastBurn
+        expr: |
+          (
+            1 -
+            sum(rate(ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}[5m]))
+            /
+            sum(rate(ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}[5m]))
+            > 0.144
+          )
+          and
+          (
+            1 -
+            sum(rate(ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}[1h]))
+            /
+            sum(rate(ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}[1h]))
+            > 0.144
+          )
+          and
+          sum(increase(ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}[5m])) >= 20
+        for: 2m
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: page
+        annotations:
+          summary: CI plan latency is consuming its error budget rapidly
+          runbook: docs/how-to/operate-production-observability.md
+
+  - name: ci-coordinator.history
+    interval: 30s
+    rules:
+      - alert: CIHistoryWorkerStopped
+        expr: |
+          (ci_coordinator_ci_history_worker_running{job="ci-coordinator",lane=~"backfill|discovery|recent|repair"} == 0)
+          and on(job, instance) (up{job="ci-coordinator"} == 1)
+        for: 2m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: An archive worker is not running
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIHistoryCollectionFailuresObserved
+        expr: |
+          sum by (lane) (increase(ci_coordinator_ci_history_items_total{job="ci-coordinator",outcome=~"store_unavailable|unexpected_error"}[15m])) >= 3
+        for: 5m
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: History item processing repeatedly reported failures
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIHistoryDetailCleanupFailuresObserved
+        expr: |
+          sum(increase(ci_coordinator_maintenance_operations_total{job="ci-coordinator",operation="ci_history_detail_cleanup",result=~"failed|timed_out"}[15m])) >= 3
+        for: 5m
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: Historical detail expiry repeatedly failed to complete
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIHistoryProviderFailuresObserved
+        expr: |
+          sum by (lane) (increase(ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",outcome=~"access_unavailable|timed_out|provider_unavailable|provider_binding_mismatch|provider_malformed|provider_incomplete|provider_unstable"}[15m])) >= 3
+        for: 5m
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: History reads repeatedly reported access or provider problems
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIHistoryDeliveryFailuresObserved
+        expr: |
+          sum(increase(ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome=~"store_unavailable|unexpected_error|timed_out"}[15m])) >= 3
+        for: 5m
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: History inbox processing repeatedly reported failures
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIHistoryOldPendingSamplesObserved
+        expr: |
+          sum(
+            increase(ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}[15m])
+            - ignoring(le)
+            increase(ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="3600.0"}[15m])
+          ) >= 3
+        for: 5m
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: History inbox samples repeatedly included sources older than one hour
+          runbook: docs/how-to/operate-production-observability.md
+      - alert: CIHistoryExpiredPendingSamplesObserved
+        expr: |
+          sum(
+            increase(ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator"}[15m])
+            - ignoring(le)
+            increase(ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",le="0.0"}[15m])
+          ) > 0
+        keep_firing_for: 15m
+        labels:
+          service: ci-coordinator
+          severity: warning
+        annotations:
+          summary: A history inbox sample contained expired pending sources
+          runbook: docs/how-to/operate-production-observability.md

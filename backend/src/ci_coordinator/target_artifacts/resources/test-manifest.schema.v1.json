@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ci-coordinator.example/ci-coordinator/test-manifest.schema.v1.json",
+  "title": "CI Coordinator target test manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generator", "tests"],
+  "properties": {
+    "schemaVersion": {"const": "dynamic-ci-test-manifest/v1"},
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$"
+        }
+      }
+    },
+    "tests": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["testId", "witnessId", "expectedSeconds"],
+        "properties": {
+          "testId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "pattern": "^[ -~]+$"
+          },
+          "witnessId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "expectedSeconds": {
+            "type": "number",
+            "minimum": 0.000001,
+            "maximum": 604800
+          }
+        }
+      }
+    }
+  }
+}

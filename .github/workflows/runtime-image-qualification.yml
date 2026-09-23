@@ -1,0 +1,401 @@
+name: Runtime Image Qualification
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [master]
+    paths:
+      - Dockerfile
+      - docker/runtime/**
+      - .github/workflows/runtime-image-qualification.yml
+      - backend/pyproject.toml
+      - backend/uv.lock
+  pull_request:
+    paths:
+      - Dockerfile
+      - docker/runtime/**
+      - .github/workflows/runtime-image-qualification.yml
+      - backend/pyproject.toml
+      - backend/uv.lock
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-image-qualification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Qualify exact runtime candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      IMAGE: ci-coordinator:runtime-candidate
+      POSTGRES: postgres:18.6-trixie@sha256:86c951e05bf56c93d95d397747fb8820ac76cc3bedb78f43abd83eedbe3666ae
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up pinned builder
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        with:
+          cache-binary: false
+          driver-opts: image=moby/buildkit:v0.33.0@sha256:6c2fa84a6b61ccd72899dde4239f8d5717f05f9a8ca6f3cad185fb1a95a94de3
+          version: v0.37.1
+      - name: Set up locked Python tooling
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Check image and qualification contracts
+        run: |
+          uv sync --project backend --frozen
+          backend/.venv/bin/python -m pytest -q \
+            scripts/tests/test_container_runtime_smoke.py \
+            scripts/tests/test_repository_tooling.py \
+            scripts/tests/test_ci_matrix.py \
+            scripts/tests/test_ci_business_migration.py \
+            scripts/tests/test_release_repair_admission.py \
+            scripts/tests/test_release_vulnerability_admission.py \
+            scripts/tests/test_release_artifact_workflow.py \
+            scripts/tests/test_release_artifact_shell_execution.py \
+            scripts/tests/test_scheduled_advisories.py \
+            scripts/tests/test_dev_environment_toolchain.py \
+            backend/tests/unit/runtime/test_supply_chain_configuration.py \
+            backend/tests/unit/runtime_settings/test_python_runtime.py
+      - name: Build the non-production candidate
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          pull: true
+          load: true
+          push: false
+          provenance: false
+          tags: ${{ env.IMAGE }}
+          build-args: CI_COORDINATOR_SOURCE_COMMIT=${{ github.sha }}
+          cache-from: type=gha,version=2,scope=runtime-qualification-amd64-${{ github.ref }}
+          cache-to: type=gha,version=2,scope=runtime-qualification-amd64-${{ github.ref }},mode=max,timeout=90s,ignore-error=true
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: "false"
+      - name: Capture image and repair witnesses
+        id: capture
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/qualification"
+          docker image inspect "${IMAGE}" --format '{{json .}}' \
+            | jq '{Id,Size,Architecture,Os,RootFS}' \
+            > "${RUNNER_TEMP}/qualification/image.json"
+          printf 'built=true\n' >> "${GITHUB_OUTPUT}"
+          docker buildx build --platform linux/amd64 --target repair-witnesses \
+            --output "type=local,dest=${RUNNER_TEMP}/qualification/repair-witnesses" .
+          chmod 755 "${RUNNER_TEMP}/qualification/repair-witnesses" \
+            "${RUNNER_TEMP}/qualification/repair-witnesses/check_zlib"
+          python3 -I -B - <<'PY'
+          import json
+          import os
+          import subprocess
+          import time
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "qualification"
+          start = time.perf_counter_ns()
+          subprocess.run([
+              "docker", "buildx", "build", "--platform", "linux/amd64", "--load",
+              "--provenance=false", "--tag", "ci-coordinator:runtime-warm",
+              "--build-arg", "CI_COORDINATOR_SOURCE_COMMIT=" + os.environ["SOURCE_COMMIT"], "."
+          ], check=True, timeout=180)
+          elapsed = time.perf_counter_ns() - start
+          warm_id = subprocess.check_output([
+              "docker", "image", "inspect", "ci-coordinator:runtime-warm", "--format", "{{.Id}}"
+          ], text=True).strip()
+          assert warm_id == json.loads((root / "image.json").read_text())["Id"]
+          (root / "build-timing.json").write_text(json.dumps({
+              "imageId": warm_id, "warmBuildElapsedNs": elapsed,
+              "nonClaim": "Same-run warm build including Docker export; not cross-run or service performance"
+          }))
+          PY
+      - name: Verify repaired components in the final image
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/qualification"
+          image_id="$(jq -r .Id "${root}/image.json")"
+          PYTHONPATH=backend/src backend/.venv/bin/python -m scripts.release_repair_evidence \
+            --subject "${image_id}" --source-commit "${SOURCE_COMMIT}" \
+            --policy docker/runtime/security/repaired-matches.v1.json \
+            --output "${root}/repair-evidence.json"
+          cleanup() {
+            docker rm --force runtime-zlib-witness runtime-python-witness runtime-stdlib-witness > /dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          timeout 20 docker run --rm --name runtime-zlib-witness --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --memory 128m --pids-limit 32 --cpus 1 \
+            --mount "type=bind,source=${root}/repair-witnesses,target=/proof,readonly" \
+            --entrypoint /proof/check_zlib "${image_id}" \
+            /usr/lib/x86_64-linux-gnu/libz.so.1.3.2 > "${root}/zlib-final.json"
+          timeout 20 docker run --rm -i --name runtime-python-witness --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --memory 128m --pids-limit 32 --cpus 1 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            --entrypoint python "${image_id}" -I -B - \
+            < docker/runtime/security/check_tarfile.py > "${root}/python-final.json"
+          timeout 40 docker run --rm -i --name runtime-stdlib-witness --network none --read-only \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --memory 128m --pids-limit 32 --cpus 1 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            --entrypoint python "${image_id}" -I -B - after \
+            < docker/runtime/security/check_stdlib.py > "${root}/stdlib-final.json"
+          docker save "${image_id}" | gzip -n > "${root}/image.tar.gz"
+          compressed="$(stat --format=%s "${root}/image.tar.gz")"
+          jq --argjson compressed "${compressed}" \
+            '{imageId:.Id,uncompressedImageBytes:.Size,gzipDockerArchiveBytes:$compressed,
+              nonClaim:"Compressed Docker archive; not measured registry transfer size or runtime performance"}' \
+            "${root}/image.json" > "${root}/size.json"
+          rm "${root}/image.tar.gz"
+      - name: Qualify read-only runtime and PostgreSQL TLS
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/qualification"
+          tls="${root}/tls"
+          mkdir -p "${tls}"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj /CN=database -addext subjectAltName=DNS:database \
+            -keyout "${tls}/server.key" -out "${tls}/server.crt" 2>/dev/null
+          chmod 644 "${tls}/server.crt"
+          docker run --rm --user 0 --entrypoint /bin/sh \
+            -v "${tls}:/tls" "${POSTGRES}" \
+            -c 'chown postgres:postgres /tls/server.key; chmod 600 /tls/server.key'
+          cleanup() {
+            docker rm --force runtime-candidate runtime-database > /dev/null 2>&1 || true
+            docker network rm runtime-qualification > /dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker network create --internal runtime-qualification
+          docker run -d --name runtime-database --network runtime-qualification \
+            --network-alias database -e POSTGRES_PASSWORD=qualification \
+            -e POSTGRES_DB=qualification -v "${tls}:/tls:ro" "${POSTGRES}" \
+            -c ssl=on -c ssl_cert_file=/tls/server.crt -c ssl_key_file=/tls/server.key
+          ready=false
+          for _attempt in $(seq 1 30); do
+            if docker exec runtime-database pg_isready -U postgres -d qualification; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          test "${ready}" = true
+          dsn='postgresql://postgres:qualification@database/qualification?sslmode=verify-full&sslrootcert=/tls/server.crt'
+          docker run -d --name runtime-candidate --network runtime-qualification \
+            --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --memory 512m --cpus 2 --pids-limit 128 \
+            --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            -v "${tls}/server.crt:/tls/server.crt:ro" \
+            -e CI_COORDINATOR_RUNTIME_MODE=disabled \
+            -e CI_COORDINATOR_BIND_HOST=0.0.0.0 -e CI_COORDINATOR_BIND_PORT=3080 \
+            -e CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS=10 \
+            -e "QUALIFICATION_DATABASE_DSN=${dsn}" \
+            "${IMAGE}"
+          healthy=false
+          for _attempt in $(seq 1 60); do
+            if test "$(docker inspect runtime-candidate --format '{{.State.Running}}')" != true; then
+              break
+            fi
+            if docker exec runtime-candidate python -m ci_coordinator.runtime.healthcheck; then
+              healthy=true
+              break
+            fi
+            sleep 1
+          done
+          if test "${healthy}" != true; then
+            docker logs runtime-candidate
+            exit 1
+          fi
+          timeout 60 docker exec -i runtime-candidate python -I -B - \
+            < docker/runtime/verify.py > "${root}/runtime.json"
+          timeout 120 docker exec \
+            -e "CI_COORDINATOR_MIGRATION_DATABASE_DSN=${dsn/postgresql:/postgresql+psycopg:}" \
+            runtime-candidate alembic upgrade head
+          timeout 20 docker exec \
+            -e "CI_COORDINATOR_MIGRATION_DATABASE_DSN=${dsn/postgresql:/postgresql+psycopg:}" \
+            runtime-candidate alembic current > "${root}/migration.txt"
+          grep -Fx '20260915_0015 (head)' "${root}/migration.txt"
+          container_id="$(docker inspect runtime-candidate --format '{{.Id}}')"
+          timeout 5 docker kill --signal TERM "${container_id}"
+          timeout 15 docker wait "${container_id}"
+          docker inspect runtime-candidate --format '{{json .State}}' \
+            | jq '{ExitCode,OOMKilled,Error,StartedAt,FinishedAt}' > "${root}/shutdown.json"
+          docker logs runtime-candidate > "${root}/shutdown.log" 2>&1
+          grep -F 'Application shutdown complete.' "${root}/shutdown.log"
+          jq -e '(.ExitCode == 0 or .ExitCode == 143) and .OOMKilled == false and .Error == ""' \
+            "${root}/shutdown.json" > /dev/null
+      - name: Compare bounded runtime workloads with the predecessor
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          baseline=050b7ef3947ad69b5d1e7762308a75a57503ee4e
+          gh api -H 'Accept: application/vnd.github.raw+json' \
+            "repos/${GITHUB_REPOSITORY}/contents/Dockerfile?ref=${baseline}" \
+            > "${RUNNER_TEMP}/baseline.Dockerfile"
+          docker buildx build --platform linux/amd64 --load --provenance=false \
+            --tag ci-coordinator:runtime-baseline --file "${RUNNER_TEMP}/baseline.Dockerfile" \
+            --build-arg "CI_COORDINATOR_SOURCE_COMMIT=${SOURCE_COMMIT}" .
+          python3 -I -B - <<'PY'
+          import json
+          import os
+          import statistics
+          import subprocess
+          from pathlib import Path
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "qualification"
+          script = Path("docker/runtime/benchmark.py").read_bytes()
+          images = [os.environ["IMAGE"], "ci-coordinator:runtime-baseline"]
+          subjects = {image: subprocess.check_output([
+              "docker", "image", "inspect", image, "--format", "{{.Id}}"
+          ], text=True, timeout=20).strip() for image in images}
+          results = {image: [] for image in images}
+          allocators = {
+              os.environ["IMAGE"]: "/usr/lib/x86_64-linux-gnu/libc.so.6",
+              "ci-coordinator:runtime-baseline": "/lib/x86_64-linux-gnu/libc.so.6",
+          }
+          try:
+              for sample in range(5):
+                  for image in images[::1 if sample % 2 == 0 else -1]:
+                      output = subprocess.check_output([
+                          "docker", "run", "--rm", "-i", "--name", "runtime-benchmark",
+                          "--network", "none", "--read-only", "--cap-drop", "ALL",
+                          "--security-opt", "no-new-privileges", "--memory", "256m",
+                          "--pids-limit", "32", "--cpus", "1", "--user", "10001:10001",
+                          "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+                          "--env", "EXPECTED_MALLOC_PROVIDER=" + allocators[image],
+                          "--entrypoint", "/app/backend/.venv/bin/python", subjects[image], "-I", "-B", "-"
+                      ], input=script, timeout=30)
+                      results[image].append(json.loads(output))
+          finally:
+              subprocess.run(["docker", "rm", "--force", "runtime-benchmark"],
+                             check=False, capture_output=True, timeout=20)
+          assert len({row["payloadSha256"] for rows in results.values() for row in rows}) == 1
+          summary = {image: {
+              "imageId": subjects[image], "samples": rows,
+              "medianImportNs": statistics.median(row["importNs"] for row in rows),
+              "medianMaxRssKiB": statistics.median(row["maxRssKiB"] for row in rows),
+              "medianElapsedNs": {key: statistics.median(row["elapsedNs"][key] for row in rows)
+                                  for key in rows[0]["elapsedNs"]},
+              "medianCpuNs": {key: statistics.median(row["cpuNs"][key] for row in rows)
+                              for key in rows[0]["cpuNs"]}
+          } for image, rows in results.items()}
+          (root / "performance.json").write_text(json.dumps({
+              "baselineSource": "050b7ef3947ad69b5d1e7762308a75a57503ee4e", "results": summary,
+              "nonClaim": "Five alternating isolated workload samples; not global runtime equivalence or connected capacity"
+          }))
+          PY
+      - name: Verify application-only layer reuse
+        if: ${{ !cancelled() && steps.capture.outputs.built == 'true' }}
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: python3 -I -B docker/runtime/check_layer_reuse.py
+      - name: Measure final filesystem vulnerability evidence
+        if: ${{ !cancelled() && steps.capture.outputs.built == 'true' }}
+        run: |
+          set -euo pipefail
+          root="${RUNNER_TEMP}/qualification"
+          test -s "${root}/image.json"
+          curl --fail --location --proto '=https' --tlsv1.2 --max-time 120 \
+            https://github.com/anchore/grype/releases/download/v0.119.0/grype_0.119.0_linux_amd64.tar.gz \
+            --output "${root}/grype.tar.gz"
+          printf '%s  %s\n' 3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b \
+            "${root}/grype.tar.gz" | sha256sum --check --strict
+          tar -xf "${root}/grype.tar.gz" -C "${root}" grype
+          jq -n --arg cache "${root}/db" '{
+            db: {"cache-dir":$cache,"auto-update":false,"validate-age":true,
+                 "validate-by-hash-on-start":true,"require-update-check":true,
+                 "max-allowed-built-age":"24h","update-url":"https://grype.anchore.io/databases/v6/latest.json"},
+            "check-for-app-update":false,"only-fixed":false,"only-notfixed":false,
+            "ignore-wontfix":"","match-upstream-kernel-headers":true,
+            ignore:[],exclude:[],"vex-documents":[],"vex-add":[],distro:""
+          }' > "${root}/config.json"
+          scan() {
+            env -i HOME="${HOME}" PATH="${PATH}" TMPDIR="${RUNNER_TEMP}" \
+              "${root}/grype" -c "${root}/config.json" "$@"
+          }
+          scan db update
+          scan db status --output json > "${root}/db-before.json"
+          image_id="$(jq -r .Id "${root}/image.json")"
+          set +e
+          scan "${image_id}" --from docker --scope squashed --output json \
+            --fail-on high > "${root}/scan.json"
+          code=$?
+          set -e
+          test "${code}" -eq 0 || test "${code}" -eq 2
+          test "$(wc -c < "${root}/scan.json")" -le 16777216
+          jq -e --arg id "${image_id}" --slurpfile db "${root}/db-before.json" \
+            '.source.target.imageID == $id and .descriptor.db.status == $db[0]
+             and $db[0].valid == true and (.matches|type=="array")
+             and .distro.name == "ubuntu" and .distro.version == "26.04"
+             and .descriptor.name == "grype" and .descriptor.version == "0.119.0"
+             and (.ignoredMatches|length==0)' "${root}/scan.json" > /dev/null
+          jq --argjson exitCode "${code}" '{
+            scannerExitCode:$exitCode, imageId:.source.target.imageID,
+            distro:.distro, database:.descriptor.db.status,
+            scanner:.descriptor.name, scannerVersion:.descriptor.version,
+            matches:[.matches[]|{id:.vulnerability.id,severity:.vulnerability.severity,
+                     package:.artifact.name,version:.artifact.version,type:.artifact.type,
+                     artifactId:.artifact.id,purl:.artifact.purl,locations:.artifact.locations,
+                     fix:.vulnerability.fix}],
+            nonClaim:"Candidate filesystem scan; not registry release admission"
+          }' "${root}/scan.json" > "${root}/vulnerabilities.json"
+          scan db status --output json > "${root}/db-after.json"
+          cmp "${root}/db-before.json" "${root}/db-after.json"
+          QUALIFICATION_ROOT="${root}" backend/.venv/bin/python - <<'PY'
+          import json
+          import os
+          from datetime import UTC, datetime
+          from pathlib import Path
+          from scripts.release_repair_admission import RepairEvidence, read_policy, validate_observations, occurrence_is_repaired
+          root = Path(os.environ["QUALIFICATION_ROOT"])
+          digest, policy = read_policy(Path("docker/runtime/security/repaired-matches.v1.json"), Path.cwd())
+          proof = RepairEvidence.model_validate_json((root / "repair-evidence.json").read_bytes())
+          validate_observations(policy=policy, policy_sha256=digest, evidence=proof, observed=datetime.now(UTC))
+          report = json.loads((root / "vulnerabilities.json").read_bytes())
+          assert proof.sourceKind == "local" and proof.imageId == report["imageId"]
+          for match in report["matches"]:
+              assert match["severity"] in {"Negligible", "Low", "Medium", "High", "Critical"}
+              if match["severity"] in {"High", "Critical"}:
+                  assert occurrence_is_repaired(
+                      policy, proof, cve=match["id"], severity=match["severity"],
+                      package=match["package"], version=match["version"], package_type=match["type"],
+                      purl=match["purl"], locations=tuple((loc["path"], loc["annotations"].get("evidence", ""), loc["layerID"]) for loc in match["locations"]),
+                  ), match["id"]
+          PY
+      - name: Preserve bounded qualification results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-image-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/qualification/image.json
+            ${{ runner.temp }}/qualification/runtime.json
+            ${{ runner.temp }}/qualification/repair-evidence.json
+            ${{ runner.temp }}/qualification/migration.txt
+            ${{ runner.temp }}/qualification/shutdown.json
+            ${{ runner.temp }}/qualification/vulnerabilities.json
+            ${{ runner.temp }}/qualification/size.json
+            ${{ runner.temp }}/qualification/build-timing.json
+            ${{ runner.temp }}/qualification/layer-reuse.json
+            ${{ runner.temp }}/qualification/performance.json
+            ${{ runner.temp }}/qualification/python-final.json
+            ${{ runner.temp }}/qualification/stdlib-final.json
+            ${{ runner.temp }}/qualification/zlib-final.json
+            ${{ runner.temp }}/qualification/repair-witnesses/*-before.json
+            ${{ runner.temp }}/qualification/repair-witnesses/*-after.json
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ci-coordinator.example/ci-coordinator/target-execution-registry.schema.v1.json",
+  "title": "CI Coordinator target execution registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generator", "adapterFiles", "workflows", "profiles"],
+  "properties": {
+    "schemaVersion": {"const": "dynamic-ci-target-execution-registry/v1"},
+    "generator": {"$ref": "#/$defs/generator"},
+    "adapterFiles": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 33,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/adapterFile"}
+    },
+    "workflows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {"$ref": "#/$defs/workflow"}
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/profile"}
+    }
+  },
+  "$defs": {
+    "adapterFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^\\.github/workflows/[^/]+\\.ya?ml$",
+              "maxLength": 256
+            },
+            {
+              "const": ".ci-coordinator/ci-coordinator.cjs"
+            }
+          ]
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z][0-9A-Za-z._-]{0,63}$"
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "workflowPath",
+        "jobId",
+        "executionKind",
+        "runnerProfileId",
+        "permissionProfileId",
+        "credentialProfileId",
+        "fixtureProfileId",
+        "serviceProfileIds",
+        "capacityClassId"
+      ],
+      "properties": {
+        "profileId": {"$ref": "#/$defs/identifier"},
+        "workflowPath": {
+          "type": "string",
+          "pattern": "^\\.github/workflows/[^/]+\\.ya?ml$",
+          "maxLength": 256
+        },
+        "jobId": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+        },
+        "executionKind": {"enum": ["witness-shards", "native-job-set"]},
+        "runnerProfileId": {"$ref": "#/$defs/identifier"},
+        "permissionProfileId": {"$ref": "#/$defs/identifier"},
+        "credentialProfileId": {"$ref": "#/$defs/identifier"},
+        "fixtureProfileId": {"$ref": "#/$defs/identifier"},
+        "serviceProfileIds": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/identifier"}
+        },
+        "capacityClassId": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflowPath",
+        "executionKind",
+        "executionJobs",
+        "planRequestJobId",
+        "planRequestWorkflowRef",
+        "planJobId",
+        "fallbackJobId",
+        "gateJobId",
+        "gateSignalName",
+        "requiredJobIds"
+      ],
+      "properties": {
+        "workflowPath": {
+          "type": "string",
+          "pattern": "^\\.github/workflows/[^/]+\\.ya?ml$",
+          "maxLength": 256
+        },
+        "executionKind": {"enum": ["witness-shards", "native-job-set"]},
+        "executionJobs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/executionJob"
+          }
+        },
+        "planRequestJobId": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+        },
+        "planRequestWorkflowRef": {
+          "type": "string",
+          "anyOf": [
+            {"const": "$/.github/workflows/trusted-plan-request.yml"},
+            {"pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9_.-]{1,100}/\\.github/workflows/[^/]+\\.ya?ml@[0-9a-f]{40}$"}
+          ],
+          "maxLength": 512
+        },
+        "planJobId": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+        },
+        "fallbackJobId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+            },
+            {"type": "null"}
+          ]
+        },
+        "gateJobId": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+        },
+        "gateSignalName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "requiredJobIds": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"executionKind": {"const": "witness-shards"}},
+            "required": ["executionKind"]
+          },
+          "then": {"properties": {"fallbackJobId": {"type": "string"}}}
+        },
+        {
+          "if": {
+            "properties": {"executionKind": {"const": "native-job-set"}},
+            "required": ["executionKind"]
+          },
+          "then": {"properties": {"fallbackJobId": {"type": "null"}}}
+        }
+      ]
+    },
+    "executionJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jobId",
+        "needs"
+      ],
+      "properties": {
+        "jobId": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+        },
+        "needs": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,127}$"
+          }
+        }
+      }
+    }
+  }
+}

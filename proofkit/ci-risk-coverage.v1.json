@@ -1,0 +1,3012 @@
+{
+  "schemaVersion": "ci-coordinator.ci-risk-coverage/v1",
+  "blueprintSha256": "a5c4d775207a6de30ab392bbd7ed9c70c427f596a5d5c849889dd6e83d05556f",
+  "candidateRows": [
+    {
+      "candidateId": "PY01",
+      "family": "tool-class",
+      "title": "Python lint security patterns and formatting",
+      "blueprintLine": 316,
+      "risk": "Required static checks are omitted or their effective source scope drifts",
+      "applicability": "partial",
+      "rationale": "The existing requirement-command admission rejects a missing exact tuple. Ruff is a configured native baseline; this assertion proves binding retention, not completeness of Ruff rules or their actual input set.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-003",
+          "witnessPath": "scripts/tests/test_proofkit_requirements.py",
+          "assertion": "test_required_binding_tuple_validator_rejects_missing_exact_tuple",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "cf0ab5b7f443f75b7bb57a33e7393f9887ce6dfa0fd9a931407d41383897b18e"
+        }
+      ]
+    },
+    {
+      "candidateId": "PY02",
+      "family": "tool-class",
+      "title": "Strict Python types and model construction",
+      "blueprintLine": 317,
+      "risk": "Type configuration or runtime scalar admission diverges from its owner",
+      "applicability": "partial",
+      "rationale": "Mypy configuration is present and its Python target is checked against the toolchain; runtime request-model tests reject noncanonical names and wrong scalar types. Neither is proof of arbitrary dynamic effects.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-029",
+          "witnessPath": "backend/tests/unit/api/http/test_model_contracts.py",
+          "assertion": "test_request_admits_only_canonical_wire_names_and_exact_scalar_types",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "c151fcfd88fd193233621ea881f44bf1491fe2132f42ab8e1cc78ed51ad5daaa"
+        },
+        {
+          "requirementId": "REQ-CI-DEV-001",
+          "witnessPath": "scripts/tests/test_dev_environment_toolchain.py",
+          "assertion": "test_runtime_minor_targets_are_projections_not_patch_equality",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "0ba8356530cad9006eae66378189d305867c50cafbf5263589defee0817bb572"
+        }
+      ]
+    },
+    {
+      "candidateId": "PY03",
+      "family": "tool-class",
+      "title": "Dependency lock and installed environment identity",
+      "blueprintLine": 318,
+      "risk": "Installation uses undeclared dependencies or loses hash admission",
+      "applicability": "covered",
+      "rationale": "The native install witness assertion requires hash-checked strict synchronization and an offline no-dependency editable project install.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-006",
+          "witnessPath": "scripts/tests/test_repository_tooling.py",
+          "assertion": "test_install_check_compiles_only_locked_dependency_bytecode",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "74550f9531cdc77d3e25a9ed64e229a1892bdc1aba73b7ecbe095f1c60c128eb"
+        }
+      ]
+    },
+    {
+      "candidateId": "PY04",
+      "family": "tool-class",
+      "title": "Python package and resource inventory",
+      "blueprintLine": 319,
+      "risk": "Built distribution omits or changes requirement-owned resources",
+      "applicability": "partial",
+      "rationale": "Package inspection rejects missing or incorrect owned-resource cardinality. Runtime import, package surface and final-container startup remain separate native witnesses.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-038",
+          "witnessPath": "scripts/tests/test_python_package_witness.py",
+          "assertion": "test_package_inspection_rejects_missing_or_inexact_owned_resource_count",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "f39d108fbf51b8450570fb07af8ea482897f55d2aa581f4d6b205006f5c98562"
+        }
+      ]
+    },
+    {
+      "candidateId": "PY05",
+      "family": "tool-class",
+      "title": "Native domain and state-machine laws",
+      "blueprintLine": 320,
+      "risk": "A legal-looking plan omits a required witness or weaker depth is accepted",
+      "applicability": "partial",
+      "rationale": "The existing planner asserts shared witnesses take the maximum required depth. This is one concrete domain law; the full domain assertion denominator is not derived from one test.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-009",
+          "witnessPath": "backend/tests/unit/planning_core/test_planner.py",
+          "assertion": "test_shared_witness_depth_is_maximum_of_requiring_obligation_depths",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "c677dc8fa9563c7308659d38238b4a3f531f1d04ab91a02c7dba0e28766b23ea"
+        }
+      ]
+    },
+    {
+      "candidateId": "PY06",
+      "family": "tool-class",
+      "title": "Coverage scope and risk-owned floors",
+      "blueprintLine": 321,
+      "risk": "Coverage execution silently narrows the declared backend population",
+      "applicability": "covered",
+      "rationale": "The coverage-wrapper assertion preserves complete pytest selection and branch measurement under the declared process bound. Coverage remains an observation, not adequacy proof.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-006",
+          "witnessPath": "scripts/tests/test_repository_tooling.py",
+          "assertion": "test_coverage_witness_preserves_complete_selection_and_process_bound",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "74550f9531cdc77d3e25a9ed64e229a1892bdc1aba73b7ecbe095f1c60c128eb"
+        }
+      ]
+    },
+    {
+      "candidateId": "PY07",
+      "family": "tool-class",
+      "title": "Python import authority and architectural boundaries",
+      "blueprintLine": 322,
+      "risk": "Application code imports forbidden transport or runtime authority",
+      "applicability": "partial",
+      "rationale": "Existing negative import probes reject infrastructure and maintained HTTP-client authority at the application boundary. Architecture semantic decomposition still needs its repository-owned proof.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-002",
+          "witnessPath": "scripts/tests/test_python_import_boundary_policy.py",
+          "assertion": "test_app_negative_probes_reject_infrastructure",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "785f8df0893b1f54d253bc1750c8418fd622dba0e7b4f29b35e8b2f8031679b4"
+        },
+        {
+          "requirementId": "REQ-CI-CORE-002",
+          "witnessPath": "scripts/tests/test_dependency_hygiene.py",
+          "assertion": "test_standard_http_contract_matches_incumbent_direct_import_policy",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "1f05a96e835c6e157815b76e52a282c02c9d70c10cade6b23a8ae883f150360c"
+        }
+      ]
+    },
+    {
+      "candidateId": "PY08",
+      "family": "tool-class",
+      "title": "Generated domain and state-space laws",
+      "blueprintLine": 323,
+      "risk": "Selected examples fail to expose a domain counterexample",
+      "applicability": "partial",
+      "rationale": "An existing Hypothesis-backed API generator and independently falsified response oracle cover three named operations. This is not general property coverage of planning, canonicalization, leases or all inputs.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Revisit on a named independent law or state-machine counterexample outside the admitted generated API corpus.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-003",
+          "witnessPath": "backend/tests/unit/api_contract/test_request_oracles.py",
+          "assertion": "test_read_oracle_rejects_consistent_but_wrong_port_and_response",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8be9d656927afc6aa47b4ef03a275895a31ce3a5623dde52cbd22444c3dedddc"
+        }
+      ]
+    },
+    {
+      "candidateId": "API01",
+      "family": "tool-class",
+      "title": "Generated OpenAPI and browser type parity",
+      "blueprintLine": 324,
+      "risk": "Producer and generated client contract drift",
+      "applicability": "covered",
+      "rationale": "The native assertion changes generated bytes and requires stale-contract rejection; coverage is the declared operator API projection, not all backend routes.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Requalify on route, DTO, generator, runtime or projection-scope changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-004",
+          "witnessPath": "scripts/tests/test_frontend_contract.py",
+          "assertion": "test_contract_write_is_reproducible_and_check_detects_drift",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8dda52f1336480d3bcf9000e481b2601846b1f37a83a2f71d9de872b37a2c8e0"
+        }
+      ]
+    },
+    {
+      "candidateId": "API02",
+      "family": "tool-class",
+      "title": "HTTP input and authorization boundaries",
+      "blueprintLine": 325,
+      "risk": "Invalid identity, role or scope reaches an effect-capable port",
+      "applicability": "partial",
+      "rationale": "Native controls assert unauthorized and invalid-scope requests are typed and effect-free. Full route/credential-plane closure remains a separate assertion inventory.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Reopen when any route, credential plane, request policy or port authority changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-021",
+          "witnessPath": "backend/tests/unit/api_contract/test_controls.py",
+          "assertion": "test_real_role_guard_refuses_missing_role",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "541a41d53593aca0f3dc079a9283ac348cfc10dbe32574f55baaec235874c2f8"
+        }
+      ]
+    },
+    {
+      "candidateId": "API03",
+      "family": "tool-class",
+      "title": "Schema-generated API boundary cases",
+      "blueprintLine": 326,
+      "risk": "Generated requests satisfy the schema but violate request-to-port binding",
+      "applicability": "partial",
+      "rationale": "Schemathesis/Hypothesis already exercise exactly three declared operations. The independent oracle rejects consistently corrupted scope, actor, limit or call multiplicity. This does not cover every public endpoint.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Reopen when profile.OPERATIONS, schema, harness ports, generator or independent response oracle changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-003",
+          "witnessPath": "backend/tests/unit/api_contract/test_request_oracles.py",
+          "assertion": "test_read_oracle_rejects_consistent_but_wrong_port_and_response",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8be9d656927afc6aa47b4ef03a275895a31ce3a5623dde52cbd22444c3dedddc"
+        }
+      ]
+    },
+    {
+      "candidateId": "API04",
+      "family": "tool-class",
+      "title": "Consumer-scoped API backward compatibility",
+      "blueprintLine": 327,
+      "risk": "Published request or response semantics change without an admitted version boundary",
+      "applicability": "partial",
+      "rationale": "CORE-010 owns immutable published domains; UI-004 parity and CONTROL-009 exact route/profile guards exist. Those assertions do not compare every released consumer against the candidate API; no whole-API backward-compatibility claim is made. A release baseline and consumer compatibility policy remain to be admitted.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Revisit on public API/schema version changes or admission of a supported consumer baseline.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CONTROL-009",
+          "witnessPath": "scripts/tests/test_config_lifecycle_http_profile.py",
+          "assertion": "test_openapi_projection_rejects_deleted_and_extra_config_routes",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "be069c69aa2c099e0ac5e60494c804db6d0c6f69eb2dc3fe76a877e0befc6a90"
+        },
+        {
+          "requirementId": "REQ-CI-UI-004",
+          "witnessPath": "scripts/tests/test_frontend_contract.py",
+          "assertion": "test_contract_write_is_reproducible_and_check_detects_drift",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8dda52f1336480d3bcf9000e481b2601846b1f37a83a2f71d9de872b37a2c8e0"
+        }
+      ]
+    },
+    {
+      "candidateId": "DB01",
+      "family": "tool-class",
+      "title": "Migration lineage and packaged database schema",
+      "blueprintLine": 328,
+      "risk": "Upgrade or downgrade changes retained capability lineage or destroys retained data",
+      "applicability": "partial",
+      "rationale": "Real-PostgreSQL tests verify expand upgrade/downgrade and replay preserve the exact declaration chain. Full data-preservation and predecessor artifact rollback remain their own required witnesses.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-007",
+          "witnessPath": "backend/tests/integration/persistence/test_migrations.py",
+          "assertion": "test_expand_upgrade_downgrade_and_exact_replay_preserve_the_declared_chain",
+          "commandIds": [
+            "python.persistence-test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "af5d08db481944190d20238194b98edc3d996d800e061c64c094c9f452864fec"
+        }
+      ]
+    },
+    {
+      "candidateId": "DB02",
+      "family": "tool-class",
+      "title": "Real transaction role and lock semantics",
+      "blueprintLine": 329,
+      "risk": "Expired issuance survives a database wait or excess privileges become available",
+      "applicability": "partial",
+      "rationale": "A real PostgreSQL lock/deadline witness rejects expired issuance and asserts no plan or audit insert. This does not exhaust every transaction or privilege combination.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-030",
+          "witnessPath": "backend/tests/integration/persistence/test_selected_issuance_expiry.py",
+          "assertion": "test_selected_issuance_rechecks_plan_expiry_after_database_wait",
+          "commandIds": [
+            "python.persistence-test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "99be49d79e94944ac6ef11753bb88bc804dcc2d95187d6a9b6d9b7d396a7e45f"
+        }
+      ]
+    },
+    {
+      "candidateId": "DB03",
+      "family": "tool-class",
+      "title": "Metadata-to-migration parity",
+      "blueprintLine": 330,
+      "risk": "SQLAlchemy metadata changes without the corresponding migration",
+      "applicability": "deferred",
+      "rationale": "The Alembic environment supplies target_metadata and native compatibility/attestation witnesses already own live schema truth. A distinct autogenerate/check predicate requires proving incremental value and a disposable database profile; no absence of migration checks is claimed.",
+      "ownerPath": "backend/alembic/env.py",
+      "revisitWhen": "Revisit on a metadata/migration divergence not rejected by current attestation or when the schema owner admits an autogenerate parity gate.",
+      "bindings": []
+    },
+    {
+      "candidateId": "DB04",
+      "family": "tool-class",
+      "title": "PostgreSQL SQL syntax and style",
+      "blueprintLine": 331,
+      "risk": "Handwritten SQL is syntactically wrong or violates an admitted style rule",
+      "applicability": "deferred",
+      "rationale": "The bootstrap SQL includes psql-specific commands and live provisioning has a native owner. A separate SQLFluff grammar and style policy are not admitted by this candidate mapping.",
+      "ownerPath": "scripts/dev_environment/bootstrap_database.sql",
+      "revisitWhen": "Revisit when handwritten SQL expands or an independently reproducible dialect/style gap is shown.",
+      "bindings": []
+    },
+    {
+      "candidateId": "DB05",
+      "family": "tool-class",
+      "title": "Query and migration performance budgets",
+      "blueprintLine": 332,
+      "risk": "Valid database operations exceed admitted latency, lock or capacity budgets",
+      "applicability": "partial",
+      "rationale": "RUNTIME-036 has independent complete-metric and budget admission falsifiers. These consume synthetic signed measurements and do not measure EXPLAIN plans, query scale or migration lock duration. A representative disposable PostgreSQL performance corpus remains unqualified.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Revisit on measured hot-query or migration-lock risk, capacity-profile changes or admission of a representative performance fixture.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-036",
+          "witnessPath": "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+          "assertion": "test_capacity_receipt_requires_the_complete_metric_domain",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a6b152f9da06522781d7500d7a703811ee12928c71821b53db47c02739b6021a"
+        },
+        {
+          "requirementId": "REQ-CI-RUNTIME-036",
+          "witnessPath": "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+          "assertion": "test_capacity_receipt_derives_budget_failure_instead_of_trusting_a_status",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a6b152f9da06522781d7500d7a703811ee12928c71821b53db47c02739b6021a"
+        }
+      ]
+    },
+    {
+      "candidateId": "FE01",
+      "family": "tool-class",
+      "title": "Frontend lint types and unit baseline",
+      "blueprintLine": 340,
+      "risk": "Promise ownership is missed by generic compilation or lint",
+      "applicability": "partial",
+      "rationale": "The static Promise corpus verifies the exact typed rule and severity on imported React overloads, thenables and socket promises. Other Biome/type/test predicates retain their native command owners; this is not complete async-lifetime proof.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-006",
+          "witnessPath": "frontend/tools/promise-lint-contract.mjs",
+          "assertion": "imported React boolean overload",
+          "commandIds": [
+            "frontend.quality"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "3fb6549d9bd538268587e6d2a68d061baecd65bcecb98119c44467ade6c308e4"
+        }
+      ]
+    },
+    {
+      "candidateId": "FE02",
+      "family": "tool-class",
+      "title": "Production assets manifest and packaged UI",
+      "blueprintLine": 341,
+      "risk": "Production bundle serves changed or unlisted assets",
+      "applicability": "covered",
+      "rationale": "The existing manifest falsifier rejects changed or extra assets independently of filename shape; browser runtime and container startup are separate witnesses.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-014",
+          "witnessPath": "scripts/tests/test_frontend_bundle.py",
+          "assertion": "test_manifest_rejects_changed_or_extra_assets_regardless_of_filename_shape",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "7da1822328d04bdd511802f37c31568a7226387501ebbd634e1c8add9139eca9"
+        }
+      ]
+    },
+    {
+      "candidateId": "FE03",
+      "family": "tool-class",
+      "title": "UI state oracles and mutation sensitivity",
+      "blueprintLine": 342,
+      "risk": "A late response replaces the current UI generation or a collection failure is misreported as a killed mutant",
+      "applicability": "partial",
+      "rationale": "The current-snapshot test completes the new response before the abandoned response and requires object-identical preserved state for scope, limit, authority and refresh changes. The mutation-report falsifier distinguishes actual assertion failure from collection failure. Full mutation adequacy is not inferred.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-015",
+          "witnessPath": "frontend/tests/workbenchSnapshot.test.tsx",
+          "assertion": "a late response from an abandoned %s generation preserves the current snapshot",
+          "commandIds": [
+            "frontend.quality"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "2fd4ebf5a462c7437341e2ab459bf7c27bd93e1cd6ab7ca401c352d807a3e053"
+        },
+        {
+          "requirementId": "REQ-CI-UI-015",
+          "witnessPath": "scripts/tests/test_vitest_mutation_report.py",
+          "assertion": "test_vitest_report_distinguishes_assertion_failure_from_collection_failure",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b44a9fa7f8796045e008f0cce8fbb308d2e52cd8dca3c32454759d0b83aa2a20"
+        }
+      ]
+    },
+    {
+      "candidateId": "FE04",
+      "family": "tool-class",
+      "title": "Browser accessibility and viewport behavior",
+      "blueprintLine": 343,
+      "risk": "UI controls or evidence views fail accessible navigation or layout",
+      "applicability": "partial",
+      "rationale": "Playwright exercises the assembled UI with intercepted API fixtures and asserts no axe violations. Automated accessibility is not full WCAG or connected-backend proof.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-005",
+          "witnessPath": "frontend/tests/browser/workbench.spec.ts",
+          "assertion": "has no automatically detectable accessibility violations",
+          "commandIds": [
+            "frontend.browser"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "0c83c9041c13860bb8d638d4ff49ff83e5f579b1f4e197eafb6b0472f3c6c624"
+        }
+      ]
+    },
+    {
+      "candidateId": "FE05",
+      "family": "tool-class",
+      "title": "Connected administrator journey",
+      "blueprintLine": 344,
+      "risk": "Browser recovery or mutation behavior diverges across identity, API and persistence boundaries",
+      "applicability": "partial",
+      "rationale": "The required disposable Keycloak/browser/application/PostgreSQL budget-policy witness checks a real authenticated mutation, reload, independently read persisted bytes and audit, exact replay and rejected effects. Other administrator operations and production identity integration remain separate obligations. Source binding is configured, not execution proof.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Revisit when a controlled connected administrator fixture and its environment authority are admitted.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-024",
+          "witnessPath": "frontend/tests/browser/configuration.spec.ts",
+          "assertion": "configuration source, retained epochs and confirmed rollback at ${width}px",
+          "commandIds": [
+            "frontend.browser"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "e5b44154d5cde4a20e34e078e98e8ae81ed5de46ee12c8d1de30f45dc41c546b"
+        },
+        {
+          "requirementId": "REQ-CI-UI-018",
+          "witnessPath": "frontend/tests/connected/administratorBudget.spec.ts",
+          "assertion": "real administrator budget mutation has one persisted audited effect",
+          "commandIds": [
+            "frontend.connected"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b9166ed02d5552d6474bf8a9e3708626ccd37a1bfcc07939b1c957ff7f14baf3"
+        }
+      ]
+    },
+    {
+      "candidateId": "FE06",
+      "family": "tool-class",
+      "title": "Unused frontend files exports and dependencies",
+      "blueprintLine": 345,
+      "risk": "Dynamic entrypoints are incorrectly deleted or unused code hides ownership drift",
+      "applicability": "deferred",
+      "rationale": "A reliable Knip entry graph must include generated contracts, browser, dev and build roots. No standalone unused-code contract is admitted; tool absence is not treated as a production defect.",
+      "ownerPath": "frontend/package.json",
+      "revisitWhen": "Revisit when an owner identifies an unused-code risk and supplies complete entrypoint and dynamic-reference dispositions.",
+      "bindings": []
+    },
+    {
+      "candidateId": "FE07",
+      "family": "tool-class",
+      "title": "Frontend cycles and dependency rules",
+      "blueprintLine": 346,
+      "risk": "A generic cycle signal is promoted to an unauthorized architecture failure",
+      "applicability": "deferred",
+      "rationale": "Repository-owned capability isolation and decomposition policy already decide forbidden co-ownership. A dependency-cruiser profile requires a unique forbidden-edge predicate and independent counterexample.",
+      "ownerPath": "docs/architecture/cross-cutting/module-ownership-and-decomposition.md",
+      "revisitWhen": "Revisit when a frontend dependency rule cannot be enforced by the current owner and a safe rule-specific corpus is available.",
+      "bindings": []
+    },
+    {
+      "candidateId": "FE08",
+      "family": "tool-class",
+      "title": "CSS assets and frontend performance budgets",
+      "blueprintLine": 347,
+      "risk": "Valid assets are changed or missing, or rendering exceeds an unadmitted budget",
+      "applicability": "partial",
+      "rationale": "UI-014 tests bind every served asset to the generated manifest and reject changed or extra assets. CSS static coverage and browser correctness do not establish a bundle-size or user-perceived performance budget; those operands remain owner decisions.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Revisit when UI owners admit bundle/performance limits or expose a CSS rule gap.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-014",
+          "witnessPath": "scripts/tests/test_frontend_bundle.py",
+          "assertion": "test_manifest_rejects_changed_or_extra_assets_regardless_of_filename_shape",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "7da1822328d04bdd511802f37c31568a7226387501ebbd634e1c8add9139eca9"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF01",
+      "family": "tool-class",
+      "title": "Standalone shell dialect analysis",
+      "blueprintLine": 382,
+      "risk": "Extensionless or nested shell inputs escape lint admission",
+      "applicability": "covered",
+      "rationale": "The repository test requires every tracked shell/shebang source to be admitted by the standalone dialect inventory; native ShellCheck is already part of workflow.lint.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-011",
+          "witnessPath": "backend/tests/unit/runtime/test_supply_chain_configuration.py",
+          "assertion": "test_standalone_shell_lint_inventory_has_no_unowned_source",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b68bbc38b30544c8c086127691cd45cc7704968c35f314b055c1cf32c1a2baa3"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF02",
+      "family": "tool-class",
+      "title": "Shell formatting",
+      "blueprintLine": 383,
+      "risk": "An unowned formatting convention generates noise or rewrites intentional shell layout",
+      "applicability": "deferred",
+      "rationale": "Dialect-aware ShellCheck exists; a separate shfmt formatting policy and accepted authored-source corpus are not admitted by this row.",
+      "ownerPath": "scripts/workflow_lint.py",
+      "revisitWhen": "Revisit when the shell owner adopts a precise formatting convention with a check-only migration plan.",
+      "bindings": []
+    },
+    {
+      "candidateId": "CF03",
+      "family": "tool-class",
+      "title": "Workflow syntax expressions and fixture closure",
+      "blueprintLine": 384,
+      "risk": "Distributed or fixture workflows are missing from syntax analysis",
+      "applicability": "covered",
+      "rationale": "Native workflow wrapper tests reject incomplete and nonregular workflow/shell inputs and preserve the locked actionlint/zizmor closure.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-011",
+          "witnessPath": "scripts/tests/test_repository_tooling.py",
+          "assertion": "test_workflow_lint_rejects_incomplete_or_nonregular_inputs",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "74550f9531cdc77d3e25a9ed64e229a1892bdc1aba73b7ecbe095f1c60c128eb"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF04",
+      "family": "tool-class",
+      "title": "Workflow security and immutable control dependencies",
+      "blueprintLine": 385,
+      "risk": "Workflow analysis loses its pinned analyzer or least-privilege control scope",
+      "applicability": "partial",
+      "rationale": "Existing tests require exact linters in the provider quality gate. Offline analyzer success does not establish transitive action download safety or every provider security property.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-011",
+          "witnessPath": "backend/tests/unit/runtime/test_supply_chain_configuration.py",
+          "assertion": "test_workflow_linters_are_exact_and_part_of_the_provider_quality_gate",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b68bbc38b30544c8c086127691cd45cc7704968c35f314b055c1cf32c1a2baa3"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF05",
+      "family": "tool-class",
+      "title": "Strict JSON syntax and ambiguous-value rejection",
+      "blueprintLine": 386,
+      "risk": "Duplicate keys or nonfinite values yield ambiguous configuration",
+      "applicability": "covered",
+      "rationale": "Native JSON admission has negative ambiguous-value cases under the existing quality owner; domain schema predicates remain separate.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-006",
+          "witnessPath": "scripts/tests/test_repository_tooling.py",
+          "assertion": "test_json_admission_rejects_ambiguous_values",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "74550f9531cdc77d3e25a9ed64e229a1892bdc1aba73b7ecbe095f1c60c128eb"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF06",
+      "family": "tool-class",
+      "title": "YAML syntax and duplicate-key admission",
+      "blueprintLine": 387,
+      "risk": "Configuration files are omitted or interpreted under an unintended YAML contract",
+      "applicability": "partial",
+      "rationale": "The utility selects hidden and nested YAML and invokes the strict pinned parser. The selected assertion proves command/input selection; effective parser coverage is a separate correction concern and not inferred from suffix membership.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Revisit when YAML source roots, dialect, anchors, parser rules or effective-input policy change.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-012",
+          "witnessPath": "scripts/tests/test_ci_utility_checks.py",
+          "assertion": "test_yaml_covers_hidden_nested_and_new_configuration",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF07",
+      "family": "tool-class",
+      "title": "Version-bound vendor schema validation",
+      "blueprintLine": 388,
+      "risk": "Untrusted or stale schema references change the admitted input language",
+      "applicability": "partial",
+      "rationale": "Pinned offline bundles and local reference checks are present. The selected negative assertion independently rejects changed provenance and remote references; this covers admitted schema families, not every vendor schema.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Requalify when a vendor schema, dialect, reference closure or configuration family changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-012",
+          "witnessPath": "scripts/tests/test_ci_utility_checks.py",
+          "assertion": "test_devcontainer_core_vendor_rejects_drift_and_nonlocal_ref",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF08",
+      "family": "tool-class",
+      "title": "TOML parse and manifest coherence",
+      "blueprintLine": 389,
+      "risk": "TOML files are parseable but disagree with locked toolchain identity",
+      "applicability": "partial",
+      "rationale": "The toolchain-owner assertion parses authored mise configuration and lock data and enforces exact versions/platform identities. Arbitrary new TOML roots are not thereby proved consumed.",
+      "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-DEV-001",
+          "witnessPath": "scripts/tests/test_developer_environment_configuration.py",
+          "assertion": "test_mise_is_the_locked_cross_language_task_owner",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "fd4c99d92fce11e9bdfeedba8b10a8e689b04822d78b9935347a02da9cfc402f"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF09",
+      "family": "tool-class",
+      "title": "Authored TOML formatting",
+      "blueprintLine": 390,
+      "risk": "Formatter policy is applied to generated lock data without an owner",
+      "applicability": "deferred",
+      "rationale": "Syntax and toolchain coherence have native owners. A separate Taplo formatting policy needs an authored-file scope and incremental benefit; generated locks are excluded from manual formatting.",
+      "ownerPath": "mise.toml",
+      "revisitWhen": "Revisit when an authored TOML formatting policy is adopted; preserve native lock bytes.",
+      "bindings": []
+    },
+    {
+      "candidateId": "CF10",
+      "family": "tool-class",
+      "title": "Task DAG and toolchain pin parity",
+      "blueprintLine": 391,
+      "risk": "A second task facade changes commands or versions silently",
+      "applicability": "covered",
+      "rationale": "The exact mise/lock assertion verifies installation and task projections, required dependency edges and supported platform sets.",
+      "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-DEV-001",
+          "witnessPath": "scripts/tests/test_developer_environment_configuration.py",
+          "assertion": "test_mise_is_the_locked_cross_language_task_owner",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "fd4c99d92fce11e9bdfeedba8b10a8e689b04822d78b9935347a02da9cfc402f"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF11",
+      "family": "tool-class",
+      "title": "Docker build checks",
+      "blueprintLine": 392,
+      "risk": "A Dockerfile is missed or native build-check warnings do not fail",
+      "applicability": "partial",
+      "rationale": "The native wrapper test requires all Dockerfile naming forms, the fixed builder and error=true. Builder execution/metadata/network behavior requires its actual provider run.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Revisit when Dockerfile inventory, context, frontend, builder or BuildKit output contract changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-012",
+          "witnessPath": "scripts/tests/test_ci_utility_checks.py",
+          "assertion": "test_docker_inventory_checks_all_filenames_with_fixed_builder",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF12",
+      "family": "tool-class",
+      "title": "Docker RUN and package lint",
+      "blueprintLine": 393,
+      "risk": "A scoped exception suppresses an unrelated Dockerfile finding",
+      "applicability": "partial",
+      "rationale": "Hadolint is already configured and its source-bound exception falsifier rejects changed source and unrelated warnings. Whole rule adequacy and actual execution remain distinct.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Revisit when Dockerfiles, Hadolint rules, version or exception bytes change.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-012",
+          "witnessPath": "scripts/tests/test_ci_utility_checks.py",
+          "assertion": "test_exact_hadolint_exception_is_source_bound_and_cannot_hide_another_warning",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF13",
+      "family": "tool-class",
+      "title": "Build context and final image runtime",
+      "blueprintLine": 394,
+      "risk": "Build assets or dependency artifacts differ from intended production inputs",
+      "applicability": "partial",
+      "rationale": "Frontend manifest tests independently reject nonproduction evidence; runtime container witnesses retain their separate provider authority. Docker context closure is not inferred from this asset assertion.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-006",
+          "witnessPath": "scripts/tests/test_frontend_bundle.py",
+          "assertion": "test_bundle_admission_rejects_non_production_evidence",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "7da1822328d04bdd511802f37c31568a7226387501ebbd634e1c8add9139eca9"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF14",
+      "family": "tool-class",
+      "title": "Compose configuration resolution",
+      "blueprintLine": 395,
+      "risk": "Malformed Compose/provider configuration reaches mutation",
+      "applicability": "partial",
+      "rationale": "The native Compose test rejects unsupported or malformed Compose before mutation; early offline schema checks supplement it and do not establish successful startup.",
+      "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-DEV-003",
+          "witnessPath": "scripts/tests/test_dev_environment_compose.py",
+          "assertion": "test_up_rejects_unsupported_or_malformed_compose_before_mutation",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "775b4ffd984e7e78bf4fbdbe50bff9cc8adeef126082569ba2f7e247eccb2fc9"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF15",
+      "family": "tool-class",
+      "title": "Connected development stack lifecycle",
+      "blueprintLine": 396,
+      "risk": "Failed admission or shutdown is crossed by later provider mutations",
+      "applicability": "partial",
+      "rationale": "Native lifecycle tests require up to stop at failed admission/runtime boundaries. Real stack health, roles, watch and cleanup still require their explicit service witnesses.",
+      "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-DEV-003",
+          "witnessPath": "scripts/tests/test_dev_environment_compose.py",
+          "assertion": "test_up_does_not_cross_a_failed_admission_or_runtime_stop",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "775b4ffd984e7e78bf4fbdbe50bff9cc8adeef126082569ba2f7e247eccb2fc9"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF16",
+      "family": "tool-class",
+      "title": "Devcontainer host and runtime boundary",
+      "blueprintLine": 397,
+      "risk": "Devcontainer configuration gains host Docker authority or unpinned tool state",
+      "applicability": "partial",
+      "rationale": "The existing configuration assertion forbids host Docker authority and pins dependencies. This source witness is distinct from the provider-backed devcontainer verification.",
+      "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-DEV-007",
+          "witnessPath": "scripts/tests/test_developer_environment_configuration.py",
+          "assertion": "test_devcontainer_is_locked_and_has_no_host_docker_authority",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "fd4c99d92fce11e9bdfeedba8b10a8e689b04822d78b9935347a02da9cfc402f"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF17",
+      "family": "tool-class",
+      "title": "Markdown graph links and authority roots",
+      "blueprintLine": 398,
+      "risk": "Documents or local links escape the rooted authority graph",
+      "applicability": "covered",
+      "rationale": "The native graph falsifier rejects unreachable Markdown; other graph tests retain strict URL, symlink, UTF-8 and resource boundaries.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-009",
+          "witnessPath": "scripts/tests/test_documentation_graph.py",
+          "assertion": "test_unreachable_markdown_document_fails_closed",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8d72902d26d3d23890fb955e21b04ceb041d35492c6690eabe207e681b69f4ca"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF18",
+      "family": "tool-class",
+      "title": "Markdown style",
+      "blueprintLine": 399,
+      "risk": "Style findings become an unauthorized semantic or historical-document rewrite",
+      "applicability": "deferred",
+      "rationale": "Documentation graph, diagrams and spelling are existing independent owners. A Markdown formatting/style subset requires an owner-approved policy and historical/generated exclusions.",
+      "ownerPath": "docs/architecture/cross-cutting/documentation-authority.md",
+      "revisitWhen": "Revisit when a concrete readability/style rule is adopted with a source-preserving remediation path.",
+      "bindings": []
+    },
+    {
+      "candidateId": "CF19",
+      "family": "tool-class",
+      "title": "Public external link availability",
+      "blueprintLine": 400,
+      "risk": "Temporary network errors are mistaken for permanently broken authoritative references",
+      "applicability": "deferred",
+      "rationale": "The documentation owner syntax-admits external HTTPS links without fetching in the deterministic gate. A scheduled reachability lane requires bounded egress and a retry/unknown policy.",
+      "ownerPath": "docs/architecture/cross-cutting/documentation-authority.md",
+      "revisitWhen": "Revisit when external-link freshness is owner-required and scheduled egress plus non-actionable failure handling are admitted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "CF20",
+      "family": "tool-class",
+      "title": "Prometheus rules and alert semantics",
+      "blueprintLine": 401,
+      "risk": "Rule syntax or alert fixtures drift from the admitted Prometheus runtime",
+      "applicability": "partial",
+      "rationale": "The wrapper test binds immutable promtool, read-only inputs and no network. Expected-alert semantics require the native promtool fixture execution; YAML validity is not a substitute.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-015",
+          "witnessPath": "scripts/tests/test_prometheus_rules.py",
+          "assertion": "test_promtool_command_is_immutable_read_only_and_network_isolated",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b55e36a25ed8f20a8a4a2dcf26316a6d0860ef7d3a47ecd61288937146228ea3"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF21",
+      "family": "tool-class",
+      "title": "Requirement documentation runtime and config coherence",
+      "blueprintLine": 402,
+      "risk": "Version projection drift is hidden by coincidental text equality",
+      "applicability": "partial",
+      "rationale": "Native toolchain tests distinguish Python minor-target projection from exact patch pins. This is a named-value relation and does not grep historical prose into one version.",
+      "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-DEV-001",
+          "witnessPath": "scripts/tests/test_dev_environment_toolchain.py",
+          "assertion": "test_runtime_minor_targets_are_projections_not_patch_equality",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "0ba8356530cad9006eae66378189d305867c50cafbf5263589defee0817bb572"
+        }
+      ]
+    },
+    {
+      "candidateId": "CF22",
+      "family": "tool-class",
+      "title": "Path mode symlink and generated-source admission",
+      "blueprintLine": 403,
+      "risk": "Input identity or file kind changes without renewed admission",
+      "applicability": "partial",
+      "rationale": "Native input falsifiers reject leaf/parent symlinks, missing files, directories and binary data. The 8e50b717 review epoch still leaves the separate early mode-change fallback concern for the correction batch; this row does not declare that correction proven.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Revisit when index path/mode identity, source roots, generated provenance or effective-input admission changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-012",
+          "witnessPath": "scripts/tests/test_ci_utility_checks.py",
+          "assertion": "test_inputs_reject_each_isolated_filesystem_boundary",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+        }
+      ]
+    },
+    {
+      "candidateId": "SC01",
+      "family": "tool-class",
+      "title": "Python and Node dependency vulnerabilities",
+      "blueprintLine": 415,
+      "risk": "One supported runtime or dependency lock is absent from the advisory scan",
+      "applicability": "partial",
+      "rationale": "The native command assertion covers supported Python versions and the frontend lock. Fresh-on-execution is not a periodic deployed-artifact requalification claim.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Revisit when supported runtime/platform/package scopes, feed contracts or freshness cadence change.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-006",
+          "witnessPath": "scripts/tests/test_repository_tooling.py",
+          "assertion": "test_dependency_audit_covers_supported_python_and_frontend_locks",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "74550f9531cdc77d3e25a9ed64e229a1892bdc1aba73b7ecbe095f1c60c128eb"
+        }
+      ]
+    },
+    {
+      "candidateId": "SC02",
+      "family": "tool-class",
+      "title": "New dependency risk review",
+      "blueprintLine": 416,
+      "risk": "PR dependency changes bypass their immutable provider action",
+      "applicability": "partial",
+      "rationale": "The tracked workflow assertion binds dependency-review to its immutable action. Entitlement, provider graph completeness and live run evidence were not read in this lane.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-011",
+          "witnessPath": "backend/tests/unit/runtime/test_supply_chain_configuration.py",
+          "assertion": "test_provider_workflow_reviews_dependency_diffs_with_an_immutable_action",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b68bbc38b30544c8c086127691cd45cc7704968c35f314b055c1cf32c1a2baa3"
+        }
+      ]
+    },
+    {
+      "candidateId": "SC03",
+      "family": "tool-class",
+      "title": "Provider CodeQL security analysis",
+      "blueprintLine": 417,
+      "risk": "Configured provider security analysis is mistaken for current complete results",
+      "applicability": "unknown",
+      "rationale": "The matrix delegates this check to provider-owned default setup. No source test can establish its current languages, query suite, trigger outcomes or alert completeness.",
+      "ownerPath": "proofkit/ci-matrix.v1.json",
+      "revisitWhen": "Revisit using an exact provider configuration and analysis snapshot bound to source/run/query identities.",
+      "bindings": []
+    },
+    {
+      "candidateId": "SC04",
+      "family": "tool-class",
+      "title": "Secret detection in source and history",
+      "blueprintLine": 418,
+      "risk": "Provider or offline scanning is assumed to cover unobserved patterns and history",
+      "applicability": "unknown",
+      "rationale": "The matrix names provider secret scanning and push protection. This read-only source lane does not requalify provider pattern/history coverage or an offline custom-rule delta. Scanner absence is not an absence-of-checks claim.",
+      "ownerPath": "proofkit/ci-matrix.v1.json",
+      "revisitWhen": "Revisit with authorized provider evidence and a same-corpus assessment of any proposed offline incremental scope.",
+      "bindings": []
+    },
+    {
+      "candidateId": "SC05",
+      "family": "tool-class",
+      "title": "Delivered image vulnerability admission",
+      "blueprintLine": 419,
+      "risk": "A fresh scan belongs to another image or silently suppresses actionable vulnerabilities",
+      "applicability": "covered",
+      "rationale": "The existing release owner binds image/index/child/platform, pinned scanner and database, and rejects effective caller suppressions. Covered means the named admission predicate has configured negative assertions; release execution and unknown-vulnerability absence are not claimed. Periodic rechecks discover the latest successful release, bind its immutable image to verified source and run certificates, and reuse the current image vulnerability policy. This does not inventory every deployed or retained historical image.",
+      "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
+      "revisitWhen": "Requalify scanner, database schema, distro, platform, image relation or suppression defaults.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RELEASE-001",
+          "witnessPath": "scripts/tests/test_release_vulnerability_admission.py",
+          "assertion": "test_effective_configuration_rejects_suppression_even_with_zero_matches",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "869cc82e1dafa3f16c1f9adad8f91008d354679a514bef15f748e04c880b1baa"
+        },
+        {
+          "requirementId": "REQ-CI-RELEASE-001",
+          "witnessPath": "scripts/tests/test_release_vulnerability_admission.py",
+          "assertion": "test_scan_nonvacuity_and_subject_falsifiers",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "869cc82e1dafa3f16c1f9adad8f91008d354679a514bef15f748e04c880b1baa"
+        },
+        {
+          "requirementId": "REQ-CI-RELEASE-001",
+          "witnessPath": "scripts/tests/test_scheduled_advisories.py",
+          "assertion": "test_valid_signature_for_wrong_run_or_source_is_not_latest_release",
+          "sourceSha256": "1151d61f47cd4644f506d07926d14b49409a0e29aa3374705fa5adcb3474baf4",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed"
+        }
+      ]
+    },
+    {
+      "candidateId": "SC06",
+      "family": "tool-class",
+      "title": "SBOM provenance and release identity",
+      "blueprintLine": 420,
+      "risk": "Foreign or structurally vacuous attestations are accepted as release evidence",
+      "applicability": "covered",
+      "rationale": "Native predicate admission rejects invalid provenance dimensions and non-meaningful SPDX package evidence. Source assertions are executed by Full Check; real attestations remain owned by the separate release workflow.",
+      "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
+      "revisitWhen": "Revisit on signer, workflow, subject, predicate schema or release generation changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RELEASE-001",
+          "witnessPath": "scripts/tests/test_release_predicate_admission.py",
+          "assertion": "test_predicate_admission_rejects_each_invalid_provenance_dimension",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a84a93eb9a0f8a24b5131c6dc127f6189baf63fda0789d0a83ad6942f22a2af5"
+        }
+      ]
+    },
+    {
+      "candidateId": "SC07",
+      "family": "tool-class",
+      "title": "Additional artifact inventory",
+      "blueprintLine": 421,
+      "risk": "A second SBOM or scanner duplicates the admitted release baseline without new evidence",
+      "applicability": "deferred",
+      "rationale": "The release owner already supplies BuildKit SPDX and Grype. Additional Syft/inventory diversity requires a concrete omitted package/source predicate; schema validity does not prove inventory completeness.",
+      "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
+      "revisitWhen": "Revisit when release package evidence exposes a specific inventory gap or independent inventory requirement.",
+      "bindings": []
+    },
+    {
+      "candidateId": "SC08",
+      "family": "tool-class",
+      "title": "Custom forbidden API and trust patterns",
+      "blueprintLine": 422,
+      "risk": "Generic SAST duplicates current rules or loses a repository-specific boundary",
+      "applicability": "deferred",
+      "rationale": "Repository-owned import gates and provider CodeQL already supply distinct predicates. A Semgrep rulepack needs a named uncovered pattern and independent positive/negative corpus.",
+      "ownerPath": "docs/architecture/cross-cutting/module-ownership-and-decomposition.md",
+      "revisitWhen": "Revisit upon a concrete rule-level gap in existing static or native witnesses.",
+      "bindings": []
+    },
+    {
+      "candidateId": "SC09",
+      "family": "tool-class",
+      "title": "Additional dependency ecosystem coverage",
+      "blueprintLine": 423,
+      "risk": "The owned Go helper dependency universe is omitted or build-selected files are lost",
+      "applicability": "partial",
+      "rationale": "Go vet, Staticcheck and govulncheck are already configured for each owned Go module and test sources. The frozen baseline still contains the separately reviewed cgo effective-input admission gap; correction evidence must be rebound. Native Go source discovery now rejects cgo and excluded or mismatched source cohorts before each analyzer; native import variants have a separate GitHub witness.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Revisit on Go modules, build constraints, cgo, platforms, advisory inputs or the current admission correction.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-012",
+          "witnessPath": "scripts/tests/test_ci_utility_checks.py",
+          "assertion": "test_go_commands_cover_each_module_and_include_test_sources",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6"
+        },
+        {
+          "requirementId": "REQ-CI-PROOFKIT-012",
+          "witnessPath": "scripts/tests/test_ci_utility_checks.py",
+          "assertion": "test_native_cgo_refusal_stops_every_analyzer",
+          "sourceSha256": "a479c17a40f7a97cea779d718d6cf44009857ec4f2a3bf647f61098d79e870c6",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed"
+        }
+      ]
+    },
+    {
+      "candidateId": "SC10",
+      "family": "tool-class",
+      "title": "Dependency and source license obligations",
+      "blueprintLine": 424,
+      "risk": "A structurally valid SBOM is mistaken for license approval",
+      "applicability": "unknown",
+      "rationale": "Release SBOM requirements validate structure and provenance. The finite admitted requirement sources do not establish a license allow/deny policy or an authorized legal decision owner; no legal permissibility is inferred. Selecting ScanCode cannot supply that missing policy.",
+      "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
+      "revisitWhen": "Revisit when an authorized owner admits license obligations, unknown-license disposition and the dependency/source distribution scope.",
+      "bindings": []
+    },
+    {
+      "candidateId": "SC11",
+      "family": "tool-class",
+      "title": "External artifact signature and provenance verification",
+      "blueprintLine": 425,
+      "risk": "Valid attestations belong to a foreign signer workflow or image",
+      "applicability": "partial",
+      "rationale": "The existing release verifier architecture uses a no-checkout job and never executes the image. Exact provider verification requires the separate release run and is not replaced by local structural assertions.",
+      "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
+      "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RELEASE-001",
+          "witnessPath": "scripts/tests/test_release_artifact_workflow.py",
+          "assertion": "test_attestation_job_has_no_checkout_and_never_executes_the_image",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "c4a9a97d8de38fbdeb050915187f5a279ab6a4a7b1de34f7fb413f2d2f3d6a32"
+        }
+      ]
+    },
+    {
+      "candidateId": "SC12",
+      "family": "tool-class",
+      "title": "Vulnerability exceptions and triage",
+      "blueprintLine": 426,
+      "risk": "A suppression or VEX statement erases an unresolved vulnerability",
+      "applicability": "deferred",
+      "rationale": "Current release policy intentionally rejects caller VEX/ignore/exclusion suppressions. A positive waiver lifecycle is not admitted; adding one requires a separate owner decision and exact artifact/rule/expiry binding. The separate scheduled advisory workflow rechecks unchanged lock and released-image subjects; receipt acceptance binds source, every required scope and a 36-hour maximum observation age. Missed scheduler execution and notification subscriptions remain operational obligations.",
+      "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
+      "revisitWhen": "Revisit only when the release owner admits a concrete exception workflow; retain unsuppressed raw verdicts meanwhile.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RELEASE-001",
+          "witnessPath": "scripts/tests/test_release_vulnerability_admission.py",
+          "assertion": "test_effective_configuration_rejects_suppression_even_with_zero_matches",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "869cc82e1dafa3f16c1f9adad8f91008d354679a514bef15f748e04c880b1baa"
+        },
+        {
+          "requirementId": "REQ-CI-PROOFKIT-012",
+          "witnessPath": "scripts/tests/test_scheduled_advisories.py",
+          "assertion": "test_receipt_acceptance_binds_age_source_and_all_native_results",
+          "sourceSha256": "1151d61f47cd4644f506d07926d14b49409a0e29aa3374705fa5adcb3474baf4",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed"
+        }
+      ]
+    },
+    {
+      "candidateId": "IAC01",
+      "family": "tool-class",
+      "title": "CDK cloud assembly completeness",
+      "blueprintLine": 476,
+      "risk": "Missing stage, stack or asset in a synthesized cloud assembly",
+      "applicability": "not-applicable",
+      "rationale": "The admitted product/build surface owns a Python service, React UI, OCI images and Compose development resources; AWS CDK cloud-assembly synthesis is not an adopted coordinator capability. This disposition is specific to CDK assembly, not generic build correctness.",
+      "ownerPath": "README.md",
+      "revisitWhen": "An admitted CDK stage/stack/asset assembly or infrastructure source root is added.",
+      "bindings": []
+    },
+    {
+      "candidateId": "IAC02",
+      "family": "tool-class",
+      "title": "CloudFormation security and resource schemas",
+      "blueprintLine": 477,
+      "risk": "Valid infrastructure syntax hides forbidden IAM or network authority",
+      "applicability": "not-applicable",
+      "rationale": "The frozen coordinator capability and build inventory has no adopted CloudFormation/CDK deployment contract. Docker, GitHub and runtime authorization remain separately applicable.",
+      "ownerPath": "README.md",
+      "revisitWhen": "A repository-owned synthesized CloudFormation or AWS policy surface is adopted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "OPS01",
+      "family": "tool-class",
+      "title": "Proxy public configuration and secret precedence",
+      "blueprintLine": 478,
+      "risk": "Runtime or browser configuration exposes secrets or bypasses authentication",
+      "applicability": "partial",
+      "rationale": "Native development image assertions require owner-only secret files to be copied into private tmpfs and constrain runtime identity. This does not prove a deployment proxy or protected-stage end-to-end configuration.",
+      "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-DEV-009",
+          "witnessPath": "scripts/tests/test_developer_environment_configuration.py",
+          "assertion": "test_runtime_services_copy_file_secrets_into_private_tmpfs",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "fd4c99d92fce11e9bdfeedba8b10a8e689b04822d78b9935347a02da9cfc402f"
+        }
+      ]
+    },
+    {
+      "candidateId": "OPS02",
+      "family": "tool-class",
+      "title": "Deployment source generation and cleanup",
+      "blueprintLine": 479,
+      "risk": "A workflow publishes or verifies a foreign source/image generation",
+      "applicability": "partial",
+      "rationale": "Release assertions bind exact source and registry digest; deployment rollout, startup and rollback are separate environment-specific witnesses and are not inferred from build success.",
+      "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RELEASE-001",
+          "witnessPath": "scripts/tests/test_release_artifact_workflow.py",
+          "assertion": "test_build_uses_exact_source_and_registry_digest_is_the_only_authority",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "c4a9a97d8de38fbdeb050915187f5a279ab6a4a7b1de34f7fb413f2d2f3d6a32"
+        }
+      ]
+    },
+    {
+      "candidateId": "OPS03",
+      "family": "tool-class",
+      "title": "Observability units dimensions and redaction",
+      "blueprintLine": 480,
+      "risk": "Telemetry labels or missing data misrepresent authority or leak sensitive values",
+      "applicability": "partial",
+      "rationale": "Prometheus has a pinned native rule/test command. CloudWatch/OTel-specific dimensions are not inherited; exact runtime telemetry and redaction retain their current owners.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-015",
+          "witnessPath": "scripts/tests/test_prometheus_rules.py",
+          "assertion": "test_promtool_command_is_immutable_read_only_and_network_isolated",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b55e36a25ed8f20a8a4a2dcf26316a6d0860ef7d3a47ecd61288937146228ea3"
+        }
+      ]
+    },
+    {
+      "candidateId": "DATA01",
+      "family": "tool-class",
+      "title": "Anonymized restore disposition",
+      "blueprintLine": 481,
+      "risk": "A restored dataset exposes PII or breaks foreign-key closure",
+      "applicability": "not-applicable",
+      "rationale": "The admitted database lifecycle owns coordinator evidence and migrations; it does not admit a production-data anonymization/restore transformation. Migration retention requirements remain applicable under DB01/CI13.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "A database-copy or anonymization product/operations capability is admitted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "DATA02",
+      "family": "tool-class",
+      "title": "Backup restore and cutover fidelity",
+      "blueprintLine": 482,
+      "risk": "A backup restore drops retained evidence or publishes a partial database",
+      "applicability": "unknown",
+      "rationale": "Migration rollback/retention is admitted, but it does not itself prove backup restore or an operational recovery-point/time contract. This bounded lane has no environment-bound restore evidence and does not claim the operation is absent.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Revisit when the persistence/operations owner identifies the supported backup/restore procedure and exact recovery/cutover witnesses.",
+      "bindings": []
+    },
+    {
+      "candidateId": "DATA03",
+      "family": "tool-class",
+      "title": "Database dialect and principal-specific semantics",
+      "blueprintLine": 483,
+      "risk": "A database surrogate or different dialect is mistaken for PostgreSQL authority",
+      "applicability": "partial",
+      "rationale": "The coordinator owns PostgreSQL and real privilege tests reject PUBLIC/schema/append-only violations. Other consumers SQL Server/Oracle/Fabric/BigQuery clauses are outside the adopted backend runtime.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-015",
+          "witnessPath": "backend/tests/integration/persistence/test_database_privileges.py",
+          "assertion": "test_public_has_no_application_schema_access_and_history_is_append_only",
+          "commandIds": [
+            "python.persistence-test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8aa166d1a75e029c33fbda5b089232bd50edb5b8380e3dfbdbe8fc9354ebfb85"
+        }
+      ]
+    },
+    {
+      "candidateId": "DATA04",
+      "family": "tool-class",
+      "title": "Read-only data and scope authorization",
+      "blueprintLine": 484,
+      "risk": "A read operation changes actor, repository, cursor or query scope",
+      "applicability": "partial",
+      "rationale": "The request oracle rejects a consistently changed port and response scope. This is a fixed repository-query contract, not admission of arbitrary untrusted SQL or generic query rewriting.",
+      "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-003",
+          "witnessPath": "backend/tests/unit/api_contract/test_request_oracles.py",
+          "assertion": "test_read_oracle_rejects_consistent_but_wrong_port_and_response",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8be9d656927afc6aa47b4ef03a275895a31ce3a5623dde52cbd22444c3dedddc"
+        }
+      ]
+    },
+    {
+      "candidateId": "DATA05",
+      "family": "tool-class",
+      "title": "CSV and spreadsheet data conversion",
+      "blueprintLine": 485,
+      "risk": "Tabular import/export changes decimals, dates, encoding or inert text",
+      "applicability": "not-applicable",
+      "rationale": "The current finite versioned API/configuration contracts exchange strict JSON and retained JSON/YAML source, not CSV/XLSX conversion. This disposition is scoped to tabular conversion, not all exports.",
+      "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+      "revisitWhen": "A CSV/XLSX import/export operation or spreadsheet artifact is admitted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "DATA06",
+      "family": "tool-class",
+      "title": "Report source lineage and trust",
+      "blueprintLine": 486,
+      "risk": "Provider-only or uploaded facts acquire an unsupported provenance class",
+      "applicability": "partial",
+      "rationale": "The measurement falsifier rejects provider-only facts masquerading as webhook evidence. Complete source/report-pointer lifecycle coverage requires its own relation and retention assertions.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-038",
+          "witnessPath": "backend/tests/unit/ci_economics/test_measurement.py",
+          "assertion": "test_provider_only_fact_cannot_masquerade_as_webhook_evidence",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "5fd74ada83558791677b18b11c0a5223f98151904247810c8adaeda9b3347e35"
+        }
+      ]
+    },
+    {
+      "candidateId": "DATA07",
+      "family": "tool-class",
+      "title": "Batch provenance and generation accounting",
+      "blueprintLine": 487,
+      "risk": "Retry or partial ingestion changes business keys or falsely advances freshness",
+      "applicability": "unknown",
+      "rationale": "Current archive requirements RUNTIME-046 through RUNTIME-055 own generation, keys, quotas and progress. This candidate spans several independently owned ingestion relations; one batch-function name or generic DB test cannot close it. The lane has not completed their assertion partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Revisit with an explicit partition of archive batch, generation, source-key and retry assertions under their existing requirements.",
+      "bindings": []
+    },
+    {
+      "candidateId": "ART01",
+      "family": "tool-class",
+      "title": "Archive and binary input materialization",
+      "blueprintLine": 488,
+      "risk": "Encoded archives expand beyond resource limits or escape the output root",
+      "applicability": "unknown",
+      "rationale": "Current bounded source/report and package readers have distinct owners. The specialized ZIP/MIME/MSG/OOXML decompression surface is not established or disproved by the tool inventory; no archive-safety coverage is inferred from JSON bounds.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Revisit when a concrete archive producer/consumer and its decode/materialization boundary are identified.",
+      "bindings": []
+    },
+    {
+      "candidateId": "ART02",
+      "family": "tool-class",
+      "title": "Document rendering and OCR semantics",
+      "blueprintLine": 489,
+      "risk": "PDF/OCR/image/slide conversion loses visible content or geometry",
+      "applicability": "not-applicable",
+      "rationale": "The coordinator owns web assets and documentation diagrams, not an admitted document-conversion or OCR pipeline. Diagram and frontend asset contracts are accounted separately.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "A PDF/OCR/image/slide ingestion or transformation capability is adopted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "ART03",
+      "family": "tool-class",
+      "title": "XML SOAP and invoice wire conformance",
+      "blueprintLine": 490,
+      "risk": "Namespaces, encodings or financial sums violate an XML consumer contract",
+      "applicability": "not-applicable",
+      "rationale": "The admitted public transport surface is JSON/HTTP with exact generated contracts; it has no SOAP/XML invoice conformance capability. JSON wire tests are not substituted for XML proof.",
+      "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+      "revisitWhen": "An XML/SOAP or electronic-invoice consumer contract is adopted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "AG01",
+      "family": "tool-class",
+      "title": "Executable agent tool authorization",
+      "blueprintLine": 491,
+      "risk": "An agent tool call expands approval, tenant or effect authority",
+      "applicability": "not-applicable",
+      "rationale": "The adopted agent capability supplies bounded risk advice and may not name execution authority. It is not an executable agent tool registry. Advice monotonicity is independently applicable under CI05.",
+      "ownerPath": "docs/architecture/modules/agent-risk-advice.md",
+      "revisitWhen": "An executable tool registry or agent-driven provider write is admitted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "AG02",
+      "family": "tool-class",
+      "title": "Durable agent sessions and checkpoints",
+      "blueprintLine": 492,
+      "risk": "Agent memory replay or checkpoint recovery changes conversation state",
+      "applicability": "not-applicable",
+      "rationale": "Coordinator policy/audit persistence does not create an agent conversation, WAL or memory-session capability. General durable-state requirements are separately applicable under CI12-CI16.",
+      "ownerPath": "docs/architecture/modules/agent-risk-advice.md",
+      "revisitWhen": "Durable agent sessions, checkpoints or memory replay enter the product contract.",
+      "bindings": []
+    },
+    {
+      "candidateId": "AG03",
+      "family": "tool-class",
+      "title": "SSE WebSocket and NDJSON stream protocol",
+      "blueprintLine": 493,
+      "risk": "Streaming chunks violate framing, cancellation or conversation scope",
+      "applicability": "not-applicable",
+      "rationale": "The admitted product API/UI contract does not define an SSE/WebSocket/NDJSON conversation protocol. HTTP body bounds and development-server sockets do not establish that product surface.",
+      "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+      "revisitWhen": "A product streaming protocol or reconnect contract is added.",
+      "bindings": []
+    },
+    {
+      "candidateId": "AG04",
+      "family": "tool-class",
+      "title": "Retrieval corpus ACL and citation lineage",
+      "blueprintLine": 494,
+      "risk": "Search returns another tenant corpus or unsupported citations",
+      "applicability": "not-applicable",
+      "rationale": "The product evidence queries are bounded authoritative repository projections; no retrieval/vector corpus or citation-quality subsystem is adopted. SQL read authorization remains independently applicable.",
+      "ownerPath": "docs/architecture/01-meta-specification.md",
+      "revisitWhen": "A retrieval corpus, search index with tenant ACL, or generated citation capability is adopted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "AG05",
+      "family": "tool-class",
+      "title": "Model quality and independent evaluation",
+      "blueprintLine": 495,
+      "risk": "Advice without accepted independent evaluation is mistaken for trustworthy guidance",
+      "applicability": "partial",
+      "rationale": "Risk-advice admission rejects otherwise valid advice when its independent evaluation fails. This proves an admission predicate, not held-out model quality, calibration, grounding or cost performance.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-001",
+          "witnessPath": "backend/tests/unit/test_agent_risk_advice.py",
+          "assertion": "test_failed_independent_evaluation_rejects_otherwise_valid_advice",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "fd0a40ebed08934b3dd2985241fe04a28a5d4fd5070d76ee67b2b5b84167f99e"
+        }
+      ]
+    },
+    {
+      "candidateId": "AG06",
+      "family": "tool-class",
+      "title": "Audio and speech lifecycle",
+      "blueprintLine": 496,
+      "risk": "Cancelled audio is applied to another conversation or media resources leak",
+      "applicability": "not-applicable",
+      "rationale": "No voice recording/transcription/STT operation exists in the admitted finite product API and browser capability contracts.",
+      "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+      "revisitWhen": "An audio/media capture, transcription or STT provider boundary is adopted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "ASY01",
+      "family": "tool-class",
+      "title": "Background work retry lease and recovery",
+      "blueprintLine": 497,
+      "risk": "Background work redelivery repeats an effect or falsely records progress",
+      "applicability": "unknown",
+      "rationale": "The coordinator has native PostgreSQL-backed collection/reconciliation lanes, not the blueprint consumers Celery stack. Existing RUNTIME-048/054 lifecycle owners apply; the complete scheduler/lease/crash assertion partition remains unresolved in this bounded mapping.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Revisit with lane-specific acknowledgement, lease, idempotency, crash and shutdown witnesses rather than adding a broker plugin by name.",
+      "bindings": []
+    },
+    {
+      "candidateId": "UX01",
+      "family": "tool-class",
+      "title": "Offline client write replay",
+      "blueprintLine": 498,
+      "risk": "Offline queued writes cross identity or replay in the wrong order",
+      "applicability": "not-applicable",
+      "rationale": "The current operator UI is an online projection with explicit unavailable/unknown outcomes; no service-worker/IndexedDB/native offline-write queue is admitted. Retry of one retained operation is covered by the existing online command contract.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "An offline write queue, service worker or native bridge gains product authority.",
+      "bindings": []
+    },
+    {
+      "candidateId": "UX02",
+      "family": "tool-class",
+      "title": "Web composition and mounted assets",
+      "blueprintLine": 499,
+      "risk": "The assembled UI references missing changed or extra served assets",
+      "applicability": "covered",
+      "rationale": "The production asset manifest has a native mutation falsifier binding exact bytes independent of filenames. Jinja and embedded report host-specific clauses activate only with such a consumer.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-014",
+          "witnessPath": "scripts/tests/test_frontend_bundle.py",
+          "assertion": "test_manifest_rejects_changed_or_extra_assets_regardless_of_filename_shape",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "7da1822328d04bdd511802f37c31568a7226387501ebbd634e1c8add9139eca9"
+        }
+      ]
+    },
+    {
+      "candidateId": "UX03",
+      "family": "tool-class",
+      "title": "Time filters ordering and pagination semantics",
+      "blueprintLine": 500,
+      "risk": "A response looks coherent after the request cursor or filter was changed",
+      "applicability": "partial",
+      "rationale": "The status oracle independently rejects cursor substitution even when returned rows are unchanged. Locale/DST and every analytics pagination contract require separate owner-specific assertions.",
+      "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-003",
+          "witnessPath": "backend/tests/unit/api_contract/test_request_oracles.py",
+          "assertion": "test_status_oracle_rejects_cursor_change_even_when_page_is_unchanged",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8be9d656927afc6aa47b4ef03a275895a31ce3a5623dde52cbd22444c3dedddc"
+        }
+      ]
+    },
+    {
+      "candidateId": "DOM01",
+      "family": "tool-class",
+      "title": "Geospatial routing and feasibility",
+      "blueprintLine": 501,
+      "risk": "Coordinates, units or routing constraints produce an invalid optimum",
+      "applicability": "not-applicable",
+      "rationale": "CI scheduling optimization does not own geographic coordinates, vehicle-routing constraints or a geospatial solver. Its separate coverage/capacity laws remain applicable.",
+      "ownerPath": "docs/architecture/01-meta-specification.md",
+      "revisitWhen": "A geospatial planning or physical routing domain becomes an adopted capability.",
+      "bindings": []
+    },
+    {
+      "candidateId": "DOM02",
+      "family": "tool-class",
+      "title": "Financial totals and booking lifecycle",
+      "blueprintLine": 502,
+      "risk": "Rounding, tax allocation or booking retries change monetary ledger totals",
+      "applicability": "not-applicable",
+      "rationale": "CI runner-time economics and budget projections do not establish invoice, tax, payment or financial booking authority. Audit ledger terminology is not a financial-ledger surface.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Financial amounts, tax allocation, invoicing or payment/booking semantics are adopted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "INT01",
+      "family": "tool-class",
+      "title": "External HTTP effects and retry ambiguity",
+      "blueprintLine": 503,
+      "risk": "A provider request is replayed under another operation or identity scope",
+      "applicability": "partial",
+      "rationale": "Native GitHub request-binding tests reject each independent identity substitution. Current App permission policy and reconciliation decide permitted effects; no synthetic call proves remote delivery or atomicity.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-008",
+          "witnessPath": "backend/tests/unit/integrations/test_github_request_binding.py",
+          "assertion": "test_get_binding_rejects_each_independent_substitution",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8901288d0c882b052c6cb63eb17a4af92df39dbe1b69e4292048ef9adee522c1"
+        }
+      ]
+    },
+    {
+      "candidateId": "INT02",
+      "family": "tool-class",
+      "title": "Office add-in manifest and host compatibility",
+      "blueprintLine": 504,
+      "risk": "A valid manifest requires unavailable Office host capability",
+      "applicability": "not-applicable",
+      "rationale": "The product exposes a browser operator workbench and API, not an Office/Outlook add-in manifest or Office.js host lifecycle.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "An Office add-in package, manifest or supported Office host matrix is adopted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "AUTH01",
+      "family": "tool-class",
+      "title": "WebAuthn authenticator conformance",
+      "blueprintLine": 505,
+      "risk": "Challenge, RP ID or user-verification policy accepts a replayed assertion",
+      "applicability": "not-applicable",
+      "rationale": "The adopted administrator identity delegates authentication to the exact Keycloak OIDC/BFF contract. The coordinator does not implement a WebAuthn relying-party registration/assertion capability.",
+      "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+      "revisitWhen": "A coordinator-owned WebAuthn registration, assertion or recovery endpoint is adopted.",
+      "bindings": []
+    },
+    {
+      "candidateId": "CI01",
+      "family": "property",
+      "title": "Exact diff graph and source epoch",
+      "blueprintLine": 540,
+      "risk": "Violation of the following protected observation: Unknown and incomplete diff evidence must invalidate selective planning.",
+      "applicability": "partial",
+      "rationale": "Unknown and incomplete diff evidence must invalidate selective planning. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition. The self-consumer additionally qualifies exact head path/mode inventory through authenticated recursive Git objects before permitting omission; stale mode/deletion fixtures require planner and verifier FullCI.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-004",
+          "witnessPath": "backend/tests/unit/repo_context/test_repo_context.py",
+          "assertion": "test_diff_unknown_or_incomplete_evidence_is_full_ci_invalidating",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "faf85b99bf348a8ccf9e24afd18eded2c5326c11f925bf0997510941b96f51d5"
+        },
+        {
+          "requirementId": "REQ-CI-RUNTIME-005",
+          "witnessPath": "backend/tests/unit/integrations/test_github_self_ci_inventory.py",
+          "assertion": "test_provider_inventory_failure_forces_full_selection_before_omission",
+          "sourceSha256": "ea66c3c4a11abb9849addf3aa91b6a1a063cdecec702c55e32667529dbb4666f",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI02",
+      "family": "property",
+      "title": "Complete witness and depth closure",
+      "blueprintLine": 541,
+      "risk": "Violation of the following protected observation: Two obligations sharing one witness require the maximum of their independent depths.",
+      "applicability": "partial",
+      "rationale": "Two obligations sharing one witness require the maximum of their independent depths. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-009",
+          "witnessPath": "backend/tests/unit/planning_core/test_planner.py",
+          "assertion": "test_shared_witness_depth_is_maximum_of_requiring_obligation_depths",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "c677dc8fa9563c7308659d38238b4a3f531f1d04ab91a02c7dba0e28766b23ea"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI03",
+      "family": "property",
+      "title": "Deterministic conservative planning",
+      "blueprintLine": 542,
+      "risk": "Violation of the following protected observation: An unknown path must select every obligation at full depth.",
+      "applicability": "partial",
+      "rationale": "An unknown path must select every obligation at full depth. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-009",
+          "witnessPath": "backend/tests/unit/planning_core/test_planner.py",
+          "assertion": "test_unknown_path_fallback_selects_every_obligation_at_its_full_depth",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "c677dc8fa9563c7308659d38238b4a3f531f1d04ab91a02c7dba0e28766b23ea"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI04",
+      "family": "property",
+      "title": "Independent plan rejection",
+      "blueprintLine": 543,
+      "risk": "Violation of the following protected observation: A deliberately defective planner replay must still be rejected independently.",
+      "applicability": "partial",
+      "rationale": "A deliberately defective planner replay must still be rejected independently. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-004",
+          "witnessPath": "backend/tests/unit/test_verification_core.py",
+          "assertion": "test_verifier_rejects_a_defect_reproduced_by_planner_replay",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "732d2a95956200ff0297b29de37742e87d10ee3f777c7f7b175a5b3a223c26b3"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI05",
+      "family": "property",
+      "title": "Advice coverage and authority monotonicity",
+      "blueprintLine": 544,
+      "risk": "Violation of the following protected observation: Adding an obligation must not expand service or execution authority.",
+      "applicability": "partial",
+      "rationale": "Adding an obligation must not expand service or execution authority. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-004",
+          "witnessPath": "backend/tests/unit/test_verification_core.py",
+          "assertion": "test_agent_obligation_cannot_expand_execution_authority",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "732d2a95956200ff0297b29de37742e87d10ee3f777c7f7b175a5b3a223c26b3"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI06",
+      "family": "property",
+      "title": "Capacity scheduling retains every work item",
+      "blueprintLine": 545,
+      "risk": "Violation of the following protected observation: Profile-homogeneous shards must execute each selected test exactly once.",
+      "applicability": "partial",
+      "rationale": "Profile-homogeneous shards must execute each selected test exactly once. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-005",
+          "witnessPath": "backend/tests/unit/test_runner_capacity.py",
+          "assertion": "test_optimization_is_profile_homogeneous_and_covers_each_test_once",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "fce12b75192217ae901b42581dc5ef8775d3caa686985f22398b5c3d806812e4"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI07",
+      "family": "property",
+      "title": "Admitted signature keys and caller identity",
+      "blueprintLine": 546,
+      "risk": "Violation of the following protected observation: An empty or ambiguous signing-key domain must be rejected before identity is trusted.",
+      "applicability": "partial",
+      "rationale": "An empty or ambiguous signing-key domain must be rejected before identity is trusted. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-006",
+          "witnessPath": "backend/tests/unit/identity_admission/test_oidc_verifier.py",
+          "assertion": "test_key_set_rejects_duplicate_or_empty_admitted_key_sets",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "7a62974c00e84e61dee4af0596247a73566c4a958499f9c44382999d002ab4c6"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI08",
+      "family": "property",
+      "title": "Webhook signature and bounded JSON boundary",
+      "blueprintLine": 547,
+      "risk": "Violation of the following protected observation: Duplicate keys, surrogates, nonfinite constants and wrong top-level shape cannot produce a partial trusted event.",
+      "applicability": "partial",
+      "rationale": "Duplicate keys, surrogates, nonfinite constants and wrong top-level shape cannot produce a partial trusted event. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-001",
+          "witnessPath": "backend/tests/unit/github_ingestion/test_strict_json.py",
+          "assertion": "test_untrusted_json_never_becomes_a_partial_object",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "354647555b1621966d5dd6a210cebf8247acd080d4882c53a5cbe841d65a9c69"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI09",
+      "family": "property",
+      "title": "HTTP admission resources and cancellation",
+      "blueprintLine": 548,
+      "risk": "Violation of the following protected observation: Cancelled requests must release scarce work-class admission capacity.",
+      "applicability": "partial",
+      "rationale": "Cancelled requests must release scarce work-class admission capacity. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-035",
+          "witnessPath": "backend/tests/unit/api/http/test_request_admission.py",
+          "assertion": "test_cancellation_releases_bulkhead_capacity",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "97baddc7ed7d242786c10b3c207bafd8efd93042fb7718723c2c9794c3b433db"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI10",
+      "family": "property",
+      "title": "Canonical bytes and cross-runtime identities",
+      "blueprintLine": 549,
+      "risk": "Violation of the following protected observation: Canonical bytes and identity must match independently authored requirement vectors.",
+      "applicability": "partial",
+      "rationale": "Canonical bytes and identity must match independently authored requirement vectors. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-009",
+          "witnessPath": "backend/tests/unit/kernel/test_canonical_json.py",
+          "assertion": "test_matches_requirement_owned_canonical_identity_vector",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b615616869847a90f68949ce614523d638f350deccbce491d2fbddab8cff1475"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI11",
+      "family": "property",
+      "title": "Browser and machine credential separation",
+      "blueprintLine": 550,
+      "risk": "Violation of the following protected observation: Browser context must not bypass the real machine mutation guard.",
+      "applicability": "partial",
+      "rationale": "Browser context must not bypass the real machine mutation guard. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-021",
+          "witnessPath": "backend/tests/unit/api_contract/test_controls.py",
+          "assertion": "test_real_mutation_guard_refuses_browser_context",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "541a41d53593aca0f3dc079a9283ac348cfc10dbe32574f55baaec235874c2f8"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI12",
+      "family": "property",
+      "title": "Immutable epochs concurrency and audit pairing",
+      "blueprintLine": 551,
+      "risk": "Violation of the following protected observation: Concurrent activation for the same expected revision must have at most one successful transaction.",
+      "applicability": "partial",
+      "rationale": "Concurrent activation for the same expected revision must have at most one successful transaction. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-016",
+          "witnessPath": "backend/tests/integration/persistence/test_config_epoch_lifecycle.py",
+          "assertion": "test_concurrent_expected_revision_has_at_most_one_success",
+          "commandIds": [
+            "python.persistence-test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "b4c28d70f584db7cebdf9af01b21f069214866609216b90d781267cbb83589d9"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI13",
+      "family": "property",
+      "title": "Database schema ACL and migration lineage",
+      "blueprintLine": 552,
+      "risk": "Violation of the following protected observation: PUBLIC cannot gain application schema authority and history must remain append-only.",
+      "applicability": "partial",
+      "rationale": "PUBLIC cannot gain application schema authority and history must remain append-only. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-015",
+          "witnessPath": "backend/tests/integration/persistence/test_database_privileges.py",
+          "assertion": "test_public_has_no_application_schema_access_and_history_is_append_only",
+          "commandIds": [
+            "python.persistence-test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8aa166d1a75e029c33fbda5b089232bd50edb5b8380e3dfbdbe8fc9354ebfb85"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI14",
+      "family": "property",
+      "title": "Database-time authority at linearization",
+      "blueprintLine": 553,
+      "risk": "Violation of the following protected observation: A lock-blocked plan that expires must be rejected with no plan or audit insertion.",
+      "applicability": "partial",
+      "rationale": "A lock-blocked plan that expires must be rejected with no plan or audit insertion. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-030",
+          "witnessPath": "backend/tests/integration/persistence/test_selected_issuance_expiry.py",
+          "assertion": "test_selected_issuance_rechecks_plan_expiry_after_database_wait",
+          "commandIds": [
+            "python.persistence-test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "99be49d79e94944ac6ef11753bb88bc804dcc2d95187d6a9b6d9b7d396a7e45f"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI15",
+      "family": "property",
+      "title": "Audit verification before filtered presentation",
+      "blueprintLine": 554,
+      "risk": "Violation of the following protected observation: Hidden events must be verified in bounded order before a filtered view is interpreted.",
+      "applicability": "partial",
+      "rationale": "Hidden events must be verified in bounded order before a filtered view is interpreted. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-CORE-007",
+          "witnessPath": "backend/tests/unit/audit_replay/test_paged_replay.py",
+          "assertion": "test_scan_verifies_bounded_pages_before_reporting_a_missing_filter",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "5224a9189677adfbe3a18c957cf1e622f98ae001f785229063ce333da174864e"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI16",
+      "family": "property",
+      "title": "Reconciliation and exact provider attempt",
+      "blueprintLine": 555,
+      "risk": "Violation of the following protected observation: An observation from another run attempt cannot enter the current snapshot.",
+      "applicability": "partial",
+      "rationale": "An observation from another run attempt cannot enter the current snapshot. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-003",
+          "witnessPath": "backend/tests/unit/reconciliation/test_reconciliation.py",
+          "assertion": "test_snapshot_rejects_an_observation_from_another_run_attempt",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "613f9e77a413554b9e18972cc07f6f7149fa9ff9e0e5840fded887418861e860"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI17",
+      "family": "property",
+      "title": "Execution registry and static job identity",
+      "blueprintLine": 556,
+      "risk": "Two execution profiles alias the same static job identity",
+      "applicability": "partial",
+      "rationale": "The registry falsifier requires rejection of two profiles bound to one static job. The exact existing RUNTIME-026 route invokes the file through runtime026.test; this does not establish provider DAG execution.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on registry, profile, job identity, native-workflow or targeted-witness selection changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-026",
+          "witnessPath": "backend/tests/unit/execution_orchestration/test_target_registry.py",
+          "assertion": "test_target_registry_rejects_two_profiles_bound_to_one_static_job",
+          "commandIds": [
+            "runtime026.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "346cde20778f6975590832f8523aa57f39519641f472ac59769327dc58e5e758"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI18",
+      "family": "property",
+      "title": "Consumer fallback and authenticated subject",
+      "blueprintLine": 557,
+      "risk": "Violation of the following protected observation: A signed fallback for another authenticated repository must remain invalid.",
+      "applicability": "partial",
+      "rationale": "A signed fallback for another authenticated repository must remain invalid. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-007",
+          "witnessPath": "backend/tests/unit/runtime/test_bootstrap_validator.py",
+          "assertion": "test_bootstrap_validator_rejects_auth_mismatch_in_a_signed_fallback",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "7956c89e1f8b11d7c0ebf139be53102058a2c3fc53c5a1584cf9b7002b5bd015"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI19",
+      "family": "property",
+      "title": "Consumer laboratory and process boundary",
+      "blueprintLine": 558,
+      "risk": "Candidate output or descendants escape bounded laboratory execution",
+      "applicability": "partial",
+      "rationale": "Native process assertions establish combined output bounds, exact environment projection and child cleanup. They do not prove an OS sandbox or network isolation. Consumer receipts remain synthetic.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Revisit on process runtime, child lifecycle, decoder, environment or laboratory authority changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-008",
+          "witnessPath": "scripts/tests/test_bounded_process.py",
+          "assertion": "test_spawn_bounds_combined_stdout_and_stderr",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "c57afd32a12d9d9bb7d7c1a336d70a620c41b2fcdcbc726952008d25d1870dcf"
+        },
+        {
+          "requirementId": "REQ-CI-PROOFKIT-008",
+          "witnessPath": "scripts/tests/test_bounded_process.py",
+          "assertion": "test_spawn_projects_exact_environment_and_stdin",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "c57afd32a12d9d9bb7d7c1a336d70a620c41b2fcdcbc726952008d25d1870dcf"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI20",
+      "family": "property",
+      "title": "UI evidence and request lifecycle",
+      "blueprintLine": 559,
+      "risk": "A retry changes operation bytes or stale UI state overwrites current evidence",
+      "applicability": "partial",
+      "rationale": "Native UI assertions preserve the current generation after a late abandoned response and require identical serialized registration retries. Browser API interception does not establish server authorization or database effects.",
+      "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+      "revisitWhen": "Revisit on UI state transitions, API contracts or admission of a connected browser fixture.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-UI-024",
+          "witnessPath": "frontend/tests/browser/configuration.spec.ts",
+          "assertion": "configuration source, retained epochs and confirmed rollback at ${width}px",
+          "commandIds": [
+            "frontend.browser"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "e5b44154d5cde4a20e34e078e98e8ae81ed5de46ee12c8d1de30f45dc41c546b"
+        },
+        {
+          "requirementId": "REQ-CI-UI-015",
+          "witnessPath": "frontend/tests/workbenchSnapshot.test.tsx",
+          "assertion": "a late response from an abandoned %s generation preserves the current snapshot",
+          "commandIds": [
+            "frontend.quality"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "2fd4ebf5a462c7437341e2ab459bf7c27bd93e1cd6ab7ca401c352d807a3e053"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI21",
+      "family": "property",
+      "title": "HTTP integration subject and routing boundary",
+      "blueprintLine": 560,
+      "risk": "Violation of the following protected observation: Independent request-coordinate substitutions must be rejected.",
+      "applicability": "partial",
+      "rationale": "Independent request-coordinate substitutions must be rejected. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-008",
+          "witnessPath": "backend/tests/unit/integrations/test_github_request_binding.py",
+          "assertion": "test_get_binding_rejects_each_independent_substitution",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "8901288d0c882b052c6cb63eb17a4af92df39dbe1b69e4292048ef9adee522c1"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI22",
+      "family": "property",
+      "title": "Runtime readiness and lifecycle",
+      "blueprintLine": 561,
+      "risk": "Violation of the following protected observation: Readiness needs active resources, an admitted database and healthy background processing.",
+      "applicability": "partial",
+      "rationale": "Readiness needs active resources, an admitted database and healthy background processing. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-008",
+          "witnessPath": "backend/tests/unit/runtime/test_runtime_readiness.py",
+          "assertion": "test_readiness_requires_active_resources_database_and_healthy_background",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "216ff2fd968e2df71ad55cde991caeaf04a740895f86eb87975c96c2ee238c0b"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI23",
+      "family": "property",
+      "title": "Economics observation identity and aggregates",
+      "blueprintLine": 562,
+      "risk": "Violation of the following protected observation: Changing a source measurement must invalidate every aggregate that depends on it.",
+      "applicability": "partial",
+      "rationale": "Changing a source measurement must invalidate every aggregate that depends on it. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-038",
+          "witnessPath": "backend/tests/unit/ci_economics/test_measurement.py",
+          "assertion": "test_mutating_any_shared_source_fact_invalidates_every_exact_aggregate",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "5fd74ada83558791677b18b11c0a5223f98151904247810c8adaeda9b3347e35"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI24",
+      "family": "property",
+      "title": "Capacity and release evidence",
+      "blueprintLine": 563,
+      "risk": "A valid signature authenticates foreign or incomplete performance evidence",
+      "applicability": "partial",
+      "rationale": "Capacity admission requires the complete metric domain and rejects over-budget values; release predicate tests bind source and artifact separately. Synthetic capacity fixtures do not qualify a real environment.",
+      "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
+      "revisitWhen": "Revisit on required metric domains, environment profile, measurement provenance or artifact identity changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-RUNTIME-036",
+          "witnessPath": "backend/tests/unit/capacity_qualification/test_capacity_qualification.py",
+          "assertion": "test_capacity_receipt_requires_the_complete_metric_domain",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a6b152f9da06522781d7500d7a703811ee12928c71821b53db47c02739b6021a"
+        },
+        {
+          "requirementId": "REQ-CI-RELEASE-001",
+          "witnessPath": "scripts/tests/test_release_predicate_admission.py",
+          "assertion": "test_predicate_admission_rejects_each_invalid_provenance_dimension",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "a84a93eb9a0f8a24b5131c6dc127f6189baf63fda0789d0a83ad6942f22a2af5"
+        }
+      ]
+    },
+    {
+      "candidateId": "CI25",
+      "family": "property",
+      "title": "Architecture documentation and proof ownership",
+      "blueprintLine": 564,
+      "risk": "A path or report name is mistaken for admitted requirement evidence",
+      "applicability": "partial",
+      "rationale": "Proofkit rejects missing exact requirement-path-command tuples. This projection adds source-bound assertion selectors; it does not make source presence or a configured function a runtime pass or complete semantics.",
+      "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+      "revisitWhen": "Revisit on requirement lifecycle, route identities, assertions, commands or projection schema changes.",
+      "bindings": [
+        {
+          "requirementId": "REQ-CI-PROOFKIT-003",
+          "witnessPath": "scripts/tests/test_proofkit_requirements.py",
+          "assertion": "test_required_binding_tuple_validator_rejects_missing_exact_tuple",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "cf0ab5b7f443f75b7bb57a33e7393f9887ce6dfa0fd9a931407d41383897b18e"
+        }
+      ]
+    }
+  ],
+  "unresolvedScope": [
+    "The unnumbered Make assurance dimensions in section 8.1 are not part of the numbered 89-class denominator.",
+    "The unnumbered deep-assurance rows in section 9.2 require separate admission.",
+    "The unnumbered optional ecosystem rows in section 9.3 require separate admission."
+  ],
+  "nonClaims": [
+    "Candidate disposition closure is not semantic requirement completeness.",
+    "A configured assertion was read, not executed in this research.",
+    "No provider execution or current service state is proved.",
+    "Existing Proofkit requirements, route bindings and command catalogs retain authority."
+  ],
+  "executionInputs": {
+    ".github/workflows/python-persistence.yml": "19def7c340d2347f220132389183795e9cfce12d72993d346b273b6f53fbfc5f",
+    "docker/ci/connected-administrator.compose.yaml": "f827fc7b9d93123f8710d41fe19de97316a7ee4596d6e4a4b84fd614c42fca24",
+    "docker/ci/connected-browser.Dockerfile": "98d669c9e2bb25062aefaa084e097bfa2eb45acc0a1a6817343a529ae8abce25",
+    "frontend/connected.playwright.config.ts": "c8a3e6a7f8671d2bef34a7d9fa9b3dd9a465f242819b493d9c212e0558566603",
+    "frontend/package.json": "0aab4c17c2f1b0e8f0853ce6dfa1fdf6c3dc33688f209d45d3da817ca574b2a7",
+    "frontend/playwright.config.ts": "5cb35a04c2a44f979c7fac95034fe05cac9d9d72b19fd98524753d500e6a1ebd",
+    "frontend/vitest.config.ts": "24ce82049d6dc72467fbad3ee8871e42d9ca1d5e76358712522c0a08e327d9d4",
+    "scripts/browser_test_admission.py": "d1fbe2a6777f5716ecdd74eda3a4159f6ef99c3b8e0b2e2e4dbedba9685eaf18",
+    "scripts/browser_test_execution.py": "8de3c7573901b7cdf37fc12223c899a320125ed662aa5f47e560c9be9d75826b",
+    "scripts/ci_business_witness/__init__.py": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "scripts/ci_business_witness/__main__.py": "39233d77025a38f7b44ee712fc26b6e9aa799e17d6b7839ef4ec7c919755ef8e",
+    "scripts/ci_business_witness/attached_logs.py": "42ae6599986a7ef49236d034120ec970b342c92bc135fa8fec0b9d09e19aae35",
+    "scripts/ci_business_witness/consumers.py": "601b02f78f0725d3e3b016da78c7c263765708191c7af4122ac950237d1e6d9b",
+    "scripts/ci_business_witness/diagnostics.py": "aca65a9f8a31ecf5d175c054c5d2fa470ffc65fedabcf5f0aa9b38545eec52ff",
+    "scripts/ci_business_witness/fixture.py": "64cab0f5ea7a3c53001e8c3d4f869c223c7306ed71291869329788c29b5e4ef1",
+    "scripts/ci_business_witness/lifecycle.py": "26565a0ffe8f29b94d802f338017d8281e3f76ffb686dd34900cd15017fd9dd0",
+    "scripts/ci_business_witness/oracle.py": "3cf70f37fe69726c51bb28432271d4f030407249c1f196b55e1beafd82fe66f6",
+    "scripts/ci_business_witness/runner.py": "620de68cf5642baac79c7e95e5d6df26bf7454911fad7b8f5684fb9cc4ae3ec4",
+    "scripts/ci_business_witness/storage.py": "db6e1c48130249869f068f7bffe251807b1eef072467761122b90b8de2ba1b8c",
+    "scripts/ci_test_execution.py": "f8cecf70180c062c80dcc835a8a9b7ff7ffed2612bbc18114e4e4205cd2605c5",
+    "scripts/ci_test_plan.py": "94afc6757e81813ec3e4ecfe3006805ccc00498c97048bd23968abfded861c2f",
+    "scripts/ci_test_report.py": "88765ae21a14c5bf55c4e238fb24e4dd8f556863564a18d7674591edaf82cad8",
+    "scripts/python_coverage_diagnostics.py": "f847802c417d4ddc4f4d4bb6506d1f9696a31c1d4f7156cb7c4eee44738bc11b",
+    "scripts/python_witness.py": "8af3e984f1c46d28d3f400654c8269d1e163038aae48ea1d375ee7bcfa0c1de9"
+  }
+}

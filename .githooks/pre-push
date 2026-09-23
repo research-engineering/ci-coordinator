@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+exec "$root/backend/.venv/bin/python" -m scripts.diagram_push --hook

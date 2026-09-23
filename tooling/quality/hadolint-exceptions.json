@@ -1,0 +1,38 @@
+[
+  {
+    "file": ".devcontainer/Dockerfile",
+    "line": 5,
+    "code": "DL4006",
+    "level": "warning",
+    "source": "RUN case \"${TARGETARCH}\" in \\\n      amd64) mise_arch=x64; mise_sha=6e39ee1ffa926a1f64814efbf1d26c3f617255e2a6ba6152e3c8a5135fa5a35f ;; \\\n      arm64) mise_arch=arm64; mise_sha=80ad6e9589d3c4483fd67a4a97f07e28330964dde64ca8cad15d5cb56134a54d ;; \\\n      *) exit 2 ;; \\\n    esac \\\n    && curl --fail --location --silent --show-error \\\n      \"https://github.com/jdx/mise/releases/download/v${MISE_VERSION}/mise-v${MISE_VERSION}-linux-${mise_arch}\" \\\n      --output /usr/local/bin/mise \\\n    && echo \"${mise_sha}  /usr/local/bin/mise\" | sha256sum --check --strict \\\n    && chmod 0755 /usr/local/bin/mise",
+    "reason": "The only pipe feeds a fixed builtin echo into sha256sum --check --strict. sha256sum is the final status-bearing command and rejects empty, malformed or mismatched input. There is no fallible download on the left of the pipe.",
+    "sha256": "76a0c889d3994063cde8a015e1bac3c5fd1f9247d85898a8988568fc0521b1fe"
+  },
+  {
+    "file": "frontend/Dockerfile.dev",
+    "line": 14,
+    "code": "DL3066",
+    "level": "info",
+    "source": "USER node",
+    "reason": "The digest-pinned official Node image defines the node account. This build-stage USER is resolved inside that image, not by a host bind-mount account lookup.",
+    "sha256": "eb6cb85650deeb4f08358726773cccd735a164a0a3a0f7e12a7b1ae6a07d7100"
+  },
+  {
+    "file": "frontend/Dockerfile.dev",
+    "line": 16,
+    "code": "DL3066",
+    "level": "info",
+    "source": "USER root",
+    "reason": "The standard root account is needed for the following ownership-preserving COPY operations; the final USER returns to node in the same pinned official image.",
+    "sha256": "eb6cb85650deeb4f08358726773cccd735a164a0a3a0f7e12a7b1ae6a07d7100"
+  },
+  {
+    "file": "frontend/Dockerfile.dev",
+    "line": 20,
+    "code": "DL3066",
+    "level": "info",
+    "source": "USER node",
+    "reason": "The digest-pinned official Node image defines node. The development runtime uses that image account and does not resolve an arbitrary host user name.",
+    "sha256": "eb6cb85650deeb4f08358726773cccd735a164a0a3a0f7e12a7b1ae6a07d7100"
+  }
+]

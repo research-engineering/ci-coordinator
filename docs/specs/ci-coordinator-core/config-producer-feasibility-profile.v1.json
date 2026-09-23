@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "ci-config-producer-feasibility-profile/v1",
+  "profileId": "ci-config-dynamic-ci-audit-feasibility/v1",
+  "ownerId": "ci-coordinator.config-control",
+  "input": {
+    "document": "normalized repository policy",
+    "pointer": "/repository/dynamicCi",
+    "nullResult": "feasible",
+    "planningDisabledResult": "feasible"
+  },
+  "projection": {
+    "projectionId": "configured-validation-catalog-audit-lower-bound/v1",
+    "fields": {
+      "obligations": "compiled-dynamicCi.obligations:all-fields",
+      "witnesses": "compiled-dynamicCi.witnesses:all-fields",
+      "executionProfiles": "compiled-dynamicCi.executionProfiles:all-fields"
+    },
+    "canonicalOrder": "kernel.canonical-json/v1",
+    "proof": "Every verified planning-evidence payload embeds this complete configured ValidationCatalog. Canonical JSON for the enclosing payload is strictly larger than canonical JSON for this catalog, so a catalog overflow proves that every such payload must overflow.",
+    "excludes": [
+      "policyVersion",
+      "riskClasses",
+      "agentAdvice",
+      "dependencyGraphSource",
+      "globalRiskPaths",
+      "fallbackTimeoutSeconds"
+    ]
+  },
+  "byteAdmission": {
+    "measureId": "canonical-json-utf-8-octets/v1",
+    "limit": 1048576,
+    "overflowObserved": 1048577,
+    "evaluation": "encode the complete projection with bounded canonical JSON and stop after proving limit plus one"
+  },
+  "diagnostic": {
+    "code": "feasibility.audit_projection_exceeded",
+    "phase": "feasibility",
+    "ruleId": "feasibility.audit-projection",
+    "instancePointer": "/repository/dynamicCi",
+    "parameters": {
+      "profileId": "profileId",
+      "limit": "byteAdmission.limit",
+      "observed": "byteAdmission.overflowObserved",
+      "projectionId": "projection.projectionId"
+    }
+  },
+  "compatibility": {
+    "owner": "backend/src/ci_coordinator/config_control/_feasibility.py",
+    "fieldAliases": [],
+    "changeRequiresNewProfileVersion": true
+  },
+  "nonClaims": [
+    "Passing this catalog lower bound does not prove that any complete runtime payload fits.",
+    "This profile does not authorize bypassing runtime audit resource or byte admission.",
+    "This profile does not prove provider inventory completeness, provider execution, or production omission safety."
+  ]
+}

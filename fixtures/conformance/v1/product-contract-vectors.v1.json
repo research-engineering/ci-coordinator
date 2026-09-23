@@ -1,0 +1,1087 @@
+{
+  "schemaVersion": "ci-coordinator-product-contract-vectors/v1",
+  "contractId": "ci-coordinator-core-contract-vectors/v1",
+  "reviewedAt": "2026-07-15",
+  "cases": {
+    "canonicalIdentity": {
+      "canonical": "{\"a\":{\"count\":3,\"nested\":true},\"z\":[\"last\",{\"alpha\":1,\"beta\":2}]}",
+      "hash": "63c52acbfd1fe450ef21d83d76b426a36af665b7bac419d41efc0c4bfd794b5d",
+      "value": {
+        "a": {
+          "count": 3,
+          "nested": true
+        },
+        "z": [
+          "last",
+          {
+            "alpha": 1,
+            "beta": 2
+          }
+        ]
+      }
+    },
+    "auditReplay": {
+      "auditEventFilter": {
+        "events": [
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+            "createdAt": "2026-07-09T00:00:00.000Z",
+            "eventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+            "eventType": "created",
+            "idempotencyKey": "audit-case-001",
+            "inputHash": "82ee39806db65aef18617076de6b851dc4b7a90576a5aafdf6af650d5c6a532a",
+            "payload": {
+              "sequence": 1,
+              "status": "created"
+            },
+            "payloadHash": "686293bbb1524f5464849a488f6448fb9bcce26f38792d1f21c858e4f1ef2b50",
+            "previousEventHash": null,
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 1,
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+            "createdAt": "2026-07-09T00:01:00.000Z",
+            "eventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+            "eventType": "verified",
+            "idempotencyKey": "audit-case-002",
+            "inputHash": "bee4e88765855b96da0e11cf5fa79391bcbd276becf3c09301a3ebe34cb0f76f",
+            "payload": {
+              "sequence": 2,
+              "status": "verified"
+            },
+            "payloadHash": "eee5ed9329fd53a9b4f1cda5557fefe62104a0d933da57287bbce17ab305ce88",
+            "previousEventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 2,
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_48e0551a14d36a59c6d9a5bbbe356c0c",
+            "createdAt": "2026-07-09T00:02:00.000Z",
+            "eventHash": "48e0551a14d36a59c6d9a5bbbe356c0cb165d1c2a06bd2efb5e53c69886894e0",
+            "eventType": "detected",
+            "idempotencyKey": "audit-case-003",
+            "inputHash": "2d6f92f0b0ad5faf815cc7fcfa6a90edd9858cf5e9fa049b9205bd07e87b7ca8",
+            "payload": {
+              "sequence": 3,
+              "status": "detected"
+            },
+            "payloadHash": "9db2c3ab04595854c6b128bd31f425021946b2ed89ac7e703332c10e3e84775b",
+            "previousEventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 3,
+            "subjectId": "plan-a",
+            "subjectType": "policy-drift"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_f2139dc80758095c60925c294d66863e",
+            "createdAt": "2026-07-09T00:03:00.000Z",
+            "eventHash": "f2139dc80758095c60925c294d66863e38ced7616edb1331fb7e43181bbbf2a5",
+            "eventType": "created",
+            "idempotencyKey": "audit-case-004",
+            "inputHash": "9276a92ae3b06c544781a5860b1640cd57a314de04cbb9ac44889c6cf99f56cb",
+            "payload": {
+              "sequence": 4,
+              "status": "created"
+            },
+            "payloadHash": "f8e12d1621bd4ed082d4e1598713631ed2aee5ff804b52f706cb34bb9460f122",
+            "previousEventHash": "48e0551a14d36a59c6d9a5bbbe356c0cb165d1c2a06bd2efb5e53c69886894e0",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 4,
+            "subjectId": "plan-b",
+            "subjectType": "dynamic-ci-plan"
+          }
+        ],
+        "replay": {
+          "events": [
+            {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+              "createdAt": "2026-07-09T00:01:00.000Z",
+              "eventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+              "eventType": "verified",
+              "inputHash": "bee4e88765855b96da0e11cf5fa79391bcbd276becf3c09301a3ebe34cb0f76f",
+              "payloadHash": "eee5ed9329fd53a9b4f1cda5557fefe62104a0d933da57287bbce17ab305ce88",
+              "previousEventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+              "sequence": 2,
+              "subjectId": "plan-a",
+              "subjectType": "dynamic-ci-plan"
+            }
+          ],
+          "filter": {
+            "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+            "kind": "audit-event"
+          },
+          "ledger": {
+            "lastEventHash": "f2139dc80758095c60925c294d66863e38ced7616edb1331fb7e43181bbbf2a5",
+            "totalEvents": 4,
+            "valid": true
+          },
+          "ok": true,
+          "status": "valid"
+        }
+      },
+      "conflictingIdempotencyKey": {
+        "verification": {
+          "auditEventId": "audit_24e78e0b90f8be575ba0ea3d9f0fbe88",
+          "reason": "conflicting audit event idempotency key",
+          "valid": false
+        }
+      },
+      "corruptedPayload": {
+        "replay": {
+          "events": [],
+          "filter": {
+            "kind": "all"
+          },
+          "ledger": {
+            "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+            "reason": "payload hash does not match payload",
+            "totalEvents": 2,
+            "valid": false
+          },
+          "ok": false,
+          "status": "invalid-ledger"
+        },
+        "verification": {
+          "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+          "reason": "payload hash does not match payload",
+          "valid": false
+        }
+      },
+      "dualFaultPrecedence": {
+        "verification": {
+          "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+          "reason": "payload hash does not match payload",
+          "valid": false
+        }
+      },
+      "duplicateIdempotencyKey": {
+        "verification": {
+          "auditEventId": "audit_c0a73d907e6f69caa62eeac798705915",
+          "reason": "duplicate audit event idempotency key",
+          "valid": false
+        }
+      },
+      "missingAuditEvent": {
+        "events": [
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+            "createdAt": "2026-07-09T00:00:00.000Z",
+            "eventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+            "eventType": "created",
+            "idempotencyKey": "audit-case-001",
+            "inputHash": "82ee39806db65aef18617076de6b851dc4b7a90576a5aafdf6af650d5c6a532a",
+            "payload": {
+              "sequence": 1,
+              "status": "created"
+            },
+            "payloadHash": "686293bbb1524f5464849a488f6448fb9bcce26f38792d1f21c858e4f1ef2b50",
+            "previousEventHash": null,
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 1,
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+            "createdAt": "2026-07-09T00:01:00.000Z",
+            "eventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+            "eventType": "verified",
+            "idempotencyKey": "audit-case-002",
+            "inputHash": "bee4e88765855b96da0e11cf5fa79391bcbd276becf3c09301a3ebe34cb0f76f",
+            "payload": {
+              "sequence": 2,
+              "status": "verified"
+            },
+            "payloadHash": "eee5ed9329fd53a9b4f1cda5557fefe62104a0d933da57287bbce17ab305ce88",
+            "previousEventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 2,
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_48e0551a14d36a59c6d9a5bbbe356c0c",
+            "createdAt": "2026-07-09T00:02:00.000Z",
+            "eventHash": "48e0551a14d36a59c6d9a5bbbe356c0cb165d1c2a06bd2efb5e53c69886894e0",
+            "eventType": "detected",
+            "idempotencyKey": "audit-case-003",
+            "inputHash": "2d6f92f0b0ad5faf815cc7fcfa6a90edd9858cf5e9fa049b9205bd07e87b7ca8",
+            "payload": {
+              "sequence": 3,
+              "status": "detected"
+            },
+            "payloadHash": "9db2c3ab04595854c6b128bd31f425021946b2ed89ac7e703332c10e3e84775b",
+            "previousEventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 3,
+            "subjectId": "plan-a",
+            "subjectType": "policy-drift"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_f2139dc80758095c60925c294d66863e",
+            "createdAt": "2026-07-09T00:03:00.000Z",
+            "eventHash": "f2139dc80758095c60925c294d66863e38ced7616edb1331fb7e43181bbbf2a5",
+            "eventType": "created",
+            "idempotencyKey": "audit-case-004",
+            "inputHash": "9276a92ae3b06c544781a5860b1640cd57a314de04cbb9ac44889c6cf99f56cb",
+            "payload": {
+              "sequence": 4,
+              "status": "created"
+            },
+            "payloadHash": "f8e12d1621bd4ed082d4e1598713631ed2aee5ff804b52f706cb34bb9460f122",
+            "previousEventHash": "48e0551a14d36a59c6d9a5bbbe356c0cb165d1c2a06bd2efb5e53c69886894e0",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 4,
+            "subjectId": "plan-b",
+            "subjectType": "dynamic-ci-plan"
+          }
+        ],
+        "replay": {
+          "events": [],
+          "filter": {
+            "auditEventId": "audit_00000000000000000000000000000000",
+            "kind": "audit-event"
+          },
+          "ledger": {
+            "lastEventHash": "f2139dc80758095c60925c294d66863e38ced7616edb1331fb7e43181bbbf2a5",
+            "totalEvents": 4,
+            "valid": true
+          },
+          "ok": false,
+          "status": "not-found"
+        }
+      },
+      "resourceAdmissionV1": {
+        "caseCount": 21,
+        "cases": {
+          "alias-over-limit": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload/1",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "alias-within-limit": {
+            "accepted": true,
+            "payloadHash": "1cc958ae61e3f39516d9d18d40397011ac3c226801223f7bcf9b00a3485e91f3"
+          },
+          "depth-at-limit": {
+            "accepted": true,
+            "payloadHash": "90446a22034badcd5eaf4de52f6f1572f844d27acfffb38bbdc8fa1a34e65429"
+          },
+          "depth-over-limit": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_depth_exceeded",
+              "instancePointer": "/payload/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0",
+              "limit": 64,
+              "observed": 65
+            }
+          },
+          "empty-array-root": {
+            "accepted": true,
+            "payloadHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          },
+          "empty-object-root": {
+            "accepted": true,
+            "payloadHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "future-depth-and-nodes": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload/9998",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "hostile-depth": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_depth_exceeded",
+              "instancePointer": "/payload/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0/0",
+              "limit": 64,
+              "observed": 65
+            }
+          },
+          "mixed-depth-at-limit": {
+            "accepted": true,
+            "payloadHash": "4f4308c99dd5c3becd5a211ef6d89d334c27a09d611f191fd6dbff1727a58e08"
+          },
+          "mixed-depth-over-limit": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_depth_exceeded",
+              "instancePointer": "/payload/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0/value/0",
+              "limit": 64,
+              "observed": 65
+            }
+          },
+          "nodes-and-invalid-scalar": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "nodes-at-limit": {
+            "accepted": true,
+            "payloadHash": "94037cb8adef5933e79a3383233a2545c43f29786d24b4739b579e401601aa2f"
+          },
+          "nodes-over-limit": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "null-root": {
+            "accepted": true,
+            "payloadHash": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "object-keys-at-limit": {
+            "accepted": true,
+            "payloadHash": "c35a9e104bde60186477214048ced94b025a0dbe6b6c9aa1c4105e96210a90f9"
+          },
+          "object-keys-over-limit": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "object-order-over-limit": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "pointer-dot-key": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload/a.b",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "pointer-empty-key": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload/",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "pointer-slash-key": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload/a~1b",
+              "limit": 10000,
+              "observed": 10001
+            }
+          },
+          "pointer-tilde-key": {
+            "accepted": false,
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload/m~0n",
+              "limit": 10000,
+              "observed": 10001
+            }
+          }
+        },
+        "limits": {
+          "maxDepth": 64,
+          "maxNodes": 10000
+        },
+        "profileDigest": "211e5a32e49adcf48c3101dd116265e76cba6ddc7b3e0a314693801cc09d40a7",
+        "profileId": "ci-audit-event-json-resources/v1",
+        "schemaVersion": "ci-audit-json-resource-corpus/v1"
+      },
+      "resourceAndInvalidMetadataRecord": {
+        "replay": {
+          "events": [],
+          "filter": {
+            "kind": "all"
+          },
+          "ledger": {
+            "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+            "reason": "payload exceeds maximum JSON node count of 10000",
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload",
+              "limit": 10000,
+              "observed": 10001
+            },
+            "totalEvents": 1,
+            "valid": false
+          },
+          "ok": false,
+          "status": "invalid-ledger"
+        },
+        "verification": {
+          "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+          "reason": "payload exceeds maximum JSON node count of 10000",
+          "resourceFailure": {
+            "code": "json_max_nodes_exceeded",
+            "instancePointer": "/payload",
+            "limit": 10000,
+            "observed": 10001
+          },
+          "valid": false
+        }
+      },
+      "resourceExhaustedRecord": {
+        "replay": {
+          "events": [],
+          "filter": {
+            "kind": "all"
+          },
+          "ledger": {
+            "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+            "reason": "payload exceeds maximum JSON node count of 10000",
+            "resourceFailure": {
+              "code": "json_max_nodes_exceeded",
+              "instancePointer": "/payload",
+              "limit": 10000,
+              "observed": 10001
+            },
+            "totalEvents": 1,
+            "valid": false
+          },
+          "ok": false,
+          "status": "invalid-ledger"
+        },
+        "verification": {
+          "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+          "reason": "payload exceeds maximum JSON node count of 10000",
+          "resourceFailure": {
+            "code": "json_max_nodes_exceeded",
+            "instancePointer": "/payload",
+            "limit": 10000,
+            "observed": 10001
+          },
+          "valid": false
+        }
+      },
+      "scalarDomain": {
+        "auditText": {
+          "lowSurrogateActor": {
+            "accepted": false
+          },
+          "surrogateActor": {
+            "accepted": false
+          },
+          "surrogateEventType": {
+            "accepted": false
+          },
+          "surrogateIdempotencyKey": {
+            "accepted": false
+          },
+          "surrogateSubjectId": {
+            "accepted": false
+          }
+        },
+        "numberCorpus": {
+          "caseCount": 8696,
+          "digest": "9f0498f083e000d94d224eac699136542d97e7abf1926530b8bb33df3caf4ab8"
+        },
+        "payload": {
+          "arrayOrder": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"values\":[1,2,3]}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_bba9afc709163bae5c3a5a8db054c6e6",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "bba9afc709163bae5c3a5a8db054c6e6b7de229fbeaad4f22ab8b487a8809899",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-array-order",
+              "inputHash": "eced2ddc76f22c5da05c8e39079466b16528b37bffc287f56f87b2c5a035b202",
+              "payload": {
+                "values": [1, 2, 3]
+              },
+              "payloadHash": "abe0a9abcc957f9f5aa04d68c4f49fadee7c4b62343e403a3a1c0b646519d53c",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "finiteFraction": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"value\":1e-7}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_41fb2085297d875de55910347db1a3fe",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "41fb2085297d875de55910347db1a3fe694f82febcfa538797af6c1913507d29",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-finite-fraction",
+              "inputHash": "c8f0776483e47b5129eaaac85ef9963c0a0d010cdcd468aac8b06d122f81ef81",
+              "payload": {
+                "value": 1e-7
+              },
+              "payloadHash": "910750038eb30a40d06da88009b6259aabaf3751b3cb212c616d51abb6b008a4",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "lowSurrogateKey": {
+            "accepted": false
+          },
+          "lowSurrogateValue": {
+            "accepted": false
+          },
+          "negativeFiniteFraction": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"value\":-1e-7}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_232074435891ba6185d7976f9f9627d7",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "232074435891ba6185d7976f9f9627d7a561f61d18e761ceaa77d9346b9688e4",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-negative-finite-fraction",
+              "inputHash": "d388288cb44aecd1ddf9d486578d5b1ed5d82976f7e4e942f7cb808a225c9183",
+              "payload": {
+                "value": -1e-7
+              },
+              "payloadHash": "07f205e995e6b3d584d198ed587ada3f42b26be4933c3d88eba80814e1fba81d",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "negativeNonFinite": {
+            "accepted": false
+          },
+          "negativeSubnormal": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"value\":-5e-324}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_88433e231dac1f7f739573704b23efa4",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "88433e231dac1f7f739573704b23efa412924dc6f49176490dddc6e4469b1c97",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-negative-subnormal",
+              "inputHash": "7a3faea23bd9349a401cef94eb254995d74d2c4f71201c07a6f95423be5c4126",
+              "payload": {
+                "value": -5e-324
+              },
+              "payloadHash": "ab7b8bf379e41464b0e5750cbcbd9747ea2d326b5a1140c916352769663ecc85",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "negativeZero": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"value\":0}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_9d26cd7b10461a177f041cab072e3d05",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "9d26cd7b10461a177f041cab072e3d05da58bbf782ad511ec5385128bdc7d710",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-negative-zero",
+              "inputHash": "000aae6b57aea43ebf256929409cc5e8e0922e1d28c24a4f68ff7f2ef8099134",
+              "payload": {
+                "value": 0
+              },
+              "payloadHash": "23d7b286bd429460b92a2a1c21b6afc34110446c5034c17363fda363aa0a7c5d",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "nestedProtoKey": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"nested\":{\"__proto__\":\"evidence\"}}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_3f648e5958f7f14d917b6b4ae7a53a53",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "3f648e5958f7f14d917b6b4ae7a53a53cc028696328caf86b16e1d9354976532",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-nested-proto-key",
+              "inputHash": "42c681e2a01222ae0104d582d3644f46203959f7e9b1ef462732fbb32f6e415f",
+              "payload": {
+                "nested": {
+                  "__proto__": "evidence"
+                }
+              },
+              "payloadHash": "cdd92f5f8f10e8ed0a0dd8a34180479fa81a467048be544adbd97160367d5dab",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "nonFinite": {
+            "accepted": false
+          },
+          "positiveSubnormal": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"value\":5e-324}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_76341af46c7e46539dd3c4b89097c6ab",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "76341af46c7e46539dd3c4b89097c6abb5777326b0332c21af32eccf65b9824e",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-positive-subnormal",
+              "inputHash": "a4ee7739efd6f14bf03ad2e271f6be806f2b52cb1b739c79d8d43d01c5b6a8c1",
+              "payload": {
+                "value": 5e-324
+              },
+              "payloadHash": "8f275eb622ce665f3cf21739b40600308dcea7c36627451f1c210a4152343c85",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "protoKey": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"__proto__\":\"evidence\"}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_8077d2c5df7f2dae650ec8e353ca9ff1",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "8077d2c5df7f2dae650ec8e353ca9ff12b8d9e5f2c26eb3b0ed66f494bf059b3",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-proto-key",
+              "inputHash": "7495028a7e0a4f931bcefe60cb4f6b0601afddca54d3bc42b65dd7894d794c7b",
+              "payload": {
+                "__proto__": "evidence"
+              },
+              "payloadHash": "7090850f99514505bd4f17259ff59e42b73c36199c525c0c22c4d8238398d9fc",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "safeIntegerMaximum": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"value\":9007199254740991}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_fd5c236a48b770c27d65653d684177a1",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "fd5c236a48b770c27d65653d684177a1f385aae15e8f49ed0c0809b71d776122",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-safe-integer",
+              "inputHash": "ceafbb1a1592d40e836e492534717f6a87059f07678322bc309f94ca6283a343",
+              "payload": {
+                "value": 9007199254740991
+              },
+              "payloadHash": "16c63bddb910905c4ee8abf36273baa20dba53020dbaf265da5936013ded185d",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "safeIntegerMinimum": {
+            "accepted": true,
+            "canonicalPayloadJson": "{\"value\":-9007199254740991}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_40d815e4ef05b9178efc5e2b404c6d8d",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "40d815e4ef05b9178efc5e2b404c6d8d20a4e3e3dba3336855027f6da9996391",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-safe-negative-integer",
+              "inputHash": "a017c3327ea8b51d79f4f7a51d6b7712f2e5f3d627643a9ba3bfa8d7eb6548fd",
+              "payload": {
+                "value": -9007199254740991
+              },
+              "payloadHash": "4fcd1f34a0ba00a639b9a6a805c6952838e7f403c126290440bc71e64d01693a",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "surrogateKey": {
+            "accepted": false
+          },
+          "surrogateValue": {
+            "accepted": false
+          },
+          "unsafeInteger": {
+            "accepted": false
+          },
+          "unsafeMagnitude": {
+            "accepted": false
+          },
+          "unsafeNegativeInteger": {
+            "accepted": false
+          }
+        },
+        "sequence": {
+          "boolean": {
+            "accepted": false
+          },
+          "fraction": {
+            "accepted": false
+          },
+          "integralFloatOne": {
+            "accepted": true
+          },
+          "negative": {
+            "accepted": false
+          },
+          "successorAfterMaximum": {
+            "accepted": false
+          },
+          "unsafeInteger": {
+            "accepted": false
+          },
+          "zero": {
+            "accepted": false
+          }
+        },
+        "timestamp": {
+          "invalidLeapDay": {
+            "accepted": false
+          },
+          "maximumYear": {
+            "accepted": true,
+            "canonicalPayloadJson": "{}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_27e1eab9e7665860757c9be9ab13519d",
+              "createdAt": "9999-12-31T23:59:59.999Z",
+              "eventHash": "27e1eab9e7665860757c9be9ab13519d76a523ee1b034f61bb6908f2b3a8a189",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-maximum-year",
+              "inputHash": "9d84e0c1394288d5f2ba5e15ee6396fe7eda05932f641abcb0e6b7e09b879d40",
+              "payload": {},
+              "payloadHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "minimumYear": {
+            "accepted": true,
+            "canonicalPayloadJson": "{}",
+            "event": {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_2eb65b405fd2dd16fd2b0f3513641876",
+              "createdAt": "0001-01-01T00:00:00.000Z",
+              "eventHash": "2eb65b405fd2dd16fd2b0f3513641876e1971ed0798fe0d6aced5bb4a96f10b9",
+              "eventType": "scalar-domain.checked",
+              "idempotencyKey": "audit-scalar-minimum-year",
+              "inputHash": "af9ec771ac035022895722ee126155111c99c3dc5ff5aca8afba5b37ba738ea5",
+              "payload": {},
+              "payloadHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+              "previousEventHash": null,
+              "schemaVersion": "ci-audit-event/v1",
+              "sequence": 1,
+              "subjectId": "scalar-domain",
+              "subjectType": "dynamic-ci-plan"
+            }
+          },
+          "missingMilliseconds": {
+            "accepted": false
+          },
+          "negativeExtendedYear": {
+            "accepted": false
+          },
+          "offsetUtc": {
+            "accepted": false
+          },
+          "positiveExtendedYear": {
+            "accepted": false
+          },
+          "yearZero": {
+            "accepted": false
+          }
+        }
+      },
+      "subjectFilter": {
+        "events": [
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+            "createdAt": "2026-07-09T00:00:00.000Z",
+            "eventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+            "eventType": "created",
+            "idempotencyKey": "audit-case-001",
+            "inputHash": "82ee39806db65aef18617076de6b851dc4b7a90576a5aafdf6af650d5c6a532a",
+            "payload": {
+              "sequence": 1,
+              "status": "created"
+            },
+            "payloadHash": "686293bbb1524f5464849a488f6448fb9bcce26f38792d1f21c858e4f1ef2b50",
+            "previousEventHash": null,
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 1,
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+            "createdAt": "2026-07-09T00:01:00.000Z",
+            "eventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+            "eventType": "verified",
+            "idempotencyKey": "audit-case-002",
+            "inputHash": "bee4e88765855b96da0e11cf5fa79391bcbd276becf3c09301a3ebe34cb0f76f",
+            "payload": {
+              "sequence": 2,
+              "status": "verified"
+            },
+            "payloadHash": "eee5ed9329fd53a9b4f1cda5557fefe62104a0d933da57287bbce17ab305ce88",
+            "previousEventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 2,
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_48e0551a14d36a59c6d9a5bbbe356c0c",
+            "createdAt": "2026-07-09T00:02:00.000Z",
+            "eventHash": "48e0551a14d36a59c6d9a5bbbe356c0cb165d1c2a06bd2efb5e53c69886894e0",
+            "eventType": "detected",
+            "idempotencyKey": "audit-case-003",
+            "inputHash": "2d6f92f0b0ad5faf815cc7fcfa6a90edd9858cf5e9fa049b9205bd07e87b7ca8",
+            "payload": {
+              "sequence": 3,
+              "status": "detected"
+            },
+            "payloadHash": "9db2c3ab04595854c6b128bd31f425021946b2ed89ac7e703332c10e3e84775b",
+            "previousEventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 3,
+            "subjectId": "plan-a",
+            "subjectType": "policy-drift"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_f2139dc80758095c60925c294d66863e",
+            "createdAt": "2026-07-09T00:03:00.000Z",
+            "eventHash": "f2139dc80758095c60925c294d66863e38ced7616edb1331fb7e43181bbbf2a5",
+            "eventType": "created",
+            "idempotencyKey": "audit-case-004",
+            "inputHash": "9276a92ae3b06c544781a5860b1640cd57a314de04cbb9ac44889c6cf99f56cb",
+            "payload": {
+              "sequence": 4,
+              "status": "created"
+            },
+            "payloadHash": "f8e12d1621bd4ed082d4e1598713631ed2aee5ff804b52f706cb34bb9460f122",
+            "previousEventHash": "48e0551a14d36a59c6d9a5bbbe356c0cb165d1c2a06bd2efb5e53c69886894e0",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 4,
+            "subjectId": "plan-b",
+            "subjectType": "dynamic-ci-plan"
+          }
+        ],
+        "replay": {
+          "events": [
+            {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+              "eventType": "created",
+              "inputHash": "82ee39806db65aef18617076de6b851dc4b7a90576a5aafdf6af650d5c6a532a",
+              "payloadHash": "686293bbb1524f5464849a488f6448fb9bcce26f38792d1f21c858e4f1ef2b50",
+              "previousEventHash": null,
+              "sequence": 1,
+              "subjectId": "plan-a",
+              "subjectType": "dynamic-ci-plan"
+            },
+            {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+              "createdAt": "2026-07-09T00:01:00.000Z",
+              "eventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+              "eventType": "verified",
+              "inputHash": "bee4e88765855b96da0e11cf5fa79391bcbd276becf3c09301a3ebe34cb0f76f",
+              "payloadHash": "eee5ed9329fd53a9b4f1cda5557fefe62104a0d933da57287bbce17ab305ce88",
+              "previousEventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+              "sequence": 2,
+              "subjectId": "plan-a",
+              "subjectType": "dynamic-ci-plan"
+            }
+          ],
+          "filter": {
+            "kind": "subject",
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          },
+          "ledger": {
+            "lastEventHash": "f2139dc80758095c60925c294d66863e38ced7616edb1331fb7e43181bbbf2a5",
+            "totalEvents": 4,
+            "valid": true
+          },
+          "ok": true,
+          "status": "valid"
+        }
+      },
+      "tamperedAuditEventId": {
+        "verification": {
+          "auditEventId": "audit_00000000000000000000000000000000",
+          "reason": "audit event id does not match event hash",
+          "valid": false
+        }
+      },
+      "tamperedEventHash": {
+        "verification": {
+          "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+          "reason": "event hash does not match event identity",
+          "valid": false
+        }
+      },
+      "validChain": {
+        "events": [
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+            "createdAt": "2026-07-09T00:00:00.000Z",
+            "eventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+            "eventType": "created",
+            "idempotencyKey": "audit-case-001",
+            "inputHash": "82ee39806db65aef18617076de6b851dc4b7a90576a5aafdf6af650d5c6a532a",
+            "payload": {
+              "sequence": 1,
+              "status": "created"
+            },
+            "payloadHash": "686293bbb1524f5464849a488f6448fb9bcce26f38792d1f21c858e4f1ef2b50",
+            "previousEventHash": null,
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 1,
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          },
+          {
+            "actor": "ci-coordinator",
+            "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+            "createdAt": "2026-07-09T00:01:00.000Z",
+            "eventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+            "eventType": "verified",
+            "idempotencyKey": "audit-case-002",
+            "inputHash": "bee4e88765855b96da0e11cf5fa79391bcbd276becf3c09301a3ebe34cb0f76f",
+            "payload": {
+              "sequence": 2,
+              "status": "verified"
+            },
+            "payloadHash": "eee5ed9329fd53a9b4f1cda5557fefe62104a0d933da57287bbce17ab305ce88",
+            "previousEventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+            "schemaVersion": "ci-audit-event/v1",
+            "sequence": 2,
+            "subjectId": "plan-a",
+            "subjectType": "dynamic-ci-plan"
+          }
+        ],
+        "replay": {
+          "events": [
+            {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_c84df0dcd29e2df1fefd4c52dce7eac6",
+              "createdAt": "2026-07-09T00:00:00.000Z",
+              "eventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+              "eventType": "created",
+              "inputHash": "82ee39806db65aef18617076de6b851dc4b7a90576a5aafdf6af650d5c6a532a",
+              "payloadHash": "686293bbb1524f5464849a488f6448fb9bcce26f38792d1f21c858e4f1ef2b50",
+              "previousEventHash": null,
+              "sequence": 1,
+              "subjectId": "plan-a",
+              "subjectType": "dynamic-ci-plan"
+            },
+            {
+              "actor": "ci-coordinator",
+              "auditEventId": "audit_6c255c4a92975f3840090827aacd9886",
+              "createdAt": "2026-07-09T00:01:00.000Z",
+              "eventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+              "eventType": "verified",
+              "inputHash": "bee4e88765855b96da0e11cf5fa79391bcbd276becf3c09301a3ebe34cb0f76f",
+              "payloadHash": "eee5ed9329fd53a9b4f1cda5557fefe62104a0d933da57287bbce17ab305ce88",
+              "previousEventHash": "c84df0dcd29e2df1fefd4c52dce7eac69844b83adcae2f48385304ab1e7f9cca",
+              "sequence": 2,
+              "subjectId": "plan-a",
+              "subjectType": "dynamic-ci-plan"
+            }
+          ],
+          "filter": {
+            "kind": "all"
+          },
+          "ledger": {
+            "lastEventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+            "totalEvents": 2,
+            "valid": true
+          },
+          "ok": true,
+          "status": "valid"
+        },
+        "verification": {
+          "lastEventHash": "6c255c4a92975f3840090827aacd988613e7b7332afb5aa67ee73bde91b592ee",
+          "valid": true
+        }
+      },
+      "wrongPreviousHash": {
+        "verification": {
+          "auditEventId": "audit_ff3d7256fc3180d56ce8c3647136f746",
+          "reason": "previous event hash does not match",
+          "valid": false
+        }
+      }
+    }
+  },
+  "nonClaims": [
+    "These vectors freeze only the canonical identity and audit replay contracts exercised by native Python witnesses.",
+    "The values are requirement-owned regression data and do not grant authority to an implementation."
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "CI Coordinator",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "remoteUser": "vscode",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "mounts": [
+    "source=${devcontainerId}-backend-venv,target=${containerWorkspaceFolder}/backend/.venv,type=volume",
+    "source=${devcontainerId}-mise-data,target=/home/vscode/.local/share/mise,type=volume",
+    "source=${devcontainerId}-pnpm-store,target=${containerWorkspaceFolder}/.pnpm-store,type=volume",
+    "source=${devcontainerId}-root-node-modules,target=${containerWorkspaceFolder}/node_modules,type=volume",
+    "source=${devcontainerId}-frontend-node-modules,target=${containerWorkspaceFolder}/frontend/node_modules,type=volume"
+  ],
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "biomejs.biome",
+        "charliermarsh.ruff",
+        "dbaeumer.vscode-eslint",
+        "ms-python.mypy-type-checker",
+        "ms-python.python",
+        "TypeScriptTeam.native-preview"
+      ],
+      "settings": {
+        "js/ts.experimental.useTsgo": true,
+        "js/ts.tsdk.path": "./frontend/node_modules/@typescript/native"
+      }
+    }
+  }
+}

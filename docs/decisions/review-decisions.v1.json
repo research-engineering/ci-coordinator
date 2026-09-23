@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "registerId": "ci-coordinator.review-decisions/v1",
+  "decisions": [
+    {
+      "decisionId": "RD-001",
+      "kind": "owner-choice",
+      "rejectedArgument": "Supporting only CPython 3.13.15 is a defect merely because a newer Python minor exists.",
+      "scope": "The current company-aligned runtime support projection, not dependency security or runtime correctness.",
+      "ownerReferences": [
+        {"path": "docs/specs/ci-coordinator-runtime/python-runtime-profile.v1.json", "sha256": "b4925b478fb154dc1f952af968e7f4e48868a80f708a79c29f8fc834212a64d4"}
+      ],
+      "assumptions": ["The owner still selects the singleton company runtime.", "Required dependencies remain compatible with this runtime; security qualification is checked separately."],
+      "protectedObservations": ["One exact runtime identity agrees across package, container, development and CI projections."],
+      "simplestAlternative": "Support additional Python minors and validate every added runtime independently.",
+      "rationale": "Additional runtime families add a compatibility obligation without an admitted consumer need. A higher version number alone establishes no benefit under this scope.",
+      "acceptedCost": "Newer-runtime capabilities and optimizations are not automatically available.",
+      "falsifiers": ["An applicable security advisory or required dependency cannot be handled on the admitted runtime.", "A required workload has a demonstrated unacceptable limitation that an admitted newer runtime resolves."],
+      "revisionTriggers": ["Company runtime changes.", "Security support, dependency compatibility or a measured workload budget changes."],
+      "residualReview": "Always review exact patch security, dependency compatibility and projection consistency; this decision is not a security exception."
+    },
+    {
+      "decisionId": "RD-002",
+      "kind": "conditional-tradeoff",
+      "rejectedArgument": "The ledger-head lock is intrinsically an architecture bug and should be replaced with per-repository chains.",
+      "scope": "The current complete-ledger total-order and paired-state audit contract, not the measured cost of its implementation.",
+      "ownerReferences": [
+        {"path": "docs/architecture/modules/audit-replay.md", "sha256": "59941c7d46bb518c1ca9748be6db86ccdeafb2d0779b0ab74eea09e4e7421f42"}
+      ],
+      "assumptions": ["One retained total order remains an owner requirement.", "No measured capacity result proves the current serialization budget unacceptable."],
+      "protectedObservations": ["Subject filtering cannot hide corruption elsewhere in the frozen chain.", "An audit event and its owning state transition commit atomically."],
+      "simplestAlternative": "Partition audit order by repository with a new cross-chain verification and checkpoint contract.",
+      "rationale": "Partitioning changes the proof relation rather than preserving the same contract faster. Such a transition needs explicit owner admission and witnesses.",
+      "acceptedCost": "Audit appends serialize on the ledger head; throughput and contention still require measurement.",
+      "falsifiers": ["A reachable deadlock or excessive lock duration violates the admitted lifecycle.", "Measured representative load exceeds the capacity budget."],
+      "revisionTriggers": ["The audit owner no longer requires one total order.", "Contention measurements or deployment topology justify a versioned alternative."],
+      "residualReview": "Review lock ordering, transaction duration, cancellation, throughput, retention and checkpoint integrity. Do not report capacity as proved by this record."
+    },
+    {
+      "decisionId": "RD-003",
+      "kind": "conditional-tradeoff",
+      "rejectedArgument": "Canonical audit payload text should unconditionally be replaced by JSONB because JSONB is the modern PostgreSQL JSON type.",
+      "scope": "The durable byte identity used by audit hashing and replay, not auxiliary analytical projections.",
+      "ownerReferences": [
+        {"path": "docs/architecture/modules/audit-replay.md", "sha256": "59941c7d46bb518c1ca9748be6db86ccdeafb2d0779b0ab74eea09e4e7421f42"}
+      ],
+      "assumptions": ["Prepared canonical payload bytes remain authoritative for the retained hash.", "Queries do not require replacing that byte authority with normalized database JSON."],
+      "protectedObservations": ["Persistence writes the exact prepared payload used to derive its hash, without rereading or recanonicalizing caller data."],
+      "simplestAlternative": "Retain canonical bytes and add a separately owned bounded query projection only when needed.",
+      "rationale": "A storage-type preference does not establish equivalence of byte identity. A query projection can preserve the original authority without redefining replay.",
+      "acceptedCost": "Arbitrary JSON queries may require decoding or an additional justified projection.",
+      "falsifiers": ["Stored bytes differ from the prepared hash input.", "Parsing, payload limits or query cost violate a required budget."],
+      "revisionTriggers": ["An analytical consumer or schema evolution changes access needs.", "The canonical format or replay owner changes."],
+      "residualReview": "Continue checking canonicalization, Unicode, parser bounds, SQL storage constraints and query cost; this is not a blanket exemption for text JSON."
+    },
+    {
+      "decisionId": "RD-004",
+      "kind": "owner-choice",
+      "rejectedArgument": "A file is a blockable god-file solely because its line count, exports or fan-out exceed a threshold.",
+      "scope": "Metric-only severity assignment under the current repository module-ownership policy.",
+      "ownerReferences": [
+        {"path": "docs/architecture/cross-cutting/module-ownership-and-decomposition.md", "sha256": "43214f42980369bcad82b9c66f459c3f5329b9fac4e2c64420c72cdf6a78affa"}
+      ],
+      "assumptions": ["The finding provides only selection metrics, not a closed forbidden-coownership proof."],
+      "protectedObservations": ["Production and test cohorts remain distinct.", "Real boundary defects remain reviewable even in small files."],
+      "simplestAlternative": "Use size thresholds as review-selection signals, then prove semantic ownership and a safe preferable decomposition.",
+      "rationale": "Size is neither necessary nor sufficient for forbidden semantic coownership. It cannot discharge the profile's remaining predicates.",
+      "acceptedCost": "Semantic candidate review remains a human or agent evidence task; not every large file will be split.",
+      "falsifiers": ["The finding supplies applicable ownership, exact epoch, observables, a complete safe preferable decomposition and the remaining block predicates."],
+      "revisionTriggers": ["New ownership evidence, changed responsibilities or changed repository policy."],
+      "residualReview": "Always inspect selected candidates for real concentration, fragmentation, naming and risk. This record rejects the size-only inference, not decomposition."
+    },
+    {
+      "decisionId": "RD-005",
+      "kind": "conditional-tradeoff",
+      "rejectedArgument": "The service requires an internal broker, separate CQRS database or microservices solely to qualify as an enterprise architecture.",
+      "scope": "Internal deployment boundaries of the current modular monolith; external provider recovery is a separate obligation.",
+      "ownerReferences": [
+        {"path": "docs/decisions/backend-architecture-style.md", "sha256": "8a4e47a035a3a77d9bd5259fd6bd3083568f1dff190ddecc5d2dcd90d24ff8c5"}
+      ],
+      "assumptions": ["One deployable backend and transactional database still satisfy the admitted context.", "No independent internal consumer or deployment boundary has been required."],
+      "protectedObservations": ["Local state and audit changes remain atomic.", "Provider timeout, ambiguity and recovery remain explicit rather than treated as local calls."],
+      "simplestAlternative": "Use cohesive modules, existing transaction boundaries and bounded provider reconciliation.",
+      "rationale": "Extra distributed boundaries add partial failure and operational obligations without an evidenced independent consumer. Popularity does not demonstrate net benefit.",
+      "acceptedCost": "Internal capabilities share deployment and database failure domains.",
+      "falsifiers": ["Required independent scaling, failure isolation, governance or deployment cannot be satisfied inside the current boundary.", "A missing recovery contract is incorrectly defended as a monolith choice."],
+      "revisionTriggers": ["Independent consumers, ownership or hard operational budgets change."],
+      "residualReview": "Continue reviewing modularity, workload isolation, durable recovery and database availability; this decision does not excuse a dropped delivery or unbounded queue."
+    }
+  ]
+}

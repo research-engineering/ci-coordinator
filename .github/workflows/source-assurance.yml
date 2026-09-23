@@ -1,0 +1,32 @@
+name: Reusable source assurance
+
+on:
+  workflow_call:
+    inputs:
+      manual_base_sha:
+        description: Explicit base commit for a manual history scan; PR and merge-group bases come from the event.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Source and history secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the caller execution subject and complete history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan with the defining workflow's immutable action
+        uses: $/.github/actions/secret-scan
+        with:
+          source: .
+          history: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || inputs.manual_base_sha != '') && 'required' || 'none' }}
+          base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || inputs.manual_base_sha }}
+          head: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || inputs.manual_base_sha != '') && github.sha || '' }}

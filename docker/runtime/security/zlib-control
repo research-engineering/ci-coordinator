@@ -1,0 +1,9 @@
+Package: zlib1g
+Source: zlib
+Version: 1:1.3.2-0+ci1
+Architecture: amd64
+Maintainer: CI Coordinator maintainers
+Depends: libc6 (>= 2.43)
+Description: zlib with a project-qualified upstream security backport
+ Built from zlib 1.3.2 with upstream df84af25dc1942490e1d1c899a07619152a46148.
+ This package is built by CI Coordinator, not distributed or signed by Canonical.

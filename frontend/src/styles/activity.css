@@ -1,0 +1,85 @@
+.activity-tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+}
+.activity-tabs button {
+  padding: 0.7rem 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.activity-tabs button[aria-selected="true"] {
+  border-color: var(--interactive);
+  font-weight: 600;
+}
+.activity-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+.activity-toolbar p {
+  flex: 1 1 18rem;
+  margin: 0;
+}
+.activity-context {
+  overflow-wrap: anywhere;
+}
+.activity-table-scroll {
+  overflow-x: auto;
+}
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 680px;
+}
+.activity-table caption {
+  text-align: left;
+  margin-bottom: 0.7rem;
+  font-weight: 600;
+}
+.activity-table th,
+.activity-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.activity-table th:first-child {
+  width: 19%;
+}
+.activity-table th:nth-child(4) {
+  width: 13%;
+}
+.activity-table summary {
+  cursor: pointer;
+}
+.activity-table dl {
+  font-size: 0.8rem;
+}
+.activity-table dt {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+.activity-table dd {
+  margin: 0;
+}
+.activity-error {
+  margin: 1rem 0;
+}
+@media (max-width: 700px) {
+  .activity-toolbar {
+    align-items: flex-start;
+  }
+  .activity-tabs {
+    gap: 0.75rem;
+  }
+}

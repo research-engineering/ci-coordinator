@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "ci-coordinator.proofkit-adoption.requirements",
+  "specPackagePath": "docs/specs/ci-coordinator-proofkit-adoption",
+  "overviewPath": "docs/specs/ci-coordinator-proofkit-adoption/overview.md",
+  "requirementsPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+  "requirements": [
+    {
+      "requirementId": "REQ-CI-PROOFKIT-001",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "CI Coordinator consumes the public `agentic-proofkit` Python distribution through an exact pinned dependency and CLI/JSON contracts rather than vendored binaries, local copied verifier logic, or package-root SDK assumptions; a repository-owned witness admits exact manifest and uv-lock identity, complete supported-platform wheel hashes, installed distribution metadata, executable containment, and CLI smoke without misrepresenting npm-specific Proofkit dependency admission as Python package evidence.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-001"],
+      "nonClaims": [
+        "This requirement does not claim PyPI availability, publisher provenance, GitHub release artifact closure, provider execution, proof freshness, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-002",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "Durable product truth starts only after CI Coordinator commits and admits `requirements.v1.json` records; Markdown overviews, generated plans, agent output, and Proofkit route guidance remain non-authoritative until materialized into admitted records.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-002"],
+      "nonClaims": [
+        "This requirement does not claim Proofkit extracts complete behavior from code or approves requirement meaning."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-003",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "Every blocking requirement has a proof-binding route that names a scenario, witness id, witness kind, witness path, command id, and environment class before the requirement can be used as implementation or enforcement authority, and every caller-designated critical requirement-path-command tuple is present exactly as declared even when unrelated bindings retain the same path.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-003"],
+      "nonClaims": [
+        "This requirement does not claim the named command has executed, that a fresh receipt exists, or that structural route closure proves semantic witness adequacy."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-004",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "Proofkit-generated prompts, agent envelopes, route guidance, rendered views, and selective plans are bounded derived products; they may reduce ambiguity for agents but cannot create semantic authority, omit checks, broaden credentials, disable fallback, or approve edits by themselves.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-004"],
+      "nonClaims": [
+        "This requirement does not claim generated prompt quality is perfect or that agents may skip owner review."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-005",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "Proofkit integration changes record adoption friction, missing primitives, unclear prompts, schema-discovery gaps, and consumer integration defects in a tracked machine-admitted feedback ledger whose dependency identity, record identities, categories, canonical repository-relative evidence references to tracked regular files in the current snapshot, status, and falsifiable closure oracles are validated independently from this requirement source, without weakening CI Coordinator requirements to fit current tooling.",
+      "claimLevel": "blocking",
+      "riskClass": "medium",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-005"],
+      "nonClaims": [
+        "This requirement does not claim feedback items are defects until validated against Proofkit's owner surfaces, that current-path evidence authenticates historical snapshots, or that structural ledger admission proves observation completeness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-006",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "The quality gate admits the repo profile, requirement sources, requirement bindings, witness plan, exact Python Proofkit distribution, text policy, and selective plan inputs before lint, typecheck, tests, and build are considered sufficient local evidence; every consumed Proofkit JSON document must reject duplicate object keys, non-finite numbers, and unpaired Unicode surrogates before structural admission; every consumed state-bearing Proofkit output must match the exact v1 report root and command-owned report kind; witness-plan output must equal the complete normalized v1 projection of the caller-owned command catalog; every selective-plan result must expose an exact duplicate-free aggregate execution-command set derived independently from its caller-owned input, and each selective-plan path must expose exactly the union of requirement IDs owned by an exact matching source path and IDs owned by bindings for that path plus exactly the base, path-class-owned, and binding-owned commands for that path, with no other additions; before any governed mutation witness, it must admit every configured suite manifest as a non-empty finite inventory with positive integer time bounds and each mutant with non-empty argv, unique non-empty requirement-owner ids, and a non-no-op patch, prove that each owner id binds the manifest path to the exact suite command, then prove that each named original byte sequence occurs exactly once in its canonical regular non-symlinked repository target; each detached suite repeats that applicability proof against its exact HEAD image before linking dependencies or invoking its first witness, and each witness inherits only PATH, may receive only manifest-owned PYTHONPATH, fixed PYTHONDONTWRITEBYTECODE=1, PROOFKIT_BASE_REF, and PROOFKIT_HEAD_REF additions, and cannot re-enable Python bytecode writes; each manifest outer timeout must not exceed its owning witness-command timeout, the direct provider mutation matrix must contain every registered provider suite exactly once, run preflight and harness checks once in its required repository-quality predecessor, and prove that the maximum individual suite outer timeout plus the machine-owned 30-minute non-suite reserve does not exceed the machine-owned 258-minute per-job timeout, and the provider workflow must be an exact tested projection of that machine-owned timeout; every first-party module and repository data input used by mutation admission must match the attributed exact HEAD; declared CI range mode must prove a distinct ancestor base and the exact checked-out head before unioning its NUL-delimited no-rename diff with staged, unstaged, untracked, and explicit paths; local branch-head quality must independently require two distinct exact full lowercase commit SHA values, prove their ancestor, checkout, and non-empty-diff relations before and after its complete command plan, release lifecycle-owned temporary resources on every preflight, execution, and postflight exit, suppress a success receipt after an observed interrupt, and reject every no-range invocation; a manual full-scope provider run must bypass selective path inference and execute the workflow's complete fixed witness sequence; all missing, ambiguous, empty, or invalid range modes must fail closed.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-006"],
+      "nonClaims": [
+        "This requirement does not replace provider secret scanning, GitHub Actions checks, or deployment gates."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-007",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "A proof-owner deletion is admitted only over an explicit base/head range whose owner universe is the union of the base and head repo profiles, when a committed retirement transition names every deleted classified path, records whether its baseline binding set is bound or explicitly empty, commits that complete set by digest, records the exact affected requirement set and an explicit obsolete disposition, leaves no path or binding at head, and every affected active requirement or its explicit one-to-one replacement retains a live head witness without degrading a baseline non-contract witness class to contract-only; profile narrowing, an unrelated witness, an ambiguous requirement replacement, witness-class degradation, or an undeclared deletion must fail closed.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-007"],
+      "nonClaims": [
+        "This requirement records structural owner retirement; it does not prove that an obsolete disposition or retained witness is semantically correct without owner review."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-008",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "Every finite captured repository proof command executes through the sole finite-command process owner with a positive finite success deadline, one combined stdout-plus-stderr capture bound enforced while bytes are read, closed stdin unless input is explicitly supplied, and an owned POSIX process group. Managed interactive provider sessions that require concurrent provider observation are a separate algebra governed by their domain lifecycle. Signal-aware finite command orchestration, bounded Git, detached-worktree cleanup, and mutation execution delegate to the finite-command owner rather than implementing independent pipe, timeout, or process-group engines. A code-owned stop predicate sampled true at pre-spawn admission suppresses process creation; a stop first observed after that linearization point irreversibly suppresses success and starts bounded whole-group termination. Reaching the deadline likewise irreversibly suppresses success; the first terminal cause remains authoritative, termination starts at most once, allows one fixed one-second SIGTERM grace followed by SIGKILL and one fixed one-second pipe-closure grace, does not issue an unconditional final process-group signal after result resolution and direct-child reap, and makes no wall-clock claim about host syscall scheduling. After direct-child exit, executable descendants may quiesce only within one fixed 250 ms interval capped by the success deadline; on Linux, a bounded process-metadata scan treats live or stopped members as executable and treats a zombie or dead leader as non-executable only when its process record reports exactly one thread. Additional or invalid thread counts remain executable or unknown because another thread can continue after leader exit. Stop, timeout, output overflow, or parent-side lifecycle failure terminates the group and suppresses every success receipt. A persistent executable descendant is rejected by default; a code-owned caller may instead request whole-group termination while preserving the direct-child status, but cannot produce success until no executable descendant remains and all capture pipes close. The cleanup policy is not a product postcondition and cannot replace caller-owned post-cleanup validation. Local and branch-head quality project exactly the command's declared environment allowlist, reject credential-shaped allowlist names when the credential class is none, and retain and admit network and cache classifications without representing them as operating-system sandbox enforcement.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-008"],
+      "nonClaims": [
+        "This requirement does not claim network or filesystem isolation, Windows support, provider execution, native witness freshness, merge authority, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-009",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "The repository documentation gate admits only a bounded Git path inventory and bounded Markdown graph rooted at README.md and ROADMAP.md; every admitted local link target exists with exact case, remains repository-relative, traverses no symlink component, and resolves any admitted ASCII fragment; raw HTML, malformed or unsupported URL forms, invalid UTF-8, unreachable documents, and exceeded resource limits fail closed; top-level State declarations are non-empty, subject-unique, and owned by ROADMAP.md; diagnostics are deterministic, and the native witness is mandatory in portable and local quality plans.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-009"],
+      "nonClaims": [
+        "This requirement does not claim external URL availability, unrestricted Markdown semantic freshness, branch-head identity, provider execution, merge authority, deployment readiness, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-010",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "Automatic mutation discovery uses exact development-only engines, explicitly bounded source scopes, disposable per-profile CI checkouts, at most two workers, the existing bounded process executor and a credential-free environment projection. Existing report output is rejected rather than reused or deleted. Native reports must be present, bounded, non-empty and structurally admitted with complete known result accounting; interrupted, crashed or unresolved executions cannot become observations. Results remain diagnostic upstream categories under state observed, never certified test kills or a mutation-adequacy claim. Survivors, uncovered and timed-out mutants remain visible and do not silently alter a score threshold. Existing curated mutation inventories, their strict oracles and production dependencies remain unchanged.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-010"],
+      "nonClaims": [
+        "This requirement does not prove exhaustive fault discovery, test adequacy, equivalent-mutant classification, OS isolation, cache-reuse soundness, or production readiness."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-011",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "Documentation diagrams are admitted only from a bounded complete CommonMark Mermaid-fence inventory over the configured documentation scope, with strict source admission and non-empty corpus, exact source identities, an explicit supported-type and metadata policy, and one unique result per inventory identity from both the selected pinned semantic rules over the official lexer projection and the pinned official renderer. Empty, oversize, suppressed, unsupported, malformed, omitted, duplicated, changed, failed or timed-out input and fallback or missing render output cannot produce success. Installed dependencies and the browser provider are explicit prerequisites; validation performs no installation or external requests and closes owned processes and browser resources. Cancellation signals and deadlines suppress success and terminate the complete owned checker process chain. The inventory command is part of provisioned repository quality; full rendering, semantic and renderer falsifiers, and process lifecycle qualification run explicitly after the existing browser preparation in the required operator job. The process qualifier exercises the actual push, hook, Node and Chromium chain and rejects missing prerequisites rather than skipping. Selective routing includes documentation and all checker, configuration, dependency and workflow inputs. The optional nonpersistent pre-push adapter admits every update record, skips deletions, conservatively selects new or unknown remote bases, deduplicates proposed commit objects, and checks each relevant exact pushed tree independently of dirty working files. It refuses conflicting hooks or mismatched checker/dependency inputs and cannot replace protected CI.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-PROOFKIT-011"],
+      "nonClaims": [
+        "This requirement does not prove diagram meaning, visual clarity, complete accessibility, complete semantic-rule construct coverage, GitHub rendering parity, native witness freshness, or merge authority."
+      ],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    },
+    {
+      "requirementId": "REQ-CI-PROOFKIT-012",
+      "ownerId": "ci-coordinator.proofkit-adoption",
+      "invariant": "The CI matrix closes every declared command against the canonical witness catalog and assigns every bounded Git-index path to an explicit check surface using current regular-file bytes; unknown paths, duplicate identities, foreign commands, empty input sets, or missing utility results fail closed. Utility execution preserves each declared command, environment, timeout, process outcome, exact result set and before/after input inventory without converting diagnostics into authenticated provider receipts. Matrix admission and self-consumer parity checks are mandatory native gates. Surface assignment is distinct from actual declared input membership: native command roots and explicit fixture/generated/resource owners must cover each admitted path, and unsupported active roots fail admission. Native Go analysis must reconcile its complete selected source inventory with the Git-owned cohort before analysis; cgo, ignored, invalid, missing or foreign sources require a separate configuration owner. A source-bound blueprint projection must retain all admitted candidate identities and separate covered, partial, deferred, unknown and inapplicable risks; assertion selectors and requirement-path-command relations must resolve through the existing Proofkit authority, while static admission never upgrades them to runtime evidence. Complete command coverage is the union of branch-head commands, disjoint utility groups whose native execution and required-gate assertions are admitted, and the existing explicitly subsumed commands; utilities retain their separately prepared credential-free tool environments. The generated self-consumer preserves native job bodies, runners, permissions, timeouts, matrices, dependencies and aggregate result/output predicates through the existing runtime decoders; Python collection, shards and combination remain one coverage obligation, and requester invocation retains its separate expected-output assertion. Generated registry, catalog, source, dependency graph, test manifest, control bundle and workflow must match their owners. Only the configuration and Go static utility families may be marked omittable through a bounded responsibility projection that covers every declared direct input, every Go module input, and global control paths in a complete finite Git-observed path-and-mode universe. Matrix and runtime path matching must agree for that universe; changed control inputs, incomplete diffs, unknown paths, changes to the admitted path-and-mode inventory or stale selected plans retain full fallback. The self-ci generator profile must independently qualify complete current head Git paths and modes, report provenance and exact graph-node membership before omission; unknown or stale qualification makes the graph untrusted and selects FullCI. Native coverage, provider, Docker, spelling and vulnerability families remain non-omittable. Unavailable plans retain full fallback, and the independent native required gate retains authority until separate production admission. A separate default-branch daily advisory workflow rechecks both Python locks, the workspace npm lock, every admitted Go module and the latest released immutable image without executing Full Check. Coverage requires successful same-source receipts for every scope, unchanged bound inputs, current observations within 36 hours and no future timestamps. Failure or missing evidence remains non-pass; unavailable scheduling does not create a successful observation or notification claim.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": [
+        "proofkit/requirement-bindings.json"
+      ],
+      "nonClaimRefs": [
+        "NC-CI-PROOFKIT-012"
+      ],
+      "nonClaims": [
+        "This requirement does not prove universal tool-market coverage, semantic test adequacy, atomic filesystem snapshots, native execution, authenticated provider receipts, safe omission, merge authority, or production readiness."
+      ],
+      "lifecycle": {
+        "state": "active",
+        "replacementRequirementIds": [],
+        "evidenceRefs": []
+      },
+      "deferral": null,
+      "updatePolicy": {
+        "reviewOwnerId": "ci-coordinator.proofkit-adoption",
+        "requiresImpactDeclaration": true,
+        "requiresProofBindingReview": true
+      }
+    }
+  ],
+  "nonClaims": [
+    "This requirement source does not claim Proofkit owns CI Coordinator product meaning, native witness execution, proof freshness, merge approval, rollout, or production readiness."
+  ]
+}

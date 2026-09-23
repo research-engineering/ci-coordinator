@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "ci-audit-json-resource-profile/v1",
+  "profileId": "ci-audit-event-json-resources/v1",
+  "appliesToSchema": "ci-audit-event/v1",
+  "measureId": "canonical-json-tree-measure/v1",
+  "limits": {
+    "maxDepth": 64,
+    "maxNodes": 10000
+  },
+  "candidateSlotGuard": {
+    "purpose": "inevitable-node-overflow-lower-bound",
+    "arrayCandidateSlotCount": "declared-length",
+    "objectCandidateSlotCount": "own-property-count",
+    "evaluationPrecedence": "before-descendant-shape-validation",
+    "malformedCandidateSlotsAreJsonNodes": false
+  },
+  "resourceFailure": {
+    "schemaVersion": "ci-audit-json-resource-failure/v1",
+    "fields": ["code", "instancePointer", "limit", "observed"],
+    "codes": ["json_max_depth_exceeded", "json_max_nodes_exceeded"],
+    "instancePointer": {
+      "encoding": "rfc6901-json-pointer",
+      "document": "audit-event-input",
+      "payloadRoot": "/payload"
+    },
+    "nodeOverflowObservedValue": 10001
+  },
+  "compatibility": {
+    "limitsAreRuntimeTuning": false,
+    "changeRequiresSchemaReview": true,
+    "changeRequirementId": "REQ-CI-CORE-010",
+    "admittedDomainChange": {
+      "narrowingGoverned": true,
+      "wideningGoverned": true,
+      "publishedVersionChange": {
+        "requiresNewSchemaVersion": true,
+        "requiresVersionedReader": true,
+        "requiresExplicitMigration": true
+      }
+    }
+  },
+  "nonClaims": [
+    "This profile does not bound canonical bytes, string length, key length, transport bodies, ledger cardinality, or storage capacity.",
+    "This in-memory profile does not bound host-object materialization or own-key enumeration before candidate cardinality is known.",
+    "This profile does not make arbitrary malformed-input free-form messages part of the replay contract.",
+    "The candidate-slot guard is only a pre-validation lower bound; it does not claim that malformed candidate slots are JSON nodes."
+  ]
+}

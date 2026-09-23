@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "ci-coordinator-runtime-caller-inventory/v1",
+  "inventoryId": "ci-coordinator/runtime-callers/v1",
+  "callers": [
+    {
+      "callerId": "container.command",
+      "path": "Dockerfile",
+      "kind": "container",
+      "currentTarget": "python -m ci_coordinator.runtime"
+    },
+    {
+      "callerId": "container.healthcheck",
+      "path": "Dockerfile",
+      "kind": "container",
+      "currentTarget": "[\"python\", \"-m\", \"ci_coordinator.runtime.healthcheck\"]"
+    },
+    {
+      "callerId": "python.replay.console",
+      "path": "backend/pyproject.toml",
+      "kind": "python_console_script",
+      "currentTarget": "ci-coordinator-audit-replay = ci_coordinator.replay_cli:main"
+    },
+    {
+      "callerId": "python.database-access.console",
+      "path": "backend/pyproject.toml",
+      "kind": "python_console_script",
+      "currentTarget": "ci-coordinator-database-access = ci_coordinator.database_access_cli:main"
+    },
+    {
+      "callerId": "python.target-artifacts.console",
+      "path": "backend/pyproject.toml",
+      "kind": "python_console_script",
+      "currentTarget": "ci-coordinator-target-artifacts = ci_coordinator.target_artifacts.cli:main"
+    },
+    {
+      "callerId": "python.runtime.module",
+      "path": "backend/src/ci_coordinator/runtime/__main__.py",
+      "kind": "python_module",
+      "currentTarget": "python -m ci_coordinator.runtime"
+    }
+  ]
+}

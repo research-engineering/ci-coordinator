@@ -1,0 +1,740 @@
+{
+  "schemaVersion": 1,
+  "profileId": "ci-coordinator.architecture-traceability/v1",
+  "premiseAuthorityPath": "docs/architecture/00-system-axioms.md",
+  "lawAuthorityPath": "docs/architecture/01-meta-specification.md",
+  "premiseRoutes": [
+    {
+      "routeId": "deployment.backend-selection",
+      "relation": "selection-context",
+      "premiseIds": ["PA-1", "PA-2", "PA-8"],
+      "contractPaths": [
+        "docs/architecture/02-context-map.md",
+        "docs/decisions/backend-architecture-style.md",
+        "docs/features/control-plane-audit-closure.md"
+      ]
+    },
+    {
+      "routeId": "github.actions-platform",
+      "relation": "external-constraint",
+      "premiseIds": ["GA-1", "GA-2", "GA-3", "GA-4", "GA-5"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/github-actions-semantics.md"
+      ]
+    },
+    {
+      "routeId": "github.runner-observation",
+      "relation": "external-constraint",
+      "premiseIds": ["GA-6"],
+      "contractPaths": ["docs/architecture/modules/runner-capacity.md"]
+    },
+    {
+      "routeId": "identity.organization-control-plane",
+      "relation": "selection-context",
+      "premiseIds": ["PA-3", "PA-5", "PA-6", "PA-8", "PA-9"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/organization-control-plane.md"
+      ]
+    },
+    {
+      "routeId": "release.support-boundary",
+      "relation": "selection-context",
+      "premiseIds": ["PA-6"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/database-compatibility.md",
+        "docs/architecture/cross-cutting/release-artifact-publication.md"
+      ]
+    },
+    {
+      "routeId": "schema.projection-feasibility",
+      "relation": "feasibility-evidence",
+      "premiseIds": ["TF-1", "TF-2"],
+      "contractPaths": ["docs/features/http-model-contracts.md"]
+    }
+  ],
+  "requirementSourcePaths": [
+    "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+    "docs/specs/ci-coordinator-core/requirements.v1.json",
+    "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
+    "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
+    "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
+    "docs/specs/ci-coordinator-release/requirements.v1.json",
+    "docs/specs/ci-coordinator-runtime/requirements.v1.json"
+  ],
+  "traceGroups": [
+    {
+      "traceId": "control-plane.01-authority-separation",
+      "requirementIds": [
+        "REQ-CI-CONTROL-001",
+        "REQ-CI-CONTROL-002",
+        "REQ-CI-CONTROL-003",
+        "REQ-CI-CONTROL-004",
+        "REQ-CI-CONTROL-005",
+        "REQ-CI-CONTROL-006",
+        "REQ-CI-CONTROL-007",
+        "REQ-CI-CONTROL-008",
+        "REQ-CI-CONTROL-009"
+      ],
+      "lawIds": ["MS-10", "MS-11", "MS-7", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/organization-control-plane.md",
+        "docs/architecture/cross-cutting/security-and-oidc.md",
+        "docs/architecture/modules/config-epoch-lifecycle.md",
+        "docs/features/api-first-configuration-lifecycle-implementation-plan.md",
+        "docs/features/api-first-configuration-lifecycle.md",
+        "docs/features/control-plane-identity-authority-cutover-implementation-plan.md",
+        "docs/features/control-plane-identity-authority-cutover.md",
+        "docs/features/organization-control-plane-implementation-plan.md"
+      ]
+    },
+    {
+      "traceId": "control-plane.02-administrator-activity",
+      "requirementIds": [
+        "REQ-CI-CONTROL-010"
+      ],
+      "lawIds": [
+        "MS-10",
+        "MS-11",
+        "MS-7",
+        "MS-8"
+      ],
+      "contractPaths": [
+        "docs/features/administrator-activity-product.md"
+      ]
+    },
+    {
+      "traceId": "core.01-governing-laws",
+      "requirementIds": ["REQ-CI-CORE-001"],
+      "lawIds": ["MS-1", "MS-2", "MS-3"],
+      "contractPaths": [
+        "docs/architecture/modules/agent-risk-advice.md",
+        "docs/architecture/modules/planning-core.md",
+        "docs/architecture/modules/verification-core.md"
+      ]
+    },
+    {
+      "traceId": "core.02-boundary-proof",
+      "requirementIds": ["REQ-CI-CORE-002", "REQ-CI-CORE-003", "REQ-CI-CORE-018"],
+      "lawIds": ["MS-10"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/architecture-decision-quality.md",
+        "docs/architecture/cross-cutting/module-ownership-and-decomposition.md",
+        "docs/architecture/cross-cutting/testing-and-proofkit.md",
+        "docs/decisions/backend-architecture-style.md"
+      ]
+    },
+    {
+      "traceId": "core.03-omission-proof",
+      "requirementIds": ["REQ-CI-CORE-004"],
+      "lawIds": ["MS-1", "MS-3"],
+      "contractPaths": [
+        "docs/architecture/modules/planning-core.md",
+        "docs/architecture/modules/repo-context.md",
+        "docs/architecture/modules/verification-core.md"
+      ]
+    },
+    {
+      "traceId": "core.04-capacity-safety",
+      "requirementIds": ["REQ-CI-CORE-005"],
+      "lawIds": ["MS-6"],
+      "contractPaths": ["docs/architecture/modules/runner-capacity.md"]
+    },
+    {
+      "traceId": "core.05-shadow-evidence",
+      "requirementIds": ["REQ-CI-CORE-006"],
+      "lawIds": ["MS-1", "MS-3", "MS-8"],
+      "contractPaths": ["docs/architecture/modules/shadow-mode.md"]
+    },
+    {
+      "traceId": "core.06-persistence-lifecycle",
+      "requirementIds": ["REQ-CI-CORE-007"],
+      "lawIds": ["MS-11", "MS-8", "MS-9"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/database-compatibility.md",
+        "docs/architecture/modules/persistence.md"
+      ]
+    },
+    {
+      "traceId": "core.07-workbench-evidence",
+      "requirementIds": ["REQ-CI-CORE-008"],
+      "lawIds": ["MS-7", "MS-8"],
+      "contractPaths": ["docs/architecture/modules/workbench-read-models.md"]
+    },
+    {
+      "traceId": "core.08-conformance-authority",
+      "requirementIds": ["REQ-CI-CORE-009"],
+      "lawIds": ["MS-10", "MS-11", "MS-4"],
+      "contractPaths": ["docs/architecture/cross-cutting/testing-and-proofkit.md"]
+    },
+    {
+      "traceId": "core.09-schema-versioning",
+      "requirementIds": ["REQ-CI-CORE-010"],
+      "lawIds": ["MS-11"],
+      "contractPaths": ["docs/architecture/cross-cutting/database-compatibility.md"]
+    },
+    {
+      "traceId": "core.10-audit-byte-profiles",
+      "requirementIds": ["REQ-CI-CORE-011", "REQ-CI-CORE-013"],
+      "lawIds": ["MS-11", "MS-8"],
+      "contractPaths": ["docs/architecture/modules/audit-replay.md"]
+    },
+    {
+      "traceId": "core.11-atomic-audit-effects",
+      "requirementIds": ["REQ-CI-CORE-012"],
+      "lawIds": ["MS-11", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/modules/app-use-cases.md",
+        "docs/architecture/modules/persistence.md"
+      ]
+    },
+    {
+      "traceId": "core.12-policy-epochs",
+      "requirementIds": ["REQ-CI-CORE-014", "REQ-CI-CORE-016"],
+      "lawIds": ["MS-11", "MS-9"],
+      "contractPaths": [
+        "docs/architecture/modules/config-control.md",
+        "docs/architecture/modules/config-epoch-lifecycle.md"
+      ]
+    },
+    {
+      "traceId": "core.13-database-isolation",
+      "requirementIds": ["REQ-CI-CORE-015"],
+      "lawIds": ["MS-11", "MS-8"],
+      "contractPaths": ["docs/architecture/modules/persistence.md"]
+    },
+    {
+      "traceId": "core.14-jwks-admission",
+      "requirementIds": ["REQ-CI-CORE-017"],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": [
+        "docs/architecture/modules/identity-admission.md",
+        "docs/architecture/modules/jwks-provider.md"
+      ]
+    },
+    {
+      "traceId": "dev.01-toolchain",
+      "requirementIds": ["REQ-CI-DEV-001", "REQ-CI-DEV-006", "REQ-CI-DEV-007"],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": [
+        "docs/decisions/local-development-environment.md",
+        "docs/decisions/postgresql-platform-baseline.md"
+      ]
+    },
+    {
+      "traceId": "dev.02-instance-isolation",
+      "requirementIds": [
+        "REQ-CI-DEV-002",
+        "REQ-CI-DEV-003",
+        "REQ-CI-DEV-004",
+        "REQ-CI-DEV-005",
+        "REQ-CI-DEV-009",
+        "REQ-CI-DEV-011",
+        "REQ-CI-DEV-012"
+      ],
+      "lawIds": ["MS-10", "MS-11", "MS-8"],
+      "contractPaths": [
+        "docs/decisions/local-development-environment.md",
+        "docs/features/control-plane-identity-authority-cutover-implementation-plan.md",
+        "docs/features/control-plane-identity-authority-cutover.md",
+        "docs/features/developer-state-schema-evolution.md"
+      ]
+    },
+    {
+      "traceId": "dev.03-provider-witnesses",
+      "requirementIds": ["REQ-CI-DEV-008", "REQ-CI-DEV-010", "REQ-CI-DEV-018"],
+      "lawIds": ["MS-10"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/testing-and-proofkit.md",
+        "docs/decisions/local-development-environment.md",
+        "docs/features/proof-preserving-ci-efficiency.md"
+      ]
+    },
+    {
+      "traceId": "dev.04-observation",
+      "requirementIds": ["REQ-CI-DEV-013"],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": ["docs/features/developer-experience-convergence.md"]
+    },
+    {
+      "traceId": "dev.05-watch-ownership",
+      "requirementIds": ["REQ-CI-DEV-014"],
+      "lawIds": ["MS-10", "MS-8"],
+      "contractPaths": ["docs/features/developer-experience-convergence.md"]
+    },
+    {
+      "traceId": "dev.06-dependency-ownership",
+      "requirementIds": ["REQ-CI-DEV-015"],
+      "lawIds": ["MS-10", "MS-8"],
+      "contractPaths": ["docs/features/developer-experience-convergence.md"]
+    },
+    {
+      "traceId": "dev.07-synthetic-demo",
+      "requirementIds": ["REQ-CI-DEV-016"],
+      "lawIds": ["MS-10", "MS-7"],
+      "contractPaths": ["docs/features/developer-experience-convergence.md"]
+    },
+    {
+      "traceId": "dev.08-backend-debug",
+      "requirementIds": ["REQ-CI-DEV-017"],
+      "lawIds": ["MS-10"],
+      "contractPaths": ["docs/features/developer-experience-convergence.md"]
+    },
+    {
+      "traceId": "proofkit.01-dependency",
+      "requirementIds": ["REQ-CI-PROOFKIT-001"],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/proofkit-adoption.md",
+        "docs/decisions/python-proof-tooling.md"
+      ]
+    },
+    {
+      "traceId": "proofkit.02-authority-and-proof",
+      "requirementIds": [
+        "REQ-CI-PROOFKIT-002",
+        "REQ-CI-PROOFKIT-003",
+        "REQ-CI-PROOFKIT-006",
+        "REQ-CI-PROOFKIT-007",
+        "REQ-CI-PROOFKIT-008",
+        "REQ-CI-PROOFKIT-009"
+      ],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/documentation-authority.md",
+        "docs/architecture/cross-cutting/proof-command-execution.md",
+        "docs/architecture/cross-cutting/testing-and-proofkit.md"
+      ]
+    },
+    {
+      "traceId": "proofkit.03-derived-advice",
+      "requirementIds": ["REQ-CI-PROOFKIT-004"],
+      "lawIds": ["MS-10", "MS-2"],
+      "contractPaths": ["docs/architecture/cross-cutting/proofkit-adoption.md"]
+    },
+    {
+      "traceId": "proofkit.04-adoption-feedback",
+      "requirementIds": ["REQ-CI-PROOFKIT-005"],
+      "lawIds": ["MS-10"],
+      "contractPaths": ["docs/architecture/cross-cutting/proofkit-adoption.md"]
+    },
+    {
+      "traceId": "proofkit.05-automatic-mutation",
+      "requirementIds": ["REQ-CI-PROOFKIT-010"],
+      "lawIds": ["MS-10"],
+      "contractPaths": ["docs/features/automatic-mutation-testing.md"]
+    },
+    {
+      "traceId": "proofkit.06-documentation-diagrams",
+      "requirementIds": ["REQ-CI-PROOFKIT-011"],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": ["docs/features/diagram-validation.md"]
+    },
+    {
+      "traceId": "proofkit.07-ci-matrix-self-consumer",
+      "requirementIds": [
+        "REQ-CI-PROOFKIT-012"
+      ],
+      "lawIds": [
+        "MS-10",
+        "MS-11",
+        "MS-12",
+        "MS-3"
+      ],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/testing-and-proofkit.md",
+        "docs/decisions/comprehensive-ci-matrix.md",
+        "docs/features/self-ci-pilot-cost-qualification-plan.md",
+        "docs/features/self-ci-pilot-cost-qualification.md"
+      ]
+    },
+    {
+      "traceId": "release.01-artifact-publication",
+      "requirementIds": ["REQ-CI-RELEASE-001"],
+      "lawIds": ["MS-10", "MS-11", "MS-12", "MS-5", "MS-8"],
+      "contractPaths": ["docs/architecture/cross-cutting/release-artifact-publication.md", "docs/features/ci-trigger-policy.md"]
+    },
+    {
+      "traceId": "runtime.01-webhook-admission",
+      "requirementIds": ["REQ-CI-RUNTIME-001"],
+      "lawIds": ["MS-10", "MS-11", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/modules/github-ingestion.md",
+        "docs/architecture/modules/identity-admission.md"
+      ]
+    },
+    {
+      "traceId": "runtime.02-required-gate",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-002",
+        "REQ-CI-RUNTIME-007",
+        "REQ-CI-RUNTIME-011"
+      ],
+      "lawIds": ["MS-10", "MS-12", "MS-3", "MS-5"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/github-actions-semantics.md",
+        "docs/architecture/modules/execution-orchestration.md"
+      ]
+    },
+    {
+      "traceId": "runtime.03-reconciliation",
+      "requirementIds": ["REQ-CI-RUNTIME-003"],
+      "lawIds": ["MS-4", "MS-5", "MS-8"],
+      "contractPaths": ["docs/architecture/modules/reconciliation.md"]
+    },
+    {
+      "traceId": "runtime.04-durable-provider-state",
+      "requirementIds": ["REQ-CI-RUNTIME-004"],
+      "lawIds": ["MS-11", "MS-8", "MS-9"],
+      "contractPaths": [
+        "docs/architecture/modules/persistence.md",
+        "docs/architecture/modules/reconciliation.md"
+      ]
+    },
+    {
+      "traceId": "runtime.05-planning-context",
+      "requirementIds": ["REQ-CI-RUNTIME-005"],
+      "lawIds": ["MS-1", "MS-3", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/modules/repo-context.md",
+        "docs/features/selective-planning-safety.md"
+      ]
+    },
+    {
+      "traceId": "runtime.06-selected-issuance",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-006",
+        "REQ-CI-RUNTIME-013",
+        "REQ-CI-RUNTIME-017",
+        "REQ-CI-RUNTIME-027",
+        "REQ-CI-RUNTIME-030",
+        "REQ-CI-RUNTIME-031",
+        "REQ-CI-RUNTIME-032",
+        "REQ-CI-RUNTIME-033"
+      ],
+      "lawIds": ["MS-10", "MS-11", "MS-12", "MS-3", "MS-5", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/authority-transition-safety.md",
+        "docs/architecture/cross-cutting/production-admission.md",
+        "docs/architecture/modules/plan-issuance.md",
+        "docs/architecture/modules/target-authority-evidence.md",
+        "docs/architecture/modules/target-authority-producers.md",
+        "docs/architecture/modules/target-authority-relation.md",
+        "docs/architecture/modules/workflow-authority.md",
+        "docs/features/exact-workflow-invocation-admission.md",
+        "docs/features/generation-fenced-production-authority.md",
+        "docs/features/revision-bound-adapter-admission.md"
+      ]
+    },
+    {
+      "traceId": "runtime.07-runtime-operability",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-008",
+        "REQ-CI-RUNTIME-009",
+        "REQ-CI-RUNTIME-010",
+        "REQ-CI-RUNTIME-015"
+      ],
+      "lawIds": ["MS-10", "MS-11", "MS-3"],
+      "contractPaths": [
+        "docs/architecture/modules/observability.md",
+        "docs/architecture/modules/runtime-composition.md",
+        "docs/architecture/modules/runtime-settings.md",
+        "docs/features/control-plane-audit-closure.md"
+      ]
+    },
+    {
+      "traceId": "runtime.08-database-access",
+      "requirementIds": ["REQ-CI-RUNTIME-016"],
+      "lawIds": ["MS-10", "MS-11", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/modules/database-access-provisioning.md",
+        "docs/architecture/modules/database-principal-attestation.md"
+      ]
+    },
+    {
+      "traceId": "runtime.09-target-artifact-lab",
+      "requirementIds": ["REQ-CI-RUNTIME-012", "REQ-CI-RUNTIME-028"],
+      "lawIds": ["MS-10", "MS-11", "MS-12", "MS-5"],
+      "contractPaths": [
+        "docs/features/consumer-contract-laboratory.md",
+        "docs/features/universal-workflow-adoption.md"
+      ]
+    },
+    {
+      "traceId": "runtime.10-read-surfaces",
+      "requirementIds": ["REQ-CI-RUNTIME-014", "REQ-CI-RUNTIME-018"],
+      "lawIds": ["MS-10", "MS-7", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/modules/provider-inventory.md",
+        "docs/architecture/modules/workbench-read-models.md"
+      ]
+    },
+    {
+      "traceId": "runtime.11-workflow-discovery",
+      "requirementIds": ["REQ-CI-RUNTIME-019", "REQ-CI-RUNTIME-026"],
+      "lawIds": ["MS-10", "MS-12", "MS-3", "MS-7", "MS-8"],
+      "contractPaths": ["docs/architecture/modules/workflow-discovery.md"]
+    },
+    {
+      "traceId": "runtime.12-governed-mutations",
+      "requirementIds": ["REQ-CI-RUNTIME-020", "REQ-CI-RUNTIME-024"],
+      "lawIds": ["MS-10", "MS-7", "MS-8", "MS-9"],
+      "contractPaths": [
+        "docs/architecture/modules/governance-baseline.md",
+        "docs/architecture/modules/proposal-review-registration.md"
+      ]
+    },
+    {
+      "traceId": "runtime.13-governance-evidence",
+      "requirementIds": ["REQ-CI-RUNTIME-023", "REQ-CI-RUNTIME-025"],
+      "lawIds": ["MS-10", "MS-7", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/modules/governance-comparison.md",
+        "docs/architecture/modules/governance-observation.md"
+      ]
+    },
+    {
+      "traceId": "runtime.14-browser-identity",
+      "requirementIds": ["REQ-CI-RUNTIME-021", "REQ-CI-RUNTIME-022"],
+      "lawIds": ["MS-10", "MS-11", "MS-7"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/security-and-oidc.md",
+        "docs/architecture/modules/control-plane-identity-and-repository-attestation.md",
+        "docs/features/control-plane-identity-authority-cutover.md"
+      ]
+    },
+    {
+      "traceId": "runtime.15-http-model-authority",
+      "requirementIds": ["REQ-CI-RUNTIME-029"],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": ["docs/features/http-model-contracts.md"]
+    },
+    {
+      "traceId": "runtime.16-production-quality-closure",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-034",
+        "REQ-CI-RUNTIME-035",
+        "REQ-CI-RUNTIME-036",
+        "REQ-CI-RUNTIME-037"
+      ],
+      "lawIds": ["MS-10", "MS-11", "MS-3", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/production-admission.md",
+        "docs/architecture/modules/audit-replay.md",
+        "docs/architecture/modules/capacity-qualification.md",
+        "docs/architecture/modules/observability.md",
+        "docs/architecture/modules/runtime-composition.md",
+        "docs/features/production-quality-closure.md"
+      ]
+    },
+    {
+      "traceId": "runtime.17-ci-economics",
+      "requirementIds": ["REQ-CI-RUNTIME-038", "REQ-CI-RUNTIME-042", "REQ-CI-RUNTIME-043", "REQ-CI-RUNTIME-044", "REQ-CI-RUNTIME-045", "REQ-CI-RUNTIME-046", "REQ-CI-RUNTIME-047", "REQ-CI-RUNTIME-048", "REQ-CI-RUNTIME-049", "REQ-CI-RUNTIME-050"],
+      "lawIds": ["MS-10", "MS-11", "MS-3", "MS-8"],
+      "contractPaths": [
+        "docs/architecture/modules/ci-economics.md",
+        "docs/architecture/modules/observability.md",
+        "docs/features/actions-history-policy-resolution.md",
+        "docs/features/actions-history-population-implementation-plan.md",
+        "docs/features/actions-history-population.md",
+        "docs/features/actions-history-storage.md",
+        "docs/features/ci-economics-and-regression-telemetry-implementation-plan.md",
+        "docs/features/ci-economics-and-regression-telemetry.md",
+        "docs/features/ci-economics-measured-comparisons-implementation-plan.md",
+        "docs/features/ci-economics-measured-comparisons.md",
+        "docs/features/economics-budget-policies-implementation-plan.md",
+        "docs/features/economics-budget-policies.md",
+        "docs/features/economics-operator-console-implementation-plan.md",
+        "docs/features/economics-operator-console.md",
+        "docs/features/repository-observation-implementation-plan.md",
+        "docs/features/repository-observation.md"
+      ]
+    },
+    {
+      "traceId": "runtime.18-exact-runner-capacity",
+      "requirementIds": ["REQ-CI-RUNTIME-039"],
+      "lawIds": ["MS-10", "MS-3", "MS-6"],
+      "contractPaths": [
+        "docs/architecture/modules/runner-capacity.md",
+        "docs/features/exact-runner-capacity-evidence-implementation-plan.md",
+        "docs/features/exact-runner-capacity-evidence.md"
+      ]
+    },
+    {
+      "traceId": "runtime.19-target-local-requester",
+      "requirementIds": ["REQ-CI-RUNTIME-040"],
+      "lawIds": ["MS-10", "MS-11", "MS-12", "MS-3", "MS-5"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/github-actions-semantics.md",
+        "docs/architecture/modules/execution-orchestration.md",
+        "docs/features/target-local-plan-requester.md"
+      ]
+    },
+    {
+      "traceId": "runtime.20-context-preparation",
+      "requirementIds": ["REQ-CI-RUNTIME-041"],
+      "lawIds": ["MS-10","MS-11","MS-3","MS-5","MS-8"],
+      "contractPaths": ["docs/features/pre-ci-context-preparation.md"]
+    },
+    {
+      "traceId": "runtime.21-archive-product",
+      "requirementIds": ["REQ-CI-RUNTIME-051", "REQ-CI-RUNTIME-052"],
+      "lawIds": ["MS-10", "MS-11", "MS-3", "MS-8"],
+      "contractPaths": ["docs/features/archive-analytics-product.md", "docs/features/archive-read-retention-product.md"]
+    },
+    {
+      "traceId": "runtime.analytics-purpose-settings",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-053"
+      ],
+      "lawIds": [
+        "MS-10",
+        "MS-11",
+        "MS-7",
+        "MS-8",
+        "MS-9"
+      ],
+      "contractPaths": [
+        "docs/features/analytics-purpose-configuration.md"
+      ]
+    },
+    {
+      "traceId": "runtime.history-gap-recovery",
+      "requirementIds": ["REQ-CI-RUNTIME-055"],
+      "lawIds": ["MS-10", "MS-11", "MS-3", "MS-8"],
+      "contractPaths": ["docs/features/history-gap-recovery.md"]
+    },
+    {
+      "traceId": "runtime.history-worker-progress",
+      "requirementIds": ["REQ-CI-RUNTIME-054"],
+      "lawIds": ["MS-10", "MS-11", "MS-3", "MS-8"],
+      "contractPaths": ["docs/features/history-worker-progress.md"]
+    },
+    {
+      "traceId": "ui.01-evidence-projections",
+      "requirementIds": [
+        "REQ-CI-UI-001",
+        "REQ-CI-UI-003",
+        "REQ-CI-UI-007",
+        "REQ-CI-UI-008",
+        "REQ-CI-UI-011",
+        "REQ-CI-UI-013"
+      ],
+      "lawIds": ["MS-10", "MS-7", "MS-8"],
+      "contractPaths": [
+        "docs/features/proof-workbench-ui.md",
+        "docs/features/workflow-discovery-ui.md"
+      ]
+    },
+    {
+      "traceId": "ui.02-browser-security",
+      "requirementIds": ["REQ-CI-UI-002", "REQ-CI-UI-009"],
+      "lawIds": ["MS-10", "MS-11", "MS-7"],
+      "contractPaths": [
+        "docs/architecture/cross-cutting/security-and-oidc.md",
+        "docs/architecture/modules/control-plane-identity-and-repository-attestation.md",
+        "docs/features/control-plane-identity-authority-cutover.md"
+      ]
+    },
+    {
+      "traceId": "ui.03-governed-commands",
+      "requirementIds": ["REQ-CI-UI-010", "REQ-CI-UI-012"],
+      "lawIds": ["MS-10", "MS-7", "MS-8", "MS-9"],
+      "contractPaths": [
+        "docs/architecture/modules/governance-baseline.md",
+        "docs/architecture/modules/proposal-review-registration.md",
+        "docs/features/control-plane-identity-authority-cutover.md"
+      ]
+    },
+    {
+      "traceId": "ui.04-generated-contract",
+      "requirementIds": ["REQ-CI-UI-004", "REQ-CI-UI-006"],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": [
+        "docs/decisions/typescript-toolchain.md",
+        "docs/features/http-model-contracts.md"
+      ]
+    },
+    {
+      "traceId": "ui.05-accessibility",
+      "requirementIds": ["REQ-CI-UI-005"],
+      "lawIds": ["MS-10"],
+      "contractPaths": ["docs/features/proof-workbench-ui.md"]
+    },
+    {
+      "traceId": "ui.06-production-quality-closure",
+      "requirementIds": ["REQ-CI-UI-014", "REQ-CI-UI-015"],
+      "lawIds": ["MS-10", "MS-11"],
+      "contractPaths": ["docs/features/production-quality-closure.md"]
+    },
+    {
+      "traceId": "ui.07-task-navigation",
+      "requirementIds": ["REQ-CI-UI-016"],
+      "lawIds": ["MS-10", "MS-7", "MS-8"],
+      "contractPaths": ["docs/features/operator-navigation.md"]
+    },
+    {
+      "traceId": "ui.08-economics-console",
+      "requirementIds": ["REQ-CI-UI-017", "REQ-CI-UI-018", "REQ-CI-UI-019", "REQ-CI-UI-020"],
+      "lawIds": ["MS-10", "MS-7", "MS-8"],
+      "contractPaths": ["docs/features/actions-history-administration.md", "docs/features/economics-budget-policies.md", "docs/features/economics-operator-console.md", "docs/features/repository-observation.md"]
+    },
+    {
+      "traceId": "ui.09-archive-product",
+      "requirementIds": ["REQ-CI-UI-021", "REQ-CI-UI-022"],
+      "lawIds": ["MS-10", "MS-7", "MS-8"],
+      "contractPaths": ["docs/features/archive-operator-workspace.md"]
+    },
+    {
+      "traceId": "ui.10-administrator-activity",
+      "requirementIds": [
+        "REQ-CI-UI-023"
+      ],
+      "lawIds": [
+        "MS-10",
+        "MS-7",
+        "MS-8"
+      ],
+      "contractPaths": [
+        "docs/features/administrator-activity-workspace.md"
+      ]
+    },
+    {
+      "traceId": "ui.11-configuration-workspace",
+      "requirementIds": [
+        "REQ-CI-UI-024"
+      ],
+      "lawIds": [
+        "MS-10",
+        "MS-11",
+        "MS-7",
+        "MS-8",
+        "MS-9"
+      ],
+      "contractPaths": [
+        "docs/features/configuration-operator-workspace.md"
+      ]
+    },
+    {
+      "traceId": "ui.12-analytics-purpose-settings",
+      "requirementIds": [
+        "REQ-CI-UI-025"
+      ],
+      "lawIds": [
+        "MS-10",
+        "MS-7",
+        "MS-8"
+      ],
+      "contractPaths": [
+        "docs/features/analytics-purpose-configuration.md"
+      ]
+    }
+  ],
+  "nonClaims": [
+    "Architecture traceability does not prove implementation conformance or witness freshness.",
+    "Contract existence does not prove that the selected architecture is globally optimal.",
+    "Local reference closure does not authenticate an exact base or head Git epoch.",
+    "Local reference closure does not establish an atomic filesystem snapshot.",
+    "Owner-declared reference routes do not prove semantic entailment or prose freshness between their nodes.",
+    "Requirement coverage does not grant production admission or dynamic omission authority."
+  ]
+}

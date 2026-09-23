@@ -1,0 +1,10 @@
+FROM docker.io/library/golang:1.27.1-alpine@sha256:4cb7ac979db5fcc41cae44b2227ba5ab8a51e8807f40d9ba4dee20a0ad960b5b AS build
+WORKDIR /src
+ENV GOTOOLCHAIN=local GOWORK=off CGO_ENABLED=0
+COPY tooling/actionlint/go.mod tooling/actionlint/go.sum ./
+RUN go mod download && go mod verify
+COPY tooling/actionlint/*.go ./
+RUN go test -mod=readonly ./... && go build -mod=readonly -trimpath -ldflags='-s -w -X github.com/rhysd/actionlint.version=1.7.12+github-job-identity.1' -o /actionlint .
+
+FROM docker.io/rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+COPY --from=build /actionlint /usr/local/bin/actionlint

@@ -1,0 +1,1 @@
+        or not any(reason in diagnostic for reason in ("not allowed", "additional propert"))

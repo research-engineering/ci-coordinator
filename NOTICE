@@ -1,0 +1,15 @@
+CI Coordinator
+
+Project source is licensed under Apache License 2.0, except for third-party
+materials that retain their own licenses:
+
+- Lato fonts: copyright 2010-2011 tyPoland Lukasz Dziedzic, SIL Open Font
+  License 1.1. See frontend/src/assets/fonts/OFL.txt.
+- Development Container schema: Microsoft Corporation, MIT license.
+  See tooling/quality/schemas/devcontainers/LICENSE-CODE and provenance.json.
+- SPDX 2.3 JSON schema: SPDX specification contributors, Creative Commons
+  Attribution 3.0 Unported. Source: https://github.com/spdx/spdx-spec at commit
+  aadf3b0b8dbbabdb4d880b0fc714255fea436ff7, schemas/spdx-schema.json.
+  The local copy escapes two description characters and adds a final newline;
+  validation semantics are unchanged. See docs/specs/ci-coordinator-release/
+  overview.md and SPDX-LICENSE.txt for provenance and license terms.

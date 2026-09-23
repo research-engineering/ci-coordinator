@@ -1,0 +1,298 @@
+{
+  "schemaVersion": "ci-frontend-safety-kernel-mutation-suite/v1",
+  "suiteId": "ci-frontend-safety-kernels/v1",
+  "timeoutMs": 10000,
+  "outerTimeoutMs": 300000,
+  "expectedKilled": 12,
+  "canonicalInventoryIds": [
+    "FR01",
+    "FR02",
+    "FR03",
+    "FR04",
+    "FR05",
+    "FR06",
+    "FR07",
+    "FR08",
+    "FR09",
+    "FR10",
+    "FR11",
+    "FR12"
+  ],
+  "expectedMutantIds": [
+    "FR01",
+    "FR02",
+    "FR03",
+    "FR04",
+    "FR05",
+    "FR06",
+    "FR07",
+    "FR08",
+    "FR09",
+    "FR10",
+    "FR11",
+    "FR12"
+  ],
+  "expectedInvalidMutantIds": [],
+  "ownerClassCoverage": {
+    "observation-command-admission": [
+      "FR12"
+    ],
+    "manifest-identity": [
+      "FR07"
+    ],
+    "response-length-admission": [
+      "FR02",
+      "FR03",
+      "FR09",
+      "FR11"
+    ],
+    "response-representation-admission": [
+      "FR10"
+    ],
+    "snapshot-admission": [
+      "FR04",
+      "FR05",
+      "FR06"
+    ],
+    "stale-state-suppression": [
+      "FR08"
+    ],
+    "timeout-admission": [
+      "FR01"
+    ]
+  },
+  "mutants": [
+    {
+      "id": "FR01",
+      "requirementIds": [
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/shared/boundedFetch.ts",
+      "operator": "admit-nonpositive-request-timeout",
+      "original": "  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > MAX_REQUEST_TIMEOUT_MS) {",
+      "replacement": "  if (!Number.isSafeInteger(timeoutMs) || timeoutMs > MAX_REQUEST_TIMEOUT_MS) {",
+      "witnessId": "frontend-risk.timeout-domain",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/boundedFetch.test.ts"
+      ]
+    },
+    {
+      "id": "FR02",
+      "requirementIds": [
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/shared/boundedFetch.ts",
+      "operator": "ignore-short-declared-response-length",
+      "original": "    if (exactBody !== undefined && size !== exactBody.byteLength) {",
+      "replacement": "    if (exactBody !== undefined && size > exactBody.byteLength) {",
+      "witnessId": "frontend-risk.exact-decoded-length",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/boundedFetch.test.ts"
+      ]
+    },
+    {
+      "id": "FR03",
+      "requirementIds": [
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/shared/boundedFetch.ts",
+      "operator": "treat-encoded-wire-length-as-decoded-length",
+      "original": "  if (response.headers.has(\"content-encoding\")) return undefined;",
+      "replacement": "  if (false) return undefined;",
+      "witnessId": "frontend-risk.encoded-length-separation",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/boundedFetch.test.ts"
+      ]
+    },
+    {
+      "id": "FR04",
+      "requirementIds": [
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/workbench/schema.ts",
+      "operator": "admit-two-active-config-epochs",
+      "original": "    if (active.length > 1) {",
+      "replacement": "    if (active.length > 2) {",
+      "witnessId": "frontend-risk.single-active-epoch",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/schema.test.ts",
+        "-t",
+        "workbench response admission"
+      ]
+    },
+    {
+      "id": "FR05",
+      "requirementIds": [
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/workbench/schema.ts",
+      "operator": "invert-active-revision-consistency",
+      "original": "    if (value.configEpochs.some((epoch) => epoch.active !== (epoch.activeRevision !== null))) {",
+      "replacement": "    if (value.configEpochs.some((epoch) => epoch.active === (epoch.activeRevision !== null))) {",
+      "witnessId": "frontend-risk.active-revision-equivalence",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/schema.test.ts",
+        "-t",
+        "workbench response admission"
+      ]
+    },
+    {
+      "id": "FR06",
+      "requirementIds": [
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/workbench/schema.ts",
+      "operator": "remove-json-node-budget",
+      "original": "    if (!current || current.depth > 32 || ++nodes > 10_000) return false;",
+      "replacement": "    if (!current || current.depth > 32 || ++nodes < 0) return false;",
+      "witnessId": "frontend-risk.json-node-budget",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/schema.test.ts",
+        "-t",
+        "workbench response admission"
+      ]
+    },
+    {
+      "id": "FR07",
+      "requirementIds": [
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/workflowDiscovery/manifestIdentity.ts",
+      "operator": "replace-content-identity-with-prefix-shape",
+      "original": "  return proposal.manifestId === `proposal:${digest.slice(0, 32)}`;",
+      "replacement": "  return proposal.manifestId.startsWith(\"proposal:\");",
+      "witnessId": "frontend-risk.proposal-content-identity",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/client.test.ts",
+        "-t",
+        "workflow discovery client"
+      ]
+    },
+    {
+      "id": "FR08",
+      "requirementIds": [
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/features/workbench/useWorkbenchSnapshot.ts",
+      "operator": "commit-response-after-scope-abandonment",
+      "original": "      (result) => {\n        if (active) setState({ kind: \"settled\", requestKey: request.key, result });\n      },",
+      "replacement": "      (result) => {\n        setState({ kind: \"settled\", requestKey: request.key, result });\n      },",
+      "witnessId": "frontend-risk.abandoned-generation",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/workbenchSnapshot.test.tsx"
+      ]
+    },
+    {
+      "id": "FR09",
+      "requirementIds": [
+        "REQ-CI-UI-014",
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/shared/boundedFetch.ts",
+      "operator": "remove-platform-response-maximum",
+      "original": "    maximumBytes > MAX_RESPONSE_BYTES",
+      "replacement": "    false",
+      "witnessId": "frontend-risk.response-bound-domain",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/boundedFetch.test.ts"
+      ]
+    },
+    {
+      "id": "FR10",
+      "requirementIds": [
+        "REQ-CI-UI-014",
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/shared/boundedFetch.ts",
+      "operator": "retain-obsolete-content-encoding",
+      "original": "    headers.delete(\"content-encoding\");",
+      "replacement": "    void headers;",
+      "witnessId": "frontend-risk.decoded-representation-headers",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/boundedFetch.test.ts"
+      ]
+    },
+    {
+      "id": "FR11",
+      "requirementIds": [
+        "REQ-CI-UI-014",
+        "REQ-CI-UI-015"
+      ],
+      "file": "frontend/src/api/shared/boundedFetch.ts",
+      "operator": "treat-noncanonical-content-length-as-absent",
+      "original": "  if (!/^(?:0|[1-9][0-9]*)$/.test(supplied)) return \"invalid\";",
+      "replacement": "  if (!/^(?:0|[1-9][0-9]*)$/.test(supplied)) return undefined;",
+      "witnessId": "frontend-risk.canonical-decoded-length",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/boundedFetch.test.ts"
+      ]
+    },
+    {
+      "id": "FR12",
+      "requirementIds": [
+        "REQ-CI-UI-019"
+      ],
+      "file": "frontend/src/api/ciEconomics/observationClient.ts",
+      "operator": "admit-foreign-observation-operation",
+      "original": "      result.operationId === command.operationId &&\n",
+      "replacement": "",
+      "witnessId": "observation-ui.exact-operation",
+      "command": [
+        "frontend/node_modules/.bin/vitest",
+        "run",
+        "--root",
+        "frontend",
+        "tests/observationApi.test.ts"
+      ]
+    }
+  ],
+  "invalidMutants": [],
+  "nonClaims": [
+    "The finite inventory proves only that the named witness rejects the named patch.",
+    "This suite does not prove mutation completeness, browser-engine breadth, or rendering correctness."
+  ]
+}

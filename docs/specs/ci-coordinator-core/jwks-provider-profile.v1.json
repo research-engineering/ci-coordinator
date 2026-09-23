@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "profileId": "github-actions-oidc-jwks/v1",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "jwksUri": "https://token.actions.githubusercontent.com/.well-known/jwks",
+  "transport": {
+    "method": "GET",
+    "redirects": "forbidden",
+    "timeoutSeconds": 5,
+    "maximumBodyBytes": 1048576,
+    "requiredContentTypePrefix": "application/json",
+    "credentials": "forbidden",
+    "trustEnvironment": false,
+    "tlsVerification": "required",
+    "outboundProxy": "explicit-admitted-or-absent",
+    "proxyScheme": "http",
+    "proxyTrailingSlash": "normalized",
+    "proxyCredentials": "forbidden",
+    "injectedTransportWithProxy": "forbidden"
+  },
+  "keySet": {
+    "maximumKeys": 64,
+    "minimumRsaModulusBits": 2048,
+    "algorithm": "RS256",
+    "keyType": "RSA",
+    "keyUse": "sig",
+    "retainedMembers": [
+      "alg",
+      "e",
+      "key_ops",
+      "kid",
+      "kty",
+      "n",
+      "use"
+    ],
+    "unknownMemberPolicy": "ignored",
+    "privateMemberPolicy": "discard-entry",
+    "unsupportedEntryPolicy": "discard-entry",
+    "duplicateAdmittedKeyIdPolicy": "reject-response",
+    "emptyAdmittedSetPolicy": "reject-response"
+  },
+  "cache": {
+    "maximumAgeSeconds": 300,
+    "minimumRefreshIntervalSeconds": 30,
+    "failureBackoffSeconds": 30,
+    "expiredSnapshot": "forbidden",
+    "refresh": "single-flight",
+    "unknownKeyPolicy": "at-most-one-refresh-per-minimum-interval"
+  },
+  "failureKinds": [
+    "fetch_cancelled",
+    "fetch_timeout",
+    "fetch_unavailable",
+    "response_invalid",
+    "response_oversize",
+    "response_redirected",
+    "refresh_throttled",
+    "signing_key_unavailable"
+  ],
+  "nonClaims": [
+    "This profile does not authenticate a token, approve an issuer other than the fixed issuer, persist a key set, or provide deployment, provider availability, or production-admission evidence."
+  ]
+}

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": "ci-economics-profile/v1",
+  "profileId": "ci-coordinator.ci-economics/v1",
+  "measurementDefinitionVersion": "ci-economics-measurement/v1",
+  "provider": "github",
+  "collection": {
+    "windowSeconds": 604800,
+    "initialBackoffSeconds": 30,
+    "maximumBackoffSeconds": 3600,
+    "maximumAttempts": 20,
+    "leaseSeconds": 300,
+    "maximumClaimsPerRound": 10,
+    "maximumConcurrentClaims": 4,
+    "maximumTerminalizationsPerClaim": 10
+  },
+  "retention": {
+    "evidenceDays": 90,
+    "tombstoneGraceSeconds": 86400,
+    "cleanupBatchSize": 100
+  },
+  "maintenance": {
+    "collectionDeadlineSeconds": 240,
+    "expiryDeadlineSeconds": 30,
+    "purgeDeadlineSeconds": 30,
+    "observationCleanupDeadlineSeconds": 30
+  },
+  "http": {
+    "attempts": {
+      "method": "GET",
+      "path": "/api/v1/economics/repositories/{installation_id}/{repository_id}/attempts",
+      "operationId": "list_repository_ci_economics_attempts",
+      "requiredRole": "audit",
+      "cursorParameter": "afterCursor",
+      "defaultPageSize": 50,
+      "maximumPageSize": 100
+    },
+    "attemptJobs": {
+      "method": "GET",
+      "path": "/api/v1/economics/repositories/{installation_id}/{repository_id}/attempts/{workflow_run_id}/{run_attempt}/jobs",
+      "operationId": "get_ci_economics_attempt_jobs",
+      "requiredRole": "audit",
+      "identityParameter": "headSha",
+      "cursorParameter": "afterJobId",
+      "defaultPageSize": 50,
+      "maximumPageSize": 100
+    }
+  },
+  "bounds": {
+    "maximumAttemptPageSize": 100,
+    "maximumJobPageSize": 100,
+    "maximumJobsPerAttempt": 2000,
+    "maximumJobNameCodePoints": 512,
+    "maximumRunnerTextCodePoints": 256,
+    "maximumJobLabels": 32,
+    "maximumJobLabelCodePoints": 128,
+    "maximumObservationCanonicalBytes": 16384
+  },
+  "persistedWebhookEvents": [
+    {"event": "workflow_job", "actions": ["completed"]},
+    {"event": "workflow_run", "actions": ["completed"]}
+  ],
+  "accuracyClasses": ["exact", "partial", "unknown", "conflict"],
+  "forbiddenClaims": [
+    "actual_cpu_utilization",
+    "allocated_cores_without_owner_profile",
+    "cache_efficiency_without_cache_evidence",
+    "plan_consumption_without_receipt",
+    "saved_compute_without_comparable_consumed_runs"
+  ]
+}

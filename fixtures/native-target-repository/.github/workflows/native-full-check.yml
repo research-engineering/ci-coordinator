@@ -1,0 +1,60 @@
+name: Native Full Check
+
+on:
+  pull_request: {}
+  push: {}
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-full-check-${{ github.repository }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    name: Native lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run repository lint
+        run: printf 'native lint fixture\n'
+
+  test:
+    name: Native test
+    needs: lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run repository tests
+        run: printf 'native test fixture\n'
+
+  native-full-check-gate:
+    name: Native Full Check
+    needs: [lint, test]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Require every native job
+        env:
+          LINT_RESULT: ${{ needs.lint.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          set -euo pipefail
+          test "${LINT_RESULT}" = success
+          test "${TEST_RESULT}" = success

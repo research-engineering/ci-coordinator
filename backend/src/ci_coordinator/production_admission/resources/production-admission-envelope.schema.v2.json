@@ -1,0 +1,369 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-engineering.github.io/ci-coordinator/schemas/production-admission-envelope.schema.v2.json",
+  "title": "CI Coordinator production admission envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "algorithm",
+    "keyId",
+    "receipt",
+    "schemaVersion",
+    "signature"
+  ],
+  "properties": {
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,128}$"
+    },
+    "receipt": {
+      "$ref": "#/$defs/receipt"
+    },
+    "schemaVersion": {
+      "const": "ci-coordinator-production-admission-envelope/v2"
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{85}[AQgw]$"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "workflowRefs": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      }
+    },
+    "workflowPaths": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "maxLength": 512,
+        "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9_.-]{1,100}/\\.github/workflows/[^/\\\\]+\\.ya?ml$"
+      }
+    },
+    "ordinaryEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceDigest",
+        "observedAt",
+        "sampleCount",
+        "subjectDigest"
+      ],
+      "properties": {
+        "evidenceDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "observedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "sampleCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        "subjectDigest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "shadowEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidenceDigest",
+        "observationSeconds",
+        "observedAt",
+        "sampleCount",
+        "subjectDigest",
+        "unsafeOmissionCount"
+      ],
+      "properties": {
+        "evidenceDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "observationSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        },
+        "observedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "sampleCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000000
+        },
+        "subjectDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "unsafeOmissionCount": {
+          "const": 0
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deployment",
+        "fullCiFallback",
+        "ownerApproval",
+        "provider",
+        "rollback",
+        "shadow",
+        "stableGate"
+      ],
+      "properties": {
+        "deployment": {
+          "$ref": "#/$defs/ordinaryEvidence"
+        },
+        "fullCiFallback": {
+          "$ref": "#/$defs/ordinaryEvidence"
+        },
+        "ownerApproval": {
+          "$ref": "#/$defs/ordinaryEvidence"
+        },
+        "provider": {
+          "$ref": "#/$defs/ordinaryEvidence"
+        },
+        "rollback": {
+          "$ref": "#/$defs/ordinaryEvidence"
+        },
+        "shadow": {
+          "$ref": "#/$defs/shadowEvidence"
+        },
+        "stableGate": {
+          "$ref": "#/$defs/ordinaryEvidence"
+        }
+      }
+    },
+    "scopeGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admissionSubjectDigest",
+        "catalogHash",
+        "compiledPolicyHash",
+        "configEpochId",
+        "evidence",
+        "installationId",
+        "jobWorkflowPaths",
+        "jobWorkflowRefs",
+        "policyHash",
+        "repositoryId",
+        "targetRegistryHash",
+        "workflowPaths",
+        "workflowRefs",
+        "relation"
+      ],
+      "properties": {
+        "admissionSubjectDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "catalogHash": {
+          "$ref": "#/$defs/digest"
+        },
+        "compiledPolicyHash": {
+          "$ref": "#/$defs/digest"
+        },
+        "configEpochId": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "installationId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "jobWorkflowPaths": {
+          "$ref": "#/$defs/workflowPaths"
+        },
+        "jobWorkflowRefs": {
+          "$ref": "#/$defs/workflowRefs"
+        },
+        "policyHash": {
+          "$ref": "#/$defs/digest"
+        },
+        "repositoryId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "targetRegistryHash": {
+          "$ref": "#/$defs/digest"
+        },
+        "workflowPaths": {
+          "$ref": "#/$defs/workflowPaths"
+        },
+        "workflowRefs": {
+          "$ref": "#/$defs/workflowRefs"
+        },
+        "relation": {
+          "$ref": "#/$defs/relation"
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "workflowRefs": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "jobWorkflowRefs": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "workflowPaths": {
+              "minItems": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "jobWorkflowPaths": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactDigest",
+        "environmentId",
+        "expiresAt",
+        "issuedAt",
+        "releaseIdentity",
+        "rolloutProfileId",
+        "schemaVersion",
+        "scopeGrants",
+        "sourceCommit"
+      ],
+      "properties": {
+        "artifactDigest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "environmentId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "issuedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "releaseIdentity": {
+          "$ref": "#/$defs/digest"
+        },
+        "rolloutProfileId": {
+          "$ref": "#/$defs/digest"
+        },
+        "schemaVersion": {
+          "const": "ci-coordinator-production-admission/v2"
+        },
+        "scopeGrants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1024,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/scopeGrant"
+          }
+        },
+        "sourceCommit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40,64}$"
+        }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "generation",
+        "predecessorGeneration",
+        "evidenceBundleDigest",
+        "relationSubjectDigest",
+        "relationEpochDigest",
+        "relationClosureDigest",
+        "workflowManifestDigest",
+        "sourceBindingDigest",
+        "providerAuthorityDigest",
+        "ownerEpochDigest"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "ci-coordinator.production-relation-binding/v1"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "predecessorGeneration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740990
+        },
+        "evidenceBundleDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "relationSubjectDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "relationEpochDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "relationClosureDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "workflowManifestDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "sourceBindingDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "providerAuthorityDigest": {
+          "$ref": "#/$defs/digest"
+        },
+        "ownerEpochDigest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}

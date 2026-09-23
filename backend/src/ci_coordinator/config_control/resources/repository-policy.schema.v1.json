@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/research-engineering/ci-coordinator/schemas/repository-policy.schema.v1.json",
+  "title": "CI Coordinator Repository Policy Document V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "repository"],
+  "properties": {
+    "schemaVersion": { "const": "ci-repository-policy/v1" },
+    "repository": { "$ref": "#/$defs/repository" }
+  },
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "nominalId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "positiveSafeInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "nonEmptyStringArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/nonEmptyString" }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["installationId", "repositoryId", "owner", "name", "defaultBranch", "rules"],
+      "properties": {
+        "installationId": { "$ref": "#/$defs/positiveSafeInteger" },
+        "repositoryId": { "$ref": "#/$defs/positiveSafeInteger" },
+        "owner": { "$ref": "#/$defs/nonEmptyString" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "defaultBranch": { "$ref": "#/$defs/nonEmptyString" },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/rule" }
+        },
+        "dynamicCi": {
+          "default": null,
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/dynamicCi" }]
+        }
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "on", "mode", "expectedSignals"],
+      "properties": {
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "on": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["event", "branches"],
+          "properties": {
+            "event": { "enum": ["merge_group", "pull_request", "push"] },
+            "branches": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": { "$ref": "#/$defs/nonEmptyString" }
+            }
+          }
+        },
+        "mode": { "enum": ["observe", "hybrid", "dispatch"] },
+        "timing": { "$ref": "#/$defs/timing" },
+        "expectedSignals": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/expectedSignal" }
+        },
+        "omittedSignals": {
+          "type": "array",
+          "default": [],
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/omittedSignal" }
+        }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expectedSignalTimeoutSeconds",
+        "absenceVerificationWindowSeconds",
+        "lateFindingWindowSeconds",
+        "mutableDecisionWindowSeconds"
+      ],
+      "properties": {
+        "expectedSignalTimeoutSeconds": { "$ref": "#/$defs/positiveSafeInteger" },
+        "absenceVerificationWindowSeconds": { "$ref": "#/$defs/positiveSafeInteger" },
+        "absencePollLookbackSeconds": {
+          "allOf": [{ "$ref": "#/$defs/positiveSafeInteger" }],
+          "default": 3600
+        },
+        "lateFindingWindowSeconds": { "$ref": "#/$defs/positiveSafeInteger" },
+        "mutableDecisionWindowSeconds": { "$ref": "#/$defs/positiveSafeInteger" }
+      },
+      "default": {
+        "expectedSignalTimeoutSeconds": 3600,
+        "absenceVerificationWindowSeconds": 300,
+        "absencePollLookbackSeconds": 3600,
+        "lateFindingWindowSeconds": 86400,
+        "mutableDecisionWindowSeconds": 300
+      }
+    },
+    "expectedSignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "workflowFile", "source", "requiredConclusion", "required"],
+      "properties": {
+        "kind": { "const": "workflow" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "workflowFile": { "$ref": "#/$defs/nonEmptyString" },
+        "source": { "enum": ["native", "dispatch"] },
+        "requiredConclusion": {
+          "enum": [
+            "success",
+            "failure",
+            "cancelled",
+            "timed_out",
+            "skipped",
+            "neutral",
+            "action_required",
+            "startup_failure",
+            "unknown"
+          ]
+        },
+        "required": { "type": "boolean" }
+      }
+    },
+    "omittedSignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "workflowFile", "verifyAbsence", "reason"],
+      "properties": {
+        "kind": { "const": "workflow" },
+        "name": { "$ref": "#/$defs/nonEmptyString" },
+        "workflowFile": { "$ref": "#/$defs/nonEmptyString" },
+        "verifyAbsence": { "type": "boolean" },
+        "reason": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "dynamicCi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyVersion",
+        "obligations",
+        "witnesses",
+        "executionProfiles"
+      ],
+      "properties": {
+        "planningEnabled": { "type": "boolean", "default": false },
+        "policyVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "riskClasses": {
+          "type": "array",
+          "default": [],
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        },
+        "agentAdvice": { "$ref": "#/$defs/agentAdvice" },
+        "dependencyGraph": { "$ref": "#/$defs/dependencyGraph" },
+        "fallbackTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600,
+          "default": 60
+        },
+        "obligations": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/validationObligation" }
+        },
+        "witnesses": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": { "$ref": "#/$defs/executableWitness" }
+        },
+        "executionProfiles": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/executionProfile" }
+        }
+      }
+    },
+    "agentAdvice": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "modelIdAllowlist": {
+          "type": "array",
+          "default": [],
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+        },
+        "promptHashAllowlist": {
+          "type": "array",
+          "default": [],
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/sha256" }
+        },
+        "minConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7
+        },
+        "promptInjectionEvalRequired": { "type": "boolean", "default": false }
+      },
+      "default": {
+        "enabled": false,
+        "modelIdAllowlist": [],
+        "promptHashAllowlist": [],
+        "minConfidence": 0.7,
+        "promptInjectionEvalRequired": false
+      }
+    },
+    "dependencyGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": { "enum": ["configured", "generated"], "default": "configured" },
+        "globalRiskPaths": {
+          "type": "array",
+          "default": [],
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/nonEmptyString" }
+        }
+      },
+      "default": { "source": "configured", "globalRiskPaths": [] }
+    },
+    "validationObligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligationId",
+        "responsibility",
+        "requiredWitnessIds",
+        "defaultDepth",
+        "fullDepth",
+        "omitAllowed"
+      ],
+      "properties": {
+        "obligationId": { "$ref": "#/$defs/nominalId" },
+        "responsibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "paths": {
+              "type": "array",
+              "default": [],
+              "maxItems": 32,
+              "items": { "$ref": "#/$defs/nonEmptyString" }
+            },
+            "riskClasses": {
+              "type": "array",
+              "default": [],
+              "maxItems": 32,
+              "items": { "$ref": "#/$defs/nonEmptyString" }
+            }
+          }
+        },
+        "requiredWitnessIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": { "$ref": "#/$defs/nominalId" }
+        },
+        "defaultDepth": { "$ref": "#/$defs/validationDepth" },
+        "fullDepth": { "$ref": "#/$defs/validationDepth" },
+        "omitAllowed": { "type": "boolean" }
+      }
+    },
+    "executableWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["witnessId", "executionProfileId", "supportedDepths"],
+      "properties": {
+        "witnessId": { "$ref": "#/$defs/nominalId" },
+        "executionProfileId": { "$ref": "#/$defs/nominalId" },
+        "supportedDepths": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/validationDepth" }
+        }
+      }
+    },
+    "executionProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profileId",
+        "runnerProfileId",
+        "permissionProfileId",
+        "credentialProfileId",
+        "fixtureProfileId",
+        "capacityClassId",
+        "shardingPolicy"
+      ],
+      "properties": {
+        "profileId": { "$ref": "#/$defs/nominalId" },
+        "runnerProfileId": { "$ref": "#/$defs/nominalId" },
+        "permissionProfileId": { "$ref": "#/$defs/nominalId" },
+        "credentialProfileId": { "$ref": "#/$defs/nominalId" },
+        "fixtureProfileId": { "$ref": "#/$defs/nominalId" },
+        "serviceProfileIds": {
+          "type": "array",
+          "default": [],
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/nominalId" }
+        },
+        "capacityClassId": { "$ref": "#/$defs/nominalId" },
+        "shardingPolicy": { "$ref": "#/$defs/shardingPolicy" }
+      }
+    },
+    "shardingPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxShards",
+        "maxParallel",
+        "maxItemsPerShard",
+        "setupSecondsPerShard"
+      ],
+      "properties": {
+        "maxShards": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "maxParallel": { "type": "integer", "minimum": 1, "maximum": 256 },
+        "maxItemsPerShard": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000
+        },
+        "setupSecondsPerShard": { "type": "number", "minimum": 0, "maximum": 3600 },
+        "cpuWeight": { "type": "number", "minimum": 0, "maximum": 1000, "default": 1 },
+        "wallWeight": { "type": "number", "minimum": 0, "maximum": 1000, "default": 1 },
+        "operatorWeight": { "type": "number", "minimum": 0, "maximum": 1000, "default": 1 }
+      }
+    },
+    "validationDepth": {
+      "enum": ["smoke", "targeted", "standard", "full", "exhaustive"]
+    }
+  }
+}

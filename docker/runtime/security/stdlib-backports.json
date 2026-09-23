@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "pythonVersion": "3.13.15",
+  "modules": [
+    {
+      "module": "tarfile.py",
+      "patch": "python-tarfile.patch",
+      "sourceSha256": "9fedddf7e814c226cb7e1ac0aa603092eda40047367ec00ad740a81484a17d01",
+      "installedSha256": "8f46eb2064b20420b8126508a3524cd684830ed97a860992283a5074d1793743",
+      "patchSha256": "7821f7f4ce31ff699f81120fc0d959dc077ed829a413352307a3db8c02112fb8",
+      "repairs": [
+        {
+          "cve": "CVE-2026-82049",
+          "upstreamCommit": "b8f23e307097552eaea2604383a12ab280520d0d"
+        },
+        {
+          "cve": "CVE-2026-19672",
+          "upstreamCommit": "97688346ada2df3e5b9c279348862c3d64ab0823"
+        },
+        {
+          "cve": "CVE-2026-87910",
+          "upstreamCommit": "fb2f0bbc3b35264f09cc2cb2934b7987527a6bc2"
+        }
+      ]
+    },
+    {
+      "module": "stringprep.py",
+      "patch": "python-stringprep.patch",
+      "sourceSha256": "60b6c83581093029312efb6670b11c540090b3f78bcf72264467b494f02f21a5",
+      "installedSha256": "fc42fedb2a828a34a70cb0ff1b9a17039ca148b4f561fa7db98ce49bb2141c7a",
+      "patchSha256": "a808d9e2e650c7723878cb888315f90953a8c7de62e0fcbb257edd2251df15b9",
+      "repairs": [
+        {
+          "cve": "CVE-2026-17084",
+          "upstreamCommit": "c28b121a4f0b975937c8b5a1b4934bb361d84296"
+        }
+      ]
+    },
+    {
+      "module": "urllib/request.py",
+      "patch": "python-urllib-request.patch",
+      "sourceSha256": "94e12238d24f586253725d8e23d56e3d7d81bf34fbcefaf98ae541080f2cccbd",
+      "installedSha256": "e3bf4446c45300c800f62e869ce1ee89fa745fa073c03e6655f4f4e20fde6eb2",
+      "patchSha256": "6d55bde691b5f03d3991d1618fb0b8193c432d36820dc59b9aabffae65f2b3ac",
+      "repairs": [
+        {
+          "cve": "CVE-2026-15806",
+          "upstreamCommit": "a2773a34183b7d94a243bb98fd658926cc5348ce"
+        }
+      ]
+    },
+    {
+      "module": "poplib.py",
+      "patch": "python-poplib.patch",
+      "sourceSha256": "527e714523264093910a0a0b1a55c6583f952835c89061537fc40ad98c347056",
+      "installedSha256": "a6ffff188814b56d95b043c31d9e0dfee51ac6d6e92afe74ab070cb6136b076f",
+      "patchSha256": "35a35c2d9c04fdd41ce14ceb0d2847d1eeee4b054884430b787c6977a40c777e",
+      "repairs": [
+        {
+          "cve": "CVE-2025-15367",
+          "upstreamCommit": "b234a2b67539f787e191d2ef19a7cbdce32874e7"
+        }
+      ]
+    },
+    {
+      "module": "zipfile/__init__.py",
+      "patch": "python-zipfile-__init__.patch",
+      "sourceSha256": "c3412800039509b02afeda3f8d8e844bf566ea46490561fb09bbb08bb91909a6",
+      "installedSha256": "4067e573036149c17b2a80c288c392e1f574a9566c1d94332b2576b0c2b0a0d4",
+      "patchSha256": "bc9158b7adac1f0ae364fc00caaead4dfb5a90a3a828eb211cd4e2a0ec6b037c",
+      "repairs": [
+        {
+          "cve": "CVE-2026-15310",
+          "upstreamCommit": "31980e84b9a708424a0a1dfecde3fc991e313f89"
+        },
+        {
+          "cve": "CVE-2026-15310",
+          "upstreamCommit": "9d167992b59cf5e23c66b9ed742b13f5925f7d70"
+        }
+      ]
+    }
+  ]
+}

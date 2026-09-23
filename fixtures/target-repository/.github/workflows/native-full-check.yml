@@ -1,0 +1,35 @@
+name: Native Full Check
+
+on:
+  pull_request: {}
+  push: {}
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-full-check-${{ github.repository }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  full-ci:
+    name: Native Full Check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run repository-owned FullCI
+        run: |
+          set -euo pipefail
+          if [ ! -x .ci-coordinator/run ]; then
+            echo "::error::.ci-coordinator/run must be a version-controlled executable."
+            exit 1
+          fi
+          .ci-coordinator/run full-ci

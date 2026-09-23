@@ -1,0 +1,21 @@
+# The instance CLI owns watch exclusion, the attach deadline and ordinary-mode restore.
+# Merge after compose.yaml; do not persist this override in the normal Compose prefix.
+services:
+  backend:
+    build:
+      target: debug
+    environment:
+      DEBUGPY_ADAPTER_ENDPOINTS: ${CI_COORDINATOR_DEBUGPY_ENDPOINTS_FILE:?The instance CLI owns the debugger endpoint file}
+    command:
+      - /bin/sh
+      - -euc
+      - |
+        if [ -z "$${CI_COORDINATOR_OUTBOUND_PROXY_URL:-}" ]; then
+          unset CI_COORDINATOR_OUTBOUND_PROXY_URL
+        fi
+        exec python -m debugpy --listen 0.0.0.0:5678 --wait-for-client \
+          --configure-subProcess false -m ci_coordinator.runtime
+    ports:
+      - "127.0.0.1::5678"
+    develop:
+      watch: !reset []

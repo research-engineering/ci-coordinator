@@ -1,0 +1,95 @@
+{
+  "schemaVersion": "ci-audit-persistence-byte-profile/v1",
+  "profileId": "ci-audit-event-persistence-bytes/v1",
+  "appliesToSchema": "ci-audit-event/v1",
+  "measures": {
+    "variableText": "utf-8-octets/v1",
+    "payload": "canonical-json-utf-8-octets/v1"
+  },
+  "limits": {
+    "maxVariableTextUtf8Bytes": 4096,
+    "maxPayloadCanonicalBytes": 1048576
+  },
+  "fieldProjections": [
+    {
+      "instancePointer": "/idempotencyKey",
+      "storageColumn": "idempotency_key",
+      "measureRef": "variableText",
+      "limitRef": "maxVariableTextUtf8Bytes",
+      "nonEmpty": true
+    },
+    {
+      "instancePointer": "/subjectId",
+      "storageColumn": "subject_id",
+      "measureRef": "variableText",
+      "limitRef": "maxVariableTextUtf8Bytes",
+      "nonEmpty": true
+    },
+    {
+      "instancePointer": "/eventType",
+      "storageColumn": "event_type",
+      "measureRef": "variableText",
+      "limitRef": "maxVariableTextUtf8Bytes",
+      "nonEmpty": true
+    },
+    {
+      "instancePointer": "/actor",
+      "storageColumn": "actor",
+      "measureRef": "variableText",
+      "limitRef": "maxVariableTextUtf8Bytes",
+      "nonEmpty": true
+    },
+    {
+      "instancePointer": "/payload",
+      "storageColumn": "payload_canonical_json",
+      "measureRef": "payload",
+      "limitRef": "maxPayloadCanonicalBytes",
+      "nonEmpty": true
+    }
+  ],
+  "payloadLowerBoundGuard": {
+    "purpose": "reject-inevitable-canonical-byte-overflow-before-full-encoding",
+    "appliesTo": ["object-key", "string-value"],
+    "measure": "utf-8-octets/v1",
+    "limitRef": "maxPayloadCanonicalBytes",
+    "evaluationPrecedence": "before-full-canonical-encoding",
+    "domainEffect": "none-beyond-maxPayloadCanonicalBytes"
+  },
+  "resourceFailure": {
+    "schemaVersion": "ci-audit-persistence-byte-failure/v1",
+    "fields": ["code", "instancePointer", "limit", "observed"],
+    "codes": ["audit_text_max_utf8_bytes_exceeded", "audit_payload_max_canonical_bytes_exceeded"],
+    "instancePointer": {
+      "encoding": "rfc6901-json-pointer",
+      "document": "audit-event-input",
+      "payloadRoot": "/payload"
+    },
+    "overflowObservedValue": "limit-plus-one"
+  },
+  "storageProjection": {
+    "requiredPostgresStorage": "extended",
+    "constraintsAreBackstop": true
+  },
+  "compatibility": {
+    "limitsAreRuntimeTuning": false,
+    "changeRequiresSchemaReview": true,
+    "changeRequirementId": "REQ-CI-CORE-010",
+    "publishedVersionChange": {
+      "requiresNewSchemaVersion": true,
+      "requiresVersionedReader": true,
+      "requiresExplicitMigration": true
+    }
+  },
+  "decisionRationale": {
+    "classification": "initial-release-product-policy",
+    "payloadPolicy": "Inline canonical audit payloads above the declared cutoff are outside ci-audit-event/v1.",
+    "metadataPolicy": "Variable audit text fields above the declared cutoff are outside ci-audit-event/v1."
+  },
+  "nonClaims": [
+    "The numeric limits are product policy choices, not values derived from a production SLO or workload distribution.",
+    "This profile does not bound request bodies, host-object materialization before admission, ledger cardinality, replay output, database capacity, TOAST cost, backup, or failover.",
+    "This profile does not normalize Unicode; canonically distinct composed and decomposed strings remain distinct bytes and hashes.",
+    "The lower-bound guard does not add a separate key or scalar-string domain limit; it only rejects values that necessarily exceed the canonical payload limit.",
+    "DDL constraints do not replace runtime admission and do not authorize external writers."
+  ]
+}

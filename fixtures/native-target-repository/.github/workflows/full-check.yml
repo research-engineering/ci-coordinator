@@ -1,0 +1,181 @@
+name: Full Check
+
+on:
+  pull_request: {}
+  push: {}
+  merge_group:
+    types: [checks_requested]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-check-${{ github.repository }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci-invocation:
+    name: Classify workflow invocation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    outputs:
+      direct: ${{ steps.classify.outputs.direct }}
+    steps:
+      - name: Compare caller and defining workflow identities
+        id: classify
+        shell: bash
+        env:
+          CI_CALLER_WORKFLOW_REF: ${{ github.workflow_ref }}
+          CI_DEFINING_WORKFLOW_REF: ${{ job.workflow_ref }}
+        run: |
+          set -euo pipefail
+          direct=false
+          if [ -n "$CI_CALLER_WORKFLOW_REF" ] && [ "$CI_CALLER_WORKFLOW_REF" = "$CI_DEFINING_WORKFLOW_REF" ]; then
+            direct=true
+          fi
+          printf 'direct=%s\n' "$direct" >> "$GITHUB_OUTPUT"
+
+  plan-request:
+    name: Request dynamic CI plan
+    needs: ci-invocation
+    if: >-
+      ${{ needs['ci-invocation'].outputs.direct == 'true' &&
+      (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'merge_group') }}
+    permissions:
+      id-token: write # Delegate OIDC only to the target-free coordinator requester.
+    uses: example-org/ci-coordinator/.github/workflows/trusted-plan-request.yml@1111111111111111111111111111111111111111
+    with:
+      installation_id: ${{ vars.CI_COORDINATOR_INSTALLATION_ID || github.event.installation.id }}
+      plan_url: ${{ vars.CI_COORDINATOR_PLAN_URL }}
+
+  plan:
+    name: Resolve dynamic CI plan
+    needs: plan-request
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    outputs:
+      plan_valid: ${{ steps.validate.outputs.plan_valid }}
+      fallback: ${{ steps.validate.outputs.fallback }}
+      reason: ${{ steps.validate.outputs.reason }}
+      selected_jobs: ${{ steps.validate.outputs.selected_jobs }}
+    steps:
+      - name: Check out execution authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ job.workflow_sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Consume coordinator response
+        env:
+          PLAN_PATH: ${{ runner.temp }}/dynamic-ci-plan.json
+          CI_COORDINATOR_PLAN_REASON: ${{ needs['plan-request'].outputs.reason }}
+          CI_COORDINATOR_PLAN_CHUNK_0: ${{ needs['plan-request'].outputs.plan_chunk_0 }}
+          CI_COORDINATOR_PLAN_CHUNK_1: ${{ needs['plan-request'].outputs.plan_chunk_1 }}
+          CI_COORDINATOR_PLAN_CHUNK_2: ${{ needs['plan-request'].outputs.plan_chunk_2 }}
+          CI_COORDINATOR_PLAN_CHUNK_3: ${{ needs['plan-request'].outputs.plan_chunk_3 }}
+          CI_COORDINATOR_PLAN_CHUNK_4: ${{ needs['plan-request'].outputs.plan_chunk_4 }}
+          CI_COORDINATOR_PLAN_CHUNK_5: ${{ needs['plan-request'].outputs.plan_chunk_5 }}
+          CI_COORDINATOR_PLAN_CHUNK_6: ${{ needs['plan-request'].outputs.plan_chunk_6 }}
+        run: node .ci-coordinator/ci-coordinator.cjs consume-plan
+
+      - name: Validate signed plan
+        id: validate
+        env:
+          PLAN_PATH: ${{ runner.temp }}/dynamic-ci-plan.json
+          CI_TARGET_REGISTRY_PATH: .ci-coordinator/execution-registry.v1.json
+          CI_STATIC_JOB_IDS_JSON: '["lint","test"]'
+          CI_COORDINATOR_PLAN_TRUST_ROOT_PATH: .ci-coordinator/plan-trust-root.v1.json
+          CI_INSTALLATION_ID: ${{ vars.CI_COORDINATOR_INSTALLATION_ID || github.event.installation.id }}
+          CI_REPOSITORY_ID: ${{ github.repository_id }}
+          CI_OWNER: ${{ github.repository_owner }}
+          CI_REPO: ${{ github.event.repository.name }}
+          CI_EVENT: ${{ github.event_name }}
+          CI_RUN_ATTEMPT: ${{ github.run_attempt }}
+          CI_RUN_ID: ${{ github.run_id }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          CI_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+          CI_EXECUTION_SHA: ${{ github.sha }}
+          CI_REF: ${{ github.ref }}
+          CI_PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          CI_MERGE_GROUP_HEAD_REF: ${{ github.event.merge_group.head_ref || github.event.merge_group.ref }}
+          CI_WORKFLOW_PATH: .github/workflows/full-check.yml
+          CI_WORKFLOW_REF: ${{ job.workflow_ref }}
+          CI_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          CI_COORDINATOR_PLAN_OIDC_AUDIENCE: ${{ vars.CI_COORDINATOR_PLAN_URL }}
+        run: node .ci-coordinator/ci-coordinator.cjs validate-plan
+
+  lint:
+    name: Lint
+    needs: plan
+    if: ${{ always() && (needs.plan.result != 'success' || needs.plan.outputs.plan_valid != 'true' || needs.plan.outputs.fallback != 'false' || contains(fromJSON(needs.plan.outputs.selected_jobs || '[]'), 'lint')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Run repository lint
+        run: printf 'native lint fixture\n'
+
+  test:
+    name: Test
+    needs: [lint, plan]
+    if: ${{ always() && needs.lint.result == 'success' && (needs.plan.result != 'success' || needs.plan.outputs.plan_valid != 'true' || needs.plan.outputs.fallback != 'false' || contains(fromJSON(needs.plan.outputs.selected_jobs || '[]'), 'test')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - name: Run repository tests
+        run: printf 'native test fixture\n'
+
+  full-check-gate:
+    name: Full Check
+    needs: [lint, plan, test]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      contents: read
+    steps:
+      - name: Reject cancelled workflow
+        if: ${{ cancelled() }}
+        run: exit 1
+      - name: Check out execution authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ job.workflow_sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Admit exactly one successful execution path
+        env:
+          CI_PLAN_RESULT: ${{ needs.plan.result }}
+          CI_PLAN_VALID: ${{ needs.plan.outputs.plan_valid }}
+          CI_FALLBACK: ${{ needs.plan.outputs.fallback }}
+          CI_SELECTED_JOBS_JSON: ${{ needs.plan.outputs.selected_jobs }}
+          CI_STATIC_JOB_RESULTS_JSON: >-
+            {"lint":"${{ needs.lint.result }}","test":"${{ needs.test.result }}"}
+          CI_TARGET_REGISTRY_PATH: .ci-coordinator/execution-registry.v1.json
+          CI_OWNER: ${{ github.repository_owner }}
+          CI_REPO: ${{ github.event.repository.name }}
+          CI_WORKFLOW_PATH: .github/workflows/full-check.yml
+          CI_WORKFLOW_REF: ${{ job.workflow_ref }}
+        run: node .ci-coordinator/ci-coordinator.cjs validate-gate

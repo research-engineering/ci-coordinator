@@ -1,0 +1,42 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "composite": true,
+    "erasableSyntaxOnly": true,
+    "esModuleInterop": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
+    "lib": ["ES2024", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noEmit": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUncheckedSideEffectImports": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "rootDir": ".",
+    "skipLibCheck": false,
+    "stableTypeOrdering": true,
+    "strict": true,
+    "target": "ES2024",
+    "types": ["node"],
+    "verbatimModuleSyntax": true
+  },
+  "include": [
+    "connected.playwright.config.ts",
+    "playwright.config.ts",
+    "src/api/development/archiveProxyPolicy.ts",
+    "src/api/development/activityProxyPolicy.ts",
+    "src/api/development/configLifecycleProxyPolicy.ts",
+    "src/api/development/economicsProxyPolicy.ts",
+    "src/api/development/proxyPolicy.ts",
+    "src/api/development/proxyTarget.ts",
+    "src/api/workbench/limits.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
+}

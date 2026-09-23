@@ -1,0 +1,75 @@
+name: Automatic mutation discovery
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: automatic-mutation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    name: Mutation discovery (${{ matrix.profile }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [python, frontend]
+    steps:
+      - name: Check out disposable source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          version: "0.12.17"
+          prune-cache: true
+      - name: Install locked Python dependencies
+        run: uv sync --project backend --all-groups --frozen
+      - name: Verify discovery report and execution contracts
+        if: matrix.profile == 'python'
+        run: >-
+          backend/.venv/bin/python -m pytest -q
+          scripts/tests/test_automatic_mutation.py
+          scripts/tests/test_quality_plan.py::test_branch_head_covers_every_non_subsumed_witness_command
+          backend/tests/unit/runtime/test_python_persistence_workflow.py::test_mutation_registries_cover_every_configured_suite
+          backend/tests/unit/runtime_settings/test_entrypoint_disposition.py::test_entrypoint_disposition_exhaustively_covers_the_declared_source_profile
+      - name: Set up pnpm
+        if: matrix.profile == 'frontend'
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          version: "12.5.1"
+          run_install: false
+      - name: Set up Node.js
+        if: matrix.profile == 'frontend'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.21.0"
+      - name: Install locked frontend dependencies
+        if: matrix.profile == 'frontend'
+        run: pnpm install --frozen-lockfile
+      - name: Discover mutations within the declared scope
+        env:
+          MUTATION_PROFILE: ${{ matrix.profile }}
+        run: backend/.venv/bin/python -m scripts.automatic_mutation "$MUTATION_PROFILE"
+      - name: Preserve native diagnostic reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: automatic-mutation-${{ matrix.profile }}-${{ github.sha }}
+          path: |
+            backend/mutants/mutmut-cicd-stats.json
+            backend/mutants/src/ci_coordinator/kernel/admission.py*
+            frontend/reports/mutation/
+          if-no-files-found: error
+          retention-days: 7

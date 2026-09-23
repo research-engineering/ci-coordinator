@@ -1,0 +1,614 @@
+{
+  "schemaVersion": "ci-database-compatibility-profile/v1",
+  "profileId": "ci-database-compatibility/v1",
+  "ownerId": "ci-coordinator.core",
+  "lineageId": "ci-coordinator-postgresql/v1",
+  "protocolVersion": 1,
+  "database": {
+    "engine": "postgresql",
+    "majorVersion": 18,
+    "applicationSchema": "ci_coordinator",
+    "migrationHeadRelation": "public.alembic_version",
+    "qualificationLaw": "Every application and compatibility relation reference is schema-qualified. No writable schema precedes pg_catalog or ci_coordinator in a runtime search_path.",
+    "migrationAuthority": "alembic-single-head/v1",
+    "transactionIsolation": "read-committed",
+    "isolationEnforcement": {
+      "sqlalchemyExecutionOption": "READ COMMITTED",
+      "configurationPhase": "before-transaction-begin",
+      "verificationStatement": "SHOW transaction_isolation",
+      "verificationPhase": "first statement after begin and before timeouts or fence acquisition",
+      "acceptedValue": "read committed",
+      "mismatchFailure": "database_isolation_mismatch"
+    },
+    "snapshotReadIsolationEnforcement": {
+      "sqlalchemyExecutionOption": "READ COMMITTED",
+      "configurationPhase": "before-transaction-begin",
+      "readOnlyStatement": "SET TRANSACTION READ ONLY",
+      "isolationVerificationStatement": "SHOW transaction_isolation",
+      "readOnlyVerificationStatement": "SHOW transaction_read_only",
+      "verificationPhase": "before fence acquisition and schema-dependent admission",
+      "acceptedIsolationValue": "read committed",
+      "acceptedReadOnlyValue": "on",
+      "snapshotBoundary": "The shared compatibility fence precedes current-revision admission; all jointly interpreted bounded projections and metadata use one subsequent statement snapshot under READ COMMITTED plus READ ONLY.",
+      "mismatchFailure": "database_snapshot_read_isolation_mismatch"
+    }
+  },
+  "fence": {
+    "keySpace": "two-int32",
+    "keyDomain": "ci-coordinator/database-compatibility-writer-fence/v1",
+    "keyDerivation": "first eight SHA-256 bytes split into two signed big-endian int32 values",
+    "classId": -170580017,
+    "objectId": 1725555266,
+    "participantFunction": "pg_advisory_xact_lock_shared",
+    "migrationFunction": "pg_advisory_xact_lock",
+    "acquisitionOrder": [
+      "connect",
+      "configure-read-committed-before-transaction",
+      "begin-transaction",
+      "verify-read-committed",
+      "set-local-timeouts",
+      "acquire-compatibility-fence",
+      "read-single-migration-head",
+      "read-and-validate-declaration",
+      "admit-required-capabilities",
+      "attest-capability-owned-schema-on-cache-miss",
+      "expose-schema-dependent-operation"
+    ],
+    "timeoutFailure": "database_compatibility_fence_timeout",
+    "snapshotLaw": "Fence acquisition and current-revision admission are separate SQL statements. Under READ COMMITTED, the admission statement observes a snapshot created after the fence is acquired.",
+    "lockOrder": "compatibility fence before capability-owned table, row, or advisory locks",
+    "timeoutProfiles": {
+      "participant": {
+        "lockTimeoutMs": 5000,
+        "statementTimeoutMs": 30000,
+        "transactionTimeoutMs": 60000
+      },
+      "migration": {
+        "lockTimeoutMs": 15000,
+        "statementTimeoutMs": 120000,
+        "transactionTimeoutMs": 180000
+      },
+      "orderingLaw": "0 < lockTimeoutMs < statementTimeoutMs < transactionTimeoutMs",
+      "zeroIsForbidden": true,
+      "failureMap": {
+        "57014": "database_query_cancelled",
+        "55P03": "database_compatibility_fence_timeout",
+        "25P04": "database_compatibility_transaction_timeout",
+        "connection-loss": "database_compatibility_outcome_unknown"
+      },
+      "cancellationLaw": "SQLSTATE 57014 is query_canceled and does not identify statement_timeout provenance. Caller task cancellation remains observable and is never rewritten as a timeout."
+    },
+    "invariant": "No schema-dependent statement may execute before the transaction holds the shared compatibility fence and admits its required capabilities. Every migration transaction holds the exclusive compatibility fence before compatibility-relevant DDL or declaration changes."
+  },
+  "declaration": {
+    "table": "ci_coordinator.database_compatibility_declarations",
+    "capabilityTable": "ci_coordinator.database_compatibility_capabilities",
+    "appendOnly": true,
+    "maximumCapabilitiesPerRevision": 256,
+    "maximumRequiredCapabilitiesPerOperation": 64,
+    "maximumCapabilityIdBytes": 128,
+    "boundedReadProtocol": {
+      "declarationOrder": "generation DESC",
+      "declarationLimit": 2,
+      "capabilityOrder": "generation ASC, capability_id ASC",
+      "capabilityLimitPerRevision": 257,
+      "overflowFailure": "database_declaration_bounds_exceeded"
+    },
+    "continuityLaw": "Bootstrap is the induction base. Each first application validates exactly the current declaration and its proposed successor, while database uniqueness, parent foreign-key, generation, and immutability constraints preserve the historical induction hypothesis. Runtime admission never loads the unbounded history.",
+    "revisionIdPattern": "^[0-9]{8}_[0-9]{4}$",
+    "capabilityIdPattern": "^[a-z0-9][a-z0-9.-]*/v[1-9][0-9]*$",
+    "transitionKinds": ["bootstrap", "expand", "contract"],
+    "fields": [
+      "generation",
+      "lineageId",
+      "revisionId",
+      "parentRevisionId",
+      "transitionKind",
+      "protocolVersion",
+      "declarationHash"
+    ],
+    "capabilityFields": ["generation", "capabilityId", "descriptorHash"],
+    "canonicalHashProjection": "sha256(utf8(ci-database-revision/v1) + nul + kernel.canonical_json({generation,lineageId,revisionId,parentRevisionId,transitionKind,protocolVersion,providedCapabilities:[{capabilityId,descriptorHash}]}))",
+    "ordering": "generation-ascending and capability-id UTF-8 byte order",
+    "idempotentReplay": "An existing revision is accepted only when every declaration field, capability row, and declaration hash is byte-equivalent to the proposed declaration.",
+    "immutability": "UPDATE and DELETE are rejected by database triggers; the runtime principal has SELECT only on declaration relations."
+  },
+  "transitionAlgebra": {
+    "bootstrap": {
+      "generation": 1,
+      "parentRevisionId": null,
+      "providedCapabilities": "non-empty"
+    },
+    "successor": {
+      "generation": "previous.generation + 1",
+      "generationDelta": 1,
+      "lineageId": "previous.lineageId",
+      "parentRevisionId": "previous.revisionId",
+      "parentRelation": "exact-previous-revision"
+    },
+    "expand": {
+      "law": "previous.providedCapabilities is a proper subset of next.providedCapabilities",
+      "resultingCapabilityLaw": "Every capability in next.providedCapabilities, including every retained capability, must attest against the resulting schema and data state.",
+      "setRelation": "proper-superset",
+      "mayAdd": true,
+      "mayRemove": false,
+      "removedCapabilities": []
+    },
+    "contract": {
+      "law": "next.providedCapabilities is a proper subset of previous.providedCapabilities",
+      "resultingCapabilityLaw": "Every capability in next.providedCapabilities must attest against the resulting schema and data state.",
+      "setRelation": "proper-subset",
+      "mayAdd": false,
+      "mayRemove": true,
+      "addedCapabilities": []
+    },
+    "forbidden": [
+      "no-op successor",
+      "mixed add-and-remove successor",
+      "generation gap",
+      "parent fork",
+      "declaration rewrite",
+      "undeclared migration head"
+    ]
+  },
+  "capabilityAdmission": {
+    "relation": "required capability identifiers and descriptor hashes are an exact subset of currentDeclaration.providedCapabilities",
+    "requiredCapabilities": "non-empty sorted unique exact capability identifiers",
+    "cacheKey": "revisionId + declarationHash + requiredCapabilities",
+    "cacheLaw": "A positive schema attestation may be reused only for the same cache key while the transaction holds the shared fence.",
+    "failure": "database_capability_unavailable",
+    "requiredSetOwner": "Each schema-dependent operation contract owns one immutable non-empty required capability set. A use case may only union the sets of operations it invokes and cannot narrow them."
+  },
+  "dataCompatibility": {
+    "capabilityDescriptorFields": [
+      "schemaRequirements",
+      "readDomainId",
+      "writeDomainId",
+      "codecId",
+      "backfillStateId",
+      "bridgeConstraintIds",
+      "routineRequirements",
+      "privilegeRequirements"
+    ],
+    "capabilityIdentityLaw": "A capability identifier has immutable schema, data-domain, codec, backfill, routine, and privilege semantics across all code artifacts. Any semantic change requires a new identifier.",
+    "descriptorHashProjection": "sha256(utf8(ci-database-capability/v1) + nul + kernel.canonical_json({capabilityId,schemaRequirements,readDomainId,writeDomainId,codecId,backfillStateId,bridgeConstraintIds,routineRequirements,privilegeRequirements}))",
+    "mixedVersionLaw": "Retained rows must remain in the intersection of every retained reader domain, and the union of rows producible by retained writers must be a subset of the intersection of retained reader domains.",
+    "proofMode": "database-enforced-bridge-constraint",
+    "bridgeConstraintLaw": "Before mixed deployment, validated PostgreSQL constraints must prove every retained row and every future write lies inside every retained reader domain. If the domain cannot be expressed and enforced by the admitted database constraint algebra, the transition is outside the cooperative rolling protocol.",
+    "backfillLaw": "A capability whose read or write domain depends on a backfill cannot attest until the declared backfill state is complete and independently verified.",
+    "seededWitnessRole": "Seeded boundary rows are falsifiers for codecs and constraints; finite examples are never authority for universal domain inclusion.",
+    "emptyDatabaseIsInsufficient": true,
+    "failure": "database_data_capability_mismatch"
+  },
+  "schemaAttestation": {
+    "factOwner": "schema_attestation.py reads bounded PostgreSQL catalog and effective-privilege facts only",
+    "dataFactOwner": "data_attestation.py attests validated capability-owned bridge constraints and executes bounded seeded-row and backfill falsifiers",
+    "policyOwner": "schema_capabilities.py is a pure capability requirement registry and performs no SQL",
+    "databaseDeclarationIsNotProof": true,
+    "requiredPlanes": [
+      "relation identity and persistence",
+      "columns and types",
+      "constraints and validation state",
+      "indexes required for correctness",
+      "storage properties required for representability",
+      "retained data read and write domains",
+      "trigger, policy, and routine behavior",
+      "capability-owned runtime privilege requirement identifiers",
+      "per-session exact runtime grants before repository exposure",
+      "migration-owner and object ACL privileges",
+      "role attributes and membership closure",
+      "default privileges",
+      "PUBLIC privilege absence"
+    ],
+    "failure": "database_schema_capability_mismatch"
+  },
+  "schemaEvolution": {
+    "additiveCompatibility": "A new relation or object outside every retained capability-owned closure may be compatible. A changed column, constraint, index, trigger, policy, storage fact, or privilege inside a retained closure requires a new capability and cannot be inferred compatible from DDL syntax.",
+    "unknownDisjointObjects": "permitted when no retained capability attestation selects them",
+    "unknownOwnedFacts": "fail-closed"
+  },
+  "privilegeModel": {
+    "runtimePrincipal": [
+      "cannot own the application schema",
+      "cannot CREATE in the application schema",
+      "cannot mutate compatibility declarations",
+      "has only capability-required data privileges",
+      "has no grant options or role memberships; all capability grants are direct"
+    ],
+    "migrationPrincipal": [
+      "owns the application schema and compatibility objects",
+      "can execute admitted migrations",
+      "is not used by the runtime service"
+    ],
+    "publicPrincipal": [
+      "has no CREATE on the application schema",
+      "has no privileges on application or compatibility relations, routines, independently grantable types or domains, or array types through their element type"
+    ],
+    "routinePolicy": {
+      "securityDefinerInApplicationSchema": "forbidden",
+      "publicExecute": "forbidden",
+      "runtimeExecute": "capability-owned allowlist only"
+    },
+    "aclObjectClasses": ["schema", "relation", "sequence", "routine", "type", "domain"],
+    "defaultPrivilegePolicy": "No committed schema, relation, sequence, function, procedure, type, or domain privilege may be available to PUBLIC. Migrations do not mutate role-global defaults; they revoke object privileges in the creating transaction and reject schema-local PUBLIC defaults. PostgreSQL array types reject independent ACL changes and derive effective USAGE from their element type, so raw ACL attestation selects typelem = 0 and effective principal attestation covers the complete type closure. The runtime principal has no default ACL entries and receives reviewed direct grants only.",
+    "roleAttributePolicy": "Runtime roles must be direct-login non-superuser, non-replication, non-bypass-RLS, non-role-creation, and non-database-creation principals with no pg_auth_members membership rows.",
+    "identityEvidence": {
+      "runtimeSession": "session_user = current_user",
+      "migrationSchemaOwner": "pg_namespace.nspowner(applicationSchema)",
+      "membershipLaw": "no pg_auth_members row where member = session_user",
+      "grantLaw": "runtime capability grants are direct, exact, and non-grantable",
+      "migrationHeadRead": "SELECT only on migrationHeadRelation",
+      "attestationPhase": "migration declaration attests static post-DDL facts; each runtime transaction separately attests exact session-principal grants after the shared fence and declaration admission before repository exposure"
+    }
+  },
+  "migrationExecution": {
+    "ownerPath": "backend/alembic/env.py",
+    "onlineMode": "required",
+    "offlineMode": "forbidden-for-compatibility-protocol-execution",
+    "versionTableSchema": "public",
+    "fencePhase": "outer-transaction-before-head-and-run-migrations",
+    "fencePhaseLaw": "Acquire the exclusive fence inside the outer migration transaction before current-head inspection, context.run_migrations, revision DDL, or declaration writes.",
+    "ddlAtomicityMode": "single-transaction-only",
+    "forbiddenOperations": [
+      "Alembic autocommit block",
+      "CREATE INDEX CONCURRENTLY",
+      "DROP INDEX CONCURRENTLY",
+      "transaction boundary inside revision"
+    ]
+  },
+  "runtimeDatabaseBoundary": {
+    "publicEntryPoint": "backend/src/ci_coordinator/persistence/__init__.py",
+    "connectionOwner": "backend/src/ci_coordinator/persistence/connection.py",
+    "law": "Schema-dependent runtime code receives repositories only from the compatibility-admitted unit of work; raw engines and sessions are not public persistence exports.",
+    "cooperationNonClaim": "Database privileges prevent runtime DDL and declaration mutation but cannot force advisory-lock participation by arbitrary SQL clients."
+  },
+  "readinessProjection": {
+    "authority": "non-authoritative-startup-projection",
+    "transactionIsolation": "read-committed",
+    "lockOrder": [
+      "shared-compatibility-fence",
+      "initial-head-and-verified-prefix",
+      "bounded-chain-and-attestation-reads"
+    ],
+    "consistencyLaw": "The shared compatibility fence prevents migration, not ordinary domain writes. Readiness verifies immutable audit rows through its initial head, then observes the final head and maximum sequence together in one statement. A valid advancing head retains the verified prefix as progress; an unchanged consistent head admits that prefix without domain-row locks.",
+    "nonClaim": "A passed readiness projection is not authority for a later schema-dependent transaction."
+  },
+  "rollout": {
+    "protocolCapability": "database-compatibility-protocol/v1",
+    "undeclaredRevisionBehavior": "fail-closed before repository exposure",
+    "cooperativeClientPrecondition": "Every supported schema-dependent client participates in the fence protocol and the runtime principal cannot perform DDL or declaration mutation.",
+    "rollbackLaw": "Code rollback is admissible only when every capability required by the rollback target is provided by the current declared revision and its code-owned schema attestation passes under the shared fence.",
+    "artifactProofLaw": "A rollback-capability claim requires execution of an immutable artifact identified by the exact predecessor source commit and artifact digest against the post-transition database. An artifact built from current source before a test-owned transition proves only that transition and is not predecessor-release evidence.",
+    "forwardMigrationProtocol": {
+      "firstApplication": "Append exactly one bootstrap, expand, or contract successor declaration atomically with DDL and Alembic head movement.",
+      "knownRevisionReplay": "Byte-exactly validate the existing declaration and append nothing.",
+      "conflictingReplayFailure": "database_declaration_replay_conflict"
+    },
+    "migrationDowngradeLaw": "Before retained production state, downgrade under the exclusive fence may select and byte-exactly validate an already declared ancestor without appending a declaration. After retention, compatibility corrections are forward-only unless a separately admitted destructive-data protocol proves otherwise."
+  },
+  "authorityPaths": [
+    "docs/specs/ci-coordinator-core/requirements.v1.json",
+    "docs/specs/ci-coordinator-core/database-compatibility-profile.v1.json",
+    "docs/architecture/INDEX.md",
+    "docs/architecture/03-dataflow-and-state-machines.md",
+    "docs/architecture/cross-cutting/database-compatibility.md",
+    "docs/architecture/modules/persistence.md",
+    "docs/architecture/modules/database-migration-protocol.md",
+    "docs/architecture/modules/database-principal-attestation.md",
+    "docs/architecture/cross-cutting/production-admission.md",
+    "backend/pyproject.toml",
+    "proofkit/repo-profile.json",
+    "proofkit/requirement-bindings.json",
+    "proofkit/witness-plan-input.json",
+    "scripts/proofkit_plan_check.py"
+  ],
+  "implementationInventory": [
+    {
+      "path": "backend/alembic/env.py",
+      "responsibility": "online migration transaction and exclusive-fence boundary",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260716_0001_initial_schema.py",
+      "responsibility": "complete pre-release schema bootstrap, generation-one capability declaration, immutability, privilege DDL, and destructive downgrade guard",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260901_0002_config_epoch_registration_operations.py",
+      "responsibility": "additive config registration operation receipts, generation-two capability declaration, full resulting-capability attestation, and pre-retention downgrade guard",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260904_0003_ci_economics_evidence.py",
+      "responsibility": "bounded CI economics evidence, leased collection lifecycle, generation-three capability declaration, full resulting-capability attestation, and pre-retention downgrade guard",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260907_0006_retire_economics_evidence_v1.py",
+      "responsibility": "fenced retirement of the historical economics capability without changing stored evidence",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260908_0007_source_aware_economics.py",
+      "responsibility": "atomic source-link backfill and exact source-aware economics capability admission",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/ci_economics_v2_schema_contract.py",
+      "responsibility": "independent exact source-aware catalog facts with preserved historical economics expectations",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260909_0008_retire_economics_evidence_v2.py",
+      "responsibility": "fenced retirement of v2 before atomic budget expansion, preserving all report bytes",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260909_0009_persistent_economics_budgets.py",
+      "responsibility": "budget policy and retained signal expansion with complete v3 result attestation",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/ci_economics_v3_schema_contract.py",
+      "responsibility": "independently declared budget table, relation, index and retention trigger expectations",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260915_0014_retire_economics_evidence_v3.py",
+      "responsibility": "fenced v3 retirement before total collection admission without changing retained data",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260915_0015_total_collection_state.py",
+      "responsibility": "atomic total collection checks and v4 capability admission with fail-closed retained-row validation",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/ci_economics_v4_schema_contract.py",
+      "responsibility": "independent total lease and state catalog expectations preserving historical versions",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_collection_state_migration.py",
+      "responsibility": "positive state populations, raw NULL counterexamples, retained-row and declaration rollback witnesses",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260910_0010_repository_observation.py",
+      "responsibility": "additive observation subscriptions, leased scan cursors and finite gap evidence without enabling observation",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/ci_observation_schema_contract.py",
+      "responsibility": "independent exact observation relation, column, constraint, index and absence-of-trigger expectations",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260912_0011_actions_history.py",
+      "responsibility": "atomic permanent history and independent detail retention expansion with a technical default but no enabled datasets",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/ci_history_schema_contract.py",
+      "responsibility": "independent archival relation, column, constraint, index and absence-of-trigger expectations",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/ci_history_schema_attestation.py",
+      "responsibility": "catalog refinement and bounded singleton default-policy admission",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260913_0012_administrator_activity.py",
+      "responsibility": "generation-twelve atomic security journal and bounded diagnostics expansion",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260913_0013_analytics_purpose.py",
+      "responsibility": "generation-thirteen durable descriptive analytics mapping expansion",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/analytics_purpose_schema_contract.py",
+      "responsibility": "independent purpose settings relation, constraint and index admission",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/activity_schema_contract.py",
+      "responsibility": "independent Activity columns, constraints, indexes and relation expectations",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/activity_schema_attestation.py",
+      "responsibility": "Activity catalog refinement and exact identity-sequence admission",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/__init__.py",
+      "responsibility": "restricted persistence public surface",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/connection.py",
+      "responsibility": "isolation and transaction connection configuration",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/compatibility_contracts.py",
+      "responsibility": "immutable declaration and capability contracts",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/compatibility_fence.py",
+      "responsibility": "shared and exclusive fence acquisition with bounded timeouts",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/compatibility_admission.py",
+      "responsibility": "composition of declaration admission with independent database facts",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/migration_result_attestation.py",
+      "responsibility": "total synchronous schema, data, and global-security attestation for every capability declared by a forward migration",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/compatibility_profile.py",
+      "responsibility": "strict byte-exact machine profile projection",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/resources/__init__.py",
+      "responsibility": "installed database compatibility resource package",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/resources/database-compatibility-profile.v1.json",
+      "responsibility": "byte-identical installed profile projection",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/compatibility_repository.py",
+      "responsibility": "bounded current-and-parent declaration reads and exact replay",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/migration_protocol.py",
+      "responsibility": "forward transition and downgrade selection orchestration",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/schema_capabilities.py",
+      "responsibility": "pure capability requirement and data-domain registry",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/data_attestation.py",
+      "responsibility": "validated bridge-constraint, seeded-row, and backfill fact collection",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/readiness.py",
+      "responsibility": "non-authoritative startup compatibility projection",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/schema.py",
+      "responsibility": "schema-qualified SQLAlchemy table metadata projection",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/schema_attestation.py",
+      "responsibility": "bounded PostgreSQL catalog and effective-privilege fact collection",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/principal_attestation.py",
+      "responsibility": "live runtime principal and direct capability ACL attestation",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/unit_of_work.py",
+      "responsibility": "shared-fence admission before repository exposure",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_database_compatibility.py",
+      "responsibility": "real PostgreSQL admission and transition witnesses",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_migration_protocol.py",
+      "responsibility": "real PostgreSQL declaration append, replay, and downgrade witnesses",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_database_compatibility_interleavings.py",
+      "responsibility": "deterministic fence interleaving witnesses",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_database_privileges.py",
+      "responsibility": "effective privilege and bypass falsifiers",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_database_runtime_principal.py",
+      "responsibility": "runtime principal admission and authorization falsifiers",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/unit/persistence/test_compatibility_contracts.py",
+      "responsibility": "pure transition and bound falsifiers",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/tests/unit/persistence/test_compatibility_fence.py",
+      "responsibility": "typed PostgreSQL fence failure-algebra falsifiers",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/tests/unit/persistence/test_compatibility_profile.py",
+      "responsibility": "strict profile and deletion mutants",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/tests/unit/persistence/test_persistence_public_surface.py",
+      "responsibility": "raw persistence-engine public-export falsifier",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/tests/unit/persistence/test_unit_of_work.py",
+      "responsibility": "fence-before-admission call-order falsifier",
+      "proofClass": "python"
+    },
+    {
+      "path": "backend/tests/unit/persistence/test_migration_environment.py",
+      "responsibility": "online Alembic transaction and fence environment falsifier",
+      "proofClass": "python"
+    },
+    {
+      "path": "fixtures/conformance/v1/python-database-compatibility-mutants.v1.json",
+      "responsibility": "canonical compatibility mutation inventory",
+      "proofClass": "python"
+    },
+    {
+      "path": "scripts/mutation/mutation_suite_specs.py",
+      "responsibility": "branch-head mutation execution",
+      "proofClass": "python"
+    }
+  ],
+  "proofRouting": {
+    "nativeCommands": {
+      "postgres": "backend/.venv/bin/python -m scripts.python_witness persistence-test",
+      "python": "backend/.venv/bin/python -m scripts.python_witness test",
+      "mutation": "backend/.venv/bin/python -m scripts.mutation.mutation_suite_specs python-database-compatibility"
+    },
+    "mutationInventory": {
+      "path": "fixtures/conformance/v1/python-database-compatibility-mutants.v1.json",
+      "expectedKilled": 36,
+      "exactSelectorsRequired": true,
+      "committedHeadRequired": true
+    },
+    "nonClaim": "Native routes and the canonical mutation inventory identify local witnesses; they do not prove provider execution, deployment, or production database state."
+  },
+  "references": [
+    "https://www.postgresql.org/docs/18/explicit-locking.html",
+    "https://www.postgresql.org/docs/18/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS",
+    "https://www.postgresql.org/docs/18/sql-altertable.html",
+    "https://www.postgresql.org/docs/18/ddl-priv.html",
+    "https://www.postgresql.org/docs/18/catalogs.html",
+    "https://www.postgresql.org/docs/18/runtime-config-client.html",
+    "https://www.postgresql.org/docs/18/errcodes-appendix.html",
+    "https://alembic.sqlalchemy.org/en/latest/tutorial.html",
+    "https://alembic.sqlalchemy.org/en/latest/api/runtime.html"
+  ],
+  "nonClaims": [
+    "This profile does not make advisory locks mandatory for clients that have not adopted this protocol.",
+    "This profile does not protect against a superuser, schema owner, or non-cooperating migration that intentionally bypasses the protocol.",
+    "This profile does not prove zero-downtime deployment, backup, restore, replication, failover, capacity, or production readiness.",
+    "This profile does not authorize a contract transition or removal of a capability merely because the transition shape is valid.",
+    "This profile does not prove advisory-key collision freedom or migration starvation freedom against unrelated or non-cooperating database clients."
+  ]
+}

@@ -1,0 +1,368 @@
+{
+  "schemaVersion": 1,
+  "profileId": "ci-coordinator.organization-control-plane/v1",
+  "ownerId": "ci-coordinator.control-plane",
+  "authorityState": "normative-contract",
+  "credentialPlanes": [
+    {
+      "planeId": "emergency-safety",
+      "credentialKinds": ["deployment-break-glass-bearer"],
+      "routeFamilies": ["emergency-safety-command"],
+      "soleAuthority": "Increase validation or latch omission off."
+    },
+    {
+      "planeId": "human-administration",
+      "credentialKinds": ["keycloak-id-token", "opaque-server-session"],
+      "routeFamilies": ["administrator-browser", "administrator-command", "administrator-read"],
+      "soleAuthority": "Identify one human administrator and project exact client roles."
+    },
+    {
+      "planeId": "identity-provider-capability",
+      "credentialKinds": ["keycloak-browser-client-secret", "keycloak-workload-client-credential"],
+      "routeFamilies": ["identity-provider-operation"],
+      "soleAuthority": "Authenticate one exact coordinator or workload client to the Keycloak token endpoint."
+    },
+    {
+      "planeId": "machine-administration",
+      "credentialKinds": ["keycloak-access-token"],
+      "routeFamilies": ["administrator-command", "administrator-read"],
+      "soleAuthority": "Identify one workload and project exact client roles."
+    },
+    {
+      "planeId": "provider-capability",
+      "credentialKinds": ["github-app-client-secret", "github-app-jwt", "github-app-private-key", "github-installation-token"],
+      "routeFamilies": ["provider-operation"],
+      "soleAuthority": "Authenticate the exact GitHub App for one admitted provider operation; repository effects remain installation-scoped."
+    },
+    {
+      "planeId": "provider-event",
+      "credentialKinds": ["github-webhook-hmac"],
+      "routeFamilies": ["provider-webhook"],
+      "soleAuthority": "Admit one delivery as GitHub-originated event evidence."
+    },
+    {
+      "planeId": "repository-attestation",
+      "credentialKinds": ["github-review-receipt", "github-user-oauth"],
+      "routeFamilies": ["repository-review"],
+      "soleAuthority": "Prove that a current repository manager accepted exact proposal bytes."
+    },
+    {
+      "planeId": "target-workflow",
+      "credentialKinds": ["github-actions-oidc"],
+      "routeFamilies": ["plan-request"],
+      "soleAuthority": "Request one revision-bound plan."
+    }
+  ],
+  "roles": {
+    "assignmentComposite": "administrator",
+    "runtimeRoles": ["activate", "audit", "configure", "override", "read"]
+  },
+  "operations": [
+    {
+      "operationId": "activate-configuration",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["activate"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["activate"]}
+      ],
+      "providerEffect": {"mode": "required", "permissionProfile": "current-read"},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "audit-read",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["audit"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["audit"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "disable-omission",
+      "callerAuthorities": [
+        {"credentialPlane": "emergency-safety", "requiredRoles": []},
+        {"credentialPlane": "human-administration", "requiredRoles": ["override"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["override"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "enable-omission",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["activate", "override"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["activate", "override"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "export-configuration-source",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["configure"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["configure"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "force-full-ci",
+      "callerAuthorities": [
+        {"credentialPlane": "emergency-safety", "requiredRoles": []},
+        {"credentialPlane": "human-administration", "requiredRoles": ["override"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["override"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "read-control-plane",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["read"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["read"]}
+      ],
+      "providerEffect": {"mode": "required", "permissionProfile": "current-read"},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "read-configuration-status",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["configure"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["configure"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "register-configuration",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["configure"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["configure"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "repository-attestation",
+      "callerAuthorities": [
+        {"credentialPlane": "repository-attestation", "requiredRoles": []}
+      ],
+      "providerEffect": {"mode": "required", "permissionProfile": "current-read"},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "rollback-configuration",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["activate"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["activate"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": null
+    },
+    {
+      "operationId": "validate-configuration",
+      "callerAuthorities": [
+        {"credentialPlane": "human-administration", "requiredRoles": ["configure"]},
+        {"credentialPlane": "machine-administration", "requiredRoles": ["configure"]}
+      ],
+      "providerEffect": {"mode": "forbidden", "permissionProfile": null},
+      "providerEvidenceInput": "current-read-receipt"
+    }
+  ],
+  "routes": {
+    "administratorApiPrefix": "/api/v1",
+    "backChannelLogout": "/api/v1/auth/keycloak/backchannel-logout",
+    "browserCallback": "/api/v1/auth/keycloak/callback",
+    "browserLogout": "/api/v1/auth/keycloak/logout",
+    "browserSession": "/api/v1/auth/session",
+    "browserStart": "/api/v1/auth/keycloak/start",
+    "emergencySafetyCommand": "/api/v1/overrides/full-ci",
+    "planRequest": "/api/v1/dynamic-ci/plan",
+    "providerWebhook": "/webhooks/github",
+    "repositoryAttestationCallback": "/api/v1/repository-attestations/github/callback",
+    "repositoryAttestationStart": "/api/v1/repository-attestations/github/start"
+  },
+  "keycloak": {
+    "issuer": {
+      "configurationOwner": "deployment",
+      "environmentVariable": "CI_COORDINATOR_KEYCLOAK_ISSUER",
+      "format": "canonical-https-url",
+      "forbiddenComponents": ["fragment", "query", "userinfo", "whitespace"],
+      "maximumBytes": 512,
+      "matching": "exact"
+    },
+    "minimumServerVersion": "26.7.3",
+    "browserClientId": "ci-coordinator-admin-ui",
+    "apiClientId": "ci-coordinator-admin-api",
+    "roleClaimPath": "resource_access.ci-coordinator-admin-api.roles",
+    "browser": {
+      "grant": "authorization_code",
+      "pkceMethod": "S256",
+      "clientType": "confidential",
+      "implicitFlow": false,
+      "directAccessGrant": false,
+      "retainAccessToken": false,
+      "retainRefreshToken": false,
+      "sessionMaximumSeconds": 900,
+      "transactionMaximumSeconds": 300,
+      "sessionHandleEntropyBytes": 32,
+      "csrfEntropyBytes": 32,
+      "clientAuthentication": {
+        "credentialKind": "keycloak-browser-client-secret",
+        "method": "client_secret_basic",
+        "custodyOwner": "deployment",
+        "rotation": "drain-auth-ingress-regenerate-deploy-all-prove-restore",
+        "partiallyRotatedReplicaSet": "rejected"
+      },
+      "cookie": {
+        "httpOnly": true,
+        "secure": true,
+        "sameSite": "Lax",
+        "path": "/"
+      }
+    },
+    "backChannelLogout": {
+      "expirationAfterIssuedAtMaximumSeconds": 120,
+      "maximumTokenAgeSeconds": 120,
+      "rejectNonce": true,
+      "replayRetentionAfterIssuedAtSeconds": 180,
+      "requireExpiration": true,
+      "requiredEvent": "http://schemas.openid.net/event/backchannel-logout",
+      "requireSidOrSub": true
+    },
+    "machine": {
+      "grant": "client_credentials",
+      "credentialKind": "keycloak-workload-client-credential",
+      "oneClientPerWorkload": true,
+      "allowedWorkloadClientIds": [],
+      "preferredClientAuthentication": ["private_key_jwt", "tls_client_auth"],
+      "weakerDeploymentProfile": "client_secret_basic"
+    },
+    "tokenAdmission": {
+      "allowedSigningAlgorithms": ["RS256"],
+      "clockSkewSeconds": 60,
+      "discoveryCacheMaximumSeconds": 300,
+      "maximumTokenBytes": 16384,
+      "discoveryMaximumBytes": 262144,
+      "jwksCacheMaximumSeconds": 300,
+      "jwksMaximumBytes": 1048576,
+      "jwksMaximumKeys": 64,
+      "machineTokenLifetimeMaximumSeconds": 300,
+      "requestTimeoutSeconds": 10,
+      "unknownKidRefreshes": 1
+    }
+  },
+  "githubApp": {
+    "ownerOrganization": {
+      "configurationOwner": "deployment",
+      "requiredFields": ["id", "login"]
+    },
+    "appAuthentication": {
+      "installationTokenCredentialKind": "github-installation-token",
+      "jwtCredentialKind": "github-app-jwt",
+      "privateKeyCredentialKind": "github-app-private-key",
+      "privateKeyCustodyOwner": "deployment",
+      "privateKeyRotation": "generate-new-deploy-all-prove-delete-old"
+    },
+    "targetApplication": {
+      "configurationOwner": "deployment",
+      "requiredFields": ["appId", "clientId", "slug"],
+      "clientIdEnvironmentVariable": "CI_COORDINATOR_GITHUB_APP_CLIENT_ID",
+      "clientIdPattern": "[A-Za-z0-9._-]{1,255}",
+      "public": true
+    },
+    "reviewerStepUpOAuth": {
+      "authorizationEndpoint": "https://github.com/login/oauth/authorize",
+      "clientCredentialKind": "github-app-client-secret",
+      "clientSecretCustodyOwner": "deployment",
+      "clientSecretRotation": "generate-new-deploy-all-prove-revoke-old",
+      "pkceMethod": "S256",
+      "tokenEndpoint": "https://github.com/login/oauth/access_token"
+    },
+    "repositorySelectionDefault": "selected",
+    "currentPermissionProfile": {
+      "profileId": "current-read",
+      "permissions": {
+        "actions": "read",
+        "administration": "read",
+        "checks": "read",
+        "contents": "read",
+        "merge_queues": "read",
+        "metadata": "read",
+        "organization_self_hosted_runners": "read",
+        "pull_requests": "read"
+      },
+      "events": ["merge_group", "pull_request", "push", "workflow_run"]
+    },
+    "futurePermissionProfiles": [
+      {
+        "profileId": "governance-remediation",
+        "status": "deferred",
+        "permissions": {"administration": "write"},
+        "blockingPrerequisite": "Owner-approved desired state, remote-effect fencing, reconciliation, and rollback evidence."
+      },
+      {
+        "profileId": "pr-report-publication",
+        "status": "deferred",
+        "permissions": {"checks": "write"},
+        "blockingPrerequisite": "Exact report identity and idempotent reconciliation."
+      },
+      {
+        "profileId": "recommendation-pull-request",
+        "status": "deferred",
+        "permissions": {"contents": "write", "pull_requests": "write", "workflows": "write"},
+        "blockingPrerequisite": "Repository-owner opt-in and exact generated-byte review."
+      },
+      {
+        "profileId": "workflow-dispatch",
+        "status": "deferred",
+        "permissions": {"actions": "write"},
+        "blockingPrerequisite": "Registered block identity, remote-effect fencing, and timeout fallback."
+      }
+    ]
+  },
+  "repositoryAttestation": {
+    "independentFromKeycloak": true,
+    "authority": "ephemeral-github-step-up-receipt",
+    "requiredBindings": ["expires-at", "initiating-actor", "issued-at", "proposal-digest", "provider-observation", "repository", "review-state", "reviewer-id", "reviewer-permission", "revision"],
+    "stepUp": {
+      "activationPermissionRecheck": "github-app-current-reviewer-permission",
+      "callbackRouteRef": "repositoryAttestationCallback",
+      "flow": "github-app-user-authorization-code",
+      "receiptMaximumSeconds": 300,
+      "retainUserAccessToken": false,
+      "startRouteRef": "repositoryAttestationStart",
+      "transactionMaximumSeconds": 300
+    }
+  },
+  "breakGlass": {
+    "productionActions": ["disable-omission", "force-full-ci"],
+    "forbiddenActions": ["activate-configuration", "audit-read", "enable-omission", "provider-write", "register-configuration", "repository-attestation", "rollback-configuration"],
+    "rotationOwner": "deployment",
+    "partiallyRotatedReplicaSet": "rejected"
+  },
+  "attribution": {
+    "humanNamespace": "keycloak-human:v1",
+    "machineNamespace": "keycloak-workload:v1",
+    "reviewerNamespace": "github-reviewer:v1",
+    "breakGlassNamespace": "break-glass:v1",
+    "displayMetadataIsAuthority": false,
+    "providerEffectsRetainInitiatingActor": true
+  },
+  "supportBoundary": {
+    "releaseState": "pre-first-release",
+    "databaseOrigin": "fresh-bootstrap",
+    "developmentDataDisposition": "reset",
+    "initialDeploymentMode": "non-enforcing"
+  },
+  "liveDevelopmentObservations": {
+    "authorityState": "unconfigured",
+    "observationOwner": "deployment"
+  },
+  "nonClaims": [
+    "Complete administrator operation-to-route mapping remains deferred to the API-first configuration contract.",
+    "Deferred GitHub permission profiles grant no current provider write authority.",
+    "The unconfigured observation status does not prove deployment installation, secret custody, provider availability, or production admission.",
+    "This profile does not prove immediate identity revocation, repository-owner consent, deployment, production readiness, or CI omission authority.",
+    "This profile does not prove that Keycloak clients, roles, workload identities, callback URLs, logout routes, or secrets are configured."
+  ]
+}

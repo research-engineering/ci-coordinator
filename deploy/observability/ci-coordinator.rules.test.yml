@@ -1,0 +1,2622 @@
+rule_files:
+  - ci-coordinator.rules.yml
+evaluation_interval: 30s
+
+tests:
+  - name: detail cleanup storage failures warn after persistence and clear after recovery
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_maintenance_operations_total{job="ci-coordinator",instance="a:3000",operation="ci_history_detail_cleanup",result="failed"}'
+        values: '0+1x12 12+0x48'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: CIHistoryDetailCleanupFailuresObserved
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIHistoryDetailCleanupFailuresObserved
+        exp_alerts: &detail-cleanup-warning
+          - exp_labels:
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: Historical detail expiry repeatedly failed to complete
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 50m
+        alertname: CIHistoryDetailCleanupFailuresObserved
+        exp_alerts: []
+  - name: detail cleanup timeouts independently warn
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_maintenance_operations_total{job="ci-coordinator",instance="a:3000",operation="ci_history_detail_cleanup",result="timed_out"}'
+        values: '0+1x12'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: CIHistoryDetailCleanupFailuresObserved
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIHistoryDetailCleanupFailuresObserved
+        exp_alerts: *detail-cleanup-warning
+  - name: cleanup success foreign targets unrelated operations and counter resets do not warn
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_maintenance_operations_total{job="ci-coordinator",instance="a:3000",operation="ci_history_detail_cleanup",result="succeeded"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_maintenance_operations_total{job="foreign",instance="a:3000",operation="ci_history_detail_cleanup",result="failed"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_maintenance_operations_total{job="ci-coordinator",instance="a:3000",operation="ci_economics_expiry",result="failed"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_maintenance_operations_total{job="ci-coordinator",instance="a:3000",operation="ci_history_detail_cleanup",result="failed"}'
+        values: '1000+0x5 0+0x34'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryDetailCleanupFailuresObserved
+        exp_alerts: []
+      - eval_time: 35m
+        alertname: CIHistoryDetailCleanupFailuresObserved
+        exp_alerts: []
+  - name: a stopped archive worker is attributed and resolves when the lane returns
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="a:3000"}'
+        values: '1+0x5'
+      - series: 'ci_coordinator_ci_history_worker_running{job="ci-coordinator",instance="a:3000",lane="backfill"}'
+        values: '0 0 0 0 1 1'
+      - series: 'ci_coordinator_ci_history_worker_running{job="ci-coordinator",instance="a:3000",lane="discovery"}'
+        values: '0 0 0 0 1 1'
+      - series: 'ci_coordinator_ci_history_worker_running{job="ci-coordinator",instance="a:3000",lane="recent"}'
+        values: '0 0 0 0 1 1'
+      - series: 'ci_coordinator_ci_history_worker_running{job="ci-coordinator",instance="a:3000",lane="repair"}'
+        values: '0 0 0 0 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: CIHistoryWorkerStopped
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: CIHistoryWorkerStopped
+        exp_alerts:
+          - exp_labels:
+              job: ci-coordinator
+              instance: a:3000
+              lane: backfill
+              service: ci-coordinator
+              severity: warning
+            exp_annotations: &history-worker-stopped-annotations
+              summary: An archive worker is not running
+              runbook: docs/how-to/operate-production-observability.md
+          - exp_labels:
+              job: ci-coordinator
+              instance: a:3000
+              lane: discovery
+              service: ci-coordinator
+              severity: warning
+            exp_annotations: *history-worker-stopped-annotations
+          - exp_labels:
+              job: ci-coordinator
+              instance: a:3000
+              lane: recent
+              service: ci-coordinator
+              severity: warning
+            exp_annotations: *history-worker-stopped-annotations
+          - exp_labels:
+              job: ci-coordinator
+              instance: a:3000
+              lane: repair
+              service: ci-coordinator
+              severity: warning
+            exp_annotations: *history-worker-stopped-annotations
+      - eval_time: 5m
+        alertname: CIHistoryWorkerStopped
+        exp_alerts: []
+
+  - name: healthy unknown foreign and unavailable worker observations do not fire
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="a:3000"}'
+        values: '1+0x5'
+      - series: 'up{job="ci-coordinator",instance="b:3000"}'
+        values: '0+0x5'
+      - series: 'up{job="foreign",instance="c:3000"}'
+        values: '1+0x5'
+      - series: 'ci_coordinator_ci_history_worker_running{job="ci-coordinator",instance="a:3000",lane="backfill"}'
+        values: '1+0x5'
+      - series: 'ci_coordinator_ci_history_worker_running{job="ci-coordinator",instance="a:3000",lane="other"}'
+        values: '0+0x5'
+      - series: 'ci_coordinator_ci_history_worker_running{job="ci-coordinator",instance="b:3000",lane="backfill"}'
+        values: '0+0x5'
+      - series: 'ci_coordinator_ci_history_worker_running{job="foreign",instance="c:3000",lane="backfill"}'
+        values: '0+0x5'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryWorkerStopped
+        exp_alerts: []
+
+  - name: absent worker series do not assert that history workers are configured
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="a:3000"}'
+        values: '1+0x5'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryWorkerStopped
+        exp_alerts: []
+
+  - name: an observed webhook failure signals possible delivery loss
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_requests_total{job="ci-coordinator",method="POST",route="/webhooks/github",status_class="5xx"}'
+        values: '0+1x15'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts:
+          - exp_labels: &webhook_labels
+              service: ci-coordinator
+              severity: warning
+            exp_annotations: &webhook_annotations
+              summary: A GitHub webhook delivery needs recovery investigation
+              runbook: docs/how-to/recover-webhook-deliveries.md
+
+  - name: each unrelated selector and zero growth stay outside delivery recovery
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_requests_total{job="unrelated",method="POST",route="/webhooks/github",status_class="5xx"}'
+        values: '0+1x15'
+      - series: 'ci_coordinator_http_requests_total{job="ci-coordinator",method="GET",route="/webhooks/github",status_class="5xx"}'
+        values: '0+1x15'
+      - series: 'ci_coordinator_http_requests_total{job="ci-coordinator",method="POST",route="/api/v1/dynamic-ci/plan",status_class="5xx"}'
+        values: '0+1x15'
+      - series: 'ci_coordinator_http_requests_total{job="ci-coordinator",method="POST",route="/webhooks/github",status_class="2xx"}'
+        values: '0+1x15'
+      - series: 'ci_coordinator_http_requests_total{job="ci-coordinator",method="POST",route="/webhooks/github",status_class="5xx"}'
+        values: '7+0x15'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts: []
+
+  - name: absent webhook telemetry does not fabricate observed failure
+    interval: 1m
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts: []
+
+  - name: a counter reset alone is not a new failed delivery
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_requests_total{job="ci-coordinator",method="POST",route="/webhooks/github",status_class="5xx"}'
+        values: '7 7 0+0x13'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts: []
+
+  - name: an isolated webhook failure resolves after the bounded hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_requests_total{job="ci-coordinator",method="POST",route="/webhooks/github",status_class="5xx"}'
+        values: '0 1+0x15'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts:
+          - exp_labels: *webhook_labels
+            exp_annotations: *webhook_annotations
+      - eval_time: 8m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts:
+          - exp_labels: *webhook_labels
+            exp_annotations: *webhook_annotations
+      - eval_time: 11m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts: []
+
+  - name: healthy replicas do not fire telemetry alerts
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="a:3000"}'
+        values: '1+0x15'
+      - series: 'ci_coordinator_ready{job="ci-coordinator",instance="a:3000"}'
+        values: '1+0x15'
+      - series: 'up{job="ci-coordinator",instance="b:3000"}'
+        values: '1+0x15'
+      - series: 'ci_coordinator_ready{job="ci-coordinator",instance="b:3000"}'
+        values: '0+0x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CICoordinatorTargetsAbsent
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CICoordinatorScrapeFailed
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CICoordinatorReadinessTelemetryAbsent
+        exp_alerts: []
+
+  - name: an unrelated job cannot conceal missing coordinator targets
+    interval: 1m
+    input_series:
+      - series: 'up{job="unrelated",instance="a:3000"}'
+        values: '1+0x15'
+    alert_rule_test:
+      - eval_time: 4m30s
+        alertname: CICoordinatorTargetsAbsent
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: CICoordinatorTargetsAbsent
+        exp_alerts:
+          - exp_labels:
+              job: ci-coordinator
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: No CI Coordinator scrape target is present
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 10m
+        alertname: CICoordinatorScrapeFailed
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CICoordinatorReadinessTelemetryAbsent
+        exp_alerts: []
+
+  - name: mixed replicas retain their own failure identities
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="healthy:3000"}'
+        values: '1+0x15'
+      - series: 'ci_coordinator_ready{job="ci-coordinator",instance="healthy:3000"}'
+        values: '1+0x15'
+      - series: 'up{job="ci-coordinator",instance="down:3000"}'
+        values: '0+0x15'
+      - series: 'up{job="ci-coordinator",instance="missing:3000"}'
+        values: '1+0x15'
+      - series: 'ci_coordinator_ready{job="unrelated",instance="missing:3000"}'
+        values: '1+0x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CICoordinatorTargetsAbsent
+        exp_alerts: []
+      - eval_time: 4m30s
+        alertname: CICoordinatorScrapeFailed
+        exp_alerts: []
+      - eval_time: 4m30s
+        alertname: CICoordinatorReadinessTelemetryAbsent
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: CICoordinatorScrapeFailed
+        exp_alerts:
+          - exp_labels: &down_labels
+              instance: down:3000
+              job: ci-coordinator
+              service: ci-coordinator
+              severity: warning
+            exp_annotations: &down_annotations
+              summary: A CI Coordinator target cannot be scraped
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 5m
+        alertname: CICoordinatorReadinessTelemetryAbsent
+        exp_alerts:
+          - exp_labels:
+              instance: missing:3000
+              job: ci-coordinator
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: A scraped CI Coordinator target has no readiness telemetry
+              runbook: docs/how-to/operate-production-observability.md
+
+  - name: scrape recovery respects the bounded keep-firing interval
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="down:3000"}'
+        values: '0+0x6 1+0x8'
+      - series: 'ci_coordinator_ready{job="ci-coordinator",instance="down:3000"}'
+        values: '1+0x15'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CICoordinatorScrapeFailed
+        exp_alerts:
+          - exp_labels: *down_labels
+            exp_annotations: *down_annotations
+      - eval_time: 11m
+        alertname: CICoordinatorScrapeFailed
+        exp_alerts:
+          - exp_labels: *down_labels
+            exp_annotations: *down_annotations
+      - eval_time: 13m
+        alertname: CICoordinatorScrapeFailed
+        exp_alerts: []
+
+  - name: unsafe omission alone fires across target counters and retains its bounded hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_shadow_unsafe_omissions_total{job="ci-coordinator",instance="failed"}'
+        values: '0 1+0x25'
+      - series: 'ci_coordinator_shadow_unsafe_omissions_total{job="ci-coordinator",instance="healthy"}'
+        values: '0+0x26'
+      - series: 'ci_coordinator_shadow_replay_mismatches_total'
+        values: '0+0x26'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: CIUnsafeOmissionObserved
+        exp_alerts: &unsafe_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: critical
+            exp_annotations:
+              summary: Unsafe CI omission evidence was observed
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 19m
+        alertname: CIUnsafeOmissionObserved
+        exp_alerts: *unsafe_alert
+      - eval_time: 21m
+        alertname: CIUnsafeOmissionObserved
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: CIReplayMismatchObserved
+        exp_alerts: []
+
+  - name: replay mismatch alone fires and then clears after window and hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_shadow_replay_mismatches_total{instance="failed"}'
+        values: '0 1+0x25'
+      - series: 'ci_coordinator_shadow_replay_mismatches_total{instance="healthy"}'
+        values: '0+0x26'
+      - series: 'ci_coordinator_shadow_unsafe_omissions_total'
+        values: '0+0x26'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: CIReplayMismatchObserved
+        exp_alerts: &replay_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: critical
+            exp_annotations:
+              summary: CI shadow replay evidence diverged
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 19m
+        alertname: CIReplayMismatchObserved
+        exp_alerts: *replay_alert
+      - eval_time: 21m
+        alertname: CIReplayMismatchObserved
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: CIUnsafeOmissionObserved
+        exp_alerts: []
+
+  - name: nonzero stationary safety counters and restart alone are not new violations
+    interval: 1m
+    input_series:
+      - series: ci_coordinator_shadow_unsafe_omissions_total
+        values: '7+0x5 0+0x20'
+      - series: ci_coordinator_shadow_replay_mismatches_total
+        values: '9+0x5 0+0x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIUnsafeOmissionObserved
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIUnsafeOmissionObserved
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: CIReplayMismatchObserved
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIReplayMismatchObserved
+        exp_alerts: []
+
+  - name: missing safety gauges and counters do not fabricate incidents
+    interval: 1m
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIUnsafeOmissionObserved
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIReplayMismatchObserved
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CICoordinatorNotReady
+        exp_alerts: []
+
+  - name: one terminal replica pages the service without leaking target labels
+    interval: 30s
+    input_series:
+      - series: 'ci_coordinator_reconciliation_background_terminal_failure{job="ci-coordinator",instance="failed"}'
+        values: '1+0x4 0+0x40'
+      - series: 'ci_coordinator_reconciliation_background_terminal_failure{job="ci-coordinator",instance="healthy"}'
+        values: '0+0x45'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: &terminal_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: page
+            exp_annotations:
+              summary: CI reconciliation stopped after a terminal failure
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 17m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: *terminal_alert
+      - eval_time: 18m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: []
+
+  - name: terminal replica handoff does not restart the service pending timer
+    interval: 30s
+    input_series:
+      - series: 'ci_coordinator_reconciliation_background_terminal_failure{instance="a"}'
+        values: '1 0+0x5'
+      - series: 'ci_coordinator_reconciliation_background_terminal_failure{instance="b"}'
+        values: '0 1+0x5'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: *terminal_alert
+
+  - name: terminal transient shorter than one minute never fires
+    interval: 30s
+    input_series:
+      - series: ci_coordinator_reconciliation_background_terminal_failure
+        values: '1 0+0x40'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: []
+
+  - name: readiness preserves per-target identity pending period and recovery hold
+    interval: 30s
+    input_series:
+      - series: 'ci_coordinator_ready{job="ci-coordinator",instance="not-ready"}'
+        values: '0+0x12 1+0x16'
+      - series: 'ci_coordinator_ready{job="ci-coordinator",instance="ready"}'
+        values: '1+0x29'
+    alert_rule_test:
+      - eval_time: 4m30s
+        alertname: CICoordinatorNotReady
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: CICoordinatorNotReady
+        exp_alerts: &not_ready_alert
+          - exp_labels:
+              instance: not-ready
+              job: ci-coordinator
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: A CI Coordinator replica is not ready
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 11m
+        alertname: CICoordinatorNotReady
+        exp_alerts: *not_ready_alert
+      - eval_time: 12m
+        alertname: CICoordinatorNotReady
+        exp_alerts: []
+
+  - name: readiness transient below five minutes is not a warning
+    interval: 30s
+    input_series:
+      - series: ci_coordinator_ready
+        values: '0+0x8 1+0x20'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CICoordinatorNotReady
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CICoordinatorNotReady
+        exp_alerts: []
+
+  - name: availability dependency failures cross both windows and exact pending periods
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued",instance="healthy"}'
+        values: '0+98x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable",instance="failed"}'
+        values: '0+2x430'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: &availability_fast_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: page
+            exp_annotations:
+              summary: CI plan availability is consuming its error budget rapidly
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 15m30s
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: &availability_slow_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: ticket
+            exp_annotations:
+              summary: CI plan availability is consuming its error budget steadily
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: issuance failures alone are eligible and cannot be diluted by rejected requests
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '0+100x430'
+      - series: 'ci_coordinator_plan_requests_total{result="invalid"}'
+        values: '0+100000x430'
+      - series: 'ci_coordinator_plan_requests_total{result="unauthenticated"}'
+        values: '0+100000x430'
+      - series: 'ci_coordinator_plan_requests_total{result="forbidden"}'
+        values: '0+100000x430'
+      - series: 'ci_coordinator_plan_requests_total{result="conflict"}'
+        values: '0+100000x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: issued requests alone are not service availability failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+100x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: rejected requests cannot satisfy the eligible volume guard
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+2x430'
+      - series: 'ci_coordinator_plan_requests_total{result="invalid"}'
+        values: '0+1000x430'
+      - series: 'ci_coordinator_plan_requests_total{result="unauthenticated"}'
+        values: '0+1000x430'
+      - series: 'ci_coordinator_plan_requests_total{result="forbidden"}'
+        values: '0+1000x430'
+      - series: 'ci_coordinator_plan_requests_total{result="conflict"}'
+        values: '0+1000x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: fast availability admits exactly twenty eligible requests in five minutes
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '0+4x65'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+
+  - name: slow availability admits exactly one hundred eligible requests in thirty minutes
+    interval: 3m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '0+10x145'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: short fast availability burn alone is insufficient
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+10000x60 600000+98x10'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+0x60 0+2x10'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: long fast availability burn alone clears after the short window and hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+95x60 5700+100x40'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+5x60 300+0x40'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 75m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 90m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: short slow availability burn alone is insufficient
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+10000x360 3600000+98x70'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+0x360 0+2x70'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: long slow availability burn alone clears after the short window and hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+98x360 35280+100x130'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+2x360 720+0x130'
+    alert_rule_test:
+      - eval_time: 6h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+      - eval_time: 6h45m
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+      - eval_time: 8h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: availability counter reset without new eligible requests does not burn budget
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '800+0x5 0+0x425'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '100+0x5 0+0x425'
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '100+0x5 0+0x425'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: absent availability traffic is not an outage
+    interval: 1m
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: fast availability stays below its burn boundary
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+9857x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+143x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: fast availability crosses its burn boundary
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+9855x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+145x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+
+  - name: slow availability stays below its burn boundary
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+9941x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+59x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: slow availability crosses its burn boundary
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+9939x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+61x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: excluded terminal outcomes are not availability failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+100x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="invalid"}'
+        values: '0+100x430'
+      - series: 'ci_coordinator_plan_requests_total{result="unauthenticated"}'
+        values: '0+100x430'
+      - series: 'ci_coordinator_plan_requests_total{result="forbidden"}'
+        values: '0+100x430'
+      - series: 'ci_coordinator_plan_requests_total{result="conflict"}'
+        values: '0+100x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: successful plan latency crosses both windows after two minutes pending
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0",instance="a"}'
+        values: '0+40x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",instance="a"}'
+        values: '0+50x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0",instance="b"}'
+        values: '0+40x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",instance="b"}'
+        values: '0+50x75'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: &latency_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: page
+            exp_annotations:
+              summary: CI plan latency is consuming its error budget rapidly
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+
+  - name: latency just below the burn threshold is quiet
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+8561x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: latency just above the burn threshold fires
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+8559x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+
+  - name: fewer than twenty slow successes do not satisfy the latency volume guard
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+0x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+2x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: exactly twenty slow successes satisfy the latency volume guard
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+0x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+4x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+
+  - name: short latency burn alone is insufficient
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+10000x60 600000+80x15'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+10000x60 600000+100x15'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: long latency burn alone clears after short window and hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+50x60 3000+100x40'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x60 6000+100x40'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: latency recovery retains its bounded firing hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+50x60 3000+100x40'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x60 6000+100x40'
+    alert_rule_test:
+      - eval_time: 75m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+
+  - name: histogram reset alone is not slow successful traffic
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '800+0x5 0+0x70'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '1000+0x5 0+0x70'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: wrong method alone cannot enter successful plan latency
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="GET",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+0x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="GET",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: wrong route alone cannot enter successful plan latency
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/webhooks/github",status_class="2xx",le="10.0"}'
+        values: '0+0x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/webhooks/github",status_class="2xx"}'
+        values: '0+100x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: failed status alone cannot enter successful plan latency
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="5xx",le="10.0"}'
+        values: '0+0x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="5xx"}'
+        values: '0+100x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: another histogram bucket cannot replace the ten second latency bucket
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="5.0"}'
+        values: '0+0x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: latency with only count telemetry has no complete ratio
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: latency with only bucket telemetry has no complete ratio
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+100x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: absent latency traffic does not fabricate slow successes
+    interval: 1m
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: restored target inventory clears the absent alert only after its hold
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="restored"}'
+        values: '_ _ _ _ _ _ 1+0x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CICoordinatorTargetsAbsent
+        exp_alerts: &targets_absent_alert
+          - exp_labels:
+              job: ci-coordinator
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: No CI Coordinator scrape target is present
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 10m
+        alertname: CICoordinatorTargetsAbsent
+        exp_alerts: *targets_absent_alert
+      - eval_time: 12m
+        alertname: CICoordinatorTargetsAbsent
+        exp_alerts: []
+
+  - name: readiness from another instance cannot conceal missing telemetry
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="missing"}'
+        values: '1+0x15'
+      - series: 'ci_coordinator_ready{job="ci-coordinator",instance="different"}'
+        values: '1+0x15'
+      - series: 'ci_coordinator_ready{job="ci-coordinator",instance="missing"}'
+        values: '_ _ _ _ _ _ 1+0x9'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CICoordinatorReadinessTelemetryAbsent
+        exp_alerts: &missing_ready_alert
+          - exp_labels:
+              job: ci-coordinator
+              instance: missing
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: A scraped CI Coordinator target has no readiness telemetry
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 10m
+        alertname: CICoordinatorReadinessTelemetryAbsent
+        exp_alerts: *missing_ready_alert
+      - eval_time: 12m
+        alertname: CICoordinatorReadinessTelemetryAbsent
+        exp_alerts: []
+
+  - name: absent or down scrapes and unrelated jobs cannot imply missing readiness telemetry
+    interval: 1m
+    input_series:
+      - series: 'up{job="ci-coordinator",instance="down"}'
+        values: '0+0x15'
+      - series: 'up{job="unrelated",instance="foreign-up"}'
+        values: '1+0x15'
+      - series: 'up{job="unrelated",instance="foreign-down"}'
+        values: '0+0x15'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CICoordinatorReadinessTelemetryAbsent
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CICoordinatorScrapeFailed
+        exp_alerts:
+          - exp_labels:
+              job: ci-coordinator
+              instance: down
+              service: ci-coordinator
+              severity: warning
+            exp_annotations: *down_annotations
+
+  - name: history_items store_unavailable independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="store_unavailable"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: &history_items_alert
+          - exp_labels:
+              lane: backfill
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: History item processing repeatedly reported failures
+              runbook: docs/how-to/operate-production-observability.md
+
+  - name: history_items unexpected_error independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="unexpected_error"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: *history_items_alert
+
+  - name: history_items exactly three observations retain the fifteen minute window and hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="store_unavailable"}'
+        values: '0 3+0x39'
+    alert_rule_test:
+      - eval_time: 5m30s
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: *history_items_alert
+      - eval_time: 29m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: *history_items_alert
+      - eval_time: 31m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+
+  - name: history_items two isolated failures remain below the warning threshold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="store_unavailable"}'
+        values: '0 2+0x39'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+
+  - name: history_items counter reset alone does not fabricate failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="store_unavailable"}'
+        values: '100+0x4 0+0x35'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+
+  - name: history_items unrelated scrape job is outside the warning
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="unrelated",lane="backfill",outcome="store_unavailable"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+
+  - name: history_items per-target resets cannot hide new observed failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",instance="resetting",lane="backfill",outcome="store_unavailable"}'
+        values: '10000+0x4 0+0x35'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",instance="working",lane="backfill",outcome="store_unavailable"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: *history_items_alert
+
+  - name: history_items failures in different lanes cannot meet one lane threshold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="store_unavailable"}'
+        values: '0 2+0x39'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="repair",outcome="store_unavailable"}'
+        values: '0 2+0x39'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+
+  - name: history_provider access_unavailable independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="access_unavailable"}'
+        values: '0+1x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="applied"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: &history_provider_alert
+          - exp_labels:
+              lane: backfill
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: History reads repeatedly reported access or provider problems
+              runbook: docs/how-to/operate-production-observability.md
+
+  - name: history_provider timed_out independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="timed_out"}'
+        values: '0+1x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="applied"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+
+  - name: history_provider provider_unavailable independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="provider_unavailable"}'
+        values: '0+1x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="applied"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+
+  - name: history_provider provider_binding_mismatch independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="provider_binding_mismatch"}'
+        values: '0+1x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="applied"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+
+  - name: history_provider provider_malformed independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="provider_malformed"}'
+        values: '0+1x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="applied"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+
+  - name: history_provider provider_incomplete independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="provider_incomplete"}'
+        values: '0+1x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="applied"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+
+  - name: history_provider provider_unstable independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="provider_unstable"}'
+        values: '0+1x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="applied"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+
+  - name: history_provider exactly three observations retain the fifteen minute window and hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="access_unavailable"}'
+        values: '0 3+0x39'
+    alert_rule_test:
+      - eval_time: 5m30s
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+      - eval_time: 29m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+      - eval_time: 31m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+
+  - name: history_provider two isolated failures remain below the warning threshold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="access_unavailable"}'
+        values: '0 2+0x39'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+
+  - name: history_provider counter reset alone does not fabricate failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="access_unavailable"}'
+        values: '100+0x4 0+0x35'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+
+  - name: history_provider unrelated scrape job is outside the warning
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="unrelated",lane="backfill",outcome="access_unavailable"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+
+  - name: history_provider per-target resets cannot hide new observed failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",instance="resetting",lane="backfill",outcome="access_unavailable"}'
+        values: '10000+0x4 0+0x35'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",instance="working",lane="backfill",outcome="access_unavailable"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+
+  - name: history_provider failures in different lanes cannot meet one lane threshold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="access_unavailable"}'
+        values: '0 2+0x39'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="repair",outcome="access_unavailable"}'
+        values: '0 2+0x39'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+
+  - name: history_delivery store_unavailable independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="store_unavailable"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: &history_delivery_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: History inbox processing repeatedly reported failures
+              runbook: docs/how-to/operate-production-observability.md
+
+  - name: history_delivery unexpected_error independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="unexpected_error"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: *history_delivery_alert
+
+  - name: history_delivery timed_out independently warns after the bounded pending period
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="timed_out"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: *history_delivery_alert
+
+  - name: history_delivery exactly three observations retain the fifteen minute window and hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="store_unavailable"}'
+        values: '0 3+0x39'
+    alert_rule_test:
+      - eval_time: 5m30s
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: *history_delivery_alert
+      - eval_time: 29m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: *history_delivery_alert
+      - eval_time: 31m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+
+  - name: history_delivery two isolated failures remain below the warning threshold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="store_unavailable"}'
+        values: '0 2+0x39'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+
+  - name: history_delivery counter reset alone does not fabricate failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="store_unavailable"}'
+        values: '100+0x4 0+0x35'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+
+  - name: history_delivery unrelated scrape job is outside the warning
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="unrelated",outcome="store_unavailable"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+
+  - name: history_delivery per-target resets cannot hide new observed failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",instance="resetting",outcome="store_unavailable"}'
+        values: '10000+0x4 0+0x35'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",instance="working",outcome="store_unavailable"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: *history_delivery_alert
+
+  - name: history_items idle normal and unclassified outcomes do not prove failure
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="applied"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="claim_lost"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="capacity_reached"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="aborted"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="none_due"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="recovered"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="other"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+
+  - name: history_provider idle normal and unclassified outcomes do not prove failure
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="page"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="complete"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="partial"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="unavailable"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="conflict"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="unavailable_attempt"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="provider_not_terminal"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="other"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+
+  - name: history_delivery idle normal and unclassified outcomes do not prove failure
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="applied"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="empty"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="inactive"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="busy"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="capacity_reached"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="deferred"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="aborted"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="other"}'
+        values: '0+100x40'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+
+  - name: absent history traffic does not become an outage or a backlog assertion
+    interval: 1m
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 40m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: repeated selected sources above one hour cross the sample threshold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}'
+        values: '0+2x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="3600.0"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 7m30s
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: &old_sample_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: History inbox samples repeatedly included sources older than one hour
+              runbook: docs/how-to/operate-production-observability.md
+
+  - name: exactly three old selected-page observations retain window and hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}'
+        values: '0 5+0x39'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="3600.0"}'
+        values: '0 2+0x39'
+    alert_rule_test:
+      - eval_time: 5m30s
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: *old_sample_alert
+      - eval_time: 29m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: *old_sample_alert
+      - eval_time: 31m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: two old samples among many fresh samples are below the warning minimum
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}'
+        values: '0 12+0x39'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="3600.0"}'
+        values: '0 10+0x39'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: one positive expired sample warns immediately but is not a distinct loss count
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator"}'
+        values: '0 10+0x39'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",le="0.0"}'
+        values: '0 9+0x39'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_sum{job="ci-coordinator"}'
+        values: '0 100+0x39'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: &expired_sample_alert
+          - exp_labels:
+              service: ci-coordinator
+              severity: warning
+            exp_annotations:
+              summary: A history inbox sample contained expired pending sources
+              runbook: docs/how-to/operate-production-observability.md
+      - eval_time: 29m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: *expired_sample_alert
+      - eval_time: 31m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample observations entirely within the inclusive bucket do not warn
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="3600.0"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample count alone cannot stand in for the missing operand
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample bucket alone cannot stand in for the missing operand
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="3600.0"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample another bucket cannot supply the selected boundary
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="300.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample stationary history and reset alone contain no new observations
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}'
+        values: '200+0x5 0+0x35'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="3600.0"}'
+        values: '100+0x5 0+0x35'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample resets on another target cannot hide new observations
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="resetting"}'
+        values: '10000+0x4 0+0x35'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="resetting",le="3600.0"}'
+        values: '10000+0x4 0+0x35'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="sampling"}'
+        values: '0+2x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="sampling",le="3600.0"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: *old_sample_alert
+
+  - name: old_sample count from another job cannot complete the observation
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="unrelated"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",le="3600.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample bucket from another job cannot complete the observation
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="unrelated",le="3600.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample both from another job cannot complete the observation
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="unrelated"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="unrelated",le="3600.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample observations entirely within the inclusive bucket do not warn
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",le="0.0"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample count alone cannot stand in for the missing operand
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample bucket alone cannot stand in for the missing operand
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",le="0.0"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample another bucket cannot supply the selected boundary
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",le="1.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample stationary history and reset alone contain no new observations
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator"}'
+        values: '200+0x5 0+0x35'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",le="0.0"}'
+        values: '100+0x5 0+0x35'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample resets on another target cannot hide new observations
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator",instance="resetting"}'
+        values: '10000+0x4 0+0x35'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="resetting",le="0.0"}'
+        values: '10000+0x4 0+0x35'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator",instance="sampling"}'
+        values: '0+2x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="sampling",le="0.0"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: *expired_sample_alert
+
+  - name: expired_sample count from another job cannot complete the observation
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="unrelated"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",le="0.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample bucket from another job cannot complete the observation
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="unrelated",le="0.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample both from another job cannot complete the observation
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="unrelated"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="unrelated",le="0.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample a missing bucket on one target cannot fabricate old observations
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="missing-bucket"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="complete"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="complete",le="3600.0"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: old_sample a missing count on another target cannot conceal real observations
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="missing-count",le="3600.0"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="complete"}'
+        values: '0+2x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="complete",le="3600.0"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: *old_sample_alert
+
+  - name: expired_sample a missing bucket on one target cannot fabricate old observations
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator",instance="missing-bucket"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator",instance="complete"}'
+        values: '0+10x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="complete",le="0.0"}'
+        values: '0+10x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: expired_sample a missing count on another target cannot conceal real observations
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="missing-count",le="0.0"}'
+        values: '0+100x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator",instance="complete"}'
+        values: '0+2x40'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="complete",le="0.0"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: *expired_sample_alert
+
+  - name: latency numerator method selector independently excludes foreign fast samples
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+80x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="GET",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+
+  - name: latency denominator method selector independently excludes foreign slow samples
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="GET",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: latency numerator route selector independently excludes foreign fast samples
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+80x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/webhooks/github",status_class="2xx",le="10.0"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+
+  - name: latency denominator route selector independently excludes foreign slow samples
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/webhooks/github",status_class="2xx"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: latency numerator status selector independently excludes foreign fast samples
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+80x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="5xx",le="10.0"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+
+  - name: latency denominator status selector independently excludes foreign slow samples
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="5xx"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: each foreign latency count is independently excluded from the volume guard
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+0x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+2x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="GET",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+10000x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/webhooks/github",status_class="2xx"}'
+        values: '0+10000x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="5xx"}'
+        values: '0+10000x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: nineteen eligible requests remain below the fast availability minimum
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+3.8x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: ninety nine eligible requests remain below the slow availability minimum
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+3.3x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: nineteen slow successes remain below the latency minimum
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+0x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+3.8x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: history_items subthreshold targets and outcomes combine within the same lane
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",instance="a",lane="backfill",outcome="store_unavailable"}'
+        values: '0 2+0x39'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",instance="b",lane="backfill",outcome="unexpected_error"}'
+        values: '0 1+0x39'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: *history_items_alert
+
+  - name: history_provider subthreshold targets and outcomes combine within the same lane
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",instance="a",lane="backfill",outcome="access_unavailable"}'
+        values: '0 2+0x39'
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",instance="b",lane="backfill",outcome="provider_unstable"}'
+        values: '0 1+0x39'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: *history_provider_alert
+
+  - name: history_delivery subthreshold targets and outcomes combine within the same lane
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",instance="a",outcome="store_unavailable"}'
+        values: '0 2+0x39'
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",instance="b",outcome="timed_out"}'
+        values: '0 1+0x39'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: *history_delivery_alert
+
+  - name: old selected samples combine across correctly paired targets
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="a"}'
+        values: '0 2+0x39'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="a",le="3600.0"}'
+        values: '0+0x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="b"}'
+        values: '0 2+0x39'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="b",le="3600.0"}'
+        values: '0+0x40'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: *old_sample_alert
+
+  - name: oracle1 latency short denominator method is the sole false guard
+    interval: 1m
+    input_series:
+      - &oracle1_short_bucket
+        series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+50x60 3100+100x39'
+      - &oracle1_valid_count
+        series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+100x100'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="GET",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: &oracle1_foreign_counts '0+10000x100'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+      - eval_time: 90m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: oracle1 latency long denominator method is the sole false guard
+    interval: 1m
+    input_series:
+      - &oracle1_long_bucket
+        series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+100x60 6080+80x39'
+      - *oracle1_valid_count
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="GET",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: *oracle1_foreign_counts
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: oracle1 latency short denominator route is the sole false guard
+    interval: 1m
+    input_series:
+      - *oracle1_short_bucket
+      - *oracle1_valid_count
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/webhooks/github",status_class="2xx"}'
+        values: *oracle1_foreign_counts
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+      - eval_time: 90m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: oracle1 latency long denominator route is the sole false guard
+    interval: 1m
+    input_series:
+      - *oracle1_long_bucket
+      - *oracle1_valid_count
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/webhooks/github",status_class="2xx"}'
+        values: *oracle1_foreign_counts
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: oracle1 latency short denominator status is the sole false guard
+    interval: 1m
+    input_series:
+      - *oracle1_short_bucket
+      - *oracle1_valid_count
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="5xx"}'
+        values: *oracle1_foreign_counts
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+      - eval_time: 90m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: oracle1 latency long denominator status is the sole false guard
+    interval: 1m
+    input_series:
+      - *oracle1_long_bucket
+      - *oracle1_valid_count
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="5xx"}'
+        values: *oracle1_foreign_counts
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: oracle1 coherent cumulative buckets distinguish le in either latency numerator
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0+80x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="15.0"}'
+        values: &oracle1_cumulative_count '0+100x75'
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="+Inf"}'
+        values: *oracle1_cumulative_count
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: *oracle1_cumulative_count
+      - series: 'ci_coordinator_http_request_duration_seconds_sum{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0+960x75'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+
+  - name: oracle2 dependency_unavailable alone supplies both denominators and volume
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: &oracle2_all_failure_values '0+100x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: oracle2 issuance_unavailable alone supplies both denominators and volume
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: *oracle2_all_failure_values
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: oracle2 issued is independently necessary for both minimum volume selectors
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+98x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: &oracle2_low_failure_values '0+1x430'
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: *oracle2_low_failure_values
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: oracle2 fast short boundary independently requires dependency_unavailable and issued
+    interval: 1m
+    input_series:
+      - &oracle2_fast_short_issued
+        series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+9500x60 579857+9857x39'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: &oracle2_fast_short_failures '0+500x60 30143+143x39'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 90m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: oracle2 fast short boundary independently requires issuance_unavailable and issued
+    interval: 1m
+    input_series:
+      - *oracle2_fast_short_issued
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: *oracle2_fast_short_failures
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 90m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: oracle2 fast long boundary independently requires dependency_unavailable and issued
+    interval: 1m
+    input_series:
+      - &oracle2_fast_long_issued
+        series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+9858x60 601335+9855x39'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: &oracle2_fast_long_failures '0+142x60 8665+145x39'
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: oracle2 fast long boundary independently requires issuance_unavailable and issued
+    interval: 1m
+    input_series:
+      - *oracle2_fast_long_issued
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: *oracle2_fast_long_failures
+    alert_rule_test:
+      - eval_time: 70m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: oracle2 slow short boundary independently requires dependency_unavailable and issued
+    interval: 1m
+    input_series:
+      - &oracle2_slow_short_issued
+        series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+98000x360 35379402+99402x129'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: &oracle2_slow_short_failures '0+2000x360 720598+598x129'
+    alert_rule_test:
+      - eval_time: 6h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+      - eval_time: 8h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: oracle2 slow short boundary independently requires issuance_unavailable and issued
+    interval: 1m
+    input_series:
+      - *oracle2_slow_short_issued
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: *oracle2_slow_short_failures
+    alert_rule_test:
+      - eval_time: 6h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+      - eval_time: 8h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: oracle2 slow long boundary independently requires dependency_unavailable and issued
+    interval: 1m
+    input_series:
+      - &oracle2_slow_long_issued
+        series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+99403x360 35884470+99390x69'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: &oracle2_slow_long_failures '0+597x360 215530+610x69'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: oracle2 slow long boundary independently requires issuance_unavailable and issued
+    interval: 1m
+    input_series:
+      - *oracle2_slow_long_issued
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: *oracle2_slow_long_failures
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: oracle2 fast short nominal equality does not sustain firing after recovery hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+570000x60 34791360+591360x39'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+30000x60 1808640+8640x39'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 90m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+
+  - name: oracle2 slow short nominal equality does not sustain firing after recovery hold
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+29400x360 10613820+29820x129'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+600x360 216180+180x129'
+    alert_rule_test:
+      - eval_time: 6h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+      - eval_time: 8h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: oracle2 fast long nominal boundary starts pending only after strict crossing
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+28980240x60 1767773400+28959000x19'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+419760x60 25626600+441000x19'
+    alert_rule_test:
+      - eval_time: 72m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 73m
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+
+  - name: oracle2 slow long nominal boundary starts pending only after strict crossing
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+89163600x360 32188048830+89152830x84'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+536400x360 193651170+547170x84'
+    alert_rule_test:
+      - eval_time: 7h15m
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+      - eval_time: 7h16m
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: oracle3 items target reset with stationary peer never invents failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",instance="resetting",lane="backfill",outcome="store_unavailable"}'
+        values: &oracle3_reset_counter '1000+0x5 0+0x34'
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",instance="stationary",lane="backfill",outcome="store_unavailable"}'
+        values: &oracle3_stationary_counter '1000+0x40'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 19m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 34m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 36m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+
+  - name: oracle3 provider target reset with stationary peer never invents failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",instance="resetting",lane="backfill",outcome="provider_unavailable"}'
+        values: *oracle3_reset_counter
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",instance="stationary",lane="backfill",outcome="provider_unavailable"}'
+        values: *oracle3_stationary_counter
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 19m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 34m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 36m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+
+  - name: oracle3 delivery target reset with stationary peer never invents failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",instance="resetting",outcome="store_unavailable"}'
+        values: *oracle3_reset_counter
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",instance="stationary",outcome="store_unavailable"}'
+        values: *oracle3_stationary_counter
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 19m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 34m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 36m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+
+  - name: oracle3 old paired histogram reset with stationary peer has no new samples
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="resetting"}'
+        values: &oracle3_reset_histogram_count '2000+0x5 0+0x34'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="resetting",le="3600.0"}'
+        values: *oracle3_reset_counter
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="resetting",le="+Inf"}'
+        values: *oracle3_reset_histogram_count
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_sum{job="ci-coordinator",instance="resetting"}'
+        values: '9000000+0x5 0+0x34'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_count{job="ci-coordinator",instance="stationary"}'
+        values: &oracle3_stationary_histogram_count '2000+0x40'
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="stationary",le="3600.0"}'
+        values: *oracle3_stationary_counter
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_bucket{job="ci-coordinator",instance="stationary",le="+Inf"}'
+        values: *oracle3_stationary_histogram_count
+      - series: 'ci_coordinator_ci_history_pending_age_seconds_sum{job="ci-coordinator",instance="stationary"}'
+        values: '9000000+0x40'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 19m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 34m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 36m
+        alertname: CIHistoryOldPendingSamplesObserved
+        exp_alerts: []
+
+  - name: oracle3 expired paired histogram reset with stationary peer has no new samples
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator",instance="resetting"}'
+        values: *oracle3_reset_histogram_count
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="resetting",le="0.0"}'
+        values: *oracle3_reset_counter
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="resetting",le="+Inf"}'
+        values: *oracle3_reset_histogram_count
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_sum{job="ci-coordinator",instance="resetting"}'
+        values: '1000+0x5 0+0x34'
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_count{job="ci-coordinator",instance="stationary"}'
+        values: *oracle3_stationary_histogram_count
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="stationary",le="0.0"}'
+        values: *oracle3_stationary_counter
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_bucket{job="ci-coordinator",instance="stationary",le="+Inf"}'
+        values: *oracle3_stationary_histogram_count
+      - series: 'ci_coordinator_ci_history_expired_pending_sample_sum{job="ci-coordinator",instance="stationary"}'
+        values: '1000+0x40'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 19m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 34m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+      - eval_time: 36m
+        alertname: CIHistoryExpiredPendingSamplesObserved
+        exp_alerts: []
+
+  - name: oracle4 two terminal replicas still produce exactly one service page
+    interval: 30s
+    input_series:
+      - series: 'ci_coordinator_reconciliation_background_terminal_failure{job="ci-coordinator",instance="failed-a"}'
+        values: &oracle4_terminal_values '1+0x4'
+      - series: 'ci_coordinator_reconciliation_background_terminal_failure{job="ci-coordinator",instance="failed-b"}'
+        values: *oracle4_terminal_values
+      - series: 'ci_coordinator_reconciliation_background_terminal_failure{job="ci-coordinator",instance="healthy"}'
+        values: '0+0x4'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: *terminal_alert
+      - eval_time: 2m
+        alertname: CIReconciliationTerminalFailure
+        exp_alerts: *terminal_alert

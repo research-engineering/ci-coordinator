@@ -1,0 +1,9 @@
+--- a/gzwrite.c
++++ b/gzwrite.c
+@@ -245 +245,3 @@
+-            if (ret == -1)
++            if (ret == -1) {
++                state->strm.avail_in = 0;
++                state->strm.next_in = state->in;
+@@ -246,0 +249 @@
++            }

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "ci-webhook-ingestion-profile/v2",
+  "profileId": "ci-coordinator.github-webhook-ingestion/v2",
+  "provider": {
+    "name": "github",
+    "maximumDeliveredPayloadBytes": 26214400,
+    "payloadCapSourceUrl": "https://docs.github.com/en/webhooks/webhook-events-and-payloads"
+  },
+  "limits": {
+    "maximumBodyBytes": 26214400,
+    "maximumNestingDepth": 64,
+    "maximumJsonNodes": 262144,
+    "maximumObjectMembers": 65536,
+    "maximumArrayItems": 65536,
+    "maximumStringCodePoints": 1048576
+  },
+  "eventActions": {
+    "ping": [null],
+    "push": [null],
+    "pull_request": ["opened", "reopened", "synchronize", "ready_for_review"],
+    "merge_group": ["checks_requested"],
+    "workflow_job": ["completed"],
+    "workflow_run": ["requested", "in_progress", "completed"]
+  },
+  "stableCodes": [
+    "ambiguous_base_sha",
+    "delivery_id_conflict",
+    "delivery_idempotency_contract_violation",
+    "delivery_idempotency_unavailable",
+    "event_action_not_admitted",
+    "incomplete_merge_group",
+    "incomplete_pull_request",
+    "incomplete_push",
+    "incomplete_workflow_job",
+    "incomplete_workflow_run",
+    "invalid_json",
+    "invalid_webhook_body",
+    "missing_merge_group_head_ref",
+    "missing_delivery_id",
+    "missing_event_name",
+    "missing_installation",
+    "missing_repository",
+    "non_live_merge_group_head",
+    "non_live_pull_request_head",
+    "non_live_push_ref",
+    "unsupported_event",
+    "webhook_body_hash_mismatch",
+    "webhook_payload_array_limit_exceeded",
+    "webhook_payload_nesting_limit_exceeded",
+    "webhook_payload_node_limit_exceeded",
+    "webhook_payload_object_limit_exceeded",
+    "webhook_payload_root_not_object",
+    "webhook_payload_string_limit_exceeded",
+    "webhook_payload_too_large"
+  ]
+}

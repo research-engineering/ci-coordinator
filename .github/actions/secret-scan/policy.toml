@@ -1,0 +1,68 @@
+title = "CI assurance secret policy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public cryptography type annotation in audit checkpoint fixtures; not key material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^backend/tests/unit/audit_replay/test_checkpoint\.py$''']
+regexes = ['''^Ed25519PrivateKey$''']
+
+[[allowlists]]
+description = "Public cryptography type annotation in capacity signing fixtures; not key material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^backend/tests/unit/capacity_qualification/_support\.py$''']
+regexes = ['''^Ed25519PrivateKey$''']
+
+[[allowlists]]
+description = "Public cryptography type annotations in cutover fixture fields and arguments; not key material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^backend/tests/unit/production_cutover_support\.py$''']
+regexes = ['''^Ed25519PrivateKey$''']
+
+[[allowlists]]
+description = "Public cryptography type annotation in the admission fixture argument; not key material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^backend/tests/unit/production_admission_support\.py$''']
+regexes = ['''^Ed25519PrivateKey$''']
+
+[[allowlists]]
+description = "Public cryptography type annotation in the drain fixture field; not key material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^backend/tests/unit/production_admission/test_cutover_drain\.py$''']
+regexes = ['''^Ed25519PrivateKey$''']
+
+[[allowlists]]
+description = "Public compact Proofkit witnessIdSuffix identifier in its owner route; not authentication material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^proofkit/routes/developer\-environment\.v2\.json$''']
+regexes = ['''^dev004\-secret\-material\-contract$''']
+
+[[allowlists]]
+description = "Public compact Proofkit witnessIdSuffix identifier in its owner route; not authentication material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^proofkit/routes/developer\-environment\.v2\.json$''']
+regexes = ['''^dev009\-secret\-handoff$''']
+
+[[allowlists]]
+description = "Public compact Proofkit witnessIdSuffix identifier in its owner route; not authentication material."
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^proofkit/routes/developer\-environment\.v2\.json$''']
+regexes = ['''^dev004\-secret\-falsifiers$''']

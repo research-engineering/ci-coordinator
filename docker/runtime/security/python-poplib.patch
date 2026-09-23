@@ -1,0 +1,5 @@
+--- a/poplib.py
++++ b/poplib.py
+@@ -124,0 +125,2 @@
++        if re.search(b'[\x00-\x1F\x7F]', line):
++            raise ValueError('Control characters not allowed in commands')

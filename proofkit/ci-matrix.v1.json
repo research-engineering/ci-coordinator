@@ -1,0 +1,757 @@
+{
+  "schemaVersion": "ci-coordinator.ci-matrix/v1",
+  "ownerId": "ci-coordinator.core",
+  "nativeWorkflow": ".github/workflows/python-persistence.yml",
+  "surfaces": [
+    {
+      "id": "python",
+      "paths": [
+        "**/*.py",
+        "**/*.pyi"
+      ],
+      "commandIds": [
+        "python.lint",
+        "python.typecheck",
+        "python.import-boundary",
+        "python.coverage",
+        "python.dependency-usage"
+      ],
+      "predicate": "Authored Python syntax, lint, types, import authority and native behavior; production and test inputs remain distinct witness populations."
+    },
+    {
+      "id": "typescript",
+      "paths": [
+        "**/*.ts",
+        "**/*.tsx",
+        "**/*.mts",
+        "**/*.cts"
+      ],
+      "commandIds": [
+        "frontend.quality",
+        "frontend.build",
+        "frontend.browser"
+      ],
+      "predicate": "TypeScript types, Biome and typed Promise ownership plus native unit, production build and browser witnesses."
+    },
+    {
+      "id": "javascript",
+      "paths": [
+        "**/*.js",
+        "**/*.mjs",
+        "**/*.cjs"
+      ],
+      "commandIds": [
+        "frontend.quality",
+        "frontend.build",
+        "target-control-bundle.check",
+        "python.coverage"
+      ],
+      "predicate": "Repository Node tooling, packaged control programs and their native contract witnesses."
+    },
+    {
+      "id": "go",
+      "paths": [
+        "**/*.go",
+        "**/go.mod",
+        "**/go.sum"
+      ],
+      "commandIds": [
+        "utility.gofmt",
+        "utility.go-vet",
+        "utility.staticcheck",
+        "utility.govulncheck",
+        "workflow.lint"
+      ],
+      "predicate": "Go formatting, compiler-aware analysis, dependency and standard-library vulnerabilities, and helper execution."
+    },
+    {
+      "id": "shell",
+      "paths": [
+        "**/*.sh",
+        ".githooks/*"
+      ],
+      "commandIds": [
+        "workflow.lint",
+        "development.stack"
+      ],
+      "predicate": "Explicit Bash/POSIX dialect analysis and native developer lifecycle witnesses."
+    },
+    {
+      "id": "docker",
+      "paths": [
+        "**/Dockerfile",
+        "**/Dockerfile.*",
+        "**/*.Dockerfile",
+        "**/.dockerignore"
+      ],
+      "commandIds": [
+        "utility.hadolint",
+        "utility.build-checks",
+        "container.smoke",
+        "development.stack",
+        "devcontainer.verify"
+      ],
+      "predicate": "All authored Dockerfiles and build contexts have static and actual container witnesses; final-image scanning remains a release owner."
+    },
+    {
+      "id": "runtime-packaging",
+      "paths": [
+        "docker/runtime/ubuntu-snapshot.conf",
+        "docker/runtime/security/zlib-control",
+        "docker/runtime/security/*.c",
+        "docker/runtime/security/*.patch"
+      ],
+      "commandIds": ["container.smoke", "workflow.lint"],
+      "predicate": "Exact runtime acquisition locks, builder recipes and native probes are consumed by the image build; CVE and release admission remain separate witnesses."
+    },
+    {
+      "id": "yaml",
+      "paths": [
+        "**/*.yml",
+        "**/*.yaml"
+      ],
+      "commandIds": [
+        "utility.yaml",
+        "utility.schemas",
+        "workflow.lint",
+        "observability.rules",
+        "development.stack"
+      ],
+      "predicate": "YAML syntax/duplicate keys, applicable offline vendor schemas, and workflow/Compose/Prometheus semantic owners."
+    },
+    {
+      "id": "json",
+      "paths": [
+        "**/*.json"
+      ],
+      "commandIds": [
+        "repository.json",
+        "utility.schemas",
+        "requirements.admission",
+        "python.coverage"
+      ],
+      "predicate": "Strict JSON and applicable schema/contract owners; generic JSON validity is not runtime semantic proof."
+    },
+    {
+      "id": "toml",
+      "paths": [
+        "**/*.toml",
+        "mise.lock",
+        "**/uv.lock"
+      ],
+      "commandIds": [
+        "python.lock-check",
+        "dependency.check",
+        "utility.schemas",
+        "devcontainer.verify"
+      ],
+      "predicate": "Toolchain and dependency TOML parsing/lock coherence and actual installation/developer witnesses."
+    },
+    {
+      "id": "markdown",
+      "paths": [
+        "**/*.md"
+      ],
+      "commandIds": [
+        "documentation.graph",
+        "documentation.diagrams",
+        "utility.spelling",
+        "text.policy"
+      ],
+      "predicate": "Documentation links/requirements/projections, diagrams and conservative spelling."
+    },
+    {
+      "id": "database",
+      "paths": [
+        "**/*.sql",
+        "backend/alembic.ini",
+        "backend/alembic/*.mako"
+      ],
+      "commandIds": [
+        "python.persistence-test",
+        "development.stack",
+        "container.smoke"
+      ],
+      "predicate": "Real PostgreSQL migration, ACL, bootstrap and packaged-resource witnesses own SQL semantics."
+    },
+    {
+      "id": "web-assets",
+      "paths": [
+        "**/*.html",
+        "**/*.css",
+        "**/*.svg",
+        "**/*.png",
+        "**/*.woff2",
+        "**/*.ico"
+      ],
+      "commandIds": [
+        "frontend.quality",
+        "frontend.build",
+        "frontend.browser"
+      ],
+      "predicate": "Styles, assets, visual/browser accessibility and production-bundle integrity."
+    },
+    {
+      "id": "supply-chain",
+      "paths": [
+        "**/*.lock",
+        "**/*.patch",
+        "**/.npmrc",
+        "**/package.json"
+      ],
+      "commandIds": [
+        "python.lock-check",
+        "dependency.check",
+        "dependency.audit",
+        "frontend.install",
+        "secret.scan"
+      ],
+      "predicate": "Locked resolution, admitted package patches, package-manager configuration and dependency vulnerability analysis."
+    },
+    {
+      "id": "repository-metadata",
+      "paths": [
+        "LICENSE",
+        "NOTICE",
+        "docs/specs/ci-coordinator-release/SPDX-LICENSE.txt",
+        ".gitignore",
+        "**/py.typed",
+        ".env.example",
+        "**/README.txt",
+        "frontend/src/assets/fonts/OFL.txt",
+        "tooling/quality/*.txt",
+        "tooling/quality/**/*.txt",
+        "tooling/quality/spelling-words.dic",
+        "**/.gitignore",
+        "tooling/quality/codespell.ini",
+        "tooling/quality/schemas/devcontainers/LICENSE-CODE"
+      ],
+      "commandIds": [
+        "text.policy",
+        "python.package-check",
+        "development.stack"
+      ],
+      "predicate": "Repository/packaging metadata and development configuration remain explicitly classified."
+    },
+    {
+      "id": "self-consumer",
+      "paths": [
+        ".ci-coordinator/**",
+        ".github/workflows/coordinated-checks.yml",
+        "scripts/self_ci_*.py"
+      ],
+      "commandIds": [
+        "self-ci.check",
+        "matrix.admission",
+        "python.test"
+      ],
+      "predicate": "Exact native job and control source generation, runtime-admitted registry/catalog/graph and independently preserved gate operands."
+    },
+    {
+      "id": "ci-assurance-inputs",
+      "paths": [
+        ".github/actions/secret-scan/**",
+        "docker/ci/**"
+      ],
+      "commandIds": [
+        "secret.scan",
+        "frontend.connected",
+        "workflow.lint"
+      ],
+      "predicate": "Packaged scanner and disposable identity fixture inputs retain their native owner admission; no provider enrollment is inferred."
+    }
+  ],
+  "commands": [
+    {
+      "commandId": "documentation.diagrams-process",
+      "executionOwner": "proofkit/witness-plan-input.json#documentation.diagrams-process",
+      "purpose": "Run the repository-owned documentation.diagrams-process predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "documentation.diagrams-inventory",
+      "executionOwner": "proofkit/witness-plan-input.json#documentation.diagrams-inventory",
+      "purpose": "Run the repository-owned documentation.diagrams-inventory predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "documentation.diagrams",
+      "executionOwner": "proofkit/witness-plan-input.json#documentation.diagrams",
+      "purpose": "Run the repository-owned documentation.diagrams predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "documentation.diagrams-falsifiers",
+      "executionOwner": "proofkit/witness-plan-input.json#documentation.diagrams-falsifiers",
+      "purpose": "Run the repository-owned documentation.diagrams-falsifiers predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "discovery.mutation-python",
+      "executionOwner": "proofkit/witness-plan-input.json#discovery.mutation-python",
+      "purpose": "Run the repository-owned discovery.mutation-python predicate with its declared environment, timeout and failure contract.",
+      "kind": "discovery"
+    },
+    {
+      "commandId": "discovery.mutation-frontend",
+      "executionOwner": "proofkit/witness-plan-input.json#discovery.mutation-frontend",
+      "purpose": "Run the repository-owned discovery.mutation-frontend predicate with its declared environment, timeout and failure contract.",
+      "kind": "discovery"
+    },
+    {
+      "commandId": "container.smoke",
+      "executionOwner": "proofkit/witness-plan-input.json#container.smoke",
+      "purpose": "Run the repository-owned container.smoke predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "dependency.check",
+      "executionOwner": "proofkit/witness-plan-input.json#dependency.check",
+      "purpose": "Run the repository-owned dependency.check predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "dependency.audit",
+      "executionOwner": "proofkit/witness-plan-input.json#dependency.audit",
+      "purpose": "Run the repository-owned dependency.audit predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "requirements.admission",
+      "executionOwner": "proofkit/witness-plan-input.json#requirements.admission",
+      "purpose": "Run the repository-owned requirements.admission predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "architecture.ownership",
+      "executionOwner": "proofkit/witness-plan-input.json#architecture.ownership",
+      "purpose": "Run the repository-owned architecture.ownership predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "documentation.graph",
+      "executionOwner": "proofkit/witness-plan-input.json#documentation.graph",
+      "purpose": "Run the repository-owned documentation.graph predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "documentation.graph-falsifiers",
+      "executionOwner": "proofkit/witness-plan-input.json#documentation.graph-falsifiers",
+      "purpose": "Run the repository-owned documentation.graph-falsifiers predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "selective.plan",
+      "executionOwner": "proofkit/witness-plan-input.json#selective.plan",
+      "purpose": "Run the repository-owned selective.plan predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "target-artifacts.check",
+      "executionOwner": "proofkit/witness-plan-input.json#target-artifacts.check",
+      "purpose": "Run the repository-owned target-artifacts.check predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "target-control-bundle.check",
+      "executionOwner": "proofkit/witness-plan-input.json#target-control-bundle.check",
+      "purpose": "Run the repository-owned target-control-bundle.check predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "native-target-artifacts.check",
+      "executionOwner": "proofkit/witness-plan-input.json#native-target-artifacts.check",
+      "purpose": "Run the repository-owned native-target-artifacts.check predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "repository.json",
+      "executionOwner": "proofkit/witness-plan-input.json#repository.json",
+      "purpose": "Run the repository-owned repository.json predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "workflow.lint",
+      "executionOwner": "proofkit/witness-plan-input.json#workflow.lint",
+      "purpose": "Run the repository-owned workflow.lint predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "observability.rules",
+      "executionOwner": "proofkit/witness-plan-input.json#observability.rules",
+      "purpose": "Run the repository-owned observability.rules predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.audit-json-resources",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.audit-json-resources",
+      "purpose": "Run the repository-owned mutation.audit-json-resources predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.audit-persistence-bytes",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.audit-persistence-bytes",
+      "purpose": "Run the repository-owned mutation.audit-persistence-bytes predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.python-capacity-evidence",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.python-capacity-evidence",
+      "purpose": "Run the repository-owned mutation.python-capacity-evidence predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.python-config-policy-admission",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.python-config-policy-admission",
+      "purpose": "Run the repository-owned mutation.python-config-policy-admission predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.python-database-compatibility",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.python-database-compatibility",
+      "purpose": "Run the repository-owned mutation.python-database-compatibility predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.python-http-admission",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.python-http-admission",
+      "purpose": "Run the repository-owned mutation.python-http-admission predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.frontend-safety-kernels",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.frontend-safety-kernels",
+      "purpose": "Run the repository-owned mutation.frontend-safety-kernels predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.python-persistence",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.python-persistence",
+      "purpose": "Run the repository-owned mutation.python-persistence predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.import-boundary",
+      "executionOwner": "proofkit/witness-plan-input.json#python.import-boundary",
+      "purpose": "Run the repository-owned python.import-boundary predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.install-check",
+      "executionOwner": "proofkit/witness-plan-input.json#python.install-check",
+      "purpose": "Run the repository-owned python.install-check predicate with its declared environment, timeout and failure contract.",
+      "kind": "preparation"
+    },
+    {
+      "commandId": "python.lint",
+      "executionOwner": "proofkit/witness-plan-input.json#python.lint",
+      "purpose": "Run the repository-owned python.lint predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.lock-check",
+      "executionOwner": "proofkit/witness-plan-input.json#python.lock-check",
+      "purpose": "Run the repository-owned python.lock-check predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.package-check",
+      "executionOwner": "proofkit/witness-plan-input.json#python.package-check",
+      "purpose": "Run the repository-owned python.package-check predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.test",
+      "executionOwner": "proofkit/witness-plan-input.json#python.test",
+      "purpose": "Run the repository-owned python.test predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "runtime026.test",
+      "executionOwner": "proofkit/witness-plan-input.json#runtime026.test",
+      "purpose": "Run the repository-owned runtime026.test predicate with its declared environment, timeout and failure contract.",
+      "kind": "manual"
+    },
+    {
+      "commandId": "runtime027.test",
+      "executionOwner": "proofkit/witness-plan-input.json#runtime027.test",
+      "purpose": "Run the repository-owned runtime027.test predicate with its declared environment, timeout and failure contract.",
+      "kind": "manual"
+    },
+    {
+      "commandId": "runtime028.test",
+      "executionOwner": "proofkit/witness-plan-input.json#runtime028.test",
+      "purpose": "Run the repository-owned runtime028.test predicate with its declared environment, timeout and failure contract.",
+      "kind": "manual"
+    },
+    {
+      "commandId": "runtime026.persistence-test",
+      "executionOwner": "proofkit/witness-plan-input.json#runtime026.persistence-test",
+      "purpose": "Run the repository-owned runtime026.persistence-test predicate with its declared environment, timeout and failure contract.",
+      "kind": "manual"
+    },
+    {
+      "commandId": "python.coverage",
+      "executionOwner": "proofkit/witness-plan-input.json#python.coverage",
+      "purpose": "Run the repository-owned python.coverage predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.persistence-test",
+      "executionOwner": "proofkit/witness-plan-input.json#python.persistence-test",
+      "purpose": "Run the repository-owned python.persistence-test predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.typecheck",
+      "executionOwner": "proofkit/witness-plan-input.json#python.typecheck",
+      "purpose": "Run the repository-owned python.typecheck predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "text.policy",
+      "executionOwner": "proofkit/witness-plan-input.json#text.policy",
+      "purpose": "Run the repository-owned text.policy predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "proofkit.verify",
+      "executionOwner": "proofkit/witness-plan-input.json#proofkit.verify",
+      "purpose": "Run the repository-owned proofkit.verify predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "quality.branch-head",
+      "executionOwner": "proofkit/witness-plan-input.json#quality.branch-head",
+      "purpose": "Run the repository-owned quality.branch-head predicate with its declared environment, timeout and failure contract.",
+      "kind": "aggregate"
+    },
+    {
+      "commandId": "devcontainer.verify",
+      "executionOwner": "proofkit/witness-plan-input.json#devcontainer.verify",
+      "purpose": "Run the repository-owned devcontainer.verify predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "development.stack",
+      "executionOwner": "proofkit/witness-plan-input.json#development.stack",
+      "purpose": "Run the repository-owned development.stack predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "frontend.build",
+      "executionOwner": "proofkit/witness-plan-input.json#frontend.build",
+      "purpose": "Run the repository-owned frontend.build predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "frontend.browser",
+      "executionOwner": "proofkit/witness-plan-input.json#frontend.browser",
+      "purpose": "Run the repository-owned frontend.browser predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "frontend.contract-python",
+      "executionOwner": "proofkit/witness-plan-input.json#frontend.contract-python",
+      "purpose": "Run the repository-owned frontend.contract-python predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "frontend.contract-types",
+      "executionOwner": "proofkit/witness-plan-input.json#frontend.contract-types",
+      "purpose": "Run the repository-owned frontend.contract-types predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "frontend.install",
+      "executionOwner": "proofkit/witness-plan-input.json#frontend.install",
+      "purpose": "Run the repository-owned frontend.install predicate with its declared environment, timeout and failure contract.",
+      "kind": "preparation"
+    },
+    {
+      "commandId": "frontend.quality",
+      "executionOwner": "proofkit/witness-plan-input.json#frontend.quality",
+      "purpose": "Run the repository-owned frontend.quality predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.yaml",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.yaml",
+      "purpose": "Run the repository-owned utility.yaml predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.schemas",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.schemas",
+      "purpose": "Run the repository-owned utility.schemas predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.hadolint",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.hadolint",
+      "purpose": "Run the repository-owned utility.hadolint predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.build-checks",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.build-checks",
+      "purpose": "Run the repository-owned utility.build-checks predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.gofmt",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.gofmt",
+      "purpose": "Run the repository-owned utility.gofmt predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.go-vet",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.go-vet",
+      "purpose": "Run the repository-owned utility.go-vet predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.staticcheck",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.staticcheck",
+      "purpose": "Run the repository-owned utility.staticcheck predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.govulncheck",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.govulncheck",
+      "purpose": "Run the repository-owned utility.govulncheck predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "utility.spelling",
+      "executionOwner": "proofkit/witness-plan-input.json#utility.spelling",
+      "purpose": "Run the repository-owned utility.spelling predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "matrix.admission",
+      "executionOwner": "proofkit/witness-plan-input.json#matrix.admission",
+      "purpose": "Run the repository-owned matrix.admission predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "self-ci.check",
+      "executionOwner": "proofkit/witness-plan-input.json#self-ci.check",
+      "purpose": "Run the repository-owned self-ci.check predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.dependency-usage",
+      "executionOwner": "proofkit/witness-plan-input.json#python.dependency-usage",
+      "purpose": "Run the repository-owned python.dependency-usage predicate with its declared scope, environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "secret.scan",
+      "executionOwner": "proofkit/witness-plan-input.json#secret.scan",
+      "purpose": "Run the repository-owned secret.scan predicate with its declared scope, environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "frontend.connected",
+      "executionOwner": "proofkit/witness-plan-input.json#frontend.connected",
+      "purpose": "Run the repository-owned frontend.connected predicate with its declared scope, environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "frontend.mutation-identity",
+      "executionOwner": "proofkit/witness-plan-input.json#frontend.mutation-identity",
+      "purpose": "Run the repository-owned frontend.mutation-identity predicate with its declared scope, environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "python.native-timeout",
+      "executionOwner": "proofkit/witness-plan-input.json#python.native-timeout",
+      "purpose": "Run the Linux-only native timeout diagnostic falsifiers with GNU timeout, without credentials or network access; portable Python witnesses do not execute this file.",
+      "kind": "native"
+    }
+  ],
+  "utilityGroups": [
+    {
+      "id": "config",
+      "jobId": "utility-config",
+      "commandIds": [
+        "utility.yaml",
+        "utility.schemas"
+      ],
+      "reason": "Share the locked schema/parser environment for configuration inputs."
+    },
+    {
+      "id": "docker",
+      "jobId": "utility-docker",
+      "commandIds": [
+        "utility.hadolint",
+        "utility.build-checks"
+      ],
+      "reason": "Share Dockerfile discovery and the pinned BuildKit provider."
+    },
+    {
+      "id": "go-static",
+      "jobId": "utility-go-static",
+      "commandIds": [
+        "utility.gofmt",
+        "utility.go-vet",
+        "utility.staticcheck"
+      ],
+      "reason": "Share the same Go module, build configuration and compiler cache."
+    },
+    {
+      "id": "go-vulnerabilities",
+      "jobId": "utility-go-vulnerabilities",
+      "commandIds": [
+        "utility.govulncheck"
+      ],
+      "reason": "Keep time-sensitive vulnerability intelligence independently scheduled."
+    },
+    {
+      "id": "spelling",
+      "jobId": "utility-spelling",
+      "commandIds": [
+        "utility.spelling"
+      ],
+      "reason": "Keep dictionary checks independent from executable and configuration gates."
+    }
+  ],
+  "externalChecks": [
+    {
+      "id": "codeql",
+      "authority": "GitHub repository CodeQL default setup",
+      "predicate": "Provider-owned Python, JavaScript/TypeScript, Go and Actions security analysis; verify current provider configuration independently.",
+      "omissionPolicy": "not-controlled-by-source-diff"
+    },
+    {
+      "id": "secrets",
+      "authority": "GitHub repository secret scanning and push protection",
+      "predicate": "Provider-owned secret scanning/push protection; custom pattern and history coverage require their own admission.",
+      "omissionPolicy": "not-controlled-by-source-diff"
+    },
+    {
+      "id": "release-image",
+      "authority": ".github/workflows/release-artifact.yml",
+      "predicate": "Fresh Grype vulnerability database and exact final OCI digest/platform admission under the release owner.",
+      "omissionPolicy": "not-controlled-by-source-diff"
+    },
+    {
+      "id": "release-provenance",
+      "authority": ".github/workflows/release-artifact.yml",
+      "predicate": "Release provenance, SBOM and signer/source binding under the release owner.",
+      "omissionPolicy": "not-controlled-by-source-diff"
+    },
+    {
+      "id": "periodic-advisories",
+      "authority": ".github/workflows/scheduled-advisories.yml",
+      "predicate": "Daily current advisory observations for both Python locks, the npm workspace, every admitted Go module and the immutable latest released image, with complete same-source receipts and a 36-hour observation-age limit; missed scheduling is unknown freshness.",
+      "omissionPolicy": "not-controlled-by-source-diff"
+    }
+  ],
+  "nonClaims": [
+    "The matrix is complete for its admitted file universe and named command catalog, not every possible defect or tool in the market.",
+    "External provider/release checks retain their own execution and admission authority.",
+    "A path-to-check assignment does not prove that every semantic requirement has a sufficient test oracle."
+  ]
+}

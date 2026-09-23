@@ -1,0 +1,18 @@
+{
+  "schema": "devContainer.base.schema.json",
+  "sha256": "a0883c0405ff433db188849d458fb20b9c0d73e0ba1a6e44c1d83f3b485408dd",
+  "repository": "https://github.com/devcontainers/spec",
+  "commit": "1b2baddb5f1071ca0e8bcb7eb56dbc9d3e4a674f",
+  "source": "https://raw.githubusercontent.com/devcontainers/spec/1b2baddb5f1071ca0e8bcb7eb56dbc9d3e4a674f/schemas/devContainer.base.schema.json",
+  "retrievedOn": "2026-09-20",
+  "scope": "Core devcontainer schema only; VS Code runtime settings and extension schemas are outside this predicate.",
+  "localRefClosure": [
+    "#/definitions/Mount",
+    "#/definitions/buildOptions",
+    "#/definitions/dockerfileContainer",
+    "#/definitions/imageContainer",
+    "#/definitions/nonComposeBase",
+    "#/definitions/composeContainer",
+    "#/definitions/devContainerCommon"
+  ]
+}

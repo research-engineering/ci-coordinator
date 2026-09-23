@@ -1,0 +1,189 @@
+{
+  "schemaVersion": 1,
+  "sourceId": "ci-coordinator.control-plane.requirements",
+  "specPackagePath": "docs/specs/ci-coordinator-control-plane",
+  "requirementsPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
+  "overviewPath": "docs/specs/ci-coordinator-control-plane/overview.md",
+  "requirements": [
+    {
+      "requirementId": "REQ-CI-CONTROL-001",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "The normative organization control-plane profile declares exactly eight credential planes with globally disjoint exact credential kinds; Keycloak client authentication is distinct from human and workload access-token authority; every operation has exact per-plane caller-role alternatives, an exact forbidden or required downstream provider-effect mode, and an exact optional provider-evidence receipt profile; pure validation performs no provider I/O while activation performs the mandatory current reviewer-permission recheck; omission enablement excludes emergency authority and requires both activate and override while emergency safety requires no Keycloak role; production break-glass permits exactly force FullCI and disable omission; one exact GitHub App identity and a read-only current permission profile are normative while every write profile remains deferred; the App private key and reviewer OAuth client secret have distinct exact credential kinds, deployment custody, and bounded rotation procedures; browser sessions are bounded to at most 900 seconds and retain no Keycloak bearer; repository attestation is independent from Keycloak; and live observations remain non-authorizing.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CONTROL-001"],
+      "nonClaims": ["Profile consistency does not implement identity, configure external providers, execute witnesses, or grant production authority."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-002",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "Human administration uses the exact Keycloak issuer through a confidential authorization-code BFF with state, nonce, PKCE S256, exact callback, deployment-custodied client_secret_basic authentication and fail-closed replica rotation, bounded discovery and JWKS admission, exact ID-token validation, opaque server sessions containing no provider or Keycloak bearer, bounded expiry, local-first logout, back-channel logout tokens with required expiration, bounded lifetime, and durable replay rejection, and same-origin CSRF protection on every mutation.",
+      "claimLevel": "deferred",
+      "riskClass": "critical",
+      "proofBindingRefs": [],
+      "nonClaimRefs": ["NC-CI-CONTROL-002"],
+      "nonClaims": ["This deferred requirement does not claim configured Keycloak clients, live logout delivery, replica rotation, deployment, or production readiness."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": {
+        "ownerId": "ci-coordinator.control-plane",
+        "riskAcceptedBy": "ci-coordinator.control-plane",
+        "reviewCondition": "Promote only when the local protocol, storage, HTTP, and negative witnesses remain passing and live client, logout, replica-rotation, and deployment receipts close the remaining conjuncts.",
+        "expiryRef": "ci-coordinator.control-plane.before-first-production-browser-login",
+        "mergePolicy": "ci-coordinator.deferred-until-native-witness",
+        "evidenceRefs": ["docs/architecture/cross-cutting/organization-control-plane.md", "docs/features/control-plane-identity-authority-cutover-implementation-plan.md", "docs/features/control-plane-identity-authority-cutover.md", "docs/specs/ci-coordinator-control-plane/control-plane-profile.v1.json"]
+      },
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-003",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "Machine administration accepts only Keycloak access tokens with exact issuer, API audience, allowlisted workload client, stable subject, bounded time claims, a positive lifetime no greater than 300 seconds, and every exact fine-grained role; discovery and JWKS caches have finite freshness bounds; each workload has a distinct client identity, and neither an ID token, browser session, provider token, nor emergency bearer is admitted as a machine credential.",
+      "claimLevel": "deferred",
+      "riskClass": "critical",
+      "proofBindingRefs": [],
+      "nonClaimRefs": ["NC-CI-CONTROL-003"],
+      "nonClaims": ["This deferred requirement does not claim configured workload clients, secret custody, mTLS, deployment, or production readiness."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": {
+        "ownerId": "ci-coordinator.control-plane",
+        "riskAcceptedBy": "ci-coordinator.control-plane",
+        "reviewCondition": "Promote only when local admission and token-confusion witnesses remain passing and live workload-client, secret-custody, and deployment receipts close the remaining conjuncts.",
+        "expiryRef": "ci-coordinator.control-plane.before-first-machine-administration",
+        "mergePolicy": "ci-coordinator.deferred-until-native-witness",
+        "evidenceRefs": ["docs/architecture/cross-cutting/organization-control-plane.md", "docs/features/control-plane-identity-authority-cutover-implementation-plan.md", "docs/features/control-plane-identity-authority-cutover.md", "docs/specs/ci-coordinator-control-plane/control-plane-profile.v1.json"]
+      },
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-004",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "Provider readiness verifies the exact normative public organization-owned GitHub App id, client id, slug, owner coordinates, and distribution plus every admitted installation's account, target type, repository selection, suspension state, event set, and permission profile; public distribution grants no repository authority without an owner-approved installation; repository operations use installation-scoped tokens, the current profile remains read-only, and a write permission cannot be granted before its separately fenced and reconciled capability is admitted.",
+      "claimLevel": "deferred",
+      "riskClass": "critical",
+      "proofBindingRefs": [],
+      "nonClaimRefs": ["NC-CI-CONTROL-004"],
+      "nonClaims": ["This deferred requirement does not claim current exact-App readiness, target-organization installation, secret custody, provider availability, write authority, or production admission."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": {
+        "ownerId": "ci-coordinator.control-plane",
+        "riskAcceptedBy": "ci-coordinator.control-plane",
+        "reviewCondition": "Promote only with exact App and installation settings, startup and reconciliation admission, permission-profile witnesses, secret rotation evidence, and a live provider receipt.",
+        "expiryRef": "ci-coordinator.control-plane.before-first-production-provider-read",
+        "mergePolicy": "ci-coordinator.deferred-until-native-witness",
+        "evidenceRefs": ["docs/architecture/cross-cutting/organization-control-plane.md", "docs/features/control-plane-identity-authority-cutover-implementation-plan.md", "docs/features/control-plane-identity-authority-cutover.md", "docs/specs/ci-coordinator-control-plane/control-plane-profile.v1.json"]
+      },
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-005",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "Repository-owner attestation is independent from Keycloak administration. The flow uses exact start and callback routes and a deployment-custodied, rotation-owned GitHub App client secret; binds an ephemeral GitHub OAuth code-and-PKCE step-up to the exact Keycloak session, repository, revision, proposal digest, manifest, operation, expected active pointer, and authority profile; records a bounded durable receipt containing reviewer identity, current maintain-or-admin evidence, provider observation, review state, issue and expiry times, and initiating actor; discards the user token; and rechecks the reviewer's current permission and the reviewed active baseline through the exact GitHub App and repository transaction before activation.",
+      "claimLevel": "deferred",
+      "riskClass": "critical",
+      "proofBindingRefs": [],
+      "nonClaimRefs": ["NC-CI-CONTROL-005"],
+      "nonClaims": ["This deferred requirement does not claim a live repository-owner approval, live callback or provider freshness, deployment, production readiness, or CI omission authority."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": {
+        "ownerId": "ci-coordinator.control-plane",
+        "riskAcceptedBy": "ci-coordinator.control-plane",
+        "reviewCondition": "Promote only when local exact-binding and non-persistence witnesses remain passing and live callback, repository-permission, App installation, rotation, and deployment receipts close the remaining conjuncts.",
+        "expiryRef": "ci-coordinator.control-plane.before-removing-github-reviewer-attestation",
+        "mergePolicy": "ci-coordinator.deferred-until-native-witness",
+        "evidenceRefs": ["docs/architecture/cross-cutting/organization-control-plane.md", "docs/features/control-plane-identity-authority-cutover-implementation-plan.md", "docs/features/control-plane-identity-authority-cutover.md", "docs/specs/ci-coordinator-control-plane/control-plane-profile.v1.json"]
+      },
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-006",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "The production break-glass credential authorizes only force FullCI and disable omission, cannot configure policy, enable omission, attest review, export evidence, or perform provider writes, and rotation rejects a partially rotated replica set before ingress is restored.",
+      "claimLevel": "deferred",
+      "riskClass": "critical",
+      "proofBindingRefs": [],
+      "nonClaimRefs": ["NC-CI-CONTROL-006"],
+      "nonClaims": ["This deferred requirement does not claim current production scope narrowing, deployment isolation, completed rotation, or incident readiness."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": {
+        "ownerId": "ci-coordinator.control-plane",
+        "riskAcceptedBy": "ci-coordinator.control-plane",
+        "reviewCondition": "Promote only in the merge unit that narrows static production authority, rejects broad startup scopes, and supplies command, replica-rotation, and old-credential rejection witnesses.",
+        "expiryRef": "ci-coordinator.control-plane.before-first-production-emergency-credential",
+        "mergePolicy": "ci-coordinator.deferred-until-native-witness",
+        "evidenceRefs": ["docs/architecture/cross-cutting/organization-control-plane.md", "docs/features/control-plane-identity-authority-cutover-implementation-plan.md", "docs/features/control-plane-identity-authority-cutover.md", "docs/specs/ci-coordinator-control-plane/control-plane-profile.v1.json"]
+      },
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-007",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "Every admitted human, workload, reviewer, and break-glass actor has an immutable namespaced identity derived only from authority coordinates, and every audit event retains the credential plane, effective roles, operation, causal request, repository and installation scope, GitHub App identity, and initiating actor even when the provider attributes a remote effect to the App.",
+      "claimLevel": "deferred",
+      "riskClass": "high",
+      "proofBindingRefs": [],
+      "nonClaimRefs": ["NC-CI-CONTROL-007"],
+      "nonClaims": ["This deferred requirement does not claim complete provider-effect attribution, production audit retention, deployment, or production readiness."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": {
+        "ownerId": "ci-coordinator.control-plane",
+        "riskAcceptedBy": "ci-coordinator.control-plane",
+        "reviewCondition": "Promote only with immutable principal constructors, audit projections, provider-effect propagation, persistence witnesses, and field-by-field mutation falsifiers.",
+        "expiryRef": "ci-coordinator.control-plane.before-first-keycloak-authorized-audit-event",
+        "mergePolicy": "ci-coordinator.deferred-until-native-witness",
+        "evidenceRefs": ["docs/architecture/cross-cutting/organization-control-plane.md", "docs/features/control-plane-identity-authority-cutover-implementation-plan.md", "docs/features/control-plane-identity-authority-cutover.md", "docs/specs/ci-coordinator-control-plane/control-plane-profile.v1.json"]
+      },
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-008",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "Every repository onboarding, workflow discovery, policy proposal, validation, registration, activation, rollback, status, exact retained-source export, evidence, and statistics capability is available through a versioned API before UI projection. The complete operation-to-method-and-path map is finite and exact; dry-run validation has no durable or provider effect; mutating commands have exact request identity, same-input replay, changed-input conflict, optimistic concurrency, scope admission, and atomic audit; reads are bounded and redacted; and the UI invokes the same contracts without owning business policy.",
+      "claimLevel": "deferred",
+      "riskClass": "high",
+      "proofBindingRefs": [],
+      "nonClaimRefs": ["NC-CI-CONTROL-008"],
+      "nonClaims": ["This deferred requirement does not claim a complete current API map, validation endpoint, status or export endpoint, machine-client parity, UI parity, deployment, or production readiness."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": {
+        "ownerId": "ci-coordinator.control-plane",
+        "riskAcceptedBy": "ci-coordinator.control-plane",
+        "reviewCondition": "Promote only with the exact API transport profile, versioned HTTP models, pure validation, idempotency and concurrency witnesses, bounded status and export reads, machine-client exercises, generated UI contracts, and frontend parity witnesses.",
+        "expiryRef": "ci-coordinator.control-plane.before-first-production-configuration-client",
+        "mergePolicy": "ci-coordinator.deferred-until-native-witness",
+        "evidenceRefs": ["ROADMAP.md", "docs/architecture/cross-cutting/organization-control-plane.md", "docs/features/organization-control-plane-implementation-plan.md"]
+      },
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-009",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "The versioned configuration lifecycle API exposes pure source validation, operation-idempotent registration, activation, rollback, bounded repository status, and exact retained-source export before UI projection. After transport identity, role, and mutation admission, validation and registration use the same policy admission capability, while the configuration validation use case has no clock, config transaction, config store, audit, or provider authority. Registration atomically pairs content insert or reuse with one immutable operation receipt and audit event; exact replay writes nothing and changed client facts conflict. Status is scope-authorized and page-bounded, export filters scope before projection and emits only re-admitted exact bytes, and the machine transport profile, runtime route graph, OpenAPI, and generated client contract remain exact projections of one operation map.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CONTROL-009"],
+      "nonClaims": ["This requirement does not claim complete product API or UI parity, provider configuration, deployment, snapshot pagination, retention, backup, failover, or dynamic CI omission."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-CONTROL-010",
+      "ownerId": "ci-coordinator.control-plane",
+      "invariant": "Administrator Activity records admitted session insertions and actual lifecycle deletions atomically with their database transaction. Required journal failure rolls back the session change. Optional rejection, role-denial and export diagnostics are bounded and cannot invent committed effects or caller identity. Issuer-authorized security pages and independently repository-authorized business-reference pages remain separate, filtered, finite, no-store and continuation-bound to the current principal, profile, query and source watermark. Reads enforce retention before cleanup; physical cleanup is bounded and scheduled. The forward capability, exact schema and least-privilege runtime grants are admitted before Activity SQL. Source, identity, temporal, quota and transaction operands have independent native falsifiers.",
+      "claimLevel": "blocking",
+      "riskClass": "critical",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-CONTROL-010"],
+      "nonClaims": ["This activity projection is not all request history, business-chain verification, IdP event collection, export delivery, native acceptance, Swarm log retention or production qualification."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.control-plane", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    }
+  ],
+  "nonClaims": ["This source defines normative control-plane semantics; deferred requirements do not promote implemented local subsets into external provider configuration, deployment, production readiness, or CI omission authority."]
+}

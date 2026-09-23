@@ -1,0 +1,211 @@
+{
+  "schemaVersion": "ci-repository-policy-semantics/v1",
+  "profileId": "ci-repository-policy-semantics/v1",
+  "ownerId": "ci-coordinator.config-control",
+  "documentProfilePath": "docs/specs/ci-coordinator-core/config-document-profile.v1.json",
+  "structuralSchemaPath": "docs/specs/ci-coordinator-core/repository-policy.schema.v1.json",
+  "pointerClasses": {
+    "canonical-string": [
+      "/repository/owner",
+      "/repository/name",
+      "/repository/defaultBranch",
+      "/repository/rules/*/name",
+      "/repository/rules/*/on/branches/*",
+      "/repository/rules/*/expectedSignals/*/name",
+      "/repository/rules/*/expectedSignals/*/workflowFile",
+      "/repository/rules/*/omittedSignals/*/name",
+      "/repository/rules/*/omittedSignals/*/workflowFile",
+      "/repository/rules/*/omittedSignals/*/reason",
+      "/repository/dynamicCi/policyVersion",
+      "/repository/dynamicCi/riskClasses/*",
+      "/repository/dynamicCi/agentAdvice/modelIdAllowlist/*",
+      "/repository/dynamicCi/agentAdvice/promptHashAllowlist/*",
+      "/repository/dynamicCi/dependencyGraph/globalRiskPaths/*",
+      "/repository/dynamicCi/obligations/*/obligationId",
+      "/repository/dynamicCi/obligations/*/responsibility/paths/*",
+      "/repository/dynamicCi/obligations/*/responsibility/riskClasses/*",
+      "/repository/dynamicCi/obligations/*/requiredWitnessIds/*",
+      "/repository/dynamicCi/witnesses/*/witnessId",
+      "/repository/dynamicCi/witnesses/*/executionProfileId",
+      "/repository/dynamicCi/executionProfiles/*/profileId",
+      "/repository/dynamicCi/executionProfiles/*/runnerProfileId",
+      "/repository/dynamicCi/executionProfiles/*/permissionProfileId",
+      "/repository/dynamicCi/executionProfiles/*/credentialProfileId",
+      "/repository/dynamicCi/executionProfiles/*/fixtureProfileId",
+      "/repository/dynamicCi/executionProfiles/*/serviceProfileIds/*",
+      "/repository/dynamicCi/executionProfiles/*/capacityClassId"
+    ],
+    "case-key": [
+      "/repository/rules/*/expectedSignals/*/workflowFile",
+      "/repository/rules/*/omittedSignals/*/workflowFile"
+    ],
+    "nominal-id": [
+      "/repository/dynamicCi/riskClasses/*",
+      "/repository/dynamicCi/obligations/*/obligationId",
+      "/repository/dynamicCi/obligations/*/responsibility/riskClasses/*",
+      "/repository/dynamicCi/obligations/*/requiredWitnessIds/*",
+      "/repository/dynamicCi/witnesses/*/witnessId",
+      "/repository/dynamicCi/witnesses/*/executionProfileId",
+      "/repository/dynamicCi/executionProfiles/*/profileId",
+      "/repository/dynamicCi/executionProfiles/*/runnerProfileId",
+      "/repository/dynamicCi/executionProfiles/*/permissionProfileId",
+      "/repository/dynamicCi/executionProfiles/*/credentialProfileId",
+      "/repository/dynamicCi/executionProfiles/*/fixtureProfileId",
+      "/repository/dynamicCi/executionProfiles/*/serviceProfileIds/*",
+      "/repository/dynamicCi/executionProfiles/*/capacityClassId"
+    ],
+    "rule-name": ["/repository/rules/*/name"],
+    "rule-branch": ["/repository/rules/*/on/branches/*"],
+    "path-pattern": [
+      "/repository/dynamicCi/dependencyGraph/globalRiskPaths/*",
+      "/repository/dynamicCi/obligations/*/responsibility/paths/*"
+    ],
+    "exact-unique-list": [
+      "/repository/dynamicCi/riskClasses",
+      "/repository/dynamicCi/agentAdvice/modelIdAllowlist",
+      "/repository/dynamicCi/agentAdvice/promptHashAllowlist",
+      "/repository/dynamicCi/dependencyGraph/globalRiskPaths",
+      "/repository/dynamicCi/obligations/*/responsibility/paths",
+      "/repository/dynamicCi/obligations/*/responsibility/riskClasses",
+      "/repository/dynamicCi/obligations/*/requiredWitnessIds",
+      "/repository/dynamicCi/witnesses/*/supportedDepths",
+      "/repository/dynamicCi/executionProfiles/*/serviceProfileIds"
+    ]
+  },
+  "relations": {
+    "asciiLower": "map U+0041..U+005A to U+0061..U+007A; preserve every other Unicode scalar",
+    "asciiDomain": "every Unicode scalar is in U+0000..U+007F",
+    "nominalId": "one lowercase ASCII letter followed by zero to 63 lowercase ASCII letters, digits, dots, underscores, or hyphens",
+    "ecmascriptTrimCodePoints": [
+      "U+0009..U+000D",
+      "U+0020",
+      "U+00A0",
+      "U+1680",
+      "U+2000..U+200A",
+      "U+2028..U+2029",
+      "U+202F",
+      "U+205F",
+      "U+3000",
+      "U+FEFF"
+    ],
+    "exactString": "Unicode scalar sequence equality",
+    "signalIdentity": "kind + ':' + exact workflowFile + ':' + exact name",
+    "signalCollisionKey": "kind + ':' + asciiLower(workflowFile) + ':' + asciiLower(name)",
+    "depthOrder": ["smoke", "targeted", "standard", "full", "exhaustive"]
+  },
+  "evaluation": {
+    "missingOwnerObject": "a rule whose owning optional object is null or absent is vacuously satisfied",
+    "arrayScope": "quantifiers range only over existing array members",
+    "ruleOrder": "rule ids in Unicode scalar order; diagnostics are selected by the document profile"
+  },
+  "pathLanguage": {
+    "relativePath": {
+      "nonEmpty": true,
+      "forbidLeading": ["/", "./"],
+      "forbidSubstring": ["\\"],
+      "forbidSegments": [".."],
+      "segmentSeparator": "/"
+    },
+    "glob": {
+      "requiresRelativePath": true,
+      "tokenization": "left-to-right maximal munch",
+      "operatorPrecedence": ["**/", "**", "*", "?", "{a,b}", "literal"],
+      "forbiddenOperatorCharacters": ["]", "[", "!", "(", ")", "+", "@"],
+      "braceAlternativeForbiddenCharacters": ["*", "?", "{", "}"],
+      "rejectUnclosedOrUnmatchedBrace": true,
+      "matching": "anchored full-string Unicode-scalar match"
+    }
+  },
+  "rules": {
+    "string.canonical-whitespace": {"appliesTo": ["canonical-string"], "predicate": "neither endpoint is a member of relations.ecmascriptTrimCodePoints", "compatibility": "retained-exact"},
+    "string.ascii-case-key": {"appliesTo": ["case-key"], "predicate": "value satisfies relations.asciiDomain", "compatibility": "retained-exact"},
+    "identity.valid-nominal-id": {"appliesTo": ["nominal-id"], "predicate": "value satisfies relations.nominalId", "compatibility": "retained-exact"},
+    "rule.unique-name": {"predicate": "rule names are unique under exactString", "compatibility": "retained-exact"},
+    "rule.unique-branch": {"predicate": "branches are unique under exactString within each rule", "compatibility": "retained-exact"},
+    "rule.default-branch-covered": {"predicate": "repository.defaultBranch is an exactString member of every rule.on.branches", "compatibility": "retained-exact"},
+    "rule.dispatch-disabled": {"predicate": "every rule.mode is observe or hybrid", "compatibility": "retained-exact"},
+    "timing.mutable-after-absence": {"predicate": "mutableDecisionWindowSeconds >= absenceVerificationWindowSeconds", "compatibility": "retained-exact"},
+    "timing.late-after-mutable": {"predicate": "lateFindingWindowSeconds >= mutableDecisionWindowSeconds", "compatibility": "retained-exact"},
+    "signal.required": {"predicate": "every expected signal has required = true", "compatibility": "retained-exact"},
+    "signal.success-conclusion": {"predicate": "every expected signal has requiredConclusion = success", "compatibility": "retained-exact"},
+    "signal.expected-omitted-disjoint": {"predicate": "expected and omitted signalCollisionKey sets are disjoint within each rule; retained signalIdentity values are not normalized", "compatibility": "retained-exact"},
+    "signal.hybrid-verifies-absence": {"predicate": "every omitted signal in a hybrid rule has verifyAbsence = true", "compatibility": "retained-exact"},
+    "list.unique-value": {"predicate": "every exact-unique-list has no repeated exactString member", "compatibility": "retained-exact"},
+    "agent.enabled-model-required": {"predicate": "agentAdvice.enabled implies modelIdAllowlist is non-empty", "compatibility": "retained-exact"},
+    "agent.enabled-prompt-required": {"predicate": "agentAdvice.enabled implies promptHashAllowlist is non-empty", "compatibility": "retained-exact"},
+    "agent.injection-eval-required": {"predicate": "agentAdvice.enabled implies promptInjectionEvalRequired = true", "compatibility": "retained-exact"},
+    "path.valid-pattern": {"predicate": "every path-pattern satisfies pathLanguage.relativePath and pathLanguage.glob", "compatibility": "retained-exact"},
+    "obligation.unique-id": {"predicate": "obligationId values are unique under exactString", "compatibility": "retained-exact"},
+    "witness.unique-id": {"predicate": "witnessId values are unique under exactString", "compatibility": "retained-exact"},
+    "profile.unique-id": {"predicate": "profileId values are unique under exactString", "compatibility": "retained-exact"},
+    "obligation.depth-monotonic": {"predicate": "index(fullDepth, depthOrder) >= index(defaultDepth, depthOrder)", "compatibility": "retained-exact"},
+    "obligation.omission-has-responsibility": {"predicate": "omitAllowed implies responsibility.paths or responsibility.riskClasses is non-empty", "compatibility": "retained-exact"},
+    "obligation.known-risk-class": {"predicate": "every responsibility.riskClasses value is an exactString member of dynamicCi.riskClasses", "compatibility": "retained-exact"},
+    "obligation.known-witness": {"predicate": "every requiredWitnessIds value names exactly one executable witness", "compatibility": "retained-exact"},
+    "obligation.default-depth-supported": {"predicate": "every required witness supports the obligation defaultDepth", "compatibility": "retained-exact"},
+    "obligation.full-depth-supported": {"predicate": "every required witness supports the obligation fullDepth", "compatibility": "retained-exact"},
+    "witness.known-execution-profile": {"predicate": "every executionProfileId names exactly one execution profile", "compatibility": "retained-exact"},
+    "catalog.no-orphan-risk-class": {"predicate": "every configured risk class is referenced by at least one obligation", "compatibility": "retained-exact"},
+    "catalog.no-orphan-witness": {"predicate": "every executable witness is required by at least one obligation", "compatibility": "retained-exact"},
+    "catalog.no-orphan-profile": {"predicate": "every execution profile is referenced by at least one executable witness", "compatibility": "retained-exact"},
+    "profile.parallelism-bounded": {"predicate": "shardingPolicy.maxParallel <= shardingPolicy.maxShards", "compatibility": "retained-exact"},
+    "profile.objective-nonzero": {"predicate": "at least one of cpuWeight, wallWeight, and operatorWeight is positive", "compatibility": "retained-exact"}
+  },
+  "diagnostics": {
+    "parameterProjection": "empty-object",
+    "codeProjection": {
+      "string.canonical-whitespace": "semantics.non_canonical_string",
+      "default": "semantics.invalid"
+    },
+    "candidateSelection": {
+      "evaluation": "evaluate every rule and every violating occurrence",
+      "result": "minimum under config-document-profile.v1.json#/diagnostics/failureSelection/diagnosticOrdering",
+      "duplicateOccurrence": "every item after its first equal predecessor is a candidate",
+      "membershipOccurrence": "every unresolved or unsupported reference is a candidate"
+    },
+    "instancePointerProjection": {
+      "string.canonical-whitespace": "the violating pointer-class occurrence",
+      "string.ascii-case-key": "the violating pointer-class occurrence",
+      "identity.valid-nominal-id": "the violating nominal-id occurrence",
+      "rule.unique-name": "/repository/rules/{duplicateIndex}/name",
+      "rule.unique-branch": "/repository/rules/{ruleIndex}/on/branches/{duplicateIndex}",
+      "rule.default-branch-covered": "/repository/rules/{ruleIndex}/on/branches",
+      "rule.dispatch-disabled": "/repository/rules/{ruleIndex}/mode",
+      "timing.mutable-after-absence": "/repository/rules/{ruleIndex}/timing/mutableDecisionWindowSeconds",
+      "timing.late-after-mutable": "/repository/rules/{ruleIndex}/timing/lateFindingWindowSeconds",
+      "signal.required": "/repository/rules/{ruleIndex}/expectedSignals/{signalIndex}/required",
+      "signal.success-conclusion": "/repository/rules/{ruleIndex}/expectedSignals/{signalIndex}/requiredConclusion",
+      "signal.expected-omitted-disjoint": "/repository/rules/{ruleIndex}/omittedSignals/{signalIndex}",
+      "signal.hybrid-verifies-absence": "/repository/rules/{ruleIndex}/omittedSignals/{signalIndex}/verifyAbsence",
+      "list.unique-value": "{listPointer}/{duplicateIndex}",
+      "agent.enabled-model-required": "/repository/dynamicCi/agentAdvice/modelIdAllowlist",
+      "agent.enabled-prompt-required": "/repository/dynamicCi/agentAdvice/promptHashAllowlist",
+      "agent.injection-eval-required": "/repository/dynamicCi/agentAdvice/promptInjectionEvalRequired",
+      "path.valid-pattern": "the violating path-pattern occurrence",
+      "obligation.unique-id": "/repository/dynamicCi/obligations/{duplicateIndex}/obligationId",
+      "witness.unique-id": "/repository/dynamicCi/witnesses/{duplicateIndex}/witnessId",
+      "profile.unique-id": "/repository/dynamicCi/executionProfiles/{duplicateIndex}/profileId",
+      "obligation.depth-monotonic": "/repository/dynamicCi/obligations/{obligationIndex}/fullDepth",
+      "obligation.omission-has-responsibility": "/repository/dynamicCi/obligations/{obligationIndex}/responsibility",
+      "obligation.known-risk-class": "/repository/dynamicCi/obligations/{obligationIndex}/responsibility/riskClasses/{itemIndex}",
+      "obligation.known-witness": "/repository/dynamicCi/obligations/{obligationIndex}/requiredWitnessIds/{itemIndex}",
+      "obligation.default-depth-supported": "/repository/dynamicCi/obligations/{obligationIndex}/defaultDepth",
+      "obligation.full-depth-supported": "/repository/dynamicCi/obligations/{obligationIndex}/fullDepth",
+      "witness.known-execution-profile": "/repository/dynamicCi/witnesses/{witnessIndex}/executionProfileId",
+      "catalog.no-orphan-risk-class": "/repository/dynamicCi/riskClasses/{itemIndex}",
+      "catalog.no-orphan-witness": "/repository/dynamicCi/witnesses/{witnessIndex}/witnessId",
+      "catalog.no-orphan-profile": "/repository/dynamicCi/executionProfiles/{profileIndex}/profileId",
+      "profile.parallelism-bounded": "/repository/dynamicCi/executionProfiles/{profileIndex}/shardingPolicy/maxParallel",
+      "profile.objective-nonzero": "/repository/dynamicCi/executionProfiles/{profileIndex}/shardingPolicy"
+    },
+    "nullTotality": {
+      "dynamicCiNull": "every dynamicCi-owned semantic rule has no candidates",
+      "planningDisabledObject": "the complete object remains subject to every semantic rule"
+    }
+  },
+  "compatibility": {
+    "baseline": "the first public ci-repository-policy/v1 contract",
+    "fieldAliases": [],
+    "sourceEncodingAndResourceBoundaries": "owned by the document and resource admission profiles"
+  }
+}

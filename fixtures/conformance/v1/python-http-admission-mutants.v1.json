@@ -1,0 +1,430 @@
+{
+  "schemaVersion": "ci-python-http-admission-mutation-suite/v1",
+  "suiteId": "ci-python-http-admission/v1",
+  "timeoutMs": 5000,
+  "outerTimeoutMs": 250000,
+  "expectedKilled": 19,
+  "canonicalInventoryIds": ["HA01", "HA02", "HA03", "HA04", "HA05", "HA06", "HA07", "HA08", "HA09", "HA10", "HA11", "HA12", "HA13", "HA14", "HA15", "HA16", "HA17", "HA18", "HA19"],
+  "expectedMutantIds": ["HA01", "HA02", "HA03", "HA04", "HA05", "HA06", "HA07", "HA08", "HA09", "HA10", "HA11", "HA12", "HA13", "HA14", "HA15", "HA16", "HA17", "HA18", "HA19"],
+  "expectedInvalidMutantIds": [],
+  "ownerClassCoverage": {
+    "declared-body-admission": ["HA01"],
+    "request-model-admission": ["HA02", "HA03"],
+    "response-model-admission": ["HA04", "HA05", "HA06"],
+    "metrics-authentication": ["HA07"],
+    "operator-asset-validator": ["HA08", "HA09"],
+    "browser-session-overload": ["HA10"],
+    "transport-error-cache": ["HA11"],
+    "operator-authentication": ["HA12", "HA13"],
+    "ping-admission": ["HA14", "HA15", "HA16"],
+    "administrator-membership": ["HA17", "HA18", "HA19"]
+  },
+  "mutants": [
+    {
+      "id": "HA01",
+      "requirementIds": ["REQ-CI-RUNTIME-008"],
+      "file": "backend/src/ci_coordinator/api/http/body_limits.py",
+      "operator": "materialize-unbounded-content-length-integer",
+      "original": "    declared = 0\n    for digit in values[0]:\n        declared = declared * 10 + digit - _ASCII_ZERO\n        if declared > maximum_body_bytes:\n            return maximum_body_bytes + 1\n    return declared",
+      "replacement": "    return int(values[0])",
+      "witnessId": "http-admission.bounded-content-length-decimal",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_body_length_decimal.py",
+        "-q",
+        "-k",
+        "extreme_decimal_content_length"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA02",
+      "requirementIds": ["REQ-CI-RUNTIME-029"],
+      "file": "backend/src/ci_coordinator/api/http/model_contracts.py",
+      "operator": "admit-request-python-field-names",
+      "original": "        validate_by_alias=True,\n        validate_by_name=False,\n        validate_default=True,",
+      "replacement": "        validate_by_alias=True,\n        validate_by_name=True,\n        validate_default=True,",
+      "witnessId": "http-model.request-canonical-name-only",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_model_contracts.py",
+        "-q",
+        "-k",
+        "request_admits_only_canonical_wire_names"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA03",
+      "requirementIds": ["REQ-CI-RUNTIME-029"],
+      "file": "backend/src/ci_coordinator/api/http/model_contracts.py",
+      "operator": "relax-request-scalar-admission",
+      "original": "        serialize_by_alias=True,\n        strict=True,\n        validate_by_alias=True,",
+      "replacement": "        serialize_by_alias=True,\n        strict=False,\n        validate_by_alias=True,",
+      "witnessId": "http-model.request-strict-scalars",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_model_contracts.py",
+        "-q",
+        "-k",
+        "request_admits_only_canonical_wire_names"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA04",
+      "requirementIds": ["REQ-CI-RUNTIME-029"],
+      "file": "backend/src/ci_coordinator/api/http/model_contracts.py",
+      "operator": "admit-unbounded-response-attributes",
+      "original": "        alias_generator=_RESPONSE_ALIASES,\n        allow_inf_nan=False,\n        extra=\"forbid\",\n        frozen=True,\n        hide_input_in_errors=True,",
+      "replacement": "        alias_generator=_RESPONSE_ALIASES,\n        allow_inf_nan=False,\n        extra=\"forbid\",\n        frozen=True,\n        from_attributes=True,\n        hide_input_in_errors=True,",
+      "witnessId": "http-model.bounded-attribute-projection",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_model_contracts.py",
+        "-q",
+        "-k",
+        "every_http_model_uses_exactly_one_owned_policy"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA05",
+      "requirementIds": ["REQ-CI-RUNTIME-029"],
+      "file": "backend/src/ci_coordinator/api/http/routers/workbench.py",
+      "operator": "admit-local-response-wire-alias-input",
+      "original": "class RepositoryScopeResponse(ProjectedResponseModel):\n    installation_id: int\n    repository_id: int",
+      "replacement": "class RepositoryScopeResponse(ProjectedResponseModel):\n    model_config = {\"validate_by_alias\": True}\n    installation_id: int = Field(validation_alias=\"installationId\")\n    repository_id: int = Field(validation_alias=\"repositoryId\")",
+      "witnessId": "http-model.response-internal-name-only",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_model_contracts.py",
+        "-q",
+        "-k",
+        "response_accepts_internal_names"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA06",
+      "requirementIds": ["REQ-CI-RUNTIME-029"],
+      "file": "backend/src/ci_coordinator/api/http/model_contracts.py",
+      "operator": "remove-response-wire-alias-projection",
+      "original": "_RESPONSE_ALIASES = AliasGenerator(serialization_alias=to_camel)",
+      "replacement": "_RESPONSE_ALIASES = AliasGenerator()",
+      "witnessId": "http-model.response-canonical-wire-projection",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_model_contracts.py",
+        "-q",
+        "-k",
+        "response_accepts_internal_names"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA07",
+      "requirementIds": ["REQ-CI-RUNTIME-035"],
+      "file": "backend/src/ci_coordinator/api/http/metrics_authentication.py",
+      "operator": "accept-any-canonical-metrics-bearer",
+      "original": "            and hmac.compare_digest(sha256(token).digest(), self._bearer_token_digest)",
+      "replacement": "            and True",
+      "witnessId": "http-admission.metrics-bearer-comparison",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_observability_route.py",
+        "-q",
+        "-k",
+        "connected_metrics_require_the_exact_metrics_bearer"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA08",
+      "requirementIds": ["REQ-CI-UI-014"],
+      "file": "backend/src/ci_coordinator/api/http/operator_ui.py",
+      "operator": "reject-weak-if-none-match-validator",
+      "original": "        candidate == \"*\" or candidate.removeprefix(\"W/\") == expected",
+      "replacement": "        candidate == \"*\" or candidate == expected",
+      "witnessId": "http-admission.operator-asset-weak-etag",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_operator_ui.py",
+        "-q",
+        "-k",
+        "production_bundle_is_served_from_the_backend_origin"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA09",
+      "requirementIds": ["REQ-CI-UI-014"],
+      "file": "backend/src/ci_coordinator/api/http/operator_ui.py",
+      "operator": "cache-unversioned-asset-redirect",
+      "original": "                headers={**_COMMON_HEADERS, \"Cache-Control\": \"no-store\", \"Location\": location},",
+      "replacement": "                headers={**_COMMON_HEADERS, \"Cache-Control\": \"public, max-age=31536000, immutable\", \"Location\": location},",
+      "witnessId": "http-admission.operator-asset-content-address",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_operator_ui.py",
+        "-q",
+        "-k",
+        "production_bundle_is_served_from_the_backend_origin"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA10",
+      "requirementIds": ["REQ-CI-RUNTIME-035"],
+      "file": "backend/src/ci_coordinator/api/http/routers/control_plane_identity.py",
+      "operator": "collapse-session-overload-into-unavailability",
+      "original": "            \"overloaded\" if principal.code == \"overloaded\" else \"unauthenticated\",",
+      "replacement": "            \"unavailable\" if principal.code == \"overloaded\" else \"unauthenticated\",",
+      "witnessId": "http-admission.control-plane-session-overload",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_control_plane_identity_route.py::test_session_failure_algebra_is_exact[overloaded]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA11",
+      "requirementIds": ["REQ-CI-RUNTIME-008"],
+      "file": "backend/src/ci_coordinator/api/http/errors.py",
+      "operator": "remove-transport-error-cache-exclusion",
+      "original": "    headers = {\"Cache-Control\": \"no-store\"}\n    if error.status_code == 401:",
+      "replacement": "    headers = {\"X-Content-Type-Options\": \"nosniff\"}\n    if error.status_code == 401:",
+      "witnessId": "http-admission.transport-error-no-store",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_plan_requests.py",
+        "-q",
+        "-k",
+        "preserves_the_redacted_authentication_failure_algebra"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA12",
+      "requirementIds": ["REQ-CI-RUNTIME-008"],
+      "file": "backend/src/ci_coordinator/api/http/control_plane_authentication.py",
+      "operator": "accept-any-admitted-break-glass-bearer",
+      "original": "            self._principal if hmac.compare_digest(supplied_digest, self._bearer_digest) else None",
+      "replacement": "            self._principal if True else None",
+      "witnessId": "http-admission.break-glass-bearer-comparison",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_control_plane_authentication.py",
+        "-q",
+        "-k",
+        "preserves_disjoint_credential_planes"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA13",
+      "requirementIds": ["REQ-CI-RUNTIME-008"],
+      "file": "backend/src/ci_coordinator/runtime_settings/contracts.py",
+      "operator": "admit-compact-jwt-as-break-glass-bearer",
+      "original": "        and _BREAK_GLASS_BEARER_TOKEN.fullmatch(value) is not None",
+      "replacement": "        and value.isascii()",
+      "witnessId": "http-admission.break-glass-bearer-language-separation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_control_plane_authentication.py",
+        "-q",
+        "-k",
+        "break_glass_language_is_disjoint"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA14",
+      "requirementIds": ["REQ-CI-RUNTIME-001"],
+      "file": "backend/src/ci_coordinator/github_ingestion/use_cases.py",
+      "operator": "recognize-ping-only-under-ping-header",
+      "original": "    if {\"zen\", \"hook_id\", \"hook\"} <= keys:",
+      "replacement": "    if event_name == \"ping\" and {\"zen\", \"hook_id\", \"hook\"} <= keys:",
+      "witnessId": "ping-admission.mixed-family-both-headers",
+      "command": [
+        "backend/.venv/bin/python", "-m", "pytest",
+        "backend/tests/unit/github_ingestion/test_github_ingestion.py",
+        "-q", "-k", "ping_and_ci_payload_families_cannot_be_relabelled"
+      ],
+      "environment": {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src"}
+    },
+    {
+      "id": "HA15",
+      "requirementIds": ["REQ-CI-RUNTIME-001"],
+      "file": "backend/src/ci_coordinator/github_ingestion/ping.py",
+      "operator": "compare-hook-id-without-integer-admission",
+      "original": "        or positive_integer(hook.get(\"id\")) != hook_id",
+      "replacement": "        or hook.get(\"id\") != hook_id",
+      "witnessId": "ping-admission.equality-does-not-prove-integer-domain",
+      "command": [
+        "backend/.venv/bin/python", "-m", "pytest",
+        "backend/tests/unit/github_ingestion/test_github_ingestion.py",
+        "-q", "-k", "ping_numeric_equality_does_not_replace_exact_positive_ids"
+      ],
+      "environment": {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src"}
+    },
+    {
+      "id": "HA16",
+      "requirementIds": ["REQ-CI-RUNTIME-001"],
+      "file": "backend/src/ci_coordinator/github_ingestion/use_cases.py",
+      "operator": "ignore-ping-profile-veto",
+      "original": "            or profile.action_decision(\"ping\", None) != \"admitted\"\n",
+      "replacement": "",
+      "witnessId": "ping-admission.profile-veto-before-claim",
+      "command": [
+        "backend/.venv/bin/python", "-m", "pytest",
+        "backend/tests/unit/github_ingestion/test_github_ingestion.py",
+        "-q", "-k", "ping_profile_veto_rejects_before_delivery_claim"
+      ],
+      "environment": {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src"}
+    },
+    {
+      "id": "HA17",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-018"
+      ],
+      "file": "backend/src/ci_coordinator/integrations/github/repository_membership.py",
+      "operator": "renew-membership-deadline-before-each-repository-page",
+      "original": "                return await self._observe(scope)",
+      "replacement": "                list_repositories = self._inventory.list_repositories\n                async def renewed(*args, **kwargs):\n                    deadline.reschedule(asyncio.get_running_loop().time() + self._timeout_seconds)\n                    return await list_repositories(*args, **kwargs)\n                self._inventory.list_repositories = renewed\n                return await self._observe(scope)",
+      "witnessId": "administrator-access.cumulative-deadline",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/integrations/test_github_repository_membership.py",
+        "-q",
+        "-k",
+        "membership_deadline_covers_credentials_and_later_pages"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA18",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-018"
+      ],
+      "file": "backend/src/ci_coordinator/integrations/github/repository_membership.py",
+      "operator": "cache-successful-membership-grants",
+      "original": "                return await self._observe(scope)",
+      "replacement": "                if getattr(self, \"_previous_grant\", False):\n                    return True\n                self._previous_grant = await self._observe(scope)\n                return self._previous_grant",
+      "witnessId": "administrator-access.fresh-membership",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/integrations/test_github_repository_membership.py",
+        "-q",
+        "-k",
+        "same_reader_rechecks_membership_after_a_successful_grant"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA19",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-018"
+      ],
+      "file": "backend/src/ci_coordinator/integrations/github/repository_membership.py",
+      "operator": "deny-public-installation-members",
+      "original": "                    return not repository.disabled",
+      "replacement": "                    return not repository.disabled and repository.visibility != \"public\"",
+      "witnessId": "administrator-access.public-membership",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/integrations/test_github_repository_membership.py",
+        "-q",
+        "-k",
+        "membership_uses_app_identity_and_positive_installation_repository_evidence"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    }
+  ],
+  "invalidMutants": [],
+  "nonClaims": [
+    "The finite inventory proves only that the named witness rejects the named patch.",
+    "This suite does not prove transport-parser behavior or completeness of HTTP admission mutations."
+  ]
+}

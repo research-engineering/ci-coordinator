@@ -1,0 +1,34 @@
+name: Bounded secret scan
+description: Scan Git-observed source and optional exact history with pinned protected Gitleaks policy.
+inputs:
+  source:
+    description: Source repository checkout directory.
+    required: true
+  history:
+    description: Explicit scope, either none or required.
+    default: none
+  base:
+    description: Full base commit identity when history is required.
+    default: ''
+  head:
+    description: Full checked-out head identity when history is required.
+    default: ''
+runs:
+  using: composite
+  steps:
+    - name: Install and run protected scanner
+      shell: bash
+      env:
+        SECRET_SCAN_ACTION_PATH: ${{ github.action_path }}
+        SECRET_SCAN_SOURCE: ${{ inputs.source }}
+        SECRET_SCAN_HISTORY: ${{ inputs.history }}
+        SECRET_SCAN_BASE: ${{ inputs.base }}
+        SECRET_SCAN_HEAD: ${{ inputs.head }}
+      run: |
+        env -i PATH="$PATH" RUNNER_TEMP="$RUNNER_TEMP" \
+          SECRET_SCAN_ACTION_PATH="$SECRET_SCAN_ACTION_PATH" \
+          SECRET_SCAN_SOURCE="$SECRET_SCAN_SOURCE" \
+          SECRET_SCAN_HISTORY="$SECRET_SCAN_HISTORY" \
+          SECRET_SCAN_BASE="$SECRET_SCAN_BASE" \
+          SECRET_SCAN_HEAD="$SECRET_SCAN_HEAD" \
+          bash --noprofile --norc "$SECRET_SCAN_ACTION_PATH/run.sh"

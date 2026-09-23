@@ -1,0 +1,1 @@
+export const MAX_WORKBENCH_SECTION_ITEMS = 20;

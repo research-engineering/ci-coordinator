@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ci-coordinator.example/ci-coordinator/dependency-graph.schema.v1.json",
+  "title": "CI Coordinator target dependency graph",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["provenance", "invalidatesWhenChanged", "globalRiskPaths", "nodes"],
+  "properties": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "schemaVersion", "generator"],
+      "properties": {
+        "source": {"enum": ["configured", "generated"]},
+        "schemaVersion": {"const": "dependency-graph/v1"},
+        "generator": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]{0,63}@[0-9A-Za-z][0-9A-Za-z._-]{0,63}$"
+        }
+      }
+    },
+    "invalidatesWhenChanged": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 512}
+    },
+    "globalRiskPaths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 512}
+    },
+    "nodes": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "dependents", "riskClasses"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 4096},
+          "dependents": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1, "maxLength": 4096}
+          },
+          "riskClasses": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+            }
+          }
+        }
+      }
+    }
+  }
+}

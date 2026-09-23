@@ -1,0 +1,213 @@
+{
+  "schemaVersion": "ci-audit-json-resource-mutation-suite/v1",
+  "suiteId": "ci-audit-json-resources/v1",
+  "timeoutMs": 20000,
+  "outerTimeoutMs": 480000,
+  "expectedKilled": 10,
+  "expectedMutantIds": [
+    "M02-python-rfc6901-escape",
+    "M04-python-candidate-slot-guard",
+    "M11-python-result-limit-forwarding",
+    "M12-python-object-cycle",
+    "M14-python-record-failure-precedence",
+    "M15-proof-owner-completeness",
+    "M16-profile-compatibility-routing",
+    "M18-python-empty-container-count",
+    "M19-python-current-preparation-precedence",
+    "M21-python-object-guard-order"
+  ],
+  "mutants": [
+    {
+      "id": "M02-python-rfc6901-escape",
+      "requirementIds": ["REQ-CI-CORE-011"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "remove-pointer-token-escaping",
+      "original": "escaped_token = token.replace(\"~\", \"~0\").replace(\"/\", \"~1\")",
+      "replacement": "escaped_token = token",
+      "witnessId": "python-pointer-token-collisions",
+      "command": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/kernel/test_json_resources.py",
+        "-k",
+        "instance_pointer_escapes_rfc_6901_child_tokens"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "M04-python-candidate-slot-guard",
+      "requirementIds": ["REQ-CI-CORE-011"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "remove-list-candidate-slot-guard",
+      "original": "    resources.admit_direct_children(len(values), frame.path, frame.instance_pointer)",
+      "replacement": "",
+      "witnessId": "python-direct-child-precedence",
+      "command": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/kernel/test_json_resources.py",
+        "-k",
+        "direct_child_lower_bound_precedes_hidden_value_or_depth_fault"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "M11-python-result-limit-forwarding",
+      "requirementIds": ["REQ-CI-CORE-011"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "drop-result-wrapper-resource-limits",
+      "original": "return Ok(canonical_json(value, resource_limits=resource_limits))",
+      "replacement": "return Ok(canonical_json(value))",
+      "witnessId": "python-result-wrapper-limit-forwarding",
+      "command": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/kernel/test_json_resources.py",
+        "-k",
+        "try_canonical_json_returns_resource_limit_failure"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "M12-python-object-cycle",
+      "requirementIds": ["REQ-CI-CORE-011"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "remove-object-cycle-guard",
+      "original": "    if object_id in active:\n        raise CanonicalJsonError(\"cycle\", frame.path, \"cyclic objects are not JSON values\")\n    resources.admit_direct_children(len(value), frame.path, frame.instance_pointer)",
+      "replacement": "    resources.admit_direct_children(len(value), frame.path, frame.instance_pointer)",
+      "witnessId": "python-object-cycle-rejection",
+      "command": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/kernel/test_json_resources.py",
+        "-k",
+        "cycles_remain_outside_the_json_tree_domain"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "M14-python-record-failure-precedence",
+      "requirementIds": ["REQ-CI-CORE-011"],
+      "file": "backend/src/ci_coordinator/audit_replay/_event_codec.py",
+      "operator": "bypass-record-payload-admission",
+      "original": "    payload = snapshot_json_value(_require_field(snapshot, \"payload\"))",
+      "replacement": "    payload = cast(JsonValue, _require_field(snapshot, \"payload\"))",
+      "witnessId": "python-record-resource-failure-precedence",
+      "command": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/audit_replay/test_event_chain.py",
+        "-k",
+        "record_resource_failure_precedes_invalid_metadata"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "M15-proof-owner-completeness",
+      "requirementIds": ["REQ-CI-PROOFKIT-006", "REQ-CI-CORE-011"],
+      "file": "proofkit/repo-profile.json",
+      "operator": "remove-runtime-owner-proof-pattern",
+      "original": "      \"backend/**\",\n",
+      "replacement": "",
+      "witnessId": "proofkit-owner-level-fail-closed-probes",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_plan_check",
+        "--changed-path",
+        "proofkit/repo-profile.json"
+      ],
+      "environment": {
+        "PROOFKIT_BASE_REF": "",
+        "PROOFKIT_HEAD_REF": ""
+      }
+    },
+    {
+      "id": "M16-profile-compatibility-routing",
+      "requirementIds": ["REQ-CI-CORE-010", "REQ-CI-CORE-011"],
+      "file": "proofkit/routes/core.v2.json",
+      "operator": "remove-profile-compatibility-binding",
+      "original": "    [\"010\",\"182\",\"182\",\"contract\",\"docs/specs/ci-coordinator-core/audit-json-resource-profile.v1.json\",[\"proofkit.verify\",\"requirements.admission\",\"text.policy\"],[\"local-python\"]],\n",
+      "replacement": "",
+      "witnessId": "proofkit-profile-dual-requirement-routing",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.proofkit_plan_check",
+        "--changed-path",
+        "proofkit/routes/core.v2.json"
+      ],
+      "environment": {
+        "PROOFKIT_BASE_REF": "",
+        "PROOFKIT_HEAD_REF": ""
+      }
+    },
+    {
+      "id": "M18-python-empty-container-count",
+      "requirementIds": ["REQ-CI-CORE-011"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "skip-empty-container-resource-visits",
+      "original": "        candidate = frame.value\n        resources.visit(frame.depth, frame.path, frame.instance_pointer)\n        if candidate is None:",
+      "replacement": "        candidate = frame.value\n        is_empty_container = type(candidate) in (list, dict) and len(candidate) == 0\n        if not is_empty_container:\n            resources.visit(frame.depth, frame.path, frame.instance_pointer)\n        if candidate is None:",
+      "witnessId": "python-empty-container-node-accounting",
+      "command": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/kernel/test_json_resources.py",
+        "-k",
+        "nested_empty_containers_consume_node_budget"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "M19-python-current-preparation-precedence",
+      "requirementIds": ["REQ-CI-CORE-011", "REQ-CI-CORE-013"],
+      "file": "backend/src/ci_coordinator/audit_replay/_event_construction.py",
+      "operator": "move-previous-record-admission-before-current-preparation",
+      "original": "    prepared = prepare_audit_event(event_input)\n    return build_prepared_audit_event(prepared, previous_event)",
+      "replacement": "    if previous_event is not None:\n        audit_event_from_mapping(previous_event)\n    prepared = prepare_audit_event(event_input)\n    return build_prepared_audit_event(prepared, previous_event)",
+      "witnessId": "python-current-preparation-precedence",
+      "command": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/audit_replay/test_event_chain.py",
+        "-k",
+        "current_preparation_precedes_previous_record_admission"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "M21-python-object-guard-order",
+      "requirementIds": ["REQ-CI-CORE-011"],
+      "file": "backend/src/ci_coordinator/kernel/canonical_json.py",
+      "operator": "move-object-candidate-guard-after-entry-sort",
+      "original": "    resources.admit_direct_children(len(value), frame.path, frame.instance_pointer)\n\n    entries: list[tuple[str, object]] = []\n    for key, item in value.items():\n        if type(key) is not str:\n            raise CanonicalJsonError(\n                \"non_string_key\",\n                frame.path,\n                f\"object key {key!r} is not a string\",\n            )\n        _reject_surrogates(key, frame.path, \"object key contains surrogate code point\")\n        entries.append((key, item))\n    entries.sort()",
+      "replacement": "    entries: list[tuple[str, object]] = []\n    for key, item in value.items():\n        if type(key) is not str:\n            raise CanonicalJsonError(\n                \"non_string_key\",\n                frame.path,\n                f\"object key {key!r} is not a string\",\n            )\n        _reject_surrogates(key, frame.path, \"object key contains surrogate code point\")\n        entries.append((key, item))\n    entries.sort()\n    resources.admit_direct_children(len(value), frame.path, frame.instance_pointer)",
+      "witnessId": "python-object-candidate-guard-order",
+      "command": [
+        "backend/.venv/bin/pytest",
+        "-q",
+        "backend/tests/unit/kernel/test_json_resources.py",
+        "-k",
+        "wide_object_node_limit_precedes_key_validation"
+      ],
+      "environment": {
+        "PYTHONPATH": "backend/src"
+      }
+    }
+  ]
+}

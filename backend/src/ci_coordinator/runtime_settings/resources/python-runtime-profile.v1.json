@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "ci-coordinator-python-runtime-profile/v1",
+  "profileId": "ci-coordinator/python-runtime/v1",
+  "implementation": "CPython",
+  "buildVariant": "gil-enabled",
+  "supportedVersions": ["3.13.15"],
+  "requiresPython": "==3.13.15",
+  "staticTarget": "3.13",
+  "containerVersion": "3.13.15"
+}

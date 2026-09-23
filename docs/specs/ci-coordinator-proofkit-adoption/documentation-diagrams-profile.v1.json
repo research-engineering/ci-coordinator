@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "rendererVersion": "12.0.0",
+  "lintVersion": "0.53.1",
+  "nodeVersion": "24.21.0",
+  "playwrightVersion": "1.63.0",
+  "supportedTypes": ["flowchart", "graph", "sequenceDiagram", "stateDiagram", "stateDiagram-v2"],
+  "maxDiagrams": 512,
+  "maxDiagramUtf16Units": 50000,
+  "diagramTimeoutMs": 15000,
+  "runTimeoutSeconds": 600,
+  "maxOutputBytes": 16777216,
+  "rules": {
+    "duplicate-ids": "error",
+    "require-direction": "error",
+    "sequence-duplicate-participant": "error",
+    "no-duplicate-edges": "warn",
+    "no-duplicate-node-declarations": "warn",
+    "no-empty-labels": "warn",
+    "no-activate-without-deactivate": "warn",
+    "state-duplicate-transition": "warn",
+    "state-empty-composite": "warn",
+    "state-duplicate-state": "warn"
+  },
+  "rendererConfig": {
+    "startOnLoad": false,
+    "securityLevel": "antiscript",
+    "secure": ["secure", "securityLevel", "startOnLoad", "maxTextSize", "maxEdges"],
+    "maxTextSize": 50000,
+    "maxEdges": 500,
+    "flowchart": {"diagramPadding": 48},
+    "sequence": {"diagramMarginY": 40},
+    "gantt": {"useWidth": 1200},
+    "pie": {"useWidth": 1200},
+    "theme": "default",
+    "layout": "dagre",
+    "look": "classic"
+  }
+}

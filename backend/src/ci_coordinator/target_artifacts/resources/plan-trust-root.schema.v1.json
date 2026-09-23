@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://research-engineering.github.io/ci-coordinator/schemas/plan-trust-root.schema.v1.json",
+  "title": "CI Coordinator plan trust root",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "algorithm",
+    "keyId",
+    "publicKeySpkiBase64",
+    "schemaVersion"
+  ],
+  "properties": {
+    "algorithm": {
+      "const": "Ed25519"
+    },
+    "keyId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]{1,128}$"
+    },
+    "publicKeySpkiBase64": {
+      "type": "string",
+      "maxLength": 4096,
+      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    },
+    "schemaVersion": {
+      "const": "ci-coordinator-plan-trust-root/v1"
+    }
+  }
+}

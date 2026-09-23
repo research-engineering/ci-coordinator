@@ -1,0 +1,25 @@
+{
+  "name": "ci-coordinator-workspace",
+  "license": "Apache-2.0",
+  "private": true,
+  "packageManager": "pnpm@12.5.1",
+  "engines": {
+    "node": "24.21.0",
+    "pnpm": "12.5.1"
+  },
+  "devDependencies": {
+    "@devcontainers/cli": "0.89.0",
+    "esbuild": "0.28.2"
+  },
+  "scripts": {
+    "frontend:build": "pnpm --filter @ci-coordinator/operator-ui build",
+    "frontend:check": "pnpm --filter @ci-coordinator/operator-ui check",
+    "frontend:lint": "pnpm --filter @ci-coordinator/operator-ui lint",
+    "frontend:contract:check": "backend/.venv/bin/python -m scripts.frontend_contract check && pnpm --filter @ci-coordinator/operator-ui contract:check",
+    "frontend:contract:generate": "backend/.venv/bin/python -m scripts.frontend_contract write && pnpm --filter @ci-coordinator/operator-ui contract:generate",
+    "frontend:test": "pnpm --filter @ci-coordinator/operator-ui test",
+    "frontend:test:browser": "pnpm --filter @ci-coordinator/operator-ui test:browser",
+    "diagrams:check": "backend/.venv/bin/python -m scripts.diagram_check",
+    "diagrams:push": "backend/.venv/bin/python -m scripts.diagram_push"
+  }
+}

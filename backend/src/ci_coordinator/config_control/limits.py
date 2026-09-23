@@ -1,0 +1,4 @@
+from typing import Final
+
+MAX_CONFIG_CONTRACT_ID_UTF8_BYTES: Final = 4_096
+MAX_POLICY_SOURCE_BYTES: Final = 2_097_152

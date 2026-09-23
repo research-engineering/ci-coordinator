@@ -1,0 +1,34 @@
+--- a/urllib/request.py
++++ b/urllib/request.py
+@@ -818 +818 @@
+-                self.reduce_uri(u, default_port) for u in uri)
++                self._reduce_uri_with_scheme(u, default_port) for u in uri)
+@@ -824 +824,2 @@
+-            reduced_authuri = self.reduce_uri(authuri, default_port)
++            reduced_authuri = self._reduce_uri_with_scheme(
++                authuri, default_port)
+@@ -827 +828 @@
+-                    if self.is_suburi(uri, reduced_authuri):
++                    if self._is_suburi_with_scheme(uri, reduced_authuri):
+@@ -853,0 +855,11 @@
++    def _reduce_uri_with_scheme(self, uri, default_port=True):
++        parts = urlsplit(uri)
++        scheme = parts[0] if parts[1] else None
++        return (scheme or None, *self.reduce_uri(uri, default_port))
++
++    def _is_suburi_with_scheme(self, base, test):
++        if (base[0] is not None and test[0] is not None and
++                base[0] != test[0]):
++            return False
++        return self.is_suburi(base[1:], test[1:])
++
+@@ -899 +911 @@
+-                reduced_uri = self.reduce_uri(u, default_port)
++                reduced_uri = self._reduce_uri_with_scheme(u, default_port)
+@@ -904 +916,2 @@
+-            reduced_authuri = self.reduce_uri(authuri, default_port)
++            reduced_authuri = self._reduce_uri_with_scheme(
++                authuri, default_port)
+@@ -906 +919 @@
+-                if self.is_suburi(uri, reduced_authuri):
++                if self._is_suburi_with_scheme(uri, reduced_authuri):

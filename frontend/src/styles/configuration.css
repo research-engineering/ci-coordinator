@@ -1,0 +1,198 @@
+.configuration-workspace {
+  min-width: 0;
+  color: var(--text);
+}
+
+.configuration-tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1.25rem;
+}
+
+.configuration-tabs button {
+  background: transparent;
+  color: inherit;
+  padding: 0.75rem 0.25rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.configuration-tabs [aria-selected="true"] {
+  border-bottom-color: currentColor;
+  font-weight: 600;
+}
+
+.configuration-toolbar,
+.configuration-actions,
+.configuration-handoff {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
+.configuration-toolbar h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.configuration-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.configuration-byte-count {
+  font-size: 0.8125rem;
+  margin-left: auto;
+}
+.configuration-workspace label {
+  font-weight: 500;
+}
+.configuration-workspace textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  margin-block: 0.5rem;
+  padding: 0.75rem;
+  /* Optional override; monospace is the default when no token is supplied. */
+  /*noinspection CssUnresolvedCustomProperty*/
+  font: 0.875rem / 1.6 var(--font-mono, monospace);
+  resize: vertical;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--surface);
+  outline-offset: 3px;
+}
+.configuration-workspace select {
+  padding: 0.5rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text);
+  background: var(--surface);
+}
+.configuration-workspace button,
+.configuration-workspace a {
+  overflow-wrap: anywhere;
+}
+.configuration-source > textarea {
+  min-height: 16rem;
+}
+.configuration-review,
+.configuration-detail,
+.configuration-handoff {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+.configuration-workspace h3,
+.configuration-review h2 {
+  font-size: 1rem;
+}
+.configuration-workspace h4 {
+  font-size: 0.9375rem;
+}
+.configuration-workspace dl {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+}
+.configuration-workspace dt {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+.configuration-workspace dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.configuration-workspace code {
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+}
+.configuration-notice {
+  border-left: 3px solid currentColor;
+  padding-left: 0.75rem;
+  margin-block: 1rem;
+  overflow-wrap: anywhere;
+}
+.configuration-notice p {
+  margin-block: 0.5rem;
+}
+.configuration-notice pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8125rem;
+}
+.configuration-table-scroll {
+  max-height: 24rem;
+  overflow: auto;
+  margin-block: 1rem;
+}
+.configuration-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.configuration-table-scroll caption {
+  text-align: left;
+  margin-bottom: 0.5rem;
+}
+.configuration-table-scroll th,
+.configuration-table-scroll td {
+  text-align: left;
+  padding: 0.625rem;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--border);
+}
+.configuration-epoch-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  color: inherit;
+  /* Optional override; monospace is the default when no token is supplied. */
+  /*noinspection CssUnresolvedCustomProperty*/
+  font-family: var(--font-mono, monospace);
+  cursor: pointer;
+}
+.configuration-epoch-link[aria-pressed="true"] {
+  font-weight: 700;
+}
+.configuration-identities {
+  margin-block: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.configuration-handoff {
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+.configuration-handoff a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .configuration-workspace dl {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+  }
+  .configuration-workspace dd {
+    margin-bottom: 0.5rem;
+  }
+  .configuration-byte-count {
+    margin-left: 0;
+  }
+  .configuration-workspace .button {
+    max-width: 100%;
+    white-space: normal;
+  }
+  .configuration-table-scroll th,
+  .configuration-table-scroll td {
+    padding: 0.375rem;
+    font-size: 0.75rem;
+  }
+}
