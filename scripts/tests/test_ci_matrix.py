@@ -77,7 +77,7 @@ def test_current_input_universe_has_predicate_specific_native_or_owned_dispositi
     assert rows["docker/runtime/security/build.sh"].command_id == "workflow.lint"
     assert rows["docker/runtime/security/check_zlib.c"].command_id == "container.smoke"
     assert rows["docker/runtime/ubuntu-snapshot.conf"].command_id == "container.smoke"
-    assert rows["docs/images/repository-catalog.png"].predicate.endswith(
+    assert rows["docs/images/repository-overview.png"].predicate.endswith(
         "image pixels are not analyzed"
     )
 

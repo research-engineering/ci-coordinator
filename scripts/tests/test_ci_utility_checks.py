@@ -612,6 +612,26 @@ def test_spelling_exception_matches_one_whole_line_in_one_exact_file(tmp_path: P
         inventory.spelling_line_file(tmp_path, name)
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "docs/specs/ci-coordinator-release/spdx-2.3.schema.json",
+        "docs/specs/ci-coordinator-release/SPDX-LICENSE.txt",
+    ],
+)
+def test_spdx_spelling_exclusion_requires_exact_upstream_bytes(tmp_path: Path, name: str) -> None:
+    root = Path(__file__).resolve().parents[2]
+    original = (root / name).read_text(encoding="utf-8")
+    _write(tmp_path, name, original)
+    assert inventory.spelling_exclusion(name) is not None
+    assert inventory.spelling_exclusion("docs/other-license.txt") is None
+    inventory.admit_spelling_vendor_exclusions(tmp_path, (name,))
+
+    _write(tmp_path, name, original + "modified\n")
+    with pytest.raises(ValueError, match="stale provenance"):
+        inventory.admit_spelling_vendor_exclusions(tmp_path, (name,))
+
+
 def test_compose_overlay_exclusion_has_exact_path_and_native_owner(tmp_path: Path) -> None:
     _write(
         tmp_path, "docker/development/compose.debug.yaml", "services: {app: {develop: !reset {}}}"
