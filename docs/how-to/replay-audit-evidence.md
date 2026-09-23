@@ -74,7 +74,10 @@ unrestricted logs.
 |      4 | Ledger or replay result is invalid.      | Block admission and investigate.                        |
 
 Filtering cannot hide an earlier corrupt record because full-chain validation
-precedes projection. For a non-empty valid result, the CLI writes the second
+precedes projection. Persisted-record invariant failures, including malformed
+rows in either read pass, return exit `4` with the redacted stderr code
+`persisted_audit_invalid`; configuration and unavailable-storage failures retain
+exit `2`. For a non-empty valid result, the CLI writes the second
 verified pass to an owner-private temporary file and publishes it in fixed-size
 chunks only after the complete JSON document closes. This keeps memory bounded
 by one replay page plus one output chunk. Temporary storage is proportional to

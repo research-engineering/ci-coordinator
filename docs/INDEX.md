@@ -343,6 +343,8 @@ and the [supported runtime decision](decisions/lts-dependency-consolidation.md).
 - [Evaluate locally](how-to/evaluate-locally.md)
 - [Developer workflows and adoption](how-to/development-workflows.md)
 - [Editor dictionaries, table formatting and inspection exceptions](how-to/editor-documentation-quality.md)
+- [Configure JetBrains inspections](how-to/jetbrains-inspections.md)
+- [Recovered work admission](features/recovered-work-admission.md)
 - [Test API contracts](how-to/test-api-contracts.md)
 - [Automatic mutation discovery](features/automatic-mutation-testing.md)
 - [Update the toolchain](how-to/toolchain-updates.md)

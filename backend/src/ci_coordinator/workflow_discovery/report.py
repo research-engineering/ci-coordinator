@@ -25,7 +25,7 @@ from ci_coordinator.workflow_discovery.graph_model import CallEdge
 from ci_coordinator.workflow_discovery.source import RepositoryIdentity, WorkflowSourceIdentity
 from ci_coordinator.workflow_discovery.summary import WorkflowSummary, require_predicate_closure
 
-PARSER_VERSION: Final = "github-actions-static/v1"
+PARSER_VERSION: Final = "github-actions-static/v2"
 DISCOVERY_NON_CLAIMS: Final = tuple(
     sorted(
         (

@@ -703,6 +703,12 @@ Private-plan provider checks and independent runtime qualification remain open.
 
 ### Snapshot Audit Follow-Up
 
+The [recovered work register](docs/features/recovered-work-admission.md) retains
+unfinished registered-epoch review, decision-provenance and critical-mutation
+candidates in B1/B3/B5/B7 rather than treating local-worktree retirement as
+feature completion. Current contracts and focused native witnesses decide
+whether each draft is adapted or rejected; archived code is not merge authority.
+
 | Existing phase               | Next scoped work                                                                                                                                                                                                                                                                          | Acceptance boundary                                                                                                                                                                                                                      |
 |------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | D1/D9 (delivered in PR #162) | Retain public worker-identity admission and private-import enforcement, personalized override cache policy and actual registered-template labels.                                                                                                                                         | Constructor rejection, authentication, HTTP bodies and public-asset caching are preserved. Native witnesses compare an independent mounted public catalog with exported labels and reject a missing capture without admitting raw paths. |

@@ -16,7 +16,7 @@ from ci_coordinator.workflow_discovery._evidence_fields import (
     permissions_field as _permissions_field,
 )
 from ci_coordinator.workflow_discovery._job_parser import parse_job
-from ci_coordinator.workflow_discovery._validation import require_text
+from ci_coordinator.workflow_discovery._validation import MAX_WORKFLOW_FILE_BYTES, require_text
 from ci_coordinator.workflow_discovery._yaml_nodes import (
     YamlMapping,
     contains_expression,
@@ -45,7 +45,7 @@ from ci_coordinator.workflow_discovery.summary import (
 _MAX_YAML_EVENTS = 50_000
 _MAX_YAML_NODES = 20_000
 _MAX_YAML_DEPTH = 64
-_MAX_YAML_SCALAR_BYTES = 4_096
+_MAX_YAML_SCALAR_BYTES = MAX_WORKFLOW_FILE_BYTES
 
 
 def parse_workflow(

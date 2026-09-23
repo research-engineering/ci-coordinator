@@ -56,6 +56,21 @@ def test_readiness_fails_closed_for_unavailable_required_dependency() -> None:
     assert status.unavailable_dependencies == ("database",)
 
 
+@pytest.mark.parametrize("reason", ("deterministic_plan_mismatch", "omission_proof_mismatch"))
+def test_deterministic_verifier_reasons_keep_their_bounded_metric_identity(reason: str) -> None:
+    metrics = RuntimeMetrics()
+    metrics.full_ci_fallback(reason)
+    metrics.verifier_rejection(reason)
+    samples = prometheus_samples(metrics)
+
+    for metric in (
+        "ci_coordinator_full_ci_fallbacks_total",
+        "ci_coordinator_verifier_rejections_total",
+    ):
+        assert samples[(metric, (("reason", reason),))] == 1
+        assert samples[(metric, (("reason", "other"),))] == 0
+
+
 def test_runtime_metrics_project_bounded_operational_signals() -> None:
     metrics = RuntimeMetrics()
 

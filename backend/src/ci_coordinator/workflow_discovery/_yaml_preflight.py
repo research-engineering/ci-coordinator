@@ -17,6 +17,8 @@ from ruamel.yaml.events import (
 )
 from ruamel.yaml.nodes import ScalarNode
 
+from ci_coordinator.workflow_discovery._validation import MAX_TEXT_BYTES
+
 _JSON_TAGS = frozenset(
     {
         "tag:yaml.org,2002:bool",
@@ -140,6 +142,8 @@ def _admit_scalar(
     frames: list[_Frame],
 ) -> YamlPreflightFailure | None:
     if frames and frames[-1].kind == "mapping" and frames[-1].expecting_key:
+        if len(event.value.encode("utf-8")) > MAX_TEXT_BYTES:
+            return _failure("mapping_key_limit_exceeded", event)
         if tag != "tag:yaml.org,2002:str":
             return _failure("mapping_key_invalid", event)
         frame = frames[-1]

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -73,16 +74,48 @@ def test_length_valid_node_exhaustion_is_not_promoted_to_a_record() -> None:
         row_to_record(row)
 
 
-def _valid_row() -> dict[str, object]:
-    prepared = prepare_audit_event(
-        AuditEventInput(
-            idempotency_key="codec-byte-test",
-            subject_type="dynamic-ci-plan",
-            subject_id="plan-codec-byte-test",
-            event_type="dynamic-ci-plan.persisted",
-            created_at="2026-07-11T00:00:00.000Z",
-            actor="test-suite",
-            payload={"accepted": True},
-        )
+@pytest.mark.parametrize(
+    "field", ("idempotency_key", "subject_id", "event_type", "actor", "payload")
+)
+def test_v1_reader_preserves_exact_retained_boundary(field: str) -> None:
+    maximum = (
+        MAX_AUDIT_PAYLOAD_CANONICAL_BYTES_V1 - 2
+        if field == "payload"
+        else MAX_AUDIT_TEXT_UTF8_BYTES_V1
     )
+    value = "x" * maximum
+    event = _valid_input()
+    match field:
+        case "idempotency_key":
+            event = replace(event, idempotency_key=value)
+        case "subject_id":
+            event = replace(event, subject_id=value)
+        case "event_type":
+            event = replace(event, event_type=value)
+        case "actor":
+            event = replace(event, actor=value)
+        case "payload":
+            event = replace(event, payload=value)
+        case _:
+            raise AssertionError("unknown audit field")
+    prepared = prepare_audit_event(event)
+    record = build_prepared_audit_event(prepared, None)
+
+    assert row_to_record(prepared_record_to_row(record, prepared)) == record
+
+
+def _valid_input() -> AuditEventInput:
+    return AuditEventInput(
+        idempotency_key="codec-byte-test",
+        subject_type="dynamic-ci-plan",
+        subject_id="plan-codec-byte-test",
+        event_type="dynamic-ci-plan.persisted",
+        created_at="2026-07-11T00:00:00.000Z",
+        actor="test-suite",
+        payload={"accepted": True},
+    )
+
+
+def _valid_row() -> dict[str, object]:
+    prepared = prepare_audit_event(_valid_input())
     return prepared_record_to_row(build_prepared_audit_event(prepared, None), prepared)
