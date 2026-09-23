@@ -17,7 +17,7 @@ execution out of GitHub Actions.
 
 ## See It in Action
 
-![Repository catalog showing organization selection, repository access and a collapsible navigation sidebar](docs/images/repository-catalog.png)
+![Repository overview showing CI plans, FullCI fallback reasons and a collapsible navigation sidebar](docs/images/repository-overview.png)
 
 *The operator UI with synthetic example data. The
 [browser scenario](frontend/tests/browser/visualSystem.spec.ts) owns the example;

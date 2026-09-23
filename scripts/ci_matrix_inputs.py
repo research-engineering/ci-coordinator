@@ -225,7 +225,7 @@ _OWNER_INPUTS: dict[str, tuple[str, str, str]] = {
         "scripts/ci_utility_inventory.py",
         "Declared immutable upstream spelling exclusion",
     ),
-    "docs/images/repository-catalog.png": (
+    "docs/images/repository-overview.png": (
         "documentation.graph",
         "scripts/documentation_graph_markdown.py",
         "Linked documentation image identity; image pixels are not analyzed",
