@@ -353,9 +353,10 @@ def test_workflow_lint_uses_digest_built_actionlint_and_locked_zizmor(lint_sourc
         ("--shell=bash", "--", _LINT_SHELLS[2]),
         ("--shell=sh", "--", _LINT_SHELLS[3]),
         ("--shell=sh", "--", _LINT_SHELLS[4]),
-        ("--shell=bash", "--", _LINT_SHELLS[5]),
-        ("--shell=sh", "--", _LINT_SHELLS[6]),
-        ("--shell=bash", "--", _LINT_SHELLS[7]),
+        ("--shell=sh", "--", _LINT_SHELLS[5]),
+        ("--shell=bash", "--", _LINT_SHELLS[6]),
+        ("--shell=sh", "--", _LINT_SHELLS[7]),
+        ("--shell=bash", "--", _LINT_SHELLS[8]),
     ]
     assert all("--norc" in command.argv for command in commands[2:-1])
     for command in commands[1:-1]:
