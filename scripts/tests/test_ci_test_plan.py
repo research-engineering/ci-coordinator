@@ -86,7 +86,7 @@ def _plan() -> NativePlan:
                 (f"backend/tests/integration/test_{index}.py", ("persistence",))
                 for index in range(4)
             ),
-            ("scripts/tests/test_tool.py", ()),
+            *((f"scripts/tests/test_tool_{index}.py", ()) for index in range(3)),
         )
         for index in range(2)
     )
@@ -156,7 +156,7 @@ def test_lpt_is_deterministic_file_cohesive_and_exhaustive() -> None:
     assigned = [node for item in plan.assignments for node in item.node_ids]
     assert len(assigned) == len(set(assigned)) == len(plan.nodes)
     assert {item.shard for item in plan.assignments} == {
-        "tooling-1",
+        *(f"tooling-{i}" for i in range(1, 4)),
         *(f"{cohort}-{i}" for cohort in ("backend", "postgres") for i in range(1, 5)),
     }
     assert all(item.estimated_seconds > 0 for item in plan.assignments)
@@ -248,7 +248,7 @@ def test_artifact_join_rejects_each_independent_binding_substitution(
 ) -> None:
     plan = _plan()
     _shards(plan, tmp_path)
-    assert len(admit_shards(plan, tmp_path)) == 9
+    assert len(admit_shards(plan, tmp_path)) == len(plan.assignments)
     folder = tmp_path / f"shard-{plan.assignments[0].shard}"
     path = folder / "receipt.json"
     value = json.loads(path.read_bytes())
@@ -447,6 +447,13 @@ def test_workflow_matrix_and_required_join_match_the_partition_exactly() -> None
         item.shard for item in _plan().assignments
     ]
     assert jobs["native-test-shards"]["strategy"]["fail-fast"] is False
+    scanner_steps = [
+        step
+        for step in jobs["native-test-shards"]["steps"]
+        if step.get("name") == "Install the admitted scanner for native falsifiers"
+    ]
+    assert len(scanner_steps) == 1
+    assert scanner_steps[0]["if"] == "startsWith(matrix.shard, 'tooling-')"
     assert jobs["postgres-witness"]["needs"] == ["native-test-plan", "native-test-shards"]
     assert any(
         "ci_test_execution combine" in step.get("run", "")

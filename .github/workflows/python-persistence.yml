@@ -260,7 +260,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [backend-1, backend-2, backend-3, backend-4, postgres-1, postgres-2, postgres-3, postgres-4, tooling-1]
+        shard: [backend-1, backend-2, backend-3, backend-4, postgres-1, postgres-2, postgres-3, postgres-4, tooling-1, tooling-2, tooling-3]
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -290,7 +290,7 @@ jobs:
           raise SystemExit(0 if actual == "3.13.15" else
           f"expected Python 3.13.15, got {actual}")'
       - name: Install the admitted scanner for native falsifiers
-        if: matrix.shard == 'tooling-1'
+        if: startsWith(matrix.shard, 'tooling-')
         run: |
           scanner_binary="$(bash .github/actions/secret-scan/install.sh "$RUNNER_TEMP/gitleaks-native")"
           echo "GITLEAKS_TEST_BINARY=$scanner_binary" >> "$GITHUB_ENV"
