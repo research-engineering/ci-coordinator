@@ -401,6 +401,8 @@ jobs:
         - postgres-3
         - postgres-4
         - tooling-1
+        - tooling-2
+        - tooling-3
     steps:
     - name: Check out source
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -425,7 +427,7 @@ jobs:
     - name: Verify exact Python identity
       run: backend/.venv/bin/python -c 'import platform; actual = platform.python_version(); raise SystemExit(0 if actual == "3.13.15" else f"expected Python 3.13.15, got {actual}")'
     - name: Install the admitted scanner for native falsifiers
-      if: matrix.shard == 'tooling-1'
+      if: startsWith(matrix.shard, 'tooling-')
       run: "scanner_binary=\"$(bash .github/actions/secret-scan/install.sh \"$RUNNER_TEMP/gitleaks-native\")\"\necho \"GITLEAKS_TEST_BINARY=$scanner_binary\" >> \"$GITHUB_ENV\"\ndirname \"$scanner_binary\" >> \"$GITHUB_PATH\"\n"
     - name: Download the frozen native plan
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c

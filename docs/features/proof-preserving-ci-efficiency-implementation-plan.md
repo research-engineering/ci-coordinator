@@ -51,6 +51,16 @@ policy inputs, not inferred from CPU count. This keeps estimated group work
 near three minutes plus setup before hosted qualification; the five-minute
 target is not yet a measured guarantee.
 
+Revision for the expanded public-repository population: admit three tooling
+shards using fresh per-file phase hints from the successful exact-source run
+`35918291178`. Validate the union and disjointness of all nine source reports
+before replacing the hint file, preserving source/run provenance. Change both
+native workflow matrices and the planner's expected assignment set together.
+Install the admitted scanner on every tooling shard; do not pin scanner tests
+to one shard merely to preserve the old matrix. Keep all emitted shard receipts
+mandatory at the aggregate gate. Measure the resulting critical path and total
+runner occupancy against the one-tooling-shard baseline, including setup cost.
+
 Compared with pytest-split, preserving files avoids repeated expensive module
 fixtures. Compared with xdist on one standard runner, separate jobs do not
 make four database containers compete with CPU-heavy codecs on that runner.

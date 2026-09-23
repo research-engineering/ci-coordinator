@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from ruamel.yaml import YAML
 
 SCHEMA: Final = "ci-coordinator-native-test-plan/v2"
-SHARD_COUNTS = {"backend": 4, "postgres": 4, "tooling": 1}
+SHARD_COUNTS = {"backend": 4, "postgres": 4, "tooling": 3}
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
 type Cohort = Literal["backend", "postgres", "tooling"]
 type Seconds = Annotated[float, Field(ge=0, allow_inf_nan=False)]

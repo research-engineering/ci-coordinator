@@ -38,6 +38,16 @@ Keep all inspected runs, including subgroup regressions. The base mutation
 step took 1,016 seconds: 531.402 baseline seconds plus 479.855 mutated seconds
 over 190 mutants. The current Dev Container job still takes 535 seconds.
 
+The later public-repository [Full Check](https://github.com/research-engineering/ci-coordinator/actions/runs/35918291178)
+at exact source `9e3fc3d18c01f75b9e6e6c240825e3d3c45ef840` changes the
+scheduling premise: the single tooling shard completed 3,454 tests from 99
+files in 877.58 seconds; its recorded pytest phases total 859.69 seconds.
+All nine native shard reports passed, with 12,593 unique node identities and
+three terminal phases per node. The previous per-file hints came from source
+`85edcd4280dde4a26521b8ecc4f5712d98c2a60c` and under-estimated this
+expanded population. These are elapsed observations, not process CPU or a
+causal speedup experiment.
+
 ## Complete Cost Review, Not A Top-N Audit
 
 Produce a machine-readable CI artifact with one row per native collected test
@@ -151,6 +161,18 @@ ordering and least-load/index tie-break. Start with four backend, four isolated
 PostgreSQL and one tooling/conformance shard. This is an initial measured-load
 hypothesis, not proof of the minimum worker count. New files use the cohort
 mean cost or a positive fallback and always remain in the native universe.
+
+For the current 12,593-node population, revise the tooling count from one to
+three while retaining four backend and four PostgreSQL shards. Rebalance with
+complete per-file phase hints from the exact successful run above. LPT on the
+observed tooling phases yields about 287 seconds per tooling shard before
+per-job setup and scheduling variance. Two additional runner preparations are
+the cost of a shorter critical path; measure both wall and aggregate runner
+time after implementation. Each tooling shard must install the test scanner
+because source-file assignment is free to move scanner witnesses between
+shards. The complete native partition, serial route and coverage/mutation
+oracles remain unchanged. If measured total cost outweighs the latency gain,
+revisit the count rather than declaring three universally optimal.
 
 Existing pytest plugins were considered before this bounded assignment. Test-level
 duration splitting can duplicate expensive module fixtures; process-local
