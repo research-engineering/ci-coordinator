@@ -206,10 +206,10 @@ The GitHub.com profile admits both `./.github/workflows/{filename}` and
 `$/.github/workflows/{filename}` with identical caller-commit semantics. Neither
 form admits an `@ref` suffix or expressions. The `$/` form is not available on
 GitHub Enterprise Server; that provider profile is outside this adapter's
-current `api.github.com` scope. A filename containing a workflow extension
-followed by `@` is ambiguous with an `@ref` suffix and remains unknown even
-when a same-named file exists in the snapshot. Invalid local syntax remains an
-explicit unknown, never an inferred remote edge.
+current `api.github.com` scope. GitHub rejects any `@` in either local call
+coordinate, so such a call remains unknown even when a same-named file exists
+in the snapshot. Invalid local syntax remains an explicit unknown, never an
+inferred remote edge.
 Remote calls are recorded but are not fetched in this slice.
 
 ```text

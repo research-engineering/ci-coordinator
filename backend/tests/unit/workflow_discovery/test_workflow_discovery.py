@@ -499,10 +499,12 @@ def test_github_same_repository_calls_reject_unavailable_or_invalid_targets(
 
 
 @pytest.mark.parametrize("local_prefix", ["./", "$/"])
+@pytest.mark.parametrize("filename", ["target@release.yml", "target@nightly.yaml"])
 def test_same_repository_call_cannot_admit_ambiguous_ref_suffix_as_a_filename(
     local_prefix: str,
+    filename: str,
 ) -> None:
-    target = ".github/workflows/target.yml@release.yml"
+    target = f".github/workflows/{filename}"
     result = _completed(
         _source(_call_document(f"{local_prefix}{target}")),
         _source(_valid_document(), target),
@@ -511,6 +513,7 @@ def test_same_repository_call_cannot_admit_ambiguous_ref_suffix_as_a_filename(
     assert [(edge.kind, edge.status) for edge in result.report.call_edges] == [
         ("unknown", "invalid")
     ]
+    assert not any(fact.field == "call.target" for fact in result.report.facts)
     assert result.report.local_graph_closed is False
     assert "local_graph_open" in result.proposal.blockers
 

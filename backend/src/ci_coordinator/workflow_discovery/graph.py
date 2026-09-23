@@ -119,7 +119,7 @@ def _edge_draft(
         )
     if uses.startswith(("./", "$/")):
         target = uses[2:]
-        if ".yml@" in target or ".yaml@" in target:
+        if "@" in target:
             return _EdgeDraft(
                 caller_path, job_id, uses, "unknown", "invalid", None, None, None, provenance
             )
