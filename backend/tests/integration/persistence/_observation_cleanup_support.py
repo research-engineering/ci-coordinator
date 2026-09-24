@@ -57,7 +57,7 @@ async def expand_cleanup_snapshot(
     prototype: ProviderAttemptSnapshot,
     count: int,
     *,
-    interrupt_after_first_copy_row: Literal["error", "cancelled"] | None = None,
+    interrupt_before_last_copy_row: Literal["error", "cancelled"] | None = None,
 ) -> tuple[str, int, int]:
     construction_started = perf_counter_ns()
     assert len(prototype.jobs) == 1 and 1 < count <= 2000
@@ -87,6 +87,8 @@ async def expand_cleanup_snapshot(
     snapshot_digest = hashlib.sha256(
         _ascii_fixture_json({"attempt": prototype.attempt.canonical_mapping(), "jobs": mappings})
     ).hexdigest()
+    if interrupt_before_last_copy_row is not None and len(rows) < 128:
+        raise ValueError("fault injection requires a substantial COPY population")
     construction_elapsed = perf_counter_ns() - construction_started
     transaction_started = perf_counter_ns()
     async with admin.begin() as connection:
@@ -113,11 +115,10 @@ async def expand_cleanup_snapshot(
             table, sql.SQL(", ").join(sql.Identifier(name) for name in columns)
         )
         async with driver.cursor() as cursor, cursor.copy(statement) as copy:
-            if interrupt_after_first_copy_row is not None:
-                await copy.write_row(tuple(rows[0][name] for name in columns))
-                if interrupt_after_first_copy_row == "cancelled":
-                    raise asyncio.CancelledError
-                raise RuntimeError("fixture COPY interrupted")
-            for row in rows:
+            for index, row in enumerate(rows):
                 await copy.write_row(tuple(row[name] for name in columns))
+                if interrupt_before_last_copy_row is not None and index == len(rows) - 2:
+                    if interrupt_before_last_copy_row == "cancelled":
+                        raise asyncio.CancelledError
+                    raise RuntimeError("fixture COPY interrupted")
     return snapshot_digest, construction_elapsed, perf_counter_ns() - transaction_started

@@ -121,6 +121,11 @@ the PostgreSQL transfer protocol changes. The one fully decoded 2,000-job
 sample, counts, live survivor, canonical digest, rollback and cleanup oracle
 remain independent checks. A different row, bytea adaptation, trigger state,
 transaction boundary, or full-read result falsifies the equivalence.
+The negative fixture raises an error or `CancelledError` after hundreds of
+`write_row` calls and before the last row, then checks rollback and a valid
+retry. It exercises cancellation-exception unwinding after a substantial
+COPY payload; it does not claim to reproduce an externally timed task cancel
+during a network write.
 
 The rejected alternative is batching retention shifts: their measured total
 is below one second and changing their intermediate transaction order buys

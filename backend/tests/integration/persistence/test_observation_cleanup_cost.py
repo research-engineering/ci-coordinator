@@ -401,7 +401,7 @@ def test_expansion_copy_rolls_back_and_allows_exact_retry(
                     admin,
                     evidence,
                     404,
-                    interrupt_after_first_copy_row=failure,
+                    interrupt_before_last_copy_row=failure,
                 )
             assert isinstance(admin.pool, AsyncAdaptedQueuePool)
             assert admin.pool.checkedout() == 0

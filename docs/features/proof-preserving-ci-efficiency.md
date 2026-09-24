@@ -259,7 +259,9 @@ including its existing 240-second aggregate reserve. Provision 600, Node
 proof 60, portable parent 1,380 and cleanup 120 yield the finite 2,160-second
 Dev Container stage budget, below its unchanged 40-minute job ceiling. The
 branch aggregate and global command cap must be recomputed from their exact
-child set. Normal shard timeouts, coverage floors, selected-test population,
+child set. The ordinary native shard keeps its separately owned 900-second
+process deadline below its 960-second workflow watchdog; it must not import
+the portable budget. Coverage floors, selected-test population,
 mutation oracles and test behavior are unchanged. Revisit the bound after
 measuring the full portable stage and removing proved redundant work; this
 budget repair alone does not reduce CI cost.

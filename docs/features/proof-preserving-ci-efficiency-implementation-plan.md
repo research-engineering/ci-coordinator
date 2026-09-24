@@ -210,8 +210,11 @@ existing coverage floor. Revisit only if the pinned library changes this API.
    `1140 s -> 1380 s -> 2160 s -> 32306000 ms`.
    Keep ordinary native shards and the 40-minute outer job unchanged.
 3. Update the source-owned quality plan, direct budget assertions and
-   governing deadline document together. Run exact plan admission, scoped
-   test witnesses and the hosted Dev Container on the new exact SHA.
+   governing deadline document together. Split the portable test deadline
+   from the native shard's 900-second process ceiling, then verify the native
+   failure witness still stays below its 960-second workflow watchdog. Run
+   exact plan admission, scoped test witnesses and the hosted Dev Container
+   on the new exact SHA.
 4. Measure actual portable elapsed time and revisit the bound if the failure
    repeats or its headroom remains too narrow. A passed rerun of the old SHA
    is diagnostic, not a substitute for the repaired contract.
