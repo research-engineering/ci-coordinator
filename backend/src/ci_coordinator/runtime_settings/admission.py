@@ -40,6 +40,7 @@ _MAXIMUM_RETAINED_BODY_BYTES = f"{_PREFIX}MAXIMUM_RETAINED_BODY_BYTES"
 _DATABASE_POOL_SIZE = f"{_PREFIX}DATABASE_POOL_SIZE"
 _DATABASE_POOL_TIMEOUT = f"{_PREFIX}DATABASE_POOL_TIMEOUT_SECONDS"
 _PLAN_TTL = f"{_PREFIX}PLAN_TTL_SECONDS"
+_MAX_PLAN_TTL_SECONDS = 300
 _RECONCILIATION_INTERVAL = f"{_PREFIX}RECONCILIATION_INTERVAL_SECONDS"
 _RECONCILIATION_STARTUP_TIMEOUT = f"{_PREFIX}RECONCILIATION_STARTUP_TIMEOUT_SECONDS"
 _RECONCILIATION_SCAN_LIMIT = f"{_PREFIX}RECONCILIATION_SCAN_LIMIT"
@@ -362,7 +363,7 @@ def _admit_signing_pair(mapping: Mapping[str, str]) -> tuple[str, str] | None:
 
 def _admit_runtime_bounds(mapping: Mapping[str, str]) -> _RuntimeBounds:
     request_timeout = _positive_int(mapping, _REQUEST_TIMEOUT, maximum=3600)
-    plan_ttl = _positive_int(mapping, _PLAN_TTL, maximum=3600)
+    plan_ttl = _positive_int(mapping, _PLAN_TTL, maximum=_MAX_PLAN_TTL_SECONDS)
     interval = _positive_int(mapping, _RECONCILIATION_INTERVAL, maximum=3600)
     startup_timeout = _positive_int(mapping, _RECONCILIATION_STARTUP_TIMEOUT, maximum=3600)
     scan_limit = _positive_int(mapping, _RECONCILIATION_SCAN_LIMIT, maximum=1000)

@@ -21,6 +21,8 @@ from ci_coordinator.plan_issuance.model import (
     SignedPlanPayload,
 )
 
+MAX_SIGNED_PLAN_TTL_SECONDS = 300
+
 
 class SignedPlanSigner:
     def __init__(
@@ -31,8 +33,12 @@ class SignedPlanSigner:
         ttl_seconds: int,
         clock: Clock,
     ) -> None:
-        if not key_id or type(ttl_seconds) is not int or ttl_seconds < 1:
-            raise ValueError("signer requires a key id and positive TTL")
+        if (
+            not key_id
+            or type(ttl_seconds) is not int
+            or not 1 <= ttl_seconds <= MAX_SIGNED_PLAN_TTL_SECONDS
+        ):
+            raise ValueError("signer requires a key id and target-compatible TTL")
         key = load_pem_private_key(private_key_pem, password=None)
         if not isinstance(key, Ed25519PrivateKey):
             raise ValueError("signed plan key must be Ed25519")

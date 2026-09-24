@@ -95,7 +95,7 @@ oidc_audience: non-empty bounded text
 oidc_allowed_workflow_refs: unique bounded set for workflow_ref
 oidc_allowed_job_workflow_refs: unique bounded set for job_workflow_ref
 request_timeout_seconds: positive bounded duration
-plan_ttl_seconds: positive bounded duration
+plan_ttl_seconds: integer in [1, 300], matching the target signed-plan lifetime bound
 reconciliation_interval_seconds: positive bounded duration
 reconciliation_startup_timeout_seconds: positive bounded duration
 reconciliation_scan_limit: integer in [1, 1000]

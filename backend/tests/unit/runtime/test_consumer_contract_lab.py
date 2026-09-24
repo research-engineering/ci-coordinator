@@ -67,19 +67,29 @@ _REQUESTER_REF = (
 
 
 @pytest.mark.parametrize(
-    ("execution_kind", "selected"),
+    ("execution_kind", "selected", "ttl_seconds"),
     [
-        ("witness-shards", True),
-        ("native-job-set", True),
-        ("witness-shards", False),
-        ("native-job-set", False),
+        ("witness-shards", True, 120),
+        ("native-job-set", True, 120),
+        ("witness-shards", False, 120),
+        ("native-job-set", False, 120),
+        ("witness-shards", True, 300),
+        ("witness-shards", False, 300),
     ],
-    ids=("sharded-selected", "native-selected", "sharded-fallback", "native-fallback"),
+    ids=(
+        "sharded-selected",
+        "native-selected",
+        "sharded-fallback",
+        "native-fallback",
+        "maximum-selected",
+        "maximum-fallback",
+    ),
 )
 def test_consumer_contract_lab_round_trips_real_control_plane(
     tmp_path: Path,
     execution_kind: str,
     selected: bool,
+    ttl_seconds: int,
 ) -> None:
     now = datetime.now(UTC)
     policy = make_policy()
@@ -92,7 +102,7 @@ def test_consumer_contract_lab_round_trips_real_control_plane(
     projection = _execution_projection(execution_kind, verified, now=now)
     request = _request()
     identity = _identity(projection.workflow_path, now=now)
-    signer = _signer(now=now)
+    signer = _signer(now=now, ttl_seconds=ttl_seconds)
     authorization = (
         _authorize(request, identity, verified, projection, now=now) if selected else None
     )
@@ -224,12 +234,12 @@ def _identity(workflow_path: str, *, now: datetime) -> TrustedActionsRun:
     )
 
 
-def _signer(*, now: datetime) -> SignedPlanSigner:
+def _signer(*, now: datetime, ttl_seconds: int = 120) -> SignedPlanSigner:
     key = Ed25519PrivateKey.generate()
     return SignedPlanSigner(
         key_id="contract-lab-key",
         private_key_pem=key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()),
-        ttl_seconds=120,
+        ttl_seconds=ttl_seconds,
         clock=FixedClock(now),
     )
 

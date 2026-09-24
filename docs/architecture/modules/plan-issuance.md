@@ -44,6 +44,12 @@ event = pull_request
 
 An inconsistent pair is not a fallback candidate; it is an invalid request.
 
+The configured and directly constructed signer TTL must be in `[1, 300]`
+seconds, matching the delivered target validator. A selected plan may expire
+earlier at its production authority deadline; a fallback plan has no such
+mandatory clamp. Reject an incompatible setting or signer constructor input
+instead of silently shortening it or widening the target security window.
+
 ## 4. Failure Behavior
 
 ```text
