@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from scripts import devcontainer_witness
 from scripts.bounded_process import CommandResult, ResidualProcessGroupPolicy
+from scripts.dev_environment.identity import InstanceIdentity, derive_instance_identity
+from scripts.dev_environment.private_files import bounded_private_lock, ensure_private_directory
 from scripts.devcontainer_witness import (
     admitted_devcontainer_source,
     verify_devcontainer,
@@ -363,7 +365,7 @@ def test_witness_provisions_proves_and_cleans_one_owned_container() -> None:
     assert python_test.timeout_ms == int((PYTHON_TEST_PROCESS_TIMEOUT_SECONDS + 60) * 1_000)
     maximum_portable_timeout_ms = max(command.timeout_ms for command in plan.portable_commands())
     assert timeout_by_command[commands[proof_index]] == (maximum_portable_timeout_ms / 1_000 + 240)
-    assert plan.commands["devcontainer.verify"].timeout_ms == (600 + 60 + 1_380 + 120) * 1_000
+    assert plan.commands["devcontainer.verify"].timeout_ms == (1_920 + 120 + 60 + 60) * 1_000
     assert disconnect_index < node_index < proof_index
     assert commands[-1] == ("docker", "rm", "--force", _CONTAINER_ID)
 
@@ -427,6 +429,243 @@ def test_witness_fails_closed_and_attempts_cleanup(failure: str, message: str) -
     if failure == "node-resolution":
         assert not any("check:portable" in call[0] for call in runner.calls)
         assert runner.calls[-1][0] == ("docker", "rm", "--force", _CONTAINER_ID)
+
+
+@pytest.mark.parametrize("primary_type", [RuntimeError, OSError, KeyboardInterrupt])
+@pytest.mark.parametrize("cleanup_type", [None, RuntimeError, OSError, KeyboardInterrupt])
+def test_interruption_preserves_primary_and_attempts_owned_cleanup(
+    primary_type: type[BaseException], cleanup_type: type[BaseException] | None
+) -> None:
+    primary = primary_type("primary failure")
+    cleanup = None if cleanup_type is None else cleanup_type("secondary cleanup failure")
+
+    class InterruptedRunner(FakeRunner):
+        def __call__(self, argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+            if "check:portable" in argv:
+                raise primary
+            result = super().__call__(argv, timeout_seconds=timeout_seconds)
+            if tuple(argv[:3]) == ("docker", "rm", "--force") and cleanup is not None:
+                raise cleanup
+            return result
+
+    runner = InterruptedRunner()
+    with pytest.raises(primary_type) as caught:
+        verify_devcontainer(runner=runner, witness_id="test-witness")
+
+    assert caught.value is primary
+    assert sum(call[0][:3] == ("docker", "rm", "--force") for call in runner.calls) == 1
+    if cleanup is not None:
+        assert any("secondary cleanup failure" in note for note in primary.__notes__)
+
+
+def test_cleanup_interruption_without_primary_failure_is_not_success() -> None:
+    interruption = KeyboardInterrupt("cleanup interrupted")
+
+    class InterruptedRunner(FakeRunner):
+        def __call__(self, argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+            result = super().__call__(argv, timeout_seconds=timeout_seconds)
+            if tuple(argv[:3]) == ("docker", "rm", "--force"):
+                raise interruption
+            return result
+
+    with pytest.raises(KeyboardInterrupt) as caught:
+        verify_devcontainer(runner=InterruptedRunner(), witness_id="test-witness")
+    assert caught.value is interruption
+
+
+@pytest.mark.parametrize("network_count", [1, 8])
+def test_cumulative_work_clips_proof_and_cleanup_discovery_consumes_its_reserve(
+    monkeypatch: pytest.MonkeyPatch, network_count: int
+) -> None:
+    now = [0.0]
+    monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: now[0])
+    networks = {f"network-{index}" for index in range(network_count)}
+    observed: dict[str, float] = {}
+
+    class SlowRunner(FakeRunner):
+        def __call__(self, argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+            args = tuple(argv)
+            if args[:3] == ("docker", "inspect", "--format") and "Networks" in args[3]:
+                self.calls.append((args, timeout_seconds))
+                result = CommandResult(0, json.dumps({name: {} for name in sorted(networks)}), "")
+            elif args[:3] == ("docker", "network", "disconnect"):
+                self.calls.append((args, timeout_seconds))
+                networks.remove(args[3])
+                result = CommandResult(0, "", "")
+            else:
+                result = super().__call__(argv, timeout_seconds=timeout_seconds)
+            if "up" in args[:3]:
+                now[0] += 590
+            elif "check:portable" in args:
+                observed["proof_started"] = now[0]
+                observed["proof_timeout"] = timeout_seconds
+                now[0] += timeout_seconds
+                observed["cleanup_started"] = now[0]
+                return CommandResult(None, "last completed proof", "", "test timeout", "timeout")
+            elif "installed_mise_node_test.py" in " ".join(args):
+                now[0] += 50
+            elif args[:3] == ("docker", "rm", "--force"):
+                observed["remove_timeout"] = timeout_seconds
+                observed["remove_started"] = now[0]
+                now[0] += timeout_seconds - 1
+            else:
+                now[0] += 29
+            return result
+
+    runner = SlowRunner()
+    with pytest.raises(RuntimeError, match="test timeout"):
+        verify_devcontainer(runner=runner, witness_id="test-witness")
+
+    assert observed["proof_timeout"] < 1_380
+    assert observed["proof_started"] + observed["proof_timeout"] < 1_920
+    assert observed["remove_started"] - observed["cleanup_started"] == 29
+    assert 0 < observed["remove_timeout"] < 120 - 29
+    assert now[0] < observed["cleanup_started"] + 120
+    assert runner.calls[-1][0] == ("docker", "rm", "--force", _CONTAINER_ID)
+
+
+def test_exhausted_deadline_does_not_start_another_operation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = [0.0]
+    monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: now[0])
+    calls: list[float] = []
+
+    def execute(argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+        assert tuple(argv) == ("operation",)
+        calls.append(timeout_seconds)
+        now[0] += 15
+        return CommandResult(0, "", "")
+
+    runner = devcontainer_witness._DeadlineRunner(execute, 20)
+    assert runner(("operation",), timeout_seconds=30).status == 0
+    with pytest.raises(RuntimeError, match="deadline exhausted"):
+        runner(("operation",), timeout_seconds=30)
+    assert calls == [15]
+
+
+@pytest.mark.parametrize("status", [0, 1])
+def test_late_success_rejects_but_does_not_replace_an_existing_failure(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    now = [0.0]
+    monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: now[0])
+    original = CommandResult(status, "captured output", "captured error")
+
+    def execute(argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+        assert tuple(argv) == ("operation",)
+        assert timeout_seconds == 15
+        now[0] = 20
+        return original
+
+    result = devcontainer_witness._DeadlineRunner(execute, 20)(("operation",), timeout_seconds=30)
+    if status == 0:
+        assert result.status is None
+        assert result.failure_kind == "timeout"
+        assert result.stdout == original.stdout
+        assert result.stderr == original.stderr
+    else:
+        assert result is original
+
+
+@pytest.mark.parametrize("executor_failure", [False, True])
+def test_failure_preserves_bounded_channel_tails_and_primary_cause(
+    executor_failure: bool,
+) -> None:
+    result = CommandResult(
+        None if executor_failure else 1,
+        "old-stdout" + "x" * 10_000 + "last-stdout",
+        "old-stderr" + "y" * 10_000 + "last-stderr",
+        "primary timeout" if executor_failure else None,
+        "timeout" if executor_failure else None,
+    )
+    with pytest.raises(RuntimeError) as caught:
+        devcontainer_witness._checked(result, "proof")
+    message = str(caught.value)
+    assert message.startswith(
+        "proof failed: " + ("primary timeout" if executor_failure else "status 1")
+    )
+    assert "stdout: [tail truncated]" in message and "stderr: [tail truncated]" in message
+    assert "last-stdout" in message and "last-stderr" in message
+    assert "old-stdout" not in message and "old-stderr" not in message
+    assert len(message) < 2 * 8_192 + 150
+
+
+def test_source_finalization_is_clipped_by_the_nonrenewable_outer_phase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: 2_050.0)
+    assert devcontainer_witness._finalization_deadline(1_920) == 2_100
+
+
+def _main_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> InstanceIdentity:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    identity = derive_instance_identity(repository, state_home=tmp_path / "state")
+    (repository / ".git").mkdir()
+    monkeypatch.setattr(devcontainer_witness, "REPO_ROOT", repository)
+    monkeypatch.setattr(devcontainer_witness, "derive_instance_identity", lambda _root: identity)
+    return identity
+
+
+def test_main_shares_work_deadline_and_finalizes_source_before_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    identity = _main_identity(tmp_path, monkeypatch)
+    now = [0.0]
+    monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: now[0])
+    git_deadlines: list[float] = []
+
+    def admit_identity(_root: Path) -> InstanceIdentity:
+        now[0] = 5
+        return identity
+
+    monkeypatch.setattr(devcontainer_witness, "derive_instance_identity", admit_identity)
+
+    def git(cwd: Path, arguments: Sequence[str], deadline: float) -> CommandResult:
+        assert cwd == identity.repo_root
+        git_deadlines.append(deadline)
+        if len(git_deadlines) > 2:
+            assert capsys.readouterr().out == ""
+        now[0] += 10
+        if tuple(arguments) == ("rev-parse", "HEAD"):
+            return CommandResult(0, "a" * 40, "")
+        assert tuple(arguments) == ("status", "--porcelain", "--untracked-files=all")
+        return CommandResult(0, "", "")
+
+    def witness(*, witness_id: str, workspace_root: Path, execution_deadline: float) -> None:
+        assert witness_id == identity.project_name
+        assert workspace_root == identity.repo_root
+        assert now[0] == 25
+        assert execution_deadline == 1_920
+        now[0] = 2_030
+
+    monkeypatch.setattr(devcontainer_witness, "_git", git)
+    monkeypatch.setattr(devcontainer_witness, "verify_devcontainer", witness)
+    assert devcontainer_witness.main() == 0
+    assert git_deadlines == [1_920, 1_920, 2_090, 2_090]
+    assert now[0] == 2_050
+    assert json.loads(capsys.readouterr().out)["state"] == "passed"
+
+
+def test_busy_main_ownership_rejects_before_source_or_provider_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    identity = _main_identity(tmp_path, monkeypatch)
+    directory = identity.state_home / "witness-locks"
+    ensure_private_directory(identity.state_home)
+    ensure_private_directory(directory)
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("busy witness must not admit source or access provider")
+
+    monkeypatch.setattr(devcontainer_witness, "admitted_devcontainer_source", forbidden)
+    monkeypatch.setattr(devcontainer_witness, "verify_devcontainer", forbidden)
+    with bounded_private_lock(directory / f"{identity.project_name}.lock"):
+        assert devcontainer_witness.main() == 1
+    captured = capsys.readouterr()
+    assert "lock is busy" in captured.err
+    assert captured.out == ""
 
 
 def test_witness_rejects_untrusted_cleanup_identity() -> None:

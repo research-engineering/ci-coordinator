@@ -200,7 +200,10 @@ warnings fail that witness, including failed-admission paths. This is less
 complex than a new SQLite reader or process per artifact and preserves every
 existing coverage floor. Revisit only if the pinned library changes this API.
 
-## 8. Portable Process Budget Repair
+## 8. Prior Portable Process Budget Repair
+
+This records the previous cap adjustment. Section 9 owns the current aggregate
+lifecycle model; the four-term subtotal below is not a complete call inventory.
 
 1. Bind the exact PR #10 failing job and inspect the process timeout versus
    test failure. Preserve the full native suite and its original outcome
@@ -223,6 +226,36 @@ existing coverage floor. Revisit only if the pinned library changes this API.
 4. Measure actual portable elapsed time and revisit the bound if the failure
    repeats or its headroom remains too narrow. A passed rerun of the old SHA
    is diagnostic, not a substitute for the repaired contract.
+
+## 9. Cooperative Lifecycle And Aggregate Budget Repair
+
+1. Preserve the complete command, test and native shard populations. Treat the
+   original four-term Dev Container sum as historical, not proof that all
+   sequential operations fit.
+2. Share one work deadline across source admission and all witness operations;
+   bound cleanup discovery/removal as one phase, followed by bounded source
+   finalization. Preserve the 2,160-second catalog envelope and the 40-minute
+   direct job. Test cumulative consumption, the exact boundary, late success,
+   and multiple network operations independently of the implementation formula.
+3. Preserve the primary exception through cleanup for RuntimeError, OSError
+   and KeyboardInterrupt, including a failing/interrupted cleanup. Verify that
+   an unrelated or replaced container is never removed. Keep timeout stdout
+   and stderr bounded and distinguish both from the primary failure cause.
+4. Strengthen the PostgreSQL COPY witness under its existing owner: identify
+   the injected exception and independently observe the late COPY checkpoint;
+   distinguish a test deadline from the synthetic cancellation being tested.
+   Retain canonical rows, transaction scope, trigger state, rollback and retry.
+5. Run scoped static checks, update transitive risk/generation fingerprints,
+   obtain an independent review and execute Full Check on the published head.
+   Hosted PostgreSQL and Dev Container witnesses, not static checks, qualify
+   their respective runtime claims. Keep CI-006 open for remaining measured
+   cost reduction; do not refresh a single cost hint without cohort evidence.
+
+| Changed owner | Preserved behavior | Independent acceptance |
+| --- | --- | --- |
+| Dev Container witness | Exact source, mounts, ownership, portable command population, finite output and native shard limits | Failure-kind matrix, fake-clock cumulative boundaries, exact generated-source checks and hosted least-privilege container |
+| COPY fixture/test | Same canonical population, SQL transaction, normal insert triggers and cleanup oracle | Reached injection identity, non-injection failure rejection, committed readback, rollback and identical retry |
+| Existing design/plan | One task register and unchanged runtime authority | Historical/current scope alignment, documentation graph and exact witness bindings |
 
 ## Rollback And Completion
 

@@ -1,9 +1,8 @@
-import asyncio
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import replace
 from time import perf_counter_ns
-from typing import Literal
 
 import psycopg
 from psycopg import sql
@@ -57,12 +56,14 @@ async def expand_cleanup_snapshot(
     prototype: ProviderAttemptSnapshot,
     count: int,
     *,
-    interrupt_before_last_copy_row: Literal["error", "cancelled"] | None = None,
+    after_copy_row: Callable[[], None] | None = None,
 ) -> tuple[str, int, int]:
     construction_started = perf_counter_ns()
     assert len(prototype.jobs) == 1 and 1 < count <= 2000
     job = prototype.jobs[0]
     assert 1 <= job.provider_job_id <= count
+    if after_copy_row is not None and count - 1 < 128:
+        raise ValueError("fault injection requires a substantial COPY population")
     base = _snapshot_job_row(prototype.subject_id, job)
     mapping = job.canonical_mapping()
     assert _ascii_fixture_json(mapping) == base["job_canonical_json"]
@@ -87,8 +88,6 @@ async def expand_cleanup_snapshot(
     snapshot_digest = hashlib.sha256(
         _ascii_fixture_json({"attempt": prototype.attempt.canonical_mapping(), "jobs": mappings})
     ).hexdigest()
-    if interrupt_before_last_copy_row is not None and len(rows) < 128:
-        raise ValueError("fault injection requires a substantial COPY population")
     construction_elapsed = perf_counter_ns() - construction_started
     transaction_started = perf_counter_ns()
     async with admin.begin() as connection:
@@ -115,10 +114,8 @@ async def expand_cleanup_snapshot(
             table, sql.SQL(", ").join(sql.Identifier(name) for name in columns)
         )
         async with driver.cursor() as cursor, cursor.copy(statement) as copy:
-            for index, row in enumerate(rows):
+            for row in rows:
                 await copy.write_row(tuple(row[name] for name in columns))
-                if interrupt_before_last_copy_row is not None and index == len(rows) - 2:
-                    if interrupt_before_last_copy_row == "cancelled":
-                        raise asyncio.CancelledError
-                    raise RuntimeError("fixture COPY interrupted")
+                if after_copy_row is not None:
+                    after_copy_row()
     return snapshot_digest, construction_elapsed, perf_counter_ns() - transaction_started

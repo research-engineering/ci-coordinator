@@ -7,7 +7,11 @@ Baseline: `dc4fadd145b31754de2d857d37c94c2bff22b9e9`.
 Owners: the cleanup-capacity test and its private fixture support; production
 collection, report, budget, compatibility and cleanup contracts are unchanged.
 
-## Minimum Sufficient Model
+## Initial Seed-Transaction Scope
+
+This section through the initial writer-readiness table describes the original
+seed-transaction change. The measured expansion follow-up below owns the later
+COPY change; statements that expansion was unchanged apply only to this stage.
 
 Disposition: reuseOwnerModel. The material dimension is fixture transaction
 ordering, not a production algorithm change. Use the existing UoW state machine
@@ -139,3 +143,13 @@ test wall time 36.43 to 22.54 seconds. Construction remained 2.25 versus
 the exact-head hosted result must be measured before claiming a portable
 speedup, and this fixture optimization says nothing about production cleanup
 capacity.
+
+## Follow-up: Failure Oracle
+
+The COPY failure witness must observe the late injection checkpoint separately
+from catching the exact injected exception. A one-time unrelated early error
+followed by a successful retry must not qualify rollback after COPY writes.
+The checkpoint counts completed `write_row` calls, not server-committed rows.
+Give the focused attempt and retry a finite local test deadline whose
+cancellation cannot satisfy the expected injected `CancelledError`. Preserve
+the existing outer process watchdog and all post-rollback relation checks.

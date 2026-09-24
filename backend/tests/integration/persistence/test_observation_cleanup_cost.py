@@ -1,5 +1,7 @@
 import asyncio
 import json
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 from time import perf_counter_ns
@@ -375,6 +377,63 @@ def test_cleanup_seed_admits_once_and_rolls_back_partial_construction(
     asyncio.run(scenario())
 
 
+@asynccontextmanager
+async def _expect_late_copy_fault(
+    injected_error: RuntimeError | asyncio.CancelledError,
+) -> AsyncIterator[Callable[[], None]]:
+    completed_copy_rows = 0
+
+    def after_copy_row() -> None:
+        nonlocal completed_copy_rows
+        completed_copy_rows += 1
+        if completed_copy_rows == 402:
+            raise injected_error
+
+    with pytest.raises(type(injected_error)) as raised:
+        async with asyncio.timeout(30):
+            yield after_copy_row
+    assert raised.value is injected_error, "COPY did not raise the exact injected exception"
+    assert completed_copy_rows == 402, "COPY did not reach the 402-write checkpoint"
+
+
+@pytest.mark.parametrize("failure", ["error", "cancelled"])
+def test_expansion_copy_oracle_rejects_early_exceptions(
+    failure: Literal["error", "cancelled"],
+) -> None:
+    async def scenario() -> None:
+        error_type = asyncio.CancelledError if failure == "cancelled" else RuntimeError
+        injected_error = error_type("fixture COPY interrupted")
+        with pytest.raises(AssertionError, match="COPY did not raise the exact injected exception"):
+            async with _expect_late_copy_fault(injected_error):
+                raise error_type("fixture COPY interrupted")
+        with pytest.raises(AssertionError, match="COPY did not reach the 402-write checkpoint"):
+            async with _expect_late_copy_fault(injected_error):
+                raise injected_error
+
+    asyncio.run(scenario())
+
+
+def test_expansion_copy_oracle_rejects_deadline_as_injected_cancellation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_timeout = asyncio.timeout
+
+    def immediate_timeout(_delay: float | None) -> asyncio.Timeout:
+        return original_timeout(0)
+
+    async def scenario() -> None:
+        injected_error = asyncio.CancelledError("fixture COPY interrupted")
+        with monkeypatch.context() as patch:
+            patch.setattr(asyncio, "timeout", immediate_timeout)
+            with pytest.raises(TimeoutError) as raised:
+                async with _expect_late_copy_fault(injected_error):
+                    await asyncio.sleep(0)
+        assert isinstance(raised.value.__cause__, asyncio.CancelledError)
+        assert raised.value.__cause__ is not injected_error
+
+    asyncio.run(scenario())
+
+
 @pytest.mark.parametrize("failure", ["error", "cancelled"])
 def test_expansion_copy_rolls_back_and_allows_exact_retry(
     runtime_postgres_database_url: str,
@@ -395,13 +454,14 @@ def test_expansion_copy_rolls_back_and_allows_exact_retry(
                 await budgets.configure_policy(budget_command(report)), BudgetPolicyCommitted
             )
             await seed_cleanup_attempt(engine, source, evidence, report)
-            expected_error = asyncio.CancelledError if failure == "cancelled" else RuntimeError
-            with pytest.raises(expected_error):
+            error_type = asyncio.CancelledError if failure == "cancelled" else RuntimeError
+            injected_error = error_type("fixture COPY interrupted")
+            async with _expect_late_copy_fault(injected_error) as after_copy_row:
                 await expand_cleanup_snapshot(
                     admin,
                     evidence,
                     404,
-                    interrupt_before_last_copy_row=failure,
+                    after_copy_row=after_copy_row,
                 )
             assert isinstance(admin.pool, AsyncAdaptedQueuePool)
             assert admin.pool.checkedout() == 0
@@ -421,8 +481,9 @@ def test_expansion_copy_rolls_back_and_allows_exact_retry(
                     == 1
                 )
                 assert await connection.scalar(text("SHOW session_replication_role")) == "origin"
-            digest, _, _ = await expand_cleanup_snapshot(admin, evidence, 404)
-            decoded = await store(engine).load_measurements(source.attempt)
+            async with asyncio.timeout(30):
+                digest, _, _ = await expand_cleanup_snapshot(admin, evidence, 404)
+                decoded = await store(engine).load_measurements(source.attempt)
             assert decoded is not None
             assert isinstance(decoded.snapshot, IndependentAttemptSnapshot)
             assert decoded.snapshot.evidence.snapshot_digest == digest

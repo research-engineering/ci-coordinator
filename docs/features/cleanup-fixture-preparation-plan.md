@@ -62,6 +62,14 @@ Static success does not discharge any of the native acceptance items.
 
 ## Prior Integration Handoff
 
+The failure-oracle follow-up binds a test-owned exception instance and a
+separately observed late-copy checkpoint. Reject an unrelated early exception,
+including one of the same base class, and make timeout distinct from injected
+cancellation. Keep the canonical generator, complete COPY count, transaction,
+normal trigger mode, rollback readback, released connection and exact retry.
+Run these cases through the existing hosted PostgreSQL cohort. This changes
+test evidence only, not the production database contract.
+
 The four-file batch adds `seed_cleanup_attempt`, changes the capacity test's
 construction call site and timing field, and adds the two-case
 `test_cleanup_seed_admits_once_and_rolls_back_partial_construction` witness.
