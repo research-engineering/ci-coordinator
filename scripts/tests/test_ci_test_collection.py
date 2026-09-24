@@ -304,7 +304,7 @@ def test_failed_shard_never_writes_a_success_receipt(
         execution.run_shard(
             plan, "serial" if serial else plan.assignments[0].shard, output, diagnostic
         )
-    assert observed["timeout_seconds"] == (2_400 if serial else 900)
+    assert observed["timeout_seconds"] == (3_600 if serial else 900)
     arguments = observed["arguments"]
     assert isinstance(arguments, tuple)
     assert "faulthandler_timeout=120" in arguments

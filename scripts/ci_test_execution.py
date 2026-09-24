@@ -325,7 +325,7 @@ def run_shard(plan: TestPlan, shard: str, output: Path, diagnostics: Path) -> No
         files,
         report_path,
         coverage=coverage_path,
-        timeout=2_400 if shard == "serial" else PYTHON_TEST_PROCESS_TIMEOUT_SECONDS,
+        timeout=3_600 if shard == "serial" else PYTHON_TEST_PROCESS_TIMEOUT_SECONDS,
     )
     native = NativeReport.model_validate_json(artifact_bytes(report_path))
     empty_files = admit_collection(native, plan.candidate_files if shard == "serial" else files)

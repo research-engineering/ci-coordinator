@@ -100,6 +100,16 @@ when tooling lacks esbuild, retaining their installed execution in the required
 repository-quality job. Compare complete identities/outcomes with same-head
 serial qualification; do not turn the historical 6,831 count into a constant.
 
+For the manual serial comparison only, align its process deadline with the
+observed full-universe cost: 3600 seconds inside a 75-minute job. The previous
+2400-second limit stopped run `35940367926` at 83% despite successful normal
+shards; their shard-session time totalled 2819.67 seconds and recorded test
+phases totalled 2733.90 seconds. Keep the same complete
+collection, outcome/coverage comparisons and terminal timeout failure. Update
+the existing negative timeout witness and exact workflow budget assertion;
+regenerate dependent self-CI and runtime entrypoint fingerprints. A fresh
+same-head pass, not this bound change, qualifies serial/shard parity.
+
 Native script witnesses use small synthetic pytest projects for missing/extra
 node, duplicate assignment, failed/skipped/empty shard, stale SHA/run/attempt,
 malformed artifact, traversal and bad coverage cases. They are GitHub tests,
