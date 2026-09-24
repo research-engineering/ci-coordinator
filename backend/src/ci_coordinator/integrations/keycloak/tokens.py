@@ -123,6 +123,7 @@ class KeycloakTokenVerifier:
                 or "nonce" in claims
             ):
                 raise ValueError
+            issued_at = _numeric_date(claims, "iat")
             return KeycloakMachineTokenEvidence(
                 token_kind=_MACHINE_EVIDENCE_KIND,
                 issuer=self._issuer,
@@ -130,8 +131,8 @@ class KeycloakTokenVerifier:
                 authorized_party=_required_text(claims, "azp", 256),
                 subject=_required_text(claims, "sub", _MAXIMUM_CLAIM_TEXT_BYTES),
                 roles=_roles(claims, self._api_client_id),
-                issued_at=_numeric_date(claims, "iat"),
-                not_before=_numeric_date(claims, "nbf"),
+                issued_at=issued_at,
+                not_before=_numeric_date(claims, "nbf") if "nbf" in claims else issued_at,
                 expires_at=_numeric_date(claims, "exp"),
             )
         except (KeyError, TypeError, ValueError, OverflowError):

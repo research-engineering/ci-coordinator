@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import cast
 
 import pytest
@@ -9,10 +10,14 @@ from joserfc.jwk import RSAKey
 
 from ci_coordinator.control_plane_identity import (
     BackChannelLogoutEvidence,
+    IdentityRejected,
     KeycloakBrowserEvidence,
     KeycloakEvidenceRejected,
     KeycloakMachineTokenEvidence,
     KeycloakUnavailable,
+    KeycloakWorkloadPrincipal,
+    MachineIdentityPolicy,
+    MachineIdentityService,
 )
 from ci_coordinator.integrations.keycloak.jwks import (
     KeycloakJwksCache,
@@ -22,6 +27,7 @@ from ci_coordinator.integrations.keycloak.tokens import (
     MAXIMUM_TOKEN_BYTES,
     KeycloakTokenVerifier,
 )
+from ci_coordinator.kernel import FixedClock
 
 from ._support import (
     API_CLIENT_ID,
@@ -100,10 +106,109 @@ def test_each_token_grammar_accepts_only_its_valid_signed_evidence(kind: TokenKi
         assert result.audience == frozenset({API_CLIENT_ID, "account"})
         assert result.authorized_party == "automation-client"
         assert result.roles == frozenset({"read", "audit"})
+        assert result.not_before == result.issued_at == datetime.fromtimestamp(NOW, UTC)
     else:
         assert isinstance(result, BackChannelLogoutEvidence)
         assert result.token_id == "logout-1"
         assert result.target.keycloak_session_id == "session-1"
+
+
+@pytest.mark.parametrize("not_before", [None, 0, NOW - 1, NOW, NOW + 60])
+@pytest.mark.parametrize("header_type", ["JWT", "at+jwt", "application/at+jwt"])
+def test_machine_optional_not_before_preserves_effective_lower_bound(
+    not_before: int | None,
+    header_type: str,
+) -> None:
+    def mutate(claims: dict[str, object]) -> None:
+        claims["exp"] = NOW + 300
+        if not_before is not None:
+            claims["nbf"] = not_before
+
+    value = token(
+        "access",
+        claim_mutation=mutate,
+        header_mutation=lambda header: replace(header, "typ", header_type),
+    )
+    evidence = asyncio.run(_verifier().verify(value))
+    assert evidence.not_before == datetime.fromtimestamp(
+        NOW if not_before is None else not_before, UTC
+    )
+    principal = asyncio.run(_machine_service().authenticate(value))
+    assert isinstance(principal, KeycloakWorkloadPrincipal)
+    assert principal.roles == frozenset({"read", "audit"})
+    assert principal.issued_at == datetime.fromtimestamp(NOW, UTC)
+    assert principal.expires_at == datetime.fromtimestamp(NOW + 300, UTC)
+
+
+@pytest.mark.parametrize(
+    "invalid", [None, True, False, float(NOW), str(NOW), -1, 253_402_300_800, [], {}]
+)
+def test_present_malformed_not_before_never_uses_absence_fallback(invalid: object) -> None:
+    with pytest.raises(KeycloakEvidenceRejected):
+        asyncio.run(
+            _verifier().verify(
+                token("access", claim_mutation=lambda claims: replace(claims, "nbf", invalid))
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "field", ["iat", "exp", "iss", "aud", "azp", "sub", "typ", "resource_access"]
+)
+def test_optional_not_before_does_not_make_authority_claims_optional(field: str) -> None:
+    with pytest.raises(KeycloakEvidenceRejected):
+        asyncio.run(
+            _verifier().verify(token("access", claim_mutation=lambda claims: remove(claims, field)))
+        )
+
+
+@pytest.mark.parametrize("field", ["iat", "exp"])
+@pytest.mark.parametrize("invalid", [None, True, float(NOW), str(NOW), -1, 253_402_300_800])
+def test_absent_not_before_keeps_required_dates_strict(field: str, invalid: object) -> None:
+    with pytest.raises(KeycloakEvidenceRejected):
+        asyncio.run(
+            _verifier().verify(
+                token("access", claim_mutation=lambda claims: replace(claims, field, invalid))
+            )
+        )
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"iat": NOW + 61, "exp": NOW + 120},
+        {"iat": NOW - 60, "exp": NOW},
+        {"exp": NOW + 301},
+        {"nbf": NOW + 61, "exp": NOW + 300},
+        {"nbf": NOW + 301, "exp": NOW + 300},
+        {"iss": ISSUER + "/other"},
+        {"aud": "other-api"},
+        {"azp": "unregistered-client"},
+        {"typ": "ID"},
+        {"nonce": OPAQUE},
+        {"resource_access": {API_CLIENT_ID: {"roles": ["administrator"]}}},
+    ],
+)
+def test_provider_shaped_machine_token_retains_time_and_authority_guards(
+    overrides: dict[str, object],
+) -> None:
+    value = token("access", claim_mutation=lambda claims: claims.update(overrides))
+    assert asyncio.run(_machine_service().authenticate(value)) == IdentityRejected(
+        "invalid_machine_token"
+    )
+
+
+def _machine_service() -> MachineIdentityService:
+    return MachineIdentityService(
+        verifier=_verifier(),
+        clock=FixedClock(datetime.fromtimestamp(NOW, UTC)),
+        policy=MachineIdentityPolicy(
+            issuer=ISSUER,
+            audience=API_CLIENT_ID,
+            allowed_workload_client_ids=frozenset({"automation-client"}),
+            authority_profile_digest="a" * 64,
+        ),
+    )
 
 
 @pytest.mark.parametrize(

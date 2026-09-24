@@ -109,6 +109,13 @@ bearer is admitted only when it has the exact issuer, API audience, allowlisted
 `azp`, stable non-empty subject, bounded temporal claims, a positive lifetime
 not exceeding 300 seconds, and the exact required roles.
 
+`iat` and `exp` remain mandatory exact integer NumericDates. `nbf` is optional
+on the provider wire, not nullable: when present it must pass the same numeric
+and interval checks as before. When absent, the adapter supplies `issued_at`
+as the evidence's effective `not_before`. This is a local admission bound, not
+a claim that the provider signed an `nbf` member. No zero or current-time
+default is used, and the domain evidence type remains non-optional.
+
 An ID token, browser cookie, GitHub token, target-workflow OIDC token, or
 break-glass bearer cannot be reinterpreted as a machine credential.
 
@@ -304,3 +311,26 @@ activation succeeds without an exact current attestation recheck.
 Local implementation evidence does not prove configured Keycloak clients,
 live GitHub installation state, secret rotation, provider availability,
 deployment, or production readiness.
+
+## 13. Provider Compatibility
+
+Keycloak's optional `nbf` follows
+[RFC 7519 section 4.1.5](https://www.rfc-editor.org/rfc/rfc7519.html#section-4.1.5).
+Only absence normalizes to `iat`; explicit null, malformed or out-of-range
+values fail. Thus an absent `nbf` adds no authority beyond the retained
+`iat <= now + skew` check. Required expiry, positive bounded lifetime,
+issuer, audience, workload allowlist and roles remain unchanged.
+
+The pinned Keycloak 26.7.4
+[back-channel sender](https://github.com/keycloak/keycloak/blob/26.7.4/services/src/main/java/org/keycloak/services/managers/ResourceAdminManager.java)
+uses the form-entity constructor without a charset. Its selected Apache
+HttpClient emits the bare media type accepted by this route. No parameterized
+media-type extension is inferred from a hypothetical sender mismatch. Custom
+senders and live revocation delivery require their own evidence; revisit on
+provider changes or a concrete contrary wire receipt.
+
+Regression witnesses use signed tokens with absent, present and malformed
+`nbf` through the adapter and machine service. Logout witnesses cover bare
+case-insensitive media type, duplicate headers, unadmitted parameters and
+credential ambiguity before verifier invocation. They do not prove immediate
+revocation of offline machine tokens or deployed provider interoperability.
