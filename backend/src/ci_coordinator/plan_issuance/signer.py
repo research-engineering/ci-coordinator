@@ -86,12 +86,18 @@ def verify_signed_plan(
     public_key_pem: bytes,
     clock: Clock,
 ) -> str | None:
+    """Verify signature and lifetime; target identity binding is a separate gate."""
     if envelope.schema_version != SIGNED_PLAN_ENVELOPE_SCHEMA_VERSION:
         return "signed_plan_schema_unsupported"
     if envelope.algorithm != SIGNED_PLAN_ALGORITHM:
         return "signed_plan_algorithm_unsupported"
     if envelope.expires_at <= clock.now():
         return "signed_plan_expired"
+    if (
+        envelope.expires_at <= envelope.issued_at
+        or envelope.expires_at - envelope.issued_at > timedelta(seconds=MAX_SIGNED_PLAN_TTL_SECONDS)
+    ):
+        return "signed_plan_ttl_invalid"
     try:
         key = load_pem_public_key(public_key_pem)
         if not isinstance(key, Ed25519PublicKey):

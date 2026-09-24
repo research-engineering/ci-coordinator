@@ -183,6 +183,14 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails(ttl_seconds: 
             signature=signature.decode("ascii"),
         )
         assert _target_rejection(too_long, signer.public_key_pem()) == "signed_plan_ttl_invalid"
+        assert (
+            verify_signed_plan(
+                too_long,
+                public_key_pem=signer.public_key_pem(),
+                clock=FixedClock(NOW),
+            )
+            == "signed_plan_ttl_invalid"
+        )
     assert (
         verify_signed_plan(
             first.record.envelope,

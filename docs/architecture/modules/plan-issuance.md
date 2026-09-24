@@ -49,6 +49,10 @@ seconds, matching the delivered target validator. A selected plan may expire
 earlier at its production authority deadline; a fallback plan has no such
 mandatory clamp. Reject an incompatible setting or signer constructor input
 instead of silently shortening it or widening the target security window.
+An idempotent replay returns its persisted envelope without re-signing it.
+Reusing a nonempty issuance store created under an older lifetime rule therefore
+requires an explicit compatibility or migration receipt; an empty-store claim
+must be verified for the exact deployment, not inferred from source history.
 
 ## 4. Failure Behavior
 
