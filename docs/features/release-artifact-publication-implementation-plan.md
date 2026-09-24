@@ -1,6 +1,6 @@
 # Release Artifact Publication Implementation Plan
 
-Status: implementation complete locally; provider witness pending merge
+Status: implementation present; exact-subject GitHub verification and provider witness required
 
 Date: 2026-07-28
 
@@ -30,28 +30,29 @@ requirement and owner contract
   -> provider publication witness
 ```
 
-Provider execution cannot precede merge because GitHub dispatches only a
-workflow present on the default branch. Local proof cannot substitute for that
-provider witness.
+The publication witness follows merge because this owner admits only the exact
+`master` source and signer ref. Local static validation cannot substitute for
+that provider witness.
 
 ## 3. Implementation Units
 
 | Unit                                                     | Responsibility                                                                                 | Acceptance                                                                                                                                                               |
 |----------------------------------------------------------|------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `scripts/release_artifact_identity.py`                   | Strict gate response admission and release identity                                            | Every authority field and identity coordinate has a negative oracle.                                                                                                     |
+| `scripts/release_artifact_identity.py`                   | Bounded gate snapshot admission, deterministic selection, and release identity                 | Every observed run satisfies exact authority; selection is order-independent and remains bound to one run and attempt.                                                  |
 | `.github/workflows/release-artifact.yml`                 | Exact-source build, registry push, independent predicate validation, attestation, verification | Actionlint and zizmor pass; permissions are job-local, the subject image is not its own validator, and image code never runs in the attestor.                            |
 | `scripts/release_predicate_admission.py`                 | Strict BuildKit SLSA v1 and SPDX 2.3 predicate admission                                       | Official schema substitution, duplicate JSON, vacuous collections, wrong versions, wrong build mode, malformed RFC 3339 values, and inconsistent timestamps fail closed. |
 | Release predicate schemas                                | Pin official SPDX bytes and the exact BuildKit profiles                                        | Generic standards claims remain separate from repository-specific non-vacuity constraints.                                                                               |
-| `scripts/tests/test_release_artifact_identity.py`        | Parser and identity falsifiers                                                                 | Zero, duplicate, substituted, malformed, and oversized evidence fails.                                                                                                   |
+| `scripts/tests/test_release_artifact_identity.py`        | Parser, selection, and identity falsifiers                                                      | Repeated distinct successes pass; empty, duplicate-ID, substituted, malformed, inconsistent-count, and over-budget evidence fails.                                      |
 | `scripts/tests/test_release_predicate_admission.py`      | Predicate schema and semantic falsifiers                                                       | Every admitted profile dimension and exact byte hash has a negative oracle.                                                                                              |
 | `scripts/tests/test_release_artifact_shell_execution.py` | Executable shell failure falsifiers                                                            | Every workflow shell step is inventoried; every authority predicate and external command has an exact success or failure oracle.                                         |
-| `scripts/tests/test_release_artifact_workflow.py`        | Semantic workflow authority oracle                                                             | Wrong event, source, digest owner, permissions, action identity, execution boundary, masked shell failure, or provider verification failure would fail the test.         |
+| `scripts/tests/test_release_artifact_workflow.py`        | Semantic workflow authority oracle                                                             | Wrong event, source, digest owner, scanner digest, permissions, action identity, qualification dependency, or provider verification fails the test.                     |
 | Proofkit records                                         | Requirement-to-witness routing                                                                 | Requirement admission and required tuples close.                                                                                                                         |
 | Deployment documentation                                 | Digest-first operator path                                                                     | No mutable tag is presented as deployment authority.                                                                                                                     |
 
-## 4. Local Closeout
+## 4. Verification
 
-Run:
+Run behavioral witnesses and aggregate gates only through the repository-owned
+GitHub workflow:
 
 ```text
 backend/.venv/bin/python -m pytest -q \
@@ -70,6 +71,17 @@ git diff --check
 
 The branch-head gate and provider Full Check then bind those results to the
 reviewed commit.
+
+Local validation is limited to static lint, format, type, AST, documentation,
+and whitespace checks. It does not execute the behavioral suites above.
+
+Selection witnesses permute distinct valid run IDs and attempts, retain counts
+larger than the bounded snapshot, and independently corrupt selected and
+nonselected authority fields. Shell witnesses bind the chosen run and attempt
+to emitted release coordinates. The SBOM witness fixes the generator index
+digest independently from the BuildKit pin. Qualification witnesses retain the
+successful-build dependency of the no-checkout attestor; registry upload is
+not a successful release or production-admission receipt.
 
 ## 5. Post-Merge Provider Witness
 

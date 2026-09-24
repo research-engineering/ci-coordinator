@@ -437,6 +437,8 @@ def test_gate_resolution_accepts_the_exact_provider_response(tmp_path: Path) -> 
         "--raw-field",
         f"head_sha={SOURCE_COMMIT}",
         "--raw-field",
+        "page=1",
+        "--raw-field",
         "per_page=10",
         "--raw-field",
         "status=success",
@@ -444,6 +446,42 @@ def test_gate_resolution_accepts_the_exact_provider_response(tmp_path: Path) -> 
     assert {
         line.partition("=")[0] for line in (tmp_path / "github-output").read_text().splitlines()
     } == {"gate_run_attempt", "gate_run_id", "release_identity", "source_commit"}
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_gate_resolution_binds_the_selected_repeat_success(tmp_path: Path, reverse: bool) -> None:
+    environment = _gate_environment(tmp_path)
+    response = json.loads(_gate_response())
+    response["workflow_runs"].append({**response["workflow_runs"][0], "id": 8002, "run_attempt": 1})
+    response["total_count"] = 25
+    if reverse:
+        response["workflow_runs"].reverse()
+    Path(environment["FAKE_GATE_RESPONSE"]).write_text(json.dumps(response), encoding="utf-8")
+
+    result = _execute(_shell("preflight", "Resolve the exact successful Full Check"), environment)
+
+    assert result.returncode == 0, result.stderr
+    output = dict(
+        line.split("=", 1) for line in (tmp_path / "github-output").read_text().splitlines()
+    )
+    assert output["gate_run_id"] == "8002"
+    assert output["gate_run_attempt"] == "1"
+    assert output["source_commit"] == SOURCE_COMMIT
+
+
+def test_gate_resolution_rejects_a_wrong_nonselected_candidate(tmp_path: Path) -> None:
+    environment = _gate_environment(tmp_path)
+    response = json.loads(_gate_response())
+    response["workflow_runs"].append(
+        {**response["workflow_runs"][0], "id": 8000, "head_sha": "b" * 40}
+    )
+    response["total_count"] = 2
+    Path(environment["FAKE_GATE_RESPONSE"]).write_text(json.dumps(response), encoding="utf-8")
+
+    result = _execute(_shell("preflight", "Resolve the exact successful Full Check"), environment)
+
+    assert result.returncode != 0
+    assert "release_identity=" not in (tmp_path / "github-output").read_text()
 
 
 def test_validator_provisioning_propagates_failure_and_uses_exact_lock(

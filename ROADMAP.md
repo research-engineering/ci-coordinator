@@ -83,9 +83,11 @@ merged graph-change and comparison admission, independent verifier fallback,
 and public omission-validator binding repairs after exact-head native checks.
 These close their bounded source counterexamples, not CI-054 as a whole,
 baseline graph completeness, provider enforcement or production omission.
-The next coherent repairs cover provider-token compatibility, bounded workflow
-and policy admission, and release-evidence selection; remaining findings keep
-their per-source dispositions in the external evidence register.
+[PR #14](https://github.com/research-engineering/ci-coordinator/pull/14) also
+merged bounded provider-token compatibility repairs after its own native gates.
+Live provider enrollment remains separate. The next coherent repairs cover
+bounded workflow and policy admission and release-evidence selection; remaining
+findings keep their per-source dispositions in the external evidence register.
 
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.

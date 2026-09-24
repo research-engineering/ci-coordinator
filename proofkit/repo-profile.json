@@ -130,6 +130,7 @@
     "specGlobs": [
       "README.md",
       "ROADMAP.md",
+      "SECURITY.md",
       "docs/**/*.md",
       "docs/specs/**/requirements.v1.json"
     ]
@@ -167,6 +168,7 @@
       "NOTICE",
       "README.md",
       "ROADMAP.md",
+      "SECURITY.md",
       "backend/**",
       "compose.yaml",
       "cspell.json",
