@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
+import subprocess
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -20,7 +24,7 @@ from production_admission_support import make_production_grant
 
 from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.identity_admission import TrustedActionsRun
-from ci_coordinator.kernel import FixedClock
+from ci_coordinator.kernel import FixedClock, canonical_json
 from ci_coordinator.plan_issuance import (
     FullCiExecution,
     InMemoryIssuanceStore,
@@ -34,6 +38,7 @@ from ci_coordinator.plan_issuance import (
     RepositoryBinding,
     SelectedExecution,
     SignedNativeProfileExecution,
+    SignedPlanEnvelope,
     SignedPlanIssuer,
     SignedPlanSigner,
     SignedProfileExecution,
@@ -53,17 +58,67 @@ from ci_coordinator.verification_core import VerifiedPlan, verify
 
 NOW = datetime(2026, 7, 14, tzinfo=UTC)
 EXECUTION_SHA = "c" * 40
+_TARGET_VALIDATOR = (
+    Path(__file__).resolve().parents[2]
+    / "src/ci_coordinator/target_artifacts/control_source/validation_envelope.cjs"
+)
+_VALIDATE_ENVELOPE = """
+const { createPublicKey } = require("node:crypto");
+const { readFileSync } = require("node:fs");
+const { verifyEnvelope } = require(process.argv[1]);
+const input = JSON.parse(readFileSync(0, "utf8"));
+Date.now = () => input.now;
+process.stdout.write(JSON.stringify(verifyEnvelope(
+  input.envelope, createPublicKey(input.publicKey), input.keyId
+)));
+"""
 
 
-def test_signed_issuance_is_idempotent_and_payload_tampering_fails() -> None:
+def _target_rejection(envelope: SignedPlanEnvelope, public_key_pem: bytes) -> str | None:
+    completed = subprocess.run(
+        ["node", "-e", _VALIDATE_ENVELOPE, str(_TARGET_VALIDATOR)],
+        input=json.dumps(
+            {
+                "envelope": {**envelope.unsigned_mapping(), "signature": envelope.signature},
+                "publicKey": public_key_pem.decode("ascii"),
+                "keyId": envelope.key_id,
+                "now": int(NOW.timestamp() * 1000) + 500,
+            }
+        ),
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=5,
+    )
+    assert completed.returncode == 0, completed.stderr
+    reason = json.loads(completed.stdout)
+    assert reason is None or isinstance(reason, str)
+    return reason
+
+
+@pytest.mark.parametrize("ttl_seconds", [0, 301, 3600, True])
+def test_signer_rejects_target_incompatible_ttl(ttl_seconds: int) -> None:
+    private_key = Ed25519PrivateKey.generate().private_bytes(
+        Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()
+    )
+    with pytest.raises(ValueError, match="target-compatible TTL"):
+        SignedPlanSigner(
+            key_id="test-key",
+            private_key_pem=private_key,
+            ttl_seconds=ttl_seconds,
+            clock=FixedClock(NOW),
+        )
+
+
+@pytest.mark.parametrize("ttl_seconds", [1, 60, 300])
+def test_signed_issuance_is_idempotent_and_payload_tampering_fails(ttl_seconds: int) -> None:
     input = make_input(DiffFileChangeInput(path="docs/guide.md", status="modified"))
     verified = verify(input, make_policy(), _candidate(plan(input, make_policy())))
+    key = Ed25519PrivateKey.generate()
     signer = SignedPlanSigner(
         key_id="test-key",
-        private_key_pem=Ed25519PrivateKey.generate().private_bytes(
-            Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()
-        ),
-        ttl_seconds=60,
+        private_key_pem=key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()),
+        ttl_seconds=ttl_seconds,
         clock=FixedClock(NOW),
     )
     issuer = SignedPlanIssuer(store=InMemoryIssuanceStore(), signer=signer)
@@ -112,6 +167,30 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails() -> None:
 
     assert isinstance(first, Issued) and first.duplicate is False
     assert isinstance(second, Issued) and second.duplicate is True
+    assert first.record.envelope.expires_at - first.record.envelope.issued_at == timedelta(
+        seconds=ttl_seconds
+    )
+    assert _target_rejection(first.record.envelope, signer.public_key_pem()) is None
+    if ttl_seconds == 300:
+        unsigned = {
+            **first.record.envelope.unsigned_mapping(),
+            "expiresAt": (NOW + timedelta(seconds=301)).isoformat(),
+        }
+        signature = base64.urlsafe_b64encode(key.sign(canonical_json(unsigned))).rstrip(b"=")
+        too_long = replace(
+            first.record.envelope,
+            expires_at=NOW + timedelta(seconds=301),
+            signature=signature.decode("ascii"),
+        )
+        assert _target_rejection(too_long, signer.public_key_pem()) == "signed_plan_ttl_invalid"
+        assert (
+            verify_signed_plan(
+                too_long,
+                public_key_pem=signer.public_key_pem(),
+                clock=FixedClock(NOW),
+            )
+            == "signed_plan_ttl_invalid"
+        )
     assert (
         verify_signed_plan(
             first.record.envelope,
@@ -167,7 +246,7 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails() -> None:
         verify_signed_plan(
             second.record.envelope,
             public_key_pem=signer.public_key_pem(),
-            clock=FixedClock(NOW + timedelta(seconds=60)),
+            clock=FixedClock(NOW + timedelta(seconds=ttl_seconds)),
         )
         == "signed_plan_expired"
     )
@@ -474,7 +553,10 @@ def test_native_execution_projects_static_jobs_without_synthetic_shards() -> Non
         replace(execution, workflow_path=".github/workflows/other.yml")
 
 
-def test_production_authority_bounds_expiry_and_revalidation_falls_back() -> None:
+@pytest.mark.parametrize("ttl_seconds", [60, 300])
+def test_production_authority_bounds_expiry_and_revalidation_falls_back(
+    ttl_seconds: int,
+) -> None:
     input = make_input(DiffFileChangeInput(path="docs/guide.md", status="modified"))
     policy = make_policy()
     verified = verify(input, policy, _candidate(plan(input, policy)))
@@ -504,7 +586,7 @@ def test_production_authority_bounds_expiry_and_revalidation_falls_back() -> Non
         private_key_pem=Ed25519PrivateKey.generate().private_bytes(
             Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()
         ),
-        ttl_seconds=60,
+        ttl_seconds=ttl_seconds,
         clock=FixedClock(NOW),
     )
     store = InMemoryIssuanceStore()
@@ -566,6 +648,7 @@ def test_production_authority_bounds_expiry_and_revalidation_falls_back() -> Non
     assert isinstance(selected, Issued)
     assert selected.duplicate is False
     assert selected.record.envelope.expires_at == authorization.not_after
+    assert _target_rejection(selected.record.envelope, signer.public_key_pem()) is None
     guard = authorization.issuance_guard()
     assert production_guard_binds_record(guard, selected.record)
     payload = selected.record.envelope.payload

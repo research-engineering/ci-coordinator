@@ -10,6 +10,7 @@ from typing import Literal
 
 from ci_coordinator.runtime_settings._rejection import SettingsRejected
 from ci_coordinator.runtime_settings.contracts import (
+    MAX_PLAN_TTL_SECONDS,
     DisabledRuntimeSettings,
     EnforcingRuntimeSettings,
     NonEnforcingRuntimeSettings,
@@ -362,7 +363,7 @@ def _admit_signing_pair(mapping: Mapping[str, str]) -> tuple[str, str] | None:
 
 def _admit_runtime_bounds(mapping: Mapping[str, str]) -> _RuntimeBounds:
     request_timeout = _positive_int(mapping, _REQUEST_TIMEOUT, maximum=3600)
-    plan_ttl = _positive_int(mapping, _PLAN_TTL, maximum=3600)
+    plan_ttl = _positive_int(mapping, _PLAN_TTL, maximum=MAX_PLAN_TTL_SECONDS)
     interval = _positive_int(mapping, _RECONCILIATION_INTERVAL, maximum=3600)
     startup_timeout = _positive_int(mapping, _RECONCILIATION_STARTUP_TIMEOUT, maximum=3600)
     scan_limit = _positive_int(mapping, _RECONCILIATION_SCAN_LIMIT, maximum=1000)

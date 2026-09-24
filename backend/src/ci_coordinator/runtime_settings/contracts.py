@@ -12,6 +12,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 type RuntimeMode = Literal["disabled", "enforcing", "non_enforcing"]
+MAX_PLAN_TTL_SECONDS = 300
 _MAX_SECRET_UTF8_BYTES = 65_536
 _DNS_LABEL = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?")
 _GITHUB_OWNER = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?")
@@ -345,7 +346,11 @@ def _require_connected_bounds(settings: ConnectedRuntimeSettings) -> None:
     if type(settings.database_pool_size) is not int or not 1 <= settings.database_pool_size <= 128:
         raise ValueError("database pool size must be an integer in [1, 128]")
     _require_timeout(settings.database_pool_timeout_seconds, "database pool timeout")
-    _require_timeout(settings.plan_ttl_seconds, "plan TTL")
+    if (
+        type(settings.plan_ttl_seconds) is not int
+        or not 1 <= settings.plan_ttl_seconds <= MAX_PLAN_TTL_SECONDS
+    ):
+        raise ValueError("plan TTL must match the target lifetime bound")
     _require_timeout(settings.reconciliation_interval_seconds, "reconciliation interval")
     _require_timeout(
         settings.reconciliation_startup_timeout_seconds,

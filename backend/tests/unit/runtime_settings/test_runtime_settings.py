@@ -886,6 +886,31 @@ def test_disabled_mode_is_health_only_and_does_not_need_external_dependencies() 
     assert redacted_settings_projection(result).control_plane_identity_mode == "disabled"
 
 
+@pytest.mark.parametrize("ttl_seconds", [1, 300])
+def test_admitted_plan_ttl_matches_target_contract(ttl_seconds: int) -> None:
+    mapping = _non_enforcing_mapping()
+    mapping["CI_COORDINATOR_PLAN_TTL_SECONDS"] = str(ttl_seconds)
+    result = admit_runtime_settings(mapping)
+    assert isinstance(result, NonEnforcingRuntimeSettings)
+    assert result.plan_ttl_seconds == ttl_seconds
+
+
+@pytest.mark.parametrize("ttl_seconds", ["0", "301", "3600"])
+def test_incompatible_plan_ttl_is_rejected_at_configuration(ttl_seconds: str) -> None:
+    mapping = _non_enforcing_mapping()
+    mapping["CI_COORDINATOR_PLAN_TTL_SECONDS"] = ttl_seconds
+    assert admit_runtime_settings(mapping) == RuntimeSettingsRejection(
+        "invalid_setting_value", "CI_COORDINATOR_PLAN_TTL_SECONDS"
+    )
+
+
+def test_direct_settings_construction_cannot_bypass_plan_ttl_bound() -> None:
+    admitted = admit_runtime_settings(_non_enforcing_mapping())
+    assert isinstance(admitted, NonEnforcingRuntimeSettings)
+    with pytest.raises(ValueError, match="target lifetime bound"):
+        replace(admitted, plan_ttl_seconds=301)
+
+
 def _non_enforcing_mapping() -> dict[str, str]:
     return {
         "CI_COORDINATOR_RUNTIME_MODE": "non_enforcing",

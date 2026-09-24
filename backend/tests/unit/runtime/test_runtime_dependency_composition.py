@@ -57,7 +57,7 @@ from ci_coordinator.persistence.errors import (
     DatabaseCompatibilityError,
     PersistenceError,
 )
-from ci_coordinator.plan_issuance import PlanRequest
+from ci_coordinator.plan_issuance import PlanRequest, SignedPlanSigner
 from ci_coordinator.production_admission import ProductionAdmissionGrant, ProductionScopeSubject
 from ci_coordinator.runtime import composition as runtime_composition
 from ci_coordinator.runtime import control_plane_composition as runtime_control_plane_composition
@@ -887,6 +887,29 @@ def test_non_enforcing_composition_rejects_an_active_event_loop_before_allocatio
 
     with pytest.raises(RuntimeError, match="before the event loop starts"):
         asyncio.run(compose_inside_loop())
+
+
+@pytest.mark.parametrize("ttl_seconds", [1, 300])
+def test_runtime_passes_admitted_plan_lifetime_to_the_real_signer(
+    monkeypatch: pytest.MonkeyPatch,
+    ttl_seconds: int,
+) -> None:
+    signer = Mock(wraps=SignedPlanSigner)
+
+    def stop_before_provider_allocation(*_: object, **__: object) -> None:
+        raise ValueError("composition stopped after signer construction")
+
+    monkeypatch.setattr(runtime_composition, "SignedPlanSigner", signer)
+    monkeypatch.setattr(
+        runtime_composition, "create_postgres_engine", stop_before_provider_allocation
+    )
+    settings = replace(_non_enforcing_settings(), plan_ttl_seconds=ttl_seconds)
+
+    with pytest.raises(runtime_composition.RuntimeDependencyConfigurationError):
+        runtime_composition._compose_connected_dependencies(settings, None, SystemClock())
+
+    signer.assert_called_once()
+    assert signer.call_args.kwargs["ttl_seconds"] == ttl_seconds
 
 
 @pytest.mark.parametrize(
