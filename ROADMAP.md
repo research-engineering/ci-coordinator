@@ -127,6 +127,15 @@ diagnostic timeout. The shell repair extends the existing ShellCheck inventory
 and its independent oracles, without a new scanner or exclusion. The database
 timeout remains an investigation, not permission to increase its budget.
 
+The first same-head serial qualification on public `9939a25`
+([run 35932427988](https://github.com/research-engineering/ci-coordinator/actions/runs/35932427988))
+completed the test loop but failed to write its bounded native report. One
+log-overflow test's payload had become a 4,194,405-byte pytest ID, repeated in
+the report. The targeted repair gives this parameter set short collection IDs
+without changing the payload or oracle; the 32 MiB artifact bound remains.
+CI-001 and CI-006 still require a successful fresh same-head serial comparison
+and measured costs after that source change.
+
 ### B2: Durable Observation And Recovery
 
 State: open; existing storage and worker slices require current qualification, not blind reimplementation.
