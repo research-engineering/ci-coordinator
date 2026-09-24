@@ -140,9 +140,10 @@ inside their 20-minute job. The manually requested serial qualification uses a
 gate are unchanged. On source `9a26f1b`, run `35940367926` reached only 83% by
 the former 2400-second deadline. The same-head eleven shards recorded 2819.67
 seconds of total shard-session time and 2733.90 seconds of test phases. The
-prior serial test loop finished in 2340.82 seconds on `9939a25`, with the
-session-finished marker at 2342.61 seconds. Neither shard measure is a serial
-runtime bound, but these observations falsify a reliable 2400-second budget.
+prior run on `9939a25` emitted the test-loop-finished marker at 2340.82 seconds
+since session start, with the session-finished marker at 2342.61 seconds.
+Neither shard measure is a serial runtime bound, but these observations falsify
+a reliable 2400-second budget.
 The new finite budget provides about 28% headroom over measured shard-session time;
 the outer job retains 900 seconds beyond it for setup and comparison. A timeout
 still fails closed, and success on a fresh exact head remains to be observed.
