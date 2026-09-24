@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 
 import pytest
 from pydantic import ValidationError
@@ -46,6 +47,52 @@ def test_actor_free_request_preserves_the_existing_command_bytes_and_digest() ->
     assert command.scope == request.scope
     with pytest.raises(ValidationError):
         HistoryConfigurationRequest.model_validate(original)
+
+
+def test_optional_expansion_preserves_old_command_bytes_and_binds_new_lower_bound() -> None:
+    original = {**_command_mapping(), "expectedRevision": 1, "initialCreatedFrom": None}
+    absent = ConfigureHistory.model_validate(original)
+    explicit_null = ConfigureHistory.model_validate({**original, "expandCreatedFrom": None})
+    expanded = ConfigureHistory.model_validate(
+        {**original, "expandCreatedFrom": (ARCHIVE_TIME - timedelta(days=400)).isoformat()}
+    )
+
+    assert absent.model_dump_json() == json.dumps(original, separators=(",", ":"))
+    assert explicit_null.model_dump_json() == absent.model_dump_json()
+    assert explicit_null.command_digest == absent.command_digest
+    assert expanded.command_digest != absent.command_digest
+    assert ConfigureHistory.model_validate_json(expanded.model_dump_json()) == expanded
+
+
+@pytest.mark.parametrize(
+    "patch,reason",
+    [
+        (
+            {"expectedRevision": 0, "initialCreatedFrom": ARCHIVE_TIME.isoformat()},
+            "history expansion requires an existing dataset",
+        ),
+        ({"expandCreatedFrom": "2020-02-31T00:00:00Z"}, "day is out of range for month"),
+        (
+            {"expandCreatedFrom": "2019-01-01T00:00:00.000001Z"},
+            "history boundary requires second precision",
+        ),
+        ({"rescan": True}, "history expansion requires an existing dataset"),
+    ],
+)
+def test_expansion_rejects_initial_rescan_and_invalid_calendar_or_precision(
+    patch: dict[str, object],
+    reason: str,
+) -> None:
+    baseline = {
+        **{key: value for key, value in _command_mapping().items() if key != "actor"},
+        "expectedRevision": 1,
+        "initialCreatedFrom": None,
+        "expandCreatedFrom": "2019-01-01T00:00:00Z",
+    }
+    assert HistoryConfigurationRequest.model_validate(baseline).expand_created_from is not None
+    with pytest.raises(ValidationError) as error:
+        HistoryConfigurationRequest.model_validate({**baseline, **patch})
+    assert any(reason in issue["msg"] for issue in error.value.errors()), error.value.errors()
 
 
 @pytest.mark.parametrize("field,value", [("installation_id", True), ("actor", "forged")])

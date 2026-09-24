@@ -62,6 +62,52 @@ The cursor is a value, not write authority. Durable integration must additionall
 check current authorization, configuration/dataset generation, lease and CAS
 revision after the database lock. Pause or erasure invalidates old writers.
 
+### Explicit Earlier-Bound Expansion
+
+An administrator may explicitly move the configured lower bound to an earlier
+whole UTC second. This is an existing-dataset configuration command, not a
+provider-discovered creation date or an implicit effect of ordinary rescan.
+It requires the exact current configuration revision, a new operation ID, the
+same authorization and audit transaction, and a bound strictly earlier than
+the current backfill cursor's `created_from`. Moving the bound forward or
+reusing the operation ID for different bytes is rejected. Expansion and the
+ordinary rescan flag are mutually exclusive; expansion itself starts a new
+backfill cycle from the earlier bound through the current database time. The
+submitted selection, enablement, retention and quotas must equal the current
+configuration; changing them is a separate operation with its own revision.
+
+Expansion requires `checkpoint.pending = null` under the same SQL lock.
+Otherwise it returns an explicit `pending_work` conflict and commits no audit,
+configuration or scan effect. A pending page can contain multiple discovered
+runs that expansion must not discard. Existing rescan and selector-change
+semantics are unchanged in this batch; their recovery guarantees remain an
+independent qualification concern. A leased worker with no committed pending
+page is fenced by the incremented scan/configuration revision at terminal CAS.
+
+The existing dataset generation, accumulated statistics, first-import clocks,
+stored configuration and recent-discovery frontier remain unchanged. A
+separately governed default retention policy may still change independently;
+the expansion does not freeze it. Configuration and scan revisions advance
+atomically, fencing old claims; replay of an
+acknowledged operation remains a historical receipt, not new activation.
+Fresh success requires the atomically written backfill scan to start at the
+requested earlier bound; the mutation response names the dataset revision,
+while the subsequent coherent status read exposes the scan bound. It does not
+claim a provider snapshot or successful traversal.
+For a still-active or paused dataset, replay also checks that its current lower
+bound has not moved forward beyond the admitted expansion. Commands without
+expansion retain their previous canonical digest bytes: omitted and explicit
+`null` both mean no expansion and the new field is omitted on serialization.
+The existing timestamp admission also rejects invalid calendar dates and
+fractional seconds for the new bound. Duplicate provider
+observations remain one contribution. An uncertain write is retried only with
+the identical command; a known rejection permits a fresh read and new command.
+A new cycle
+may reread already covered history: this is an explicit, potentially costly
+administrative action, not ordinary maintenance. A future targeted older-only
+segment would require additional persistent population state and must first
+show a measured benefit that justifies that new authority.
+
 ## Attempt Population
 
 The run listing exposes a current attempt number, not all past attempts.

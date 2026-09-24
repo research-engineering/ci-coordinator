@@ -3,6 +3,7 @@ from datetime import timedelta
 
 import pytest
 
+from ci_coordinator.ci_economics.discovery import ProviderObservationPage, ProviderRunDiscoveryPage
 from ci_coordinator.ci_economics.history_configuration import (
     HistoryConfiguration,
     HistoryDatasetState,
@@ -10,6 +11,8 @@ from ci_coordinator.ci_economics.history_configuration import (
 )
 from ci_coordinator.ci_economics.history_lifecycle import configure_history_state
 from ci_coordinator.ci_economics.history_scan import acquire_history_claim
+from ci_coordinator.ci_economics.model import AttemptIdentity
+from ci_coordinator.ci_economics.sources import ProviderRunCollectionSource
 from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.kernel.canonical_json import MAX_SAFE_JSON_INTEGER
 from ci_economics.archive_factories import ARCHIVE_TIME, history_dataset, history_scan
@@ -105,6 +108,89 @@ def test_explicit_rescan_or_selector_change_restarts_without_erasing_statistics(
     assert scan.checkpoint.cursor.page_number == 1
     assert scan.pages_seen == scan.attempts_seen == 0
     assert scan.checkpoint.pending is None and scan.lease is None
+
+
+def test_earlier_bound_expansion_preserves_statistics_and_restarts_backfill() -> None:
+    dataset = replace(
+        history_dataset(), usage=HistoryUsage(attempts=2, jobs=5, gaps=0, canonicalBytes=500)
+    )
+    original = history_scan(dataset)
+    earlier = original.checkpoint.cursor.created_from - timedelta(days=30)
+    now = ARCHIVE_TIME + timedelta(days=2)
+
+    successor, scan = configure_history_state(
+        dataset.scope,
+        dataset.configuration,
+        prior=dataset,
+        scan=original,
+        now=now,
+        expand_created_from=earlier,
+    )
+
+    assert successor.configuration == dataset.configuration
+    assert successor.generation == dataset.generation
+    assert successor.data_revision == dataset.data_revision
+    assert successor.usage == dataset.usage
+    assert successor.configuration_revision == dataset.configuration_revision + 1
+    assert scan.revision == original.revision + 1 and scan.lease is None
+    assert scan.checkpoint.cursor.created_from == earlier
+    assert scan.checkpoint.cursor.created_through == now
+
+
+@pytest.mark.parametrize("violation", ["equal", "later", "configuration", "rescan"])
+def test_expansion_rejects_non_extension_or_compound_configuration(violation: str) -> None:
+    dataset = history_dataset()
+    original = history_scan(dataset)
+    lower = original.checkpoint.cursor.created_from
+    configuration = (
+        HistoryConfiguration.model_validate(
+            {**dataset.configuration.model_dump(), "enabled": False}
+        )
+        if violation == "configuration"
+        else dataset.configuration
+    )
+    expanded = lower + timedelta(days=1) if violation == "later" else lower
+    if violation in {"configuration", "rescan"}:
+        expanded -= timedelta(days=1)
+
+    with pytest.raises(ValueError, match="earlier bound and unchanged policy"):
+        configure_history_state(
+            dataset.scope,
+            configuration,
+            prior=dataset,
+            scan=original,
+            now=ARCHIVE_TIME + timedelta(days=2),
+            expand_created_from=expanded,
+            rescan=violation == "rescan",
+        )
+
+
+def test_expansion_cannot_discard_a_committed_pending_page() -> None:
+    dataset = history_dataset()
+    original = history_scan(dataset)
+    cursor = original.checkpoint.cursor
+    source = ProviderRunCollectionSource(
+        AttemptIdentity(dataset.scope, 303, 1, "a" * 40),
+        cursor.created_from,
+        "2022-11-28",
+        "b" * 64,
+    )
+    observed = ProviderObservationPage(
+        ProviderRunDiscoveryPage(dataset.scope, cursor.window, 1, 1, (source,), "exhausted"),
+        (404,),
+    )
+    checkpoint, gap = original.checkpoint.accept_page(observed)
+    assert gap is None and checkpoint.pending is not None
+    pending = replace(original, checkpoint=checkpoint)
+    with pytest.raises(ValueError, match="pending attempt work"):
+        configure_history_state(
+            dataset.scope,
+            dataset.configuration,
+            prior=dataset,
+            scan=pending,
+            now=ARCHIVE_TIME + timedelta(days=2),
+            expand_created_from=cursor.created_from - timedelta(days=1),
+        )
 
 
 @pytest.mark.parametrize("field", ["scope", "generation", "configuration_revision"])

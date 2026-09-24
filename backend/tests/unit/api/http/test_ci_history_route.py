@@ -71,7 +71,14 @@ def test_mutation_uses_only_authenticated_actor_and_projects_exact_receipt(repla
 
 
 @pytest.mark.parametrize(
-    "reason", ["revision_conflict", "operation_conflict", "capacity_reached", "dataset_fenced"]
+    "reason",
+    [
+        "revision_conflict",
+        "operation_conflict",
+        "capacity_reached",
+        "dataset_fenced",
+        "pending_work",
+    ],
 )
 def test_conflicts_cannot_masquerade_as_successful_snapshots(
     reason: Literal[
@@ -84,6 +91,26 @@ def test_conflicts_cannot_masquerade_as_successful_snapshots(
         response = client.post(HISTORY_CONFIGURATION_PATH, json=_BODY)
     assert response.status_code == 409
     assert response.json()["outcome"] == reason and response.json()["snapshot"] is None
+
+
+def test_explicit_earlier_bound_is_actor_bound_and_pending_work_is_a_conflict() -> None:
+    body = {
+        **_BODY,
+        "expectedRevision": 1,
+        "initialCreatedFrom": None,
+        "expandCreatedFrom": "2019-01-01T00:00:00Z",
+        "operationId": "expand-history",
+    }
+    use_case = AsyncMock(spec=CiHistoryAdministrationUseCase)
+    use_case.configure.return_value = HistoryConfigurationConflict("pending_work")
+
+    with TestClient(_app(use_case)) as client:
+        response = client.post(HISTORY_CONFIGURATION_PATH, json=body)
+
+    assert response.status_code == 409 and response.json()["outcome"] == "pending_work"
+    use_case.configure.assert_awaited_once_with(
+        ConfigureHistory.model_validate({**body, "actor": human_principal().actor_id})
+    )
 
 
 def test_impossible_population_is_a_typed_rejection_not_a_transport_failure() -> None:

@@ -22,6 +22,7 @@ from ci_coordinator.ci_economics.history_configuration import (
 from ci_coordinator.ci_economics.history_lifecycle import configure_history_state
 from ci_coordinator.ci_economics.history_payload import HistoryDatasetPayload
 from ci_coordinator.ci_economics.history_recent import configure_recent_history
+from ci_coordinator.ci_economics.history_scan import HistoryScanState
 from ci_coordinator.persistence._schema_ci_history_control import (
     ci_history_datasets,
     ci_history_defaults,
@@ -83,7 +84,7 @@ async def configure_history(
             raise ValueError("history receipt has foreign scope")
         if payload["commandDigest"] != command.command_digest:
             return HistoryConfigurationConflict("operation_conflict")
-        _validate_receipt(command, snapshot, prior)
+        _validate_receipt(command, snapshot, prior, scan)
         if existing.actor != command.actor:
             raise ValueError("history receipt actor disagrees with its command")
         return HistoryConfigured(snapshot, replayed=True)
@@ -109,8 +110,22 @@ async def configure_history(
         if command.initial_created_from is None
         else datetime.fromisoformat(command.initial_created_from)
     )
+    expanded_bound = (
+        None
+        if command.expand_created_from is None
+        else datetime.fromisoformat(command.expand_created_from)
+    )
     if lower_bound is not None and lower_bound > now.replace(microsecond=0):
         return HistoryConfigurationInvalid()
+    if expanded_bound is not None and (
+        prior is None
+        or scan is None
+        or expanded_bound >= scan.checkpoint.cursor.created_from
+        or command.configuration != prior.configuration
+    ):
+        return HistoryConfigurationInvalid()
+    if expanded_bound is not None and scan is not None and scan.checkpoint.pending is not None:
+        return HistoryConfigurationConflict("pending_work")
     successor, successor_scan = configure_history_state(
         scope,
         command.configuration,
@@ -118,8 +133,14 @@ async def configure_history(
         scan=scan,
         now=now,
         initial_created_from=lower_bound,
+        expand_created_from=expanded_bound,
         rescan=command.rescan,
     )
+    if (
+        expanded_bound is not None
+        and successor_scan.checkpoint.cursor.created_from != expanded_bound
+    ):
+        raise ValueError("history expansion did not persist its requested lower bound")
     successor_recent = configure_recent_history(successor, successor_scan, prior=recent)
     if (
         prior is not None
@@ -174,7 +195,10 @@ async def configure_history(
 
 
 def _validate_receipt(
-    command: ConfigureHistory, snapshot: HistoryDataset, current: HistoryDataset | None
+    command: ConfigureHistory,
+    snapshot: HistoryDataset,
+    current: HistoryDataset | None,
+    scan: HistoryScanState | None,
 ) -> None:
     if (
         snapshot.configuration_revision != command.expected_revision + 1
@@ -194,3 +218,13 @@ def _validate_receipt(
         raise ValueError("history receipt conflicts with the current configuration")
     if current.data_revision == snapshot.data_revision and current.usage != snapshot.usage:
         raise ValueError("history receipt conflicts with current data accounting")
+    if (
+        command.expand_created_from is not None
+        and current.state in {"active", "paused"}
+        and (
+            scan is None
+            or scan.checkpoint.cursor.created_from
+            > datetime.fromisoformat(command.expand_created_from)
+        )
+    ):
+        raise ValueError("history expansion receipt exceeds the current population bound")

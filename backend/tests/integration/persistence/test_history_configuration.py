@@ -1,6 +1,8 @@
 import asyncio
+from datetime import timedelta
 
 import pytest
+from ci_economics.archive_factories import ARCHIVE_TIME, archived_statistics
 from sqlalchemy import event, func, select
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -11,6 +13,7 @@ from ci_coordinator.ci_economics.history_commands import (
     HistoryConfigured,
 )
 from ci_coordinator.ci_economics.ports import CiEconomicsStoreUnavailable
+from ci_coordinator.persistence._schema_ci_history_archive import ci_history_attempts
 from ci_coordinator.persistence._schema_ci_history_control import (
     ci_history_datasets,
     ci_history_scans,
@@ -22,7 +25,7 @@ from ci_coordinator.persistence.ci_history_state_store import (
 from ci_coordinator.persistence.connection import create_postgres_engine
 from ci_coordinator.persistence.schema import audit_events
 
-from ._history_support import history_command, history_store
+from ._history_support import history_command, history_page, history_store
 
 pytestmark = pytest.mark.persistence
 
@@ -100,6 +103,91 @@ def test_configuration_replay_cannot_rewind_a_pause_or_restore_the_old_claim(
                 assert (
                     await connection.scalar(select(func.count()).select_from(ci_history_scans)) == 2
                 )
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_expansion_waits_for_pending_work_and_preserves_existing_contributions(
+    runtime_postgres_database_url: str,
+) -> None:
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        store = history_store(engine)
+        initial = history_command()
+        earlier = ARCHIVE_TIME - timedelta(days=30)
+        expansion = ConfigureHistory.model_validate(
+            {
+                **initial.model_dump(),
+                "expectedRevision": 1,
+                "initialCreatedFrom": None,
+                "expandCreatedFrom": earlier.isoformat(),
+                "operationId": "expand-history",
+            }
+        )
+        try:
+            assert isinstance(await store.configure_history(initial), HistoryConfigured)
+            assert (
+                await store.configure_history(
+                    ConfigureHistory.model_validate(
+                        {
+                            **expansion.model_dump(),
+                            "expandCreatedFrom": ARCHIVE_TIME.isoformat(),
+                            "operationId": "non-earlier-history",
+                        }
+                    )
+                )
+                == HistoryConfigurationInvalid()
+            )
+            page = await store.claim_history(worker_id="a" * 64)
+            assert page is not None
+            assert await store.record_history_page(page[1], history_page(page[1])) == "applied"
+            assert await store.configure_history(expansion) == HistoryConfigurationConflict(
+                "pending_work"
+            )
+            async with engine.connect() as connection:
+                scan = await load_history_scan(connection, initial.scope)
+                assert scan is not None and scan.checkpoint.pending is not None
+                assert await connection.scalar(select(func.count()).select_from(audit_events)) == 1
+
+            attempt = await store.claim_history(worker_id="a" * 64)
+            assert attempt is not None
+            assert (
+                await store.record_history_statistics(attempt[1], archived_statistics())
+                == "applied"
+            )
+            old_claim = await store.claim_history(worker_id="a" * 64)
+            assert old_claim is not None
+            async with engine.connect() as connection:
+                recent_before = await load_history_scan(connection, initial.scope, lane="discovery")
+                first_import = await connection.scalar(
+                    select(ci_history_attempts.c.first_imported_at)
+                )
+                assert recent_before is not None and first_import is not None
+            committed = await store.configure_history(expansion)
+            assert isinstance(committed, HistoryConfigured) and not committed.replayed
+            assert committed.snapshot.configuration_revision == 2
+            assert committed.snapshot.usage.attempts == 1
+            assert await store.defer_history(old_claim[1], "provider_unavailable") == "claim_lost"
+            assert await store.configure_history(expansion) == HistoryConfigured(
+                committed.snapshot, replayed=True
+            )
+            async with engine.connect() as connection:
+                dataset = await load_history_dataset(connection, initial.scope)
+                scan = await load_history_scan(connection, initial.scope)
+                recent_after = await load_history_scan(connection, initial.scope, lane="discovery")
+                assert dataset == committed.snapshot
+                assert scan is not None and scan.checkpoint.cursor.created_from == earlier
+                assert scan.checkpoint.pending is None and scan.lease is None
+                assert recent_after is not None
+                assert recent_after.checkpoint == recent_before.checkpoint
+                assert recent_after.recent == recent_before.recent
+                assert (
+                    await connection.scalar(select(ci_history_attempts.c.first_imported_at))
+                    == first_import
+                )
+                assert await connection.scalar(select(func.count()).select_from(audit_events)) == 2
         finally:
             await engine.dispose()
 

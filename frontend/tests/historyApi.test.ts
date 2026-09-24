@@ -34,6 +34,23 @@ test("reads and writes use exact routes, no-store, session credentials and CSRF"
   ).toBe(true);
 });
 
+test("an earlier-bound command remains exact across the API transport", async () => {
+  const command = {
+    ...historyCommand(),
+    expectedRevision: 1,
+    initialCreatedFrom: null,
+    expandCreatedFrom: "2019-12-01T00:00:00Z",
+  };
+  const fetch = vi.fn(async (_request: Request) => Response.json(historyMutation(command)));
+  vi.stubGlobal("fetch", fetch);
+
+  expect((await configureHistory(command, csrf)).kind).toBe("ready");
+  const request = fetch.mock.calls[0]?.[0];
+  const body: unknown = await request?.json();
+  expect(body).toEqual(command);
+  expect(body).not.toHaveProperty("actor");
+});
+
 test("binds unequal nondefault IDs through the actual GET path, POST body and response", async () => {
   const command = { ...historyCommand(), ...UNEQUAL_SCOPE };
   const status = historyStatus({ ...historyDataset(), ...UNEQUAL_SCOPE });
@@ -82,6 +99,7 @@ test.each([
   "operation_conflict",
   "capacity_reached",
   "dataset_fenced",
+  "pending_work",
   "invalid_population",
 ])("preserves known rejection %s without false success", async (outcome) => {
   const value = { ...historyMutation(), outcome, snapshot: null };
