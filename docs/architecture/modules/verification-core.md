@@ -45,8 +45,9 @@ not.
 Fallback and post-advice construction use verifier-owned witness closure,
 not planner builders. `VerifiedPlan` independently requires a complete catalog
 partition and exact catalog witness closure; a triggered fallback selects every
-obligation at least at its full depth. Advice may strengthen that depth within
-catalog support. A structurally consistent but partial planner fallback cannot
+obligation at least at its full depth. The value model permits conservative
+stronger coverage within witness support; this does not grant advice authority
+above the separate obligation `full_depth` cap. A partial planner fallback cannot
 become a verified fallback. Canonical plan value types and hashing remain shared;
 this is mechanism independence, not isolation of Python package loading.
 

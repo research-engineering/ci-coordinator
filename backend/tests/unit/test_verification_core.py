@@ -311,7 +311,7 @@ def test_verified_model_rejects_structurally_valid_but_inadequate_full_ci(incomp
         )
 
 
-def test_advice_can_strengthen_a_full_ci_plan_beyond_full_depth() -> None:
+def test_advice_cannot_exceed_the_obligation_full_depth_cap() -> None:
     input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
     policy = replace(
         make_policy_value(),
@@ -333,7 +333,39 @@ def test_advice_can_strengthen_a_full_ci_plan_beyond_full_depth() -> None:
 
     assert verified.fallback == candidate.fallback
     assert verified.agent_advice is not None
-    assert verified.agent_advice.accepted is True
+    assert verified.agent_advice.accepted is False
+    assert verified.agent_advice.reasons == ("agent_advice_depth_unsupported",)
+    assert verified.selected_obligations == candidate.selected_obligations
+    assert verified.selected_witnesses == candidate.selected_witnesses
+
+
+def test_verified_model_preserves_stronger_full_ci_without_granting_advice_authority() -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = make_policy_value()
+    candidate = full_ci_fallback_plan(input, policy, "provider_unavailable")
+    selected = tuple(
+        replace(item, depth="exhaustive") if item.obligation_id == "required-baseline" else item
+        for item in candidate.selected_obligations
+    )
+    witnesses = tuple(
+        replace(item, depth="exhaustive") if item.witness_id == "baseline-witness" else item
+        for item in candidate.selected_witnesses
+    )
+
+    verified = make_verified_plan(
+        source_plan=candidate,
+        catalog=policy.catalog,
+        selected_obligations=selected,
+        selected_witnesses=witnesses,
+        omitted_obligations=(),
+        fallback=candidate.fallback,
+        deterministic_evidence=candidate.evidence,
+        verification_evidence=(),
+        agent_advice=None,
+    )
+
+    assert verified.agent_advice is None
+    assert verified.fallback == candidate.fallback
     assert verified.selected_obligations[-1].depth == "exhaustive"
     assert (
         next(

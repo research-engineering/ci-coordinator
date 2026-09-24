@@ -75,7 +75,8 @@ UTF-16 canonically ordered.
 ## 5. Allowed Effects
 
 - select a known omitted obligation at its policy-defined default depth;
-- increase a known obligation to a supported depth;
+- increase a known obligation to a witness-supported depth no greater than its
+  policy-owned `full_depth`;
 - attach a bounded risk finding to a known obligation, thereby selecting it;
 - recommend FullCI.
 
