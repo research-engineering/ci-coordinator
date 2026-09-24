@@ -216,6 +216,10 @@ existing coverage floor. Revisit only if the pinned library changes this API.
    exact plan and matrix-risk admission; renew the content-addressed execution
    and witness digests for every changed owner. Run scoped test witnesses and
    the hosted Dev Container on the new exact SHA.
+   Regenerate self-CI from its source owners, then refresh the canonical and
+   packaged `generated.documents` fingerprint and run the entrypoint
+   disposition witness; the generator check alone does not close that
+   downstream classification.
 4. Measure actual portable elapsed time and revisit the bound if the failure
    repeats or its headroom remains too narrow. A passed rerun of the old SHA
    is diagnostic, not a substitute for the repaired contract.
