@@ -406,13 +406,12 @@ def test_expansion_copy_rolls_back_and_allows_exact_retry(
             assert isinstance(admin.pool, AsyncAdaptedQueuePool)
             assert admin.pool.checkedout() == 0
             async with admin.connect() as connection:
-                header = (
-                    await connection.execute(
-                        select(ci_workflow_attempt_snapshots).where(
-                            ci_workflow_attempt_snapshots.c.subject_id == source.source_id
-                        )
+                result = await connection.execute(
+                    select(ci_workflow_attempt_snapshots).where(
+                        ci_workflow_attempt_snapshots.c.subject_id == source.source_id
                     )
-                ).mappings().one()
+                )
+                header = result.mappings().one()
                 assert header["job_count"] == 1
                 assert header["snapshot_digest"] == evidence.snapshot_digest
                 assert (
