@@ -326,7 +326,11 @@ def test_sql_endpoint_is_bound_to_the_owned_internal_bridge(defect: str) -> None
             database_host(output, project="fixture", container=container)
 
 
-@pytest.mark.parametrize("data", [b"", b"safe canary-value output", b"x" * (4 * 1024 * 1024 + 1)])
+@pytest.mark.parametrize(
+    "data",
+    [b"", b"safe canary-value output", b"x" * (4 * 1024 * 1024 + 1)],
+    ids=["empty", "disclosure", "overflow"],
+)
 def test_log_oracle_rejects_absence_disclosure_and_overflow(data: bytes) -> None:
     with pytest.raises(WitnessFailure):
         admit_logs(data, (b"canary-value",))

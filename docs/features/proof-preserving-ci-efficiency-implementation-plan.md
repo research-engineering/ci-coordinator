@@ -30,6 +30,15 @@ runner in an isolated project. Preserve long native parameter IDs without
 truncation or an arbitrary per-ID ceiling; the complete artifact retains its
 32 MiB bound. A long-ID plugin witness must preserve every phase and identity.
 
+The first public same-head serial attempt (run `35932427988`) completed its
+test loop but could not write the native report: an incidental parameter ID
+for a 4 MiB + 1 log-overflow payload occupied 4,194,405 bytes and was repeated
+across collection and phase records. Keep the payload and oracle unchanged;
+give that test's three parameter cases explicit short IDs at collection. This
+is not truncation by the report writer. Recollect and qualify the changed source
+on a fresh exact run before claiming serial/shard parity; do not reuse the
+failed run's receipts.
+
 Freeze source SHA, run/attempt, dependency/toolchain identities, all nodes and
 the single assignment in a bounded JSON artifact. Each shard verifies the same
 plan before execution. Coverage/data artifacts must use non-executable formats,
