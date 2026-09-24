@@ -136,6 +136,16 @@ without changing the payload or oracle; the 32 MiB artifact bound remains.
 CI-001 and CI-006 still require a successful fresh same-head serial comparison
 and measured costs after that source change.
 
+The subsequent exact-master [run 35940367926](https://github.com/research-engineering/ci-coordinator/actions/runs/35940367926)
+showed that short IDs fixed collection size but did not qualify the optional
+serial route: the process timed out after 2400 seconds at 83% of the same
+12,603-node universe. All eleven ordinary shards and aggregate coverage passed;
+their shard-session time totalled 2819.67 seconds and test phases totalled
+2733.90 seconds. A separately bounded
+serial-budget revision and fresh exact-head comparison are required. This is
+not evidence that any missing serial tests passed or that PR-gate coverage was
+weakened.
+
 ### B2: Durable Observation And Recovery
 
 State: open; existing storage and worker slices require current qualification, not blind reimplementation.

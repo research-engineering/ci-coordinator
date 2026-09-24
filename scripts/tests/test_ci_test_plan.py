@@ -443,6 +443,11 @@ def test_native_runner_preserves_backend_execution_and_config_import_paths(
 def test_workflow_matrix_and_required_join_match_the_partition_exactly() -> None:
     root = Path(__file__).resolve().parents[2]
     jobs = YAML(typ="safe").load(root / ".github/workflows/python-persistence.yml")["jobs"]
+    serial = jobs["serial-qualification"]
+    assert serial["timeout-minutes"] == 75
+    assert serial["if"] == (
+        "${{ github.event_name == 'workflow_dispatch' && inputs.serial_qualification }}"
+    )
     assert sorted(jobs["native-test-shards"]["strategy"]["matrix"]["shard"]) == [
         item.shard for item in _plan().assignments
     ]
