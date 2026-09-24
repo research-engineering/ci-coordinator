@@ -243,7 +243,7 @@ environment-specific costs or uncertain reuse must have explicit retained
 dispositions and revision triggers. Independent Full Check and fallback stay
 available before later self-optimization under ROADMAP D2/D4/D9 and E2/E3.
 
-## Dev Container Full-Test Budget Follow-up
+## Historical Portable-Cap Adjustment
 
 The [PR #10 Full Check attempt](https://github.com/research-engineering/ci-coordinator/actions/runs/35995918521)
 ran the complete portable `python.test` selection in the least-privilege Dev
@@ -252,14 +252,14 @@ ordinary native shards passed. The timeout is a failed test obligation, not a
 green result or evidence that the remaining tests would pass. One same-head
 failed-job rerun is diagnostic; a lucky pass does not supply headroom.
 
-Preserve the exact collected portable population and raise only this process
-ceiling to 1,080 seconds. Its command envelope is 1,140 seconds including the
-existing 60-second wrapper reserve. The portable parent is 1,380 seconds,
-including its existing 240-second aggregate reserve. Provision 600, Node
-proof 60, portable parent 1,380 and cleanup 120 yield the finite 2,160-second
-Dev Container stage budget, below its unchanged 40-minute job ceiling. The
-branch aggregate and global command cap must be recomputed from their exact
-child set. The ordinary native shard keeps its separately owned 900-second
+That repair preserved the collected portable population and raised only its
+process ceiling to 1,080 seconds. Its command envelope became 1,140 seconds
+including the 60-second wrapper reserve, and the portable parent 1,380 seconds.
+The original four-term subtotal of provisioning, Node proof, portable proof
+and cleanup was 2,160 seconds; it omitted provider inspections and therefore
+did not prove the complete sequential envelope. The shared-deadline design
+below supersedes that arithmetic while retaining the same command ceiling.
+The ordinary native shard keeps its separately owned 900-second
 process deadline below its 960-second workflow watchdog; it must not import
 the portable budget. Coverage floors, selected-test population,
 mutation oracles and test behavior are unchanged. Revisit the bound after
@@ -268,3 +268,37 @@ budget repair alone does not reduce CI cost.
 
 Coverage combination uses the existing [coverage.py command](https://coverage.readthedocs.io/en/latest/commands/cmd_combine.html),
 not a hand-written merger of coverage percentages.
+
+## Dev Container Lifecycle And Shared Deadline
+
+The preceding timeout follow-up recorded individual caps, not a complete
+sequential duration bound. Its four-term sum omitted provider inspections and
+network disconnections. The quality-plan wrapper owns 2,160 seconds; the direct
+GitHub job owns 40 minutes and does not itself invoke that wrapper. Neither
+route promises every child its entire individual cap.
+
+Use one monotonic work deadline of 1,920 seconds, including source admission,
+provisioning, inspections and the portable proof. Every provider/Git call is
+capped by its remaining phase time. Reserve a separate, non-renewing 120 seconds
+for cleanup discovery and removal together, then 60 seconds for final source
+checks and 60 seconds for outer-wrapper termination/reporting. The existing
+2,160-second command ceiling remains unchanged. The portable 1,380-second cap
+is an aggregate limit for the sequential portable commands, not the sum of
+their individual allowances; work already spent can further shorten it.
+No finite in-process design guarantees cleanup after SIGKILL, host/daemon loss
+or a provider job cancellation which exhausts its own grace period.
+
+Attempt scope-checked cleanup on ordinary exceptions and cooperative
+interruption. Preserve the primary exception and attach a secondary cleanup
+failure rather than replacing cancellation. A cleanup interruption without a
+primary failure remains the failure. Lock contention fails before resource
+creation through the existing nonblocking private-lock primitive.
+Retain bounded captured output for timeout and other executor failures with
+the primary cause and both channels identified. Do not widen captured-byte
+limits or claim that a diagnostic substitutes for a passed witness.
+
+This is preferable to summing and increasing all caps: it enforces the existing
+aggregate envelope, covers variable network cardinality without another
+scheduler, and preserves every proof command. Revisit only if measured work
+cannot fit the aggregate or native interruption tests show incomplete process
+or provider cleanup. The source-equivalence and ownership checks remain required.

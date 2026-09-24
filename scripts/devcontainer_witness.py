@@ -7,15 +7,17 @@ import sys
 import tempfile
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from time import monotonic
+from traceback import format_exception_only
 from typing import Final, Protocol
 
 from scripts.bounded_process import CommandResult, ResidualProcessGroupPolicy, spawn
 from scripts.dev_environment.identity import derive_instance_identity
 from scripts.dev_environment.private_files import (
+    bounded_private_lock,
     ensure_private_directory,
-    exclusive_private_lock,
 )
 from scripts.python_witness import PYTHON_TEST_PROCESS_TIMEOUT_SECONDS
 from scripts.quality_plan import load_quality_plan
@@ -36,6 +38,11 @@ _PORTABLE_PROOF_AGGREGATE_RESERVE_SECONDS: Final = 240
 _PROVIDER_OPERATION_TIMEOUT_SECONDS: Final = 30
 _INSTALLED_NODE_PROOF_TIMEOUT_SECONDS: Final = 60
 _CLEANUP_TIMEOUT_SECONDS: Final = 120
+_EXECUTION_TIMEOUT_SECONDS: Final = 1_920
+_SOURCE_FINALIZATION_SECONDS: Final = 60
+_OUTER_WRAPPER_RESERVE_SECONDS: Final = 60
+_PROCESS_DRAIN_RESERVE_SECONDS: Final = 5
+_DIAGNOSTIC_TAIL_CHARACTERS: Final = 8_192
 _DEVCONTAINER_COMMAND: Final = (
     "node",
     "node_modules/@devcontainers/cli/devcontainer.js",
@@ -52,12 +59,35 @@ class Runner(Protocol):
     ) -> CommandResult: ...
 
 
+class _DeadlineRunner:
+    def __init__(self, runner: Runner, deadline: float) -> None:
+        self.runner = runner
+        self.deadline = deadline
+
+    def __call__(self, argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+        remaining = self.deadline - monotonic() - _PROCESS_DRAIN_RESERVE_SECONDS
+        if remaining <= 0:
+            raise RuntimeError("Dev Container phase deadline exhausted")
+        result = self.runner(argv, timeout_seconds=min(timeout_seconds, remaining))
+        if result.error is None and result.status == 0 and monotonic() >= self.deadline:
+            return replace(
+                result,
+                status=None,
+                error="Dev Container operation completed after its phase deadline",
+                failure_kind="timeout",
+            )
+        return result
+
+
 def verify_devcontainer(
     *,
     runner: Runner | None = None,
     witness_id: str | None = None,
     workspace_root: Path = REPO_ROOT,
+    execution_deadline: float | None = None,
 ) -> None:
+    if execution_deadline is None:
+        execution_deadline = monotonic() + _EXECUTION_TIMEOUT_SECONDS
     workspace = workspace_root.resolve(strict=True)
     _admit_portable_proof_deadlines(workspace)
     container_workspace = Path("/workspaces") / workspace.name
@@ -67,10 +97,11 @@ def verify_devcontainer(
     if re.fullmatch(r"[a-z0-9-]{1,80}", identity) is None:
         raise ValueError("Dev Container witness identity is invalid")
     label = f"{_WITNESS_LABEL}={identity}"
-    execute = _run if runner is None else runner
+    raw_runner = _run if runner is None else runner
+    execute = _DeadlineRunner(raw_runner, execution_deadline)
 
     container_id: str | None = None
-    primary_error: RuntimeError | None = None
+    primary_error: BaseException | None = None
     try:
         _checked(
             execute(
@@ -142,16 +173,20 @@ def verify_devcontainer(
             ),
             "Dev Container portable proof",
         )
-    except RuntimeError as error:
+    except BaseException as error:
         primary_error = error
-
-    cleanup_error = _cleanup(label, container_id, execute)
-    if primary_error is not None and cleanup_error is not None:
-        raise RuntimeError(f"{primary_error}; {cleanup_error}") from primary_error
-    if primary_error is not None:
-        raise primary_error
-    if cleanup_error is not None:
-        raise cleanup_error
+        raise
+    finally:
+        cleanup_deadline = min(
+            monotonic() + _CLEANUP_TIMEOUT_SECONDS,
+            execution_deadline + _CLEANUP_TIMEOUT_SECONDS,
+        )
+        try:
+            _cleanup(label, container_id, _DeadlineRunner(raw_runner, cleanup_deadline))
+        except BaseException as cleanup_error:
+            if primary_error is None:
+                raise
+            primary_error.add_note(f"Dev Container cleanup also failed: {cleanup_error}")
 
 
 def _admit_portable_proof_deadlines(workspace: Path) -> None:
@@ -172,29 +207,33 @@ def _admit_portable_proof_deadlines(workspace: Path) -> None:
         raise RuntimeError("portable proof does not preserve its aggregate deadline reserve")
     container_command = plan.commands.get("devcontainer.verify")
     stage_budget_ms = (
-        _PROVISION_TIMEOUT_SECONDS
-        + _INSTALLED_NODE_PROOF_TIMEOUT_SECONDS
-        + _PORTABLE_PROOF_TIMEOUT_SECONDS
+        _EXECUTION_TIMEOUT_SECONDS
         + _CLEANUP_TIMEOUT_SECONDS
+        + _SOURCE_FINALIZATION_SECONDS
+        + _OUTER_WRAPPER_RESERVE_SECONDS
     ) * 1_000
     if container_command is None or container_command.timeout_ms < stage_budget_ms:
         raise RuntimeError("Dev Container command does not preserve its stage deadline budget")
 
 
 @contextmanager
-def admitted_devcontainer_source(repo_root: Path) -> Iterator[Path]:
+def admitted_devcontainer_source(
+    repo_root: Path, *, execution_deadline: float | None = None
+) -> Iterator[Path]:
+    if execution_deadline is None:
+        execution_deadline = monotonic() + _EXECUTION_TIMEOUT_SECONDS
     source = repo_root.resolve(strict=True)
     git_marker = source / ".git"
     if git_marker.is_symlink() or not (git_marker.is_dir() or git_marker.is_file()):
         raise RuntimeError("Dev Container source Git metadata is invalid")
 
-    head = _git_stdout(source, ("rev-parse", "HEAD"), "source revision")
+    head = _git_stdout(source, ("rev-parse", "HEAD"), "source revision", execution_deadline)
     if _COMMIT_SHA.fullmatch(head) is None:
         raise RuntimeError("Dev Container source revision is invalid")
-    _require_clean_source(source)
+    _require_clean_source(source, execution_deadline)
     if git_marker.is_dir():
         yield source
-        _require_source_receipt(source, head)
+        _require_source_receipt(source, head, _finalization_deadline(execution_deadline))
         return
 
     with tempfile.TemporaryDirectory(prefix="ci-devcontainer-source-") as temporary:
@@ -211,6 +250,7 @@ def admitted_devcontainer_source(repo_root: Path) -> Iterator[Path]:
                     str(source),
                     str(workspace),
                 ),
+                execution_deadline,
             ),
             "Dev Container standalone source clone",
         )
@@ -218,6 +258,7 @@ def admitted_devcontainer_source(repo_root: Path) -> Iterator[Path]:
             _git(
                 workspace,
                 ("checkout", "--detach", "--quiet", head),
+                execution_deadline,
             ),
             "Dev Container standalone source checkout",
         )
@@ -226,35 +267,40 @@ def admitted_devcontainer_source(repo_root: Path) -> Iterator[Path]:
             not cloned_git.is_dir()
             or cloned_git.is_symlink()
             or (cloned_git / "objects/info/alternates").exists()
-            or _git_stdout(workspace, ("rev-parse", "HEAD"), "cloned revision") != head
+            or _git_stdout(workspace, ("rev-parse", "HEAD"), "cloned revision", execution_deadline)
+            != head
         ):
             raise RuntimeError("Dev Container standalone source identity is invalid")
-        _require_clean_source(workspace)
+        _require_clean_source(workspace, execution_deadline)
         yield workspace
-        _require_source_receipt(workspace, head)
-        _require_source_receipt(source, head)
+        deadline = _finalization_deadline(execution_deadline)
+        _require_source_receipt(workspace, head, deadline)
+        _require_source_receipt(source, head, deadline)
+
+
+def _finalization_deadline(execution_deadline: float) -> float:
+    return min(
+        monotonic() + _SOURCE_FINALIZATION_SECONDS,
+        execution_deadline + _CLEANUP_TIMEOUT_SECONDS + _SOURCE_FINALIZATION_SECONDS,
+    )
 
 
 def _cleanup(
     label: str,
     expected_container_id: str | None,
     runner: Runner,
-) -> RuntimeError | None:
-    try:
-        container_ids = _owned_containers(label, runner, operation="cleanup discovery")
-        if expected_container_id is not None and container_ids != (expected_container_id,):
-            raise RuntimeError("Dev Container identity changed before cleanup")
-        if container_ids:
-            _checked(
-                runner(
-                    ("docker", "rm", "--force", *container_ids),
-                    timeout_seconds=_CLEANUP_TIMEOUT_SECONDS,
-                ),
-                "Dev Container cleanup",
-            )
-    except RuntimeError as error:
-        return error
-    return None
+) -> None:
+    container_ids = _owned_containers(label, runner, operation="cleanup discovery")
+    if expected_container_id is not None and container_ids != (expected_container_id,):
+        raise RuntimeError("Dev Container identity changed before cleanup")
+    if container_ids:
+        _checked(
+            runner(
+                ("docker", "rm", "--force", *container_ids),
+                timeout_seconds=_CLEANUP_TIMEOUT_SECONDS,
+            ),
+            "Dev Container cleanup",
+        )
 
 
 def _single_owned_container(label: str, runner: Runner) -> str:
@@ -555,64 +601,74 @@ def _run(
     return result
 
 
-def _git(cwd: Path, arguments: Sequence[str]) -> CommandResult:
-    return spawn(
-        "git",
-        arguments,
-        cwd=cwd,
-        max_buffer=_MAX_OUTPUT_BYTES,
-        timeout_seconds=_PROVIDER_OPERATION_TIMEOUT_SECONDS,
+def _git(cwd: Path, arguments: Sequence[str], deadline: float) -> CommandResult:
+    def execute(argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+        return spawn(
+            "git",
+            argv,
+            cwd=cwd,
+            max_buffer=_MAX_OUTPUT_BYTES,
+            timeout_seconds=timeout_seconds,
+        )
+
+    return _DeadlineRunner(execute, deadline)(
+        arguments, timeout_seconds=_PROVIDER_OPERATION_TIMEOUT_SECONDS
     )
 
 
-def _git_stdout(cwd: Path, arguments: Sequence[str], operation: str) -> str:
-    result = _git(cwd, arguments)
+def _git_stdout(cwd: Path, arguments: Sequence[str], operation: str, deadline: float) -> str:
+    result = _git(cwd, arguments, deadline)
     _checked(result, f"Dev Container {operation}")
     return result.stdout.strip()
 
 
-def _require_clean_source(source: Path) -> None:
+def _require_clean_source(source: Path, deadline: float) -> None:
     if _git_stdout(
         source,
         ("status", "--porcelain", "--untracked-files=all"),
         "source status",
+        deadline,
     ):
         raise RuntimeError("Dev Container source must be clean")
 
 
-def _require_source_receipt(source: Path, expected_head: str) -> None:
-    if _git_stdout(source, ("rev-parse", "HEAD"), "source revision") != expected_head:
+def _require_source_receipt(source: Path, expected_head: str, deadline: float) -> None:
+    if _git_stdout(source, ("rev-parse", "HEAD"), "source revision", deadline) != expected_head:
         raise RuntimeError("Dev Container source revision changed during proof")
-    _require_clean_source(source)
+    _require_clean_source(source, deadline)
 
 
 def _checked(result: CommandResult, operation: str) -> None:
-    if result.error is not None:
-        raise RuntimeError(f"{operation} failed: {result.error}")
-    if result.status != 0:
-        detail = (
-            "\n".join(output for output in (result.stderr.strip(), result.stdout.strip()) if output)
-            or f"status {result.status}"
-        )
-        raise RuntimeError(f"{operation} failed: {detail}")
+    if result.error is not None or result.status != 0:
+        details = [result.error or f"status {result.status}"]
+        for channel, output in (("stderr", result.stderr), ("stdout", result.stdout)):
+            tail = output[-_DIAGNOSTIC_TAIL_CHARACTERS:]
+            if tail.strip():
+                prefix = "[tail truncated] " if len(output) > len(tail) else ""
+                details.append(f"{channel}: {prefix}{tail.strip()}")
+        raise RuntimeError(f"{operation} failed: " + "\n".join(details))
 
 
 def main() -> int:
+    execution_deadline = monotonic() + _EXECUTION_TIMEOUT_SECONDS
     try:
         identity = derive_instance_identity(REPO_ROOT)
         lock_directory = identity.state_home / "witness-locks"
         ensure_private_directory(identity.state_home)
         ensure_private_directory(lock_directory)
         with (
-            exclusive_private_lock(lock_directory / f"{identity.project_name}.lock"),
-            admitted_devcontainer_source(REPO_ROOT) as workspace,
+            bounded_private_lock(lock_directory / f"{identity.project_name}.lock"),
+            admitted_devcontainer_source(
+                REPO_ROOT, execution_deadline=execution_deadline
+            ) as workspace,
         ):
             verify_devcontainer(
                 witness_id=identity.project_name,
                 workspace_root=workspace,
+                execution_deadline=execution_deadline,
             )
     except (OSError, RuntimeError, ValueError) as error:
-        print(str(error), file=sys.stderr)
+        print("".join(format_exception_only(error)).rstrip(), file=sys.stderr)
         return 1
     print(
         json.dumps(

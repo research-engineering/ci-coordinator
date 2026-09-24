@@ -158,6 +158,13 @@ proof-preserving cost reduction. CI-002 still requires the immutable package,
 its attestation and its visibility/ownership admission; passing source CI is
 not a published image.
 
+CI-006 lifecycle follow-up keeps the full test population and existing command
+ceilings while repairing cooperative Dev Container cleanup, bounded failure
+diagnostics, shared monotonic phase budgets and the COPY fault-injection oracle.
+The [efficiency plan](docs/features/proof-preserving-ci-efficiency-implementation-plan.md#9-cooperative-lifecycle-and-aggregate-budget-repair)
+owns its acceptance. This scoped repair does not close the remaining cost,
+cohort-rebalancing or deployment qualification work.
+
 ### B2: Durable Observation And Recovery
 
 State: open; existing storage and worker slices require current qualification, not blind reimplementation.
