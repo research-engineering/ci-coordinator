@@ -101,7 +101,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "b24f68ce60314342f061c6f0111fd21db76aa0bf5d1556119c5168f8a0488df2"
+          "sourceSha256": "a9653b258e74fc5afff048054bd845f06ce9ecf05baead1ebb1aafc2758172d2"
         }
       ]
     },
@@ -188,7 +188,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "b24f68ce60314342f061c6f0111fd21db76aa0bf5d1556119c5168f8a0488df2"
+          "sourceSha256": "a9653b258e74fc5afff048054bd845f06ce9ecf05baead1ebb1aafc2758172d2"
         }
       ]
     },
@@ -821,7 +821,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "b24f68ce60314342f061c6f0111fd21db76aa0bf5d1556119c5168f8a0488df2"
+          "sourceSha256": "a9653b258e74fc5afff048054bd845f06ce9ecf05baead1ebb1aafc2758172d2"
         }
       ]
     },
@@ -879,7 +879,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "b24f68ce60314342f061c6f0111fd21db76aa0bf5d1556119c5168f8a0488df2"
+          "sourceSha256": "a9653b258e74fc5afff048054bd845f06ce9ecf05baead1ebb1aafc2758172d2"
         }
       ]
     },
@@ -1350,7 +1350,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "b24f68ce60314342f061c6f0111fd21db76aa0bf5d1556119c5168f8a0488df2"
+          "sourceSha256": "a9653b258e74fc5afff048054bd845f06ce9ecf05baead1ebb1aafc2758172d2"
         }
       ]
     },
@@ -3003,10 +3003,10 @@
     "scripts/ci_business_witness/oracle.py": "3cf70f37fe69726c51bb28432271d4f030407249c1f196b55e1beafd82fe66f6",
     "scripts/ci_business_witness/runner.py": "620de68cf5642baac79c7e95e5d6df26bf7454911fad7b8f5684fb9cc4ae3ec4",
     "scripts/ci_business_witness/storage.py": "db6e1c48130249869f068f7bffe251807b1eef072467761122b90b8de2ba1b8c",
-    "scripts/ci_test_execution.py": "8a147dcf20ed37d448806750389895d78c1b20cc408a880145b7d516d64fb864",
+    "scripts/ci_test_execution.py": "b8e85f8a8ff8142b4039adde46c7238f17834a03b8dd75c21da30ba241339328",
     "scripts/ci_test_plan.py": "14b58acbc84b8c12675a18018a4efe6a76d9ba118e527fe08547c07fd3ee8076",
     "scripts/ci_test_report.py": "88765ae21a14c5bf55c4e238fb24e4dd8f556863564a18d7674591edaf82cad8",
     "scripts/python_coverage_diagnostics.py": "f847802c417d4ddc4f4d4bb6506d1f9696a31c1d4f7156cb7c4eee44738bc11b",
-    "scripts/python_witness.py": "8af3e984f1c46d28d3f400654c8269d1e163038aae48ea1d375ee7bcfa0c1de9"
+    "scripts/python_witness.py": "4aa12d366198471a64b5743f50bb8bc8f2abc2e402f1bc0c06d02a77f498a7db"
   }
 }
