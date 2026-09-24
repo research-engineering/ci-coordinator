@@ -9,6 +9,7 @@ import pytest
 
 from ci_coordinator.integrations.github import GitHubAppTransportFactory, GitHubProviderInventory
 from ci_coordinator.integrations.github.app_transport_profile import GITHUB_API_VERSION
+from ci_coordinator.integrations.github.provider_inventory_decoding import decode_repository_page
 from ci_coordinator.provider_inventory import (
     InstallationPageReadResult,
     InstallationReadResult,
@@ -71,6 +72,8 @@ def test_repository_page_uses_exact_installation_token_and_validates_next_link()
     assert isinstance(result, ProviderRepositoryPage)
     assert result.has_next_page is True
     assert result.repositories[0].scope.installation_id == 77
+    assert result.repositories[0].created_at is not None
+    assert result.repositories[0].created_at.isoformat() == "2020-01-01T12:34:56+00:00"
     assert [request.url.path for request in requests] == [
         "/app/installations/77/access_tokens",
         "/installation/repositories",
@@ -89,6 +92,39 @@ def test_foreign_or_malformed_inventory_never_becomes_empty_success() -> None:
     result = asyncio.run(_read_repositories(factory, per_page=100))
 
     assert result == ProviderInventoryUnavailable("malformed_provider_response")
+
+
+@pytest.mark.parametrize(
+    "created_at",
+    [123, "2020-01-01", "2020-01-01T00:00:00", "2020-02-30T00:00:00Z"],
+)
+def test_repository_creation_metadata_rejects_malformed_provider_values(created_at: object) -> None:
+    page = json.loads(_repository_page_body(total_count=1))
+    page["repositories"][0]["created_at"] = created_at
+    assert (
+        decode_repository_page(
+            json.dumps(page).encode(),
+            installation_id=77,
+            page=1,
+            per_page=1,
+            has_next_page=False,
+        )
+        is None
+    )
+
+
+def test_missing_repository_creation_metadata_preserves_manual_import_path() -> None:
+    page = json.loads(_repository_page_body(total_count=1))
+    del page["repositories"][0]["created_at"]
+    result = decode_repository_page(
+        json.dumps(page).encode(),
+        installation_id=77,
+        page=1,
+        per_page=1,
+        has_next_page=False,
+    )
+    assert result is not None
+    assert result.repositories[0].created_at is None
 
 
 def test_rate_limit_is_preserved_without_provider_body_disclosure() -> None:
@@ -243,6 +279,7 @@ def _repository_page_body(*, total_count: int) -> bytes:
                     "full_name": "example-org/ci-coordinator",
                     "visibility": "private",
                     "default_branch": "master",
+                    "created_at": "2020-01-01T12:34:56Z",
                     "archived": False,
                     "disabled": False,
                     "fork": False,

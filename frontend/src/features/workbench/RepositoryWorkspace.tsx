@@ -19,6 +19,7 @@ import { WorkflowDiscoveryPanel } from "./WorkflowDiscoveryPanel";
 export function RepositoryWorkspace({
   authorityRevision,
   scope,
+  repositoryCreatedAt,
   session,
   view,
   tab,
@@ -29,6 +30,7 @@ export function RepositoryWorkspace({
 }: {
   readonly authorityRevision: number;
   readonly scope: WorkbenchScope;
+  readonly repositoryCreatedAt?: string | undefined;
   readonly session: ControlPlaneSession | undefined;
   readonly view: ConsoleView;
   readonly tab: EvidenceTab;
@@ -91,6 +93,7 @@ export function RepositoryWorkspace({
           onSelectTab={onEconomicsTab}
           authorityRevision={authorityRevision}
           scope={scope}
+          repositoryCreatedAt={repositoryCreatedAt}
           session={session}
           active={view === "economics"}
         />

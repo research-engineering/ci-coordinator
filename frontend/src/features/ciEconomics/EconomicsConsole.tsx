@@ -28,6 +28,7 @@ const LABELS = {
 
 type ConsoleProps = {
   readonly scope: WorkbenchScope;
+  readonly repositoryCreatedAt?: string | undefined;
   readonly authorityRevision: number;
   readonly session: ControlPlaneSession | undefined;
   readonly active?: boolean;
@@ -50,6 +51,7 @@ export function EconomicsConsole(props: ConsoleProps) {
 
 function ScopedEconomicsConsole({
   scope,
+  repositoryCreatedAt,
   authorityRevision,
   session,
   active = true,
@@ -128,7 +130,12 @@ function ScopedEconomicsConsole({
           ) : item === "observation" ? (
             <ObservationPanel scope={scope} session={session} active={active && tab === item} />
           ) : item === "history" ? (
-            <HistoryPanel scope={scope} session={session} active={active && tab === item} />
+            <HistoryPanel
+              scope={scope}
+              repositoryCreatedAt={repositoryCreatedAt}
+              session={session}
+              active={active && tab === item}
+            />
           ) : item === "analytics" ? (
             <Suspense fallback={<LoadingState label="Loading analytics" />}>
               <AnalyticsPanel

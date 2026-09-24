@@ -49,6 +49,7 @@ export function WorkbenchPage() {
   const [selection, setSelection] = useState<{
     readonly scope: WorkbenchScope;
     readonly name: string | undefined;
+    readonly createdAt: string | undefined;
     readonly authorityRevision: number;
   }>();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -65,6 +66,12 @@ export function WorkbenchPage() {
     selection?.scope.installationId === scope?.installationId &&
     selection?.scope.repositoryId === scope?.repositoryId
       ? selection?.name
+      : undefined;
+  const repositoryCreatedAt =
+    selection?.authorityRevision === identity.authorityRevision &&
+    selection?.scope.installationId === scope?.installationId &&
+    selection?.scope.repositoryId === scope?.repositoryId
+      ? selection?.createdAt
       : undefined;
   const session =
     identity.state.kind === "settled" && identity.state.result.kind === "authenticated"
@@ -99,8 +106,13 @@ export function WorkbenchPage() {
     }
   }, [title, view]);
 
-  function selectScope(nextScope: WorkbenchScope, name?: string) {
-    setSelection({ scope: nextScope, name, authorityRevision: identity.authorityRevision });
+  function selectScope(nextScope: WorkbenchScope, name?: string, createdAt?: string) {
+    setSelection({
+      scope: nextScope,
+      name,
+      createdAt,
+      authorityRevision: identity.authorityRevision,
+    });
     navigation.navigate({ scope: nextScope, tab: "plans", view: "overview" });
   }
 
@@ -246,6 +258,7 @@ export function WorkbenchPage() {
                 key={`workspace:${identity.authorityRevision}:${scope.installationId}:${scope.repositoryId}`}
                 authorityRevision={identity.authorityRevision}
                 scope={scope}
+                repositoryCreatedAt={repositoryCreatedAt}
                 session={session}
                 view={view}
                 tab={tab}

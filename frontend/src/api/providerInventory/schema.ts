@@ -114,6 +114,7 @@ export const installationCatalogSchema: z.ZodType<InstallationCatalog> = z
 const repository = z
   .strictObject({
     archived: z.boolean(),
+    createdAt: dateTime.nullable(),
     defaultBranch: providerBranch,
     disabled: z.boolean(),
     fork: z.boolean(),

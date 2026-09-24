@@ -133,8 +133,8 @@ completed the test loop but failed to write its bounded native report. One
 log-overflow test's payload had become a 4,194,405-byte pytest ID, repeated in
 the report. The targeted repair gives this parameter set short collection IDs
 without changing the payload or oracle; the 32 MiB artifact bound remains.
-CI-001 and CI-006 still require a successful fresh same-head serial comparison
-and measured costs after that source change.
+At this snapshot CI-001 and CI-006 still required a successful fresh same-head
+serial comparison and measured costs after that source change.
 
 The subsequent exact-master [run 35940367926](https://github.com/research-engineering/ci-coordinator/actions/runs/35940367926)
 showed that short IDs fixed collection size but did not qualify the optional
@@ -145,6 +145,18 @@ their shard-session time totalled 2819.67 seconds and test phases totalled
 serial-budget revision and fresh exact-head comparison are required. This is
 not evidence that any missing serial tests passed or that PR-gate coverage was
 weakened.
+
+The bounded serial-budget repair was squash-merged at `640a463`. Its explicitly
+dispatched [same-head serial run](https://github.com/research-engineering/ci-coordinator/actions/runs/35952421534)
+passed 12,618 native nodes; the native comparison reported equal node and
+terminal-outcome populations. Serial elapsed time was 3,014.97 seconds, while
+the ordinary shards remained independent. On `0ed8dec`, an explicitly
+dispatched [exact-master Full Check](https://github.com/research-engineering/ci-coordinator/actions/runs/35957325576)
+passed. These receipts qualify that bounded source cohort, not every future
+source epoch or a causal CPU-saving claim. CI-006 remains open for measured
+proof-preserving cost reduction. CI-002 still requires the immutable package,
+its attestation and its visibility/ownership admission; passing source CI is
+not a published image.
 
 ### B2: Durable Observation And Recovery
 
@@ -235,7 +247,7 @@ State: open; hypothesis validation, source repair and external qualification rem
 | ID | Work And Closure | Depends On |
 | --- | --- | --- |
 | CI-054 | **validate** all residual admitted audit findings, including the 180 unresolved predicate mappings from two retained legacy inputs. Match current owner and falsifier, merge duplicates and preserve scoped rejection triggers; do not recreate retired TypeScript. Regenerate current SARIF when needed; deleted report `3ed45d...` is retired-unadjudicated, not a passing review. [Audit acceptance](docs/features/assurance-audit-hardening-plan.md). | Exact current snapshot; no required reconstruction of deleted reports |
-| CI-055 | **open** confirmed plan lifetime mismatch: producer settings admit 3600 seconds while the target accepts at most 300 absent a tighter authority clamp. Admit a compatible producer/consumer intersection, preserve the security window and exercise settings -> signer -> actual target at 1/300/301/over-limit, with/without clamp. | Current signing/target owners; before affected selected execution |
+| CI-055 | **source repaired; qualify deployment compatibility**. Producer settings, signer and local verifier now admit only 1-300 seconds and exercise the actual target at 1/300/301. Before live selected execution, establish that the new environment contains no previously issued incompatible envelopes or admit an explicit migration/compatibility receipt. | Current signing/target owners; before affected selected execution |
 | CI-056 | **validate** unjustified abstractions, ownership/co-location, test duplication and contract size. Check the unused `ReconciliationPublisher` against real consumers before removal; prefer existing Pydantic/FastAPI/standard-library capabilities where behavior is preserved. Metrics select review, not god-file verdicts; no indiscriminate DTO/repository classes or whole rewrite. | CI-054; exact invariants and protected observations |
 | CI-057 | **validate** the current shared dynamic-CI blueprint against own-CI requirements and native consumed-input/evidence inventories. Freeze the candidate, disposition every applicable validation class, implement only real gaps, preserve independent baseline and profile coverage before self-optimization. Existing CF01/CF03 source repairs are not the entire comparison. | CI-001; [input coverage](docs/features/own-ci-input-coverage.md) |
 | CI-058 | **qualify** PostgreSQL contracts and the 225-scenario intake on current source: coherent observations, total collection-state checks/forward migrations and native query-plan/cardinality/concurrency controls. Source repairs do not prove deployment workloads, maintenance or memory; those measurements belong to CI-067/CI-069. Tune only measured counterexamples. | CI-014 for changed concurrent paths |

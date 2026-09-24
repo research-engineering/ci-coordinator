@@ -11,6 +11,66 @@ import {
 import { historyMutation, historyStatus } from "../historyFixture";
 import { observationWorkflows } from "../observationFixture";
 
+test("catalog creation date offers an explicit full-range shortcut without a write", async ({
+  page,
+}) => {
+  let writes = 0;
+  await page.route("**/api/v1/auth/session", (route) =>
+    route.fulfill({ json: controlPlaneSessionFixture({ roles: ["audit", "configure", "read"] }) }),
+  );
+  await page.route("**/api/v1/workbench/installations?*", (route) =>
+    route.fulfill({ json: installationCatalogFixture() }),
+  );
+  await page.route("**/api/v1/workbench/installations/1/repositories?*", (route) =>
+    route.fulfill({ json: repositoryPageFixture() }),
+  );
+  await page.route("**/api/v1/workbench/repositories/1/1?*", (route) =>
+    route.fulfill({ json: workbenchFixture() }),
+  );
+  await page.route("**/api/v1/workbench/repositories/1/2?*", (route) =>
+    route.fulfill({ json: workbenchFixture({ scope: { installationId: 1, repositoryId: 2 } }) }),
+  );
+  await page.route("**/api/v2/economics/**", (route) => {
+    if (route.request().method() === "POST") writes += 1;
+    const path = new URL(route.request().url()).pathname;
+    return route.fulfill({
+      json: {
+        ...historyStatus(null),
+        repositoryId: path.includes("/repositories/1/2/") ? 2 : 1,
+      },
+    });
+  });
+  const base = process.env["CI_COORDINATOR_PLAYWRIGHT_BASE_URL"];
+  if (!base) throw new Error("Browser server unavailable");
+  await page.goto(new URL("/workbench", base).href);
+  await page.getByRole("button", { name: "Open" }).click();
+  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  const economics = page.getByRole("link", { name: "CI economics" });
+  if (!(await economics.isVisible()))
+    await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await economics.click();
+  await page.getByRole("tab", { name: "History", exact: true }).click();
+  await expect(page.getByLabel("Import runs created since (UTC)")).toHaveValue("");
+  await page.getByRole("button", { name: "Use repository creation date (2020-01-01)" }).click();
+  await expect(page.getByLabel("Import runs created since (UTC)")).toHaveValue("2020-01-01");
+  await expect(page.getByRole("button", { name: "Save history" })).toBeEnabled();
+  await page.screenshot({
+    path: test.info().outputPath("creation-date-shortcut.png"),
+    fullPage: true,
+  });
+  expect(writes).toBe(0);
+  await page.evaluate(() => {
+    history.pushState(
+      null,
+      "",
+      "/workbench?installationId=1&repositoryId=2&limit=10&view=economics&economicsTab=history",
+    );
+    dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page.getByLabel("Import runs created since (UTC)")).toHaveValue("");
+  await expect(page.getByRole("button", { name: /Use repository creation date/ })).toHaveCount(0);
+});
+
 test("historical collection is explicit, replay-safe, accessible and responsive", async ({
   page,
 }) => {

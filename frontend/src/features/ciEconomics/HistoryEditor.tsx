@@ -28,12 +28,14 @@ type WriteState =
 
 export function HistoryEditor({
   scope,
+  repositoryCreatedAt,
   status,
   session,
   stale,
   onSaved,
 }: {
   readonly scope: WorkbenchScope;
+  readonly repositoryCreatedAt?: string | undefined;
   readonly status: HistoryStatus;
   readonly session: ControlPlaneSession | undefined;
   readonly stale: boolean;
@@ -69,6 +71,16 @@ export function HistoryEditor({
   });
   const expandedBound = candidate.success ? candidate.data.expandCreatedFrom : null;
   const currentBound = status.scan?.createdFrom;
+  const createdTime = repositoryCreatedAt ? Date.parse(repositoryCreatedAt) : Number.NaN;
+  const creationDate =
+    Number.isFinite(createdTime) && createdTime <= Date.parse(status.observedAt)
+      ? new Date(createdTime).toISOString().slice(0, 10)
+      : undefined;
+  const canUseCreationDate =
+    creationDate !== undefined &&
+    (base === null ||
+      (currentBound !== undefined &&
+        new Date(`${creationDate}T00:00:00Z`).getTime() < Date.parse(currentBound)));
   const currentBoundRevision =
     status.snapshot?.configurationRevision === base?.configurationRevision;
   const expandedInstant = expandedBound ? observationMicroseconds(expandedBound) : undefined;
@@ -190,6 +202,22 @@ export function HistoryEditor({
               </label>
             </>
           )}
+          {canUseCreationDate ? (
+            <button
+              type="button"
+              className="button button--compact"
+              onClick={() => {
+                if (!creationDate) return;
+                if (base === null) setInitialDate(creationDate);
+                else {
+                  setExpandedDate(creationDate);
+                  setRescan(false);
+                }
+              }}
+            >
+              Use repository creation date ({creationDate})
+            </button>
+          ) : null}
           <label>
             Workflows
             <select
