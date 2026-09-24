@@ -240,26 +240,33 @@ class GitHubRepositoryContextProvider:
         client: WorkflowCatalogClient,
         git_client: WorkflowDiscoveryClient,
     ) -> DependencyGraphContext:
+        if diff.full_ci_invalidating or DEPENDENCY_GRAPH_PATH in diff.changed_paths:
+            return self._fallback_graph(epoch, diff, policy)
         content = await self._load_content(
             client,
             repository,
             DEPENDENCY_GRAPH_PATH,
             epoch.head_sha,
         )
-        artifact = (
-            None
-            if content is None
-            else parse_dependency_graph_artifact(
-                content,
-                retrieved_for_sha=epoch.head_sha,
-                trusted=True,
-            )
+        if content is None:
+            return self._fallback_graph(epoch, diff, policy)
+        baseline = await self._load_content(
+            client,
+            repository,
+            DEPENDENCY_GRAPH_PATH,
+            epoch.base_sha,
+        )
+        if baseline != content:
+            return self._fallback_graph(epoch, diff, policy)
+        artifact = parse_dependency_graph_artifact(
+            content,
+            retrieved_for_sha=epoch.head_sha,
+            trusted=True,
         )
         if artifact is None:
             return self._fallback_graph(epoch, diff, policy)
         if artifact.provenance.generator.startswith("self-ci@") and (
             artifact.provenance.generator != SELF_CI_GENERATOR
-            or content is None
             or not await self_ci_inventory_is_current(
                 git_client,
                 repository,
@@ -276,10 +283,10 @@ class GitHubRepositoryContextProvider:
         client: WorkflowCatalogClient,
         repository: GitHubRepository,
         path: str,
-        head_sha: str,
+        revision_sha: str,
     ) -> bytes | None:
         try:
-            outcome = await client.get_content(repository, path, ref=head_sha)
+            outcome = await client.get_content(repository, path, ref=revision_sha)
         except Exception:
             return None
         expected_request_path = f"{repository.path}/contents/{contents_path_value(path)}"
@@ -287,7 +294,7 @@ class GitHubRepositoryContextProvider:
             not isinstance(outcome, GitHubSuccess)
             or outcome.request.operation != "workflow_catalog.get_content"
             or outcome.request.path != expected_request_path
-            or outcome.request.query != (GitHubQueryParameter("ref", head_sha),)
+            or outcome.request.query != (GitHubQueryParameter("ref", revision_sha),)
         ):
             return None
         return decode_contents_file(

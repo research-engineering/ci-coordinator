@@ -1,8 +1,8 @@
 # Selective Planning Safety
 
-Status: implemented and locally verified; provider witness pending merge
+Status: design; qualification state is owned by ROADMAP
 
-Date: 2026-07-29
+Date: 2026-09-25
 
 Owner requirements: `REQ-CI-CORE-004`, `REQ-CI-CORE-005`
 
@@ -181,6 +181,60 @@ become stale without violating constructor admission.
 | Implement a complete second planner        | Duplicates policy, increases drift, and rejects safe conservative supersets.          |
 | Accept all tests in a selected manifest    | Makes valid selective execution unreachable.                                          |
 | Cache through process-global mutable state | Adds lifecycle and invalidation authority that an immutable value can avoid.          |
+
+## Candidate Input Authority Repair
+
+The 2026-09-25 intake distinguishes structural graph validity from authority:
+an internally valid graph supplied by the candidate cannot certify removal of
+its own dependency edges. Repository context now requires unchanged exact
+base/head graph bytes and independently rejects a graph path change. Missing
+baseline, provider failure or unequal bytes produces a FullCI-invalidating
+context. Artifact-owned invalidators remain additional restrictions.
+
+```text
+GraphEligible := CompleteDiff
+  and GraphPathNotChanged
+  and BaseGraphBytesPresent
+  and HeadGraphBytes = BaseGraphBytes
+  and ExistingGraphAdmission
+
+GraphEligible !=> DependencyClosureComplete
+```
+
+This is a bounded repair of candidate-controlled replacement, not a claim that
+an unchanged graph knows every dependency. Copying the candidate's graph into
+a provenance wrapper does not fix the issue. Loading only a baseline graph
+would hide new unknown paths unless separately revalidated. Recomputing every
+language's dependency graph in the coordinator would add an unqualified compiler
+platform. Comparing already bounded immutable artifacts is the smallest local
+repair preserving unchanged-graph eligibility and independent FullCI.
+
+The event-specific comparison repair separately distinguishes PR three-dot
+semantics from before/after branch transitions. Provider ancestry and requested
+identities must justify the interpretation; an empty file list by itself does
+not prove equal trees. Exact provider conditions and adversarial fixtures are
+part of the implementation plan, not inferred from successful HTTP status.
+
+No signing format, database schema, external effect or enforcement activation
+changes. A newly introduced/edited graph intentionally loses selective
+eligibility for that transition. Independent native witnesses must demonstrate
+both that fallback and the still-reachable unchanged-graph selective path.
+
+The assertion that deterministic admission simply replays the planner is not
+true at this source: that checker already derives classification, closure and
+impact independently. The separate confirmed gap is post-admission fallback
+construction: a faulty shared planner builder could return a partial but
+internally consistent fallback. Verifier-owned construction and final catalog
+closure now remove that common-mode path. The public omission validator also
+requires current policy/input coordinates, just as the main verifier does.
+Independent literal-candidate tests exercise stale and incomplete context,
+global and transitive impact, identity substitutions and conservative supersets.
+
+Using one verifier-owned closure helper for admission, fallback, advice and
+final value checks avoids four disagreeing verifier contracts. Keeping that
+helper separate from planner closure preserves the required implementation
+diversity. Shared immutable types, canonical hashing and path matching remain
+explicit assumptions, not evidence of independence from every possible fault.
 
 ## 8. Non-Claims
 

@@ -17,6 +17,9 @@ from ci_coordinator.integrations.github._response_decoding import (
 )
 from ci_coordinator.kernel import StrictJsonError, load_strict_json
 from ci_coordinator.repo_context.diff_builder import DiffFileChangeInput
+from ci_coordinator.repo_context.diff_model import RepositoryEpoch
+
+_UNPAGED_COMPARE_COMMIT_LIMIT = 250
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,13 +67,15 @@ def parse_pull_request_files(
 def parse_compared_files(
     body: bytes,
     *,
+    epoch: RepositoryEpoch,
     max_json_bytes: int,
 ) -> tuple[DiffFileChangeInput, ...] | None:
+    """Admit an unpaged comparison for the event's requested diff semantics."""
     value = _json_object(body, max_json_bytes)
     if value is None:
         return None
     raw_files = value.get("files")
-    if not isinstance(raw_files, list):
+    if not isinstance(raw_files, list) or not _comparison_matches_epoch(value, epoch):
         return None
     files: list[DiffFileChangeInput] = []
     for item in raw_files:
@@ -79,6 +84,63 @@ def parse_compared_files(
             return None
         files.append(file)
     return tuple(files)
+
+
+def _comparison_matches_epoch(value: dict[str, object], epoch: RepositoryEpoch) -> bool:
+    base_sha = _commit_sha(value.get("base_commit"))
+    merge_base_sha = _commit_sha(value.get("merge_base_commit"))
+    status = _string(value.get("status"))
+    ahead = _non_negative_integer(value.get("ahead_by"))
+    behind = _non_negative_integer(value.get("behind_by"))
+    total = _non_negative_integer(value.get("total_commits"))
+    commits = value.get("commits")
+    if (
+        base_sha != epoch.base_sha
+        or merge_base_sha is None
+        or ahead is None
+        or behind is None
+        or total is None
+        or total != ahead
+        or not isinstance(commits, list)
+        or len(commits) != min(total, _UNPAGED_COMPARE_COMMIT_LIMIT)
+    ):
+        return False
+    commit_shas = tuple(_commit_sha(commit) for commit in commits)
+    if (
+        None in commit_shas
+        or len(set(commit_shas)) != len(commit_shas)
+        or base_sha in commit_shas
+        or merge_base_sha in commit_shas
+    ):
+        return False
+    if ahead == 0:
+        if value["files"] or merge_base_sha != epoch.head_sha:
+            return False
+        if status == "identical":
+            return behind == 0 and base_sha == epoch.head_sha
+        return (
+            epoch.event_name == "pull_request"
+            and status == "behind"
+            and behind > 0
+            and base_sha != epoch.head_sha
+        )
+    # GitHub's unpaged list ends at the most recent comparison commit, even when capped.
+    if commit_shas[-1] != epoch.head_sha or base_sha == epoch.head_sha:
+        return False
+    if status == "ahead":
+        return behind == 0 and merge_base_sha == base_sha
+    # Diverged PRs retain three-dot semantics; other events require a base-to-head diff.
+    return (
+        epoch.event_name == "pull_request"
+        and status == "diverged"
+        and behind > 0
+        and merge_base_sha not in {base_sha, epoch.head_sha}
+    )
+
+
+def _commit_sha(value: object) -> str | None:
+    commit = _object(value)
+    return None if commit is None else _git_object_id(commit.get("sha"))
 
 
 def decode_contents_file(

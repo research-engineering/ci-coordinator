@@ -231,11 +231,22 @@ async def _load_comparison_diff(
         outcome = await client.compare(repository, epoch.base_sha, epoch.head_sha)
     except Exception:
         return invalid_diff(epoch, max_diff_files)
-    if not isinstance(outcome, GitHubSuccess) or not _terminal_pagination(
-        outcome.response.pagination
+    expected_path = f"{repository.path}/compare/{epoch.base_sha}...{epoch.head_sha}"
+    if (
+        not isinstance(outcome, GitHubSuccess)
+        or outcome.request.operation != "diff.compare"
+        or outcome.request.method != "GET"
+        or outcome.request.path != expected_path
+        or outcome.request.query
+        or outcome.request.body is not None
+        or not _terminal_pagination(outcome.response.pagination)
     ):
         return invalid_diff(epoch, max_diff_files)
-    compared = parse_compared_files(outcome.response.body, max_json_bytes=max_response_json_bytes)
+    compared = parse_compared_files(
+        outcome.response.body,
+        epoch=epoch,
+        max_json_bytes=max_response_json_bytes,
+    )
     if compared is None or len(compared) > _COMPARE_FILE_LIMIT:
         return invalid_diff(epoch, max_diff_files)
     if len(compared) == _COMPARE_FILE_LIMIT and expected_file_count != _COMPARE_FILE_LIMIT:

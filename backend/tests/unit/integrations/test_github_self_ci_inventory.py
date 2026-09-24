@@ -186,6 +186,13 @@ class _Transport:
             mode_only = self.mutation == "mode-only"
             return _response(
                 {
+                    "base_commit": {"sha": "a" * 40},
+                    "merge_base_commit": {"sha": "a" * 40},
+                    "status": "ahead",
+                    "ahead_by": 1,
+                    "behind_by": 0,
+                    "total_commits": 1,
+                    "commits": [{"sha": _HEAD}],
                     "files": [
                         {
                             "filename": _DOC,
@@ -194,7 +201,7 @@ class _Transport:
                             "deletions": 0,
                             **({} if mode_only else {"patch": "changed documentation"}),
                         }
-                    ]
+                    ],
                 }
             )
         if request.operation == "workflow_catalog.get_content":

@@ -2,7 +2,7 @@
 
 Status: module specification
 
-Date: 2026-07-29
+Date: 2026-09-25
 
 ## 1. Owned Invariant
 
@@ -69,6 +69,23 @@ risk paths. A graph artifact must declare the same values. A mismatch is
 FullCI-invalidating, and the planner consumes the policy-owned global-risk
 paths rather than accepting a weaker artifact-side replacement.
 
+The GitHub adapter cannot take a candidate's graph as its own trust authority.
+It rejects a diff changing `.ci-coordinator/dependency-graph.v1.json` (including
+rename/deletion evidence), and otherwise requires the exact artifact bytes at
+the requested base and head to be equal. An absent, malformed, unavailable or
+different baseline cannot authorize omission. This guard is coordinator-owned,
+not a removable `invalidatesWhenChanged` entry in the artifact. The admitted
+artifact remains bound to the current head; self-CI inventory checks still
+apply in addition to baseline equality.
+
+Equality establishes non-replacement by this candidate, not approval of the
+baseline, completeness of its dependency edges, or protected-branch governance.
+Those remain independent input-closure and production-admission obligations.
+Changing or first introducing a graph therefore requires FullCI for that
+transition; an unchanged graph retains selective eligibility under the other
+existing predicates. Each Contents read retains its own byte bounds and the
+outer acquisition deadline; no unbounded history scan or new cache is added.
+
 Path-pattern admission is bounded to 512 pattern characters and 4,096 path
 characters. Matching uses explicit reachable path offsets rather than a regex
 engine. For pattern length `P` and path length `S`, tokenization is `O(P)`, each
@@ -82,6 +99,8 @@ is `O(P * S)` and retained matcher state is `O(P + S)`.
 TruncatedDiff => FullCI-invalidating context
 PullRequestEpochMismatch => FullCI-invalidating context
 MutablePullRequestFilesDifferFromImmutableCompare => FullCI-invalidating context
+UnboundOrInconsistentComparisonMetadata => FullCI-invalidating context
+NonPullRequestBehindOrDivergedComparison => FullCI-invalidating context
 RepositoryIdentityMismatch => FullCI-invalidating context before owner/name lookup
 UnknownFileStatus => FullCI-invalidating context
 UnsafePath => FullCI-invalidating context
@@ -92,6 +111,21 @@ UnknownWorkflowInventory => no target execution authority
 UnboundStaticGateName => no target execution authority
 StaticJobDependencyMismatch => no target execution authority
 ```
+
+An immutable comparison binds the requested base, merge base, comparison
+status/counts and the most recent returned commit to the requested head. A
+pull request retains the provider's three-dot semantics, including a consistent
+diverged or behind relation. A `push` or `merge_group` requires `ahead` with
+the requested base as merge base, or `identical` with equal base/head and empty
+files. Behind/diverged branch transitions cannot use a three-dot file list as
+their complete before/after diff. The `forced` webhook flag alone is neither
+required evidence nor sufficient proof of an unsafe tree transition.
+
+The adapter uses the documented unpaged comparison (at most 250 commits,
+whose final commit is the most recent comparison commit); it does not invent
+a `head_commit` response field. The existing 300-file boundary and incomplete
+pagination fallback remain. See the provider's
+[comparison contract](https://docs.github.com/en/rest/commits/commits#compare-two-commits).
 
 ## 5. Proof Obligations
 
