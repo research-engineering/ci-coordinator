@@ -157,7 +157,7 @@
         ]
       }
     ],
-    "maxTimeoutMs": 32126000,
+    "maxTimeoutMs": 32306000,
     "nonCacheableCredentialClasses": [],
     "parallelGroups": [
       "build",
@@ -1260,7 +1260,7 @@
       "networkPolicy": "none",
       "parallelGroup": "test",
       "schemaVersion": 1,
-      "timeoutMs": 960000
+      "timeoutMs": 1140000
     },
     {
       "argv": [
@@ -1678,7 +1678,7 @@
       "networkPolicy": "external",
       "parallelGroup": "quality",
       "schemaVersion": 1,
-      "timeoutMs": 32126000
+      "timeoutMs": 32306000
     },
     {
       "argv": [
@@ -1709,7 +1709,7 @@
       "networkPolicy": "external",
       "parallelGroup": "build",
       "schemaVersion": 1,
-      "timeoutMs": 1980000
+      "timeoutMs": 2160000
     },
     {
       "argv": [

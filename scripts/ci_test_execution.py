@@ -33,10 +33,10 @@ from scripts.python_coverage_policy import (
     changed_paths_for_coverage,
     evaluate_coverage_report,
 )
-from scripts.python_witness import PYTHON_TEST_PROCESS_TIMEOUT_SECONDS
 from scripts.repository_paths import read_repository_regular_file
 
 ROOT = Path(__file__).resolve().parent.parent
+NATIVE_TEST_SHARD_TIMEOUT_SECONDS = 900.0
 _OUTPUT_TAIL_BYTES = 65_536
 UNIVERSE = (
     "backend/tests",
@@ -325,7 +325,7 @@ def run_shard(plan: TestPlan, shard: str, output: Path, diagnostics: Path) -> No
         files,
         report_path,
         coverage=coverage_path,
-        timeout=3_600 if shard == "serial" else PYTHON_TEST_PROCESS_TIMEOUT_SECONDS,
+        timeout=3_600 if shard == "serial" else NATIVE_TEST_SHARD_TIMEOUT_SECONDS,
     )
     native = NativeReport.model_validate_json(artifact_bytes(report_path))
     empty_files = admit_collection(native, plan.candidate_files if shard == "serial" else files)

@@ -1,8 +1,13 @@
+import asyncio
 import hashlib
 import json
 from dataclasses import replace
+from time import perf_counter_ns
+from typing import Literal
 
-from sqlalchemy import insert, text, update
+import psycopg
+from psycopg import sql
+from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ci_coordinator.ci_economics import ProviderAttemptSnapshot
@@ -48,8 +53,13 @@ def _ascii_fixture_json(value: object) -> bytes:
 
 
 async def expand_cleanup_snapshot(
-    admin: AsyncEngine, prototype: ProviderAttemptSnapshot, count: int
-) -> str:
+    admin: AsyncEngine,
+    prototype: ProviderAttemptSnapshot,
+    count: int,
+    *,
+    interrupt_before_last_copy_row: Literal["error", "cancelled"] | None = None,
+) -> tuple[str, int, int]:
+    construction_started = perf_counter_ns()
     assert len(prototype.jobs) == 1 and 1 < count <= 2000
     job = prototype.jobs[0]
     assert 1 <= job.provider_job_id <= count
@@ -77,6 +87,10 @@ async def expand_cleanup_snapshot(
     snapshot_digest = hashlib.sha256(
         _ascii_fixture_json({"attempt": prototype.attempt.canonical_mapping(), "jobs": mappings})
     ).hexdigest()
+    if interrupt_before_last_copy_row is not None and len(rows) < 128:
+        raise ValueError("fault injection requires a substantial COPY population")
+    construction_elapsed = perf_counter_ns() - construction_started
+    transaction_started = perf_counter_ns()
     async with admin.begin() as connection:
         await connection.execute(text("SET LOCAL session_replication_role = replica"))
         changed = await connection.scalar(
@@ -92,5 +106,19 @@ async def expand_cleanup_snapshot(
         assert changed == prototype.subject_id
         await connection.execute(text("SET LOCAL session_replication_role = origin"))
         assert await connection.scalar(text("SHOW session_replication_role")) == "origin"
-        await connection.execute(insert(jobs), rows)
-    return snapshot_digest
+        raw = await connection.get_raw_connection()
+        driver = raw.driver_connection
+        assert isinstance(driver, psycopg.AsyncConnection)
+        columns = tuple(base)
+        table = sql.Identifier(jobs.schema, jobs.name) if jobs.schema else sql.Identifier(jobs.name)
+        statement = sql.SQL("COPY {} ({}) FROM STDIN").format(
+            table, sql.SQL(", ").join(sql.Identifier(name) for name in columns)
+        )
+        async with driver.cursor() as cursor, cursor.copy(statement) as copy:
+            for index, row in enumerate(rows):
+                await copy.write_row(tuple(row[name] for name in columns))
+                if interrupt_before_last_copy_row is not None and index == len(rows) - 2:
+                    if interrupt_before_last_copy_row == "cancelled":
+                        raise asyncio.CancelledError
+                    raise RuntimeError("fixture COPY interrupted")
+    return snapshot_digest, construction_elapsed, perf_counter_ns() - transaction_started

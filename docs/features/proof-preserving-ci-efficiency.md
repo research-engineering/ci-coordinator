@@ -243,5 +243,28 @@ environment-specific costs or uncertain reuse must have explicit retained
 dispositions and revision triggers. Independent Full Check and fallback stay
 available before later self-optimization under ROADMAP D2/D4/D9 and E2/E3.
 
+## Dev Container Full-Test Budget Follow-up
+
+The [PR #10 Full Check attempt](https://github.com/research-engineering/ci-coordinator/actions/runs/35995918521)
+ran the complete portable `python.test` selection in the least-privilege Dev
+Container to about 98% before its 900-second process deadline expired. All
+ordinary native shards passed. The timeout is a failed test obligation, not a
+green result or evidence that the remaining tests would pass. One same-head
+failed-job rerun is diagnostic; a lucky pass does not supply headroom.
+
+Preserve the exact collected portable population and raise only this process
+ceiling to 1,080 seconds. Its command envelope is 1,140 seconds including the
+existing 60-second wrapper reserve. The portable parent is 1,380 seconds,
+including its existing 240-second aggregate reserve. Provision 600, Node
+proof 60, portable parent 1,380 and cleanup 120 yield the finite 2,160-second
+Dev Container stage budget, below its unchanged 40-minute job ceiling. The
+branch aggregate and global command cap must be recomputed from their exact
+child set. The ordinary native shard keeps its separately owned 900-second
+process deadline below its 960-second workflow watchdog; it must not import
+the portable budget. Coverage floors, selected-test population,
+mutation oracles and test behavior are unchanged. Revisit the bound after
+measuring the full portable stage and removing proved redundant work; this
+budget repair alone does not reduce CI cost.
+
 Coverage combination uses the existing [coverage.py command](https://coverage.readthedocs.io/en/latest/commands/cmd_combine.html),
 not a hand-written merger of coverage percentages.

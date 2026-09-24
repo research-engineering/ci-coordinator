@@ -569,14 +569,14 @@ falsifiers; future speculation does not justify it now.
 The expanded native corpus retains one complete covered persistence pass and
 the isolated portable test selection. Its aggregate execution budget supersedes
 only the earlier 1,200-second coverage and 600-second portable test budgets:
-coverage has 2,400 seconds and portable tests have 900 seconds. Each command
+coverage has 2,400 seconds and portable tests have 1,080 seconds. Each command
 adds the existing 60-second wrapper reserve; portable proof additionally keeps
 its 240-second aggregate reserve. The Dev Container command retains a finite
-1,980-second stage budget: provisioning 600, installed-Node proof 60, portable
-proof 1,200 and cleanup 120. This is a shared cancellation ceiling, not a promise
+2,160-second stage budget: provisioning 600, installed-Node proof 60, portable
+proof 1,380 and cleanup 120. This is a shared cancellation ceiling, not a promise
 that every stage and provider operation can simultaneously exhaust its maximum.
 The branch aggregate and the global command cap project all selected child
-budgets plus the unchanged 420,000 ms orchestration reserve: 25,736,000 ms.
+budgets plus the unchanged 420,000 ms orchestration reserve: 32,306,000 ms.
 Existing GitHub job ceilings remain unchanged.
 This does not relax any test, service deadline, coverage threshold or isolation.
 

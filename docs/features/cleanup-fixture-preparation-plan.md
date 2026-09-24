@@ -44,13 +44,30 @@ requirement/witness registration and final integration.
 No production wiring, ACL, migration, provider or deployment change is needed.
 Static success does not discharge any of the native acceptance items.
 
-## Integration Handoff
+## Measured Expansion Follow-up
+
+1. Preserve the prior source and native receipt. Measure seed, expansion
+   construction, expansion transaction, retention shift and cleanup separately with
+   the same monotonic clock; reject a cost claim from combined preparation.
+2. Keep the existing canonical row generator, digest calculation and normal
+   trigger mode. Replace only the 2,000-row SQLAlchemy fixture insertion with
+   psycopg row-wise `COPY` on that transaction's raw driver connection.
+3. Run the full-capacity native test before and after on one local Docker
+   environment, and on the exact GitHub head. Compare all population and
+   cleanup assertions, not just elapsed time. Retain the local and hosted
+   results, including an unfavorable comparison.
+4. Revalidate Ruff, mypy, documentation and exact-head Full Check. If `COPY`
+   changes bytes, trigger effects, rollback or duration unfavorably, retain
+   the original insertion and only the measured disposition.
+
+## Prior Integration Handoff
 
 The four-file batch adds `seed_cleanup_attempt`, changes the capacity test's
 construction call site and timing field, and adds the two-case
 `test_cleanup_seed_admits_once_and_rolls_back_partial_construction` witness.
-The existing expansion and retention-shift helpers and the cleanup operation
-are unchanged. Root must register the new test/design/plan with the existing
+At that stage the expansion and retention-shift helpers and cleanup operation
+were unchanged; the measured follow-up above replaces only the expansion
+write protocol. Root must register the new test/design/plan with the existing
 requirement and native witness owners before closing qualification.
 
 Supporting source read beyond the initial evidence projection includes

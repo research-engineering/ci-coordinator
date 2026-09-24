@@ -1,7 +1,7 @@
 # Release Artifact Publication
 
-Status: repository implementation present; provider publication observed;
-current-head release and deployment pending
+Status: repository implementation present; publication from this repository
+and deployment pending
 
 Date: 2026-07-28
 
@@ -11,7 +11,7 @@ Normative requirement: `REQ-CI-RELEASE-001`
 
 The repository owns one manual workflow that publishes a production-eligible
 OCI image from the exact current `master` commit only after an exact successful
-`Full Check` push run for that commit. The registry-returned manifest digest is
+`Full Check` manual run for that commit. The registry-returned manifest digest is
 the artifact identity. A unique run tag is discovery metadata only.
 
 ```text
@@ -172,7 +172,7 @@ stronger provider-native verified-evidence transfer exists.
 The build:
 
 - checks out exactly `S` without persisted Git credentials;
-- uses digest-pinned GitHub Actions, BuildKit `0.31.2`, and Buildx `0.35.0`;
+- uses digest-pinned GitHub Actions, BuildKit `0.33.0`, and Buildx `0.37.1`;
 - pulls every Dockerfile base by its existing immutable digest;
 - embeds `I`, `S`, and `productionEligible=true`;
 - publishes one `linux/amd64` image;

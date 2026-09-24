@@ -174,7 +174,9 @@ Run exact-head native Full Check. Compare with the recorded baseline and, for
 causal speedup claims, the same-head serial route. Report critical path, every
 job, case/fixture phases, queue/occupancy, failures and retained bottlenecks.
 Do not claim p95, total CPU reduction or maximum performance from a single run.
-No local test fallback, threshold reduction or timeout increase is permitted.
+The original scheduling batch did not authorize a local test fallback,
+threshold reduction or timeout increase. The separately evidenced process
+budget repair below does not change any test or coverage result.
 
 Native qualification also checks every dependent workflow oracle: trigger
 domain, mandatory job dependencies, complete mutation matrix, preflight order,
@@ -197,6 +199,30 @@ forces collection of released objects before returning so strict resource
 warnings fail that witness, including failed-admission paths. This is less
 complex than a new SQLite reader or process per artifact and preserves every
 existing coverage floor. Revisit only if the pinned library changes this API.
+
+## 8. Portable Process Budget Repair
+
+1. Bind the exact PR #10 failing job and inspect the process timeout versus
+   test failure. Preserve the full native suite and its original outcome
+   requirements; do not treat 98% as completion.
+2. Set the portable `python.test` process to 1,080 seconds. Project its
+   wrapper, parent, Dev Container and branch envelopes as
+   `1140 s -> 1380 s -> 2160 s -> 32306000 ms`.
+   Keep ordinary native shards and the 40-minute outer job unchanged.
+3. Update the source-owned quality plan, direct budget assertions and
+   governing deadline document together. Split the portable test deadline
+   from the native shard's 900-second process ceiling, then verify the native
+   failure witness still stays below its 960-second workflow watchdog. Run
+   exact plan and matrix-risk admission; renew the content-addressed execution
+   and witness digests for every changed owner. Run scoped test witnesses and
+   the hosted Dev Container on the new exact SHA.
+   Regenerate self-CI from its source owners, then refresh the canonical and
+   packaged `generated.documents` fingerprint and run the entrypoint
+   disposition witness; the generator check alone does not close that
+   downstream classification.
+4. Measure actual portable elapsed time and revisit the bound if the failure
+   repeats or its headroom remains too narrow. A passed rerun of the old SHA
+   is diagnostic, not a substitute for the repaired contract.
 
 ## Rollback And Completion
 

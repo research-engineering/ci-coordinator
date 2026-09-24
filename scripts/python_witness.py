@@ -32,7 +32,7 @@ BackendState = Literal["absent", "invalid", "present"]
 ModeRunner = Callable[[], None]
 _COVERAGE_TIMEOUT_SECONDS: Final = 2_400.0
 _PYTHON_MODULE_TIMEOUT_SECONDS: Final = 600.0
-PYTHON_TEST_PROCESS_TIMEOUT_SECONDS: Final = 900.0
+PYTHON_TEST_PROCESS_TIMEOUT_SECONDS: Final = 1_080.0
 
 
 @dataclass(frozen=True, slots=True)
