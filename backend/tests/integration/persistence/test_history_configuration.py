@@ -1,8 +1,14 @@
 import asyncio
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
-from ci_economics.archive_factories import ARCHIVE_TIME, archived_statistics
+from ci_economics.archive_factories import (
+    ARCHIVE_TIME,
+    archived_statistics,
+    history_dataset,
+    history_scan,
+)
 from sqlalchemy import event, func, select
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -18,6 +24,7 @@ from ci_coordinator.persistence._schema_ci_history_control import (
     ci_history_datasets,
     ci_history_scans,
 )
+from ci_coordinator.persistence.ci_history_configuration_store import _validate_receipt
 from ci_coordinator.persistence.ci_history_state_store import (
     load_history_dataset,
     load_history_scan,
@@ -192,6 +199,27 @@ def test_expansion_waits_for_pending_work_and_preserves_existing_contributions(
             await engine.dispose()
 
     asyncio.run(scenario())
+
+
+def test_expansion_replay_requires_the_current_lower_bound_to_cover_its_receipt() -> None:
+    snapshot = replace(history_dataset(), configuration_revision=2)
+    command = ConfigureHistory.model_validate(
+        {
+            "installationId": snapshot.scope.installation_id,
+            "repositoryId": snapshot.scope.repository_id,
+            "expectedRevision": 1,
+            "configuration": snapshot.configuration,
+            "initialCreatedFrom": None,
+            "expandCreatedFrom": (ARCHIVE_TIME - timedelta(days=400)).isoformat(),
+            "rescan": False,
+            "operationId": "expand-replay-bound",
+            "actor": "operator-1",
+        }
+    )
+
+    _validate_receipt(command, snapshot, snapshot, history_scan(snapshot, days=500))
+    with pytest.raises(ValueError, match="current population bound"):
+        _validate_receipt(command, snapshot, snapshot, history_scan(snapshot, days=365))
 
 
 @pytest.mark.parametrize("relation", ["audit_events", "ci_history_datasets", "ci_history_scans"])
