@@ -2514,6 +2514,7 @@ export interface components {
         /** HistoryConfigurationRequest */
         readonly HistoryConfigurationRequest: {
             readonly configuration: components["schemas"]["HistoryConfiguration"];
+            readonly expandCreatedFrom?: components["schemas"]["ObservationTimestamp"] | null;
             /** Expectedrevision */
             readonly expectedRevision: number;
             readonly initialCreatedFrom: components["schemas"]["ObservationTimestamp"] | null;
@@ -2661,7 +2662,7 @@ export interface components {
              * Outcome
              * @enum {string}
              */
-            readonly outcome: "committed" | "replayed" | "revision_conflict" | "operation_conflict" | "capacity_reached" | "dataset_fenced" | "invalid_population";
+            readonly outcome: "committed" | "replayed" | "revision_conflict" | "operation_conflict" | "capacity_reached" | "dataset_fenced" | "pending_work" | "invalid_population";
             /**
              * Schemaversion
              * @default ci-economics-history-mutation/v1

@@ -23,16 +23,19 @@ class HistoryConfigurationRequest(EconomicsPayloadModel):
     expected_revision: int = Field(alias="expectedRevision", ge=0, lt=MAX_SAFE_JSON_INTEGER)
     configuration: HistoryConfiguration
     initial_created_from: ObservationTimestamp | None = Field(alias="initialCreatedFrom")
+    expand_created_from: ObservationTimestamp | None = Field(
+        default=None, alias="expandCreatedFrom", exclude_if=lambda value: value is None
+    )
     rescan: bool
     operation_id: str = Field(
         alias="operationId", min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.-]*$"
     )
 
-    @field_validator("initial_created_from")
+    @field_validator("initial_created_from", "expand_created_from")
     @classmethod
     def admit_initial_time(cls, value: str | None) -> str | None:
         if value is not None and datetime.fromisoformat(value).microsecond:
-            raise ValueError("initial history boundary requires second precision")
+            raise ValueError("history boundary requires second precision")
         return value
 
     @model_validator(mode="after")
@@ -42,6 +45,8 @@ class HistoryConfigurationRequest(EconomicsPayloadModel):
             raise ValueError("initial history alone requires its population lower bound")
         if initial and self.rescan:
             raise ValueError("rescan requires an existing history dataset")
+        if self.expand_created_from is not None and (initial or self.rescan):
+            raise ValueError("history expansion requires an existing dataset without rescan")
         return self
 
     @property
@@ -87,7 +92,13 @@ class HistoryConfigured:
 
 @dataclass(frozen=True, slots=True)
 class HistoryConfigurationConflict:
-    reason: Literal["revision_conflict", "operation_conflict", "capacity_reached", "dataset_fenced"]
+    reason: Literal[
+        "revision_conflict",
+        "operation_conflict",
+        "capacity_reached",
+        "dataset_fenced",
+        "pending_work",
+    ]
 
     def __post_init__(self) -> None:
         if self.reason not in {
@@ -95,6 +106,7 @@ class HistoryConfigurationConflict:
             "operation_conflict",
             "capacity_reached",
             "dataset_fenced",
+            "pending_work",
         }:
             raise ValueError("unknown history configuration conflict")
 

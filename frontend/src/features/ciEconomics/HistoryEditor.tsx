@@ -9,6 +9,7 @@ import {
   sameHistoryConfiguration,
 } from "../../api/ciEconomics/historySchema";
 import type { HistoryStatus } from "../../api/ciEconomics/historyStatusSchema";
+import { observationMicroseconds } from "../../api/ciEconomics/observationSchema";
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
 import type { WorkbenchScope } from "../../api/workbench/client";
 import { HistorySettings } from "./HistorySettings";
@@ -42,6 +43,7 @@ export function HistoryEditor({
   const [base, setBase] = useState(snapshot);
   const [draft, setDraft] = useState(snapshot?.configuration ?? INITIAL);
   const [initialDate, setInitialDate] = useState("");
+  const [expandedDate, setExpandedDate] = useState("");
   const [rescan, setRescan] = useState(false);
   const [operationId, setOperationId] = useState(() => crypto.randomUUID());
   const [write, setWrite] = useState<WriteState>({ kind: "idle" });
@@ -52,18 +54,36 @@ export function HistoryEditor({
   const uncertain = write.kind === "uncertain";
   const fenced = snapshot?.state === "erasing" || snapshot?.state === "erased";
   const newer = (snapshot?.configurationRevision ?? 0) > (base?.configurationRevision ?? 0);
-  const changed = base === null || rescan || !sameHistoryConfiguration(base.configuration, draft);
+  const configurationChanged =
+    base !== null && !sameHistoryConfiguration(base.configuration, draft);
+  const changed = base === null || rescan || expandedDate !== "" || configurationChanged;
   const candidate = historyCommandSchema.safeParse({
     installationId: scope.installationId,
     repositoryId: scope.repositoryId,
     expectedRevision: base?.configurationRevision ?? 0,
     configuration: draft,
     initialCreatedFrom: base === null && initialDate ? `${initialDate}T00:00:00Z` : null,
+    ...(base !== null && expandedDate ? { expandCreatedFrom: `${expandedDate}T00:00:00Z` } : {}),
     rescan,
     operationId,
   });
+  const expandedBound = candidate.success ? candidate.data.expandCreatedFrom : null;
+  const currentBound = status.scan?.createdFrom;
+  const currentBoundRevision =
+    status.snapshot?.configurationRevision === base?.configurationRevision;
+  const expandedInstant = expandedBound ? observationMicroseconds(expandedBound) : undefined;
+  const currentInstant = currentBound ? observationMicroseconds(currentBound) : undefined;
   const valid =
-    candidate.success && (base !== null || initialDate <= status.observedAt.slice(0, 10));
+    candidate.success &&
+    (base !== null || initialDate <= status.observedAt.slice(0, 10)) &&
+    (expandedBound === null ||
+      expandedBound === undefined ||
+      (!configurationChanged &&
+        !rescan &&
+        currentBoundRevision &&
+        expandedInstant !== undefined &&
+        currentInstant !== undefined &&
+        expandedInstant < currentInstant));
   function reload() {
     if (
       pending ||
@@ -75,6 +95,7 @@ export function HistoryEditor({
     setBase(snapshot);
     setDraft(snapshot?.configuration ?? INITIAL);
     setRescan(false);
+    setExpandedDate("");
     setOperationId(crypto.randomUUID());
     setWrite({ kind: "idle" });
   }
@@ -90,6 +111,7 @@ export function HistoryEditor({
         setBase(result.value.snapshot);
         setDraft(result.value.snapshot.configuration);
         setRescan(false);
+        setExpandedDate("");
         setOperationId(crypto.randomUUID());
         setWrite({ kind: "idle" });
         onSaved();
@@ -142,14 +164,31 @@ export function HistoryEditor({
               />
             </label>
           ) : (
-            <label className="observation-toggle">
-              <input
-                type="checkbox"
-                checked={rescan}
-                onChange={(event) => setRescan(event.target.checked)}
-              />
-              Rescan the configured history
-            </label>
+            <>
+              <label>
+                Extend import back to (UTC)
+                <input
+                  type="date"
+                  value={expandedDate}
+                  max={status.scan?.createdFrom.slice(0, 10)}
+                  onChange={(event) => {
+                    setExpandedDate(event.target.value);
+                    if (event.target.value) setRescan(false);
+                  }}
+                />
+              </label>
+              <label className="observation-toggle">
+                <input
+                  type="checkbox"
+                  checked={rescan}
+                  onChange={(event) => {
+                    setRescan(event.target.checked);
+                    if (event.target.checked) setExpandedDate("");
+                  }}
+                />
+                Rescan the configured history
+              </label>
+            </>
           )}
           <label>
             Workflows
@@ -186,6 +225,12 @@ export function HistoryEditor({
         Saved revision {base?.configurationRevision ?? 0}. Pausing preserves recorded statistics.
         Rescanning reconciles existing identities without duplicating them.
       </p>
+      {expandedDate ? (
+        <p className="economics-provenance" role="status">
+          Extending the range rereads existing history and preserves recorded statistics. Save other
+          setting changes separately.
+        </p>
+      ) : null}
       {newer ? (
         <p role="status">A newer configuration is available. Your draft has not been replaced.</p>
       ) : null}
@@ -234,7 +279,9 @@ export function HistoryEditor({
 
 function rejectionMessage(outcome: HistoryMutation["outcome"]): string {
   if (outcome === "invalid_population")
-    return "The initial date is outside the admitted population. Reload and choose an earlier date.";
+    return "The requested history boundary is invalid or no longer current. Reload and choose an earlier date.";
+  if (outcome === "pending_work")
+    return "A discovered run is still pending. Retry the range change after collection advances.";
   if (outcome === "capacity_reached") return "The archive dataset limit has been reached.";
   if (outcome === "dataset_fenced")
     return "This archive is being erased or has already been erased.";

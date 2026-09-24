@@ -73,13 +73,22 @@ export const historyCommandSchema: z.ZodType<HistoryCommand> = z
     initialCreatedFrom: observationTimestamp
       .refine((value) => observationInstant(value)?.slice(20, 26) === "000000")
       .nullable(),
+    expandCreatedFrom: observationTimestamp
+      .refine((value) => observationInstant(value)?.slice(20, 26) === "000000")
+      .nullable()
+      .optional(),
     rescan: z.boolean(),
     operationId,
+  })
+  .transform((value): HistoryCommand => {
+    const { expandCreatedFrom, ...command } = value;
+    return expandCreatedFrom === undefined ? command : { ...command, expandCreatedFrom };
   })
   .refine(
     (value) =>
       (value.expectedRevision === 0) === (value.initialCreatedFrom !== null) &&
-      (value.expectedRevision !== 0 || !value.rescan),
+      (value.expectedRevision !== 0 || !value.rescan) &&
+      (value.expandCreatedFrom == null || (value.expectedRevision > 0 && !value.rescan)),
   );
 
 export const historyMutationSchema: z.ZodType<HistoryMutation> = z
@@ -93,6 +102,7 @@ export const historyMutationSchema: z.ZodType<HistoryMutation> = z
       "operation_conflict",
       "capacity_reached",
       "dataset_fenced",
+      "pending_work",
       "invalid_population",
     ]),
     snapshot: historyDatasetSchema.nullable(),

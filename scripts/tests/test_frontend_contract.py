@@ -349,19 +349,21 @@ def test_rendered_contract_has_exact_control_plane_workbench_surface() -> None:
     ] == [{"ControlPlaneSession": []}]
 
     history_input = contract["components"]["schemas"]["HistoryConfigurationRequest"]
-    assert (
-        set(history_input["required"])
-        == set(history_input["properties"])
-        == {
-            "installationId",
-            "repositoryId",
-            "expectedRevision",
-            "configuration",
-            "initialCreatedFrom",
-            "rescan",
-            "operationId",
-        }
-    )
+    assert set(history_input["required"]) == {
+        "installationId",
+        "repositoryId",
+        "expectedRevision",
+        "configuration",
+        "initialCreatedFrom",
+        "rescan",
+        "operationId",
+    }
+    assert set(history_input["properties"]) == set(history_input["required"]) | {
+        "expandCreatedFrom"
+    }
+    assert history_input["properties"]["expandCreatedFrom"] == {
+        "anyOf": [{"$ref": "#/components/schemas/ObservationTimestamp"}, {"type": "null"}]
+    }
     assert history_input["additionalProperties"] is False
     assert "actor" not in history_input["properties"]
     history_mutation = contract["components"]["schemas"]["HistoryMutationResponse"]

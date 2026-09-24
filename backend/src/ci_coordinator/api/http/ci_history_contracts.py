@@ -30,6 +30,7 @@ class HistoryMutationResponse(ResponseModel):
         "operation_conflict",
         "capacity_reached",
         "dataset_fenced",
+        "pending_work",
         "invalid_population",
     ]
     snapshot: HistoryDatasetPayload | None

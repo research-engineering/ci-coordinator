@@ -28,6 +28,33 @@ test.each(Object.keys(historyCommand()))("requires command operand %s", (key) =>
   );
   expect(historyCommandSchema.safeParse(raw).success).toBe(false);
 });
+test("optional expansion is distinct from rescan and rejects invalid UTC boundaries", () => {
+  const existing = { ...historyCommand(), expectedRevision: 1, initialCreatedFrom: null };
+  expect(historyCommandSchema.parse(existing)).toEqual(existing);
+  expect(Object.hasOwn(historyCommandSchema.parse(existing), "expandCreatedFrom")).toBe(false);
+  expect(
+    Object.hasOwn(
+      historyCommandSchema.parse({ ...existing, expandCreatedFrom: undefined }),
+      "expandCreatedFrom",
+    ),
+  ).toBe(false);
+  expect(historyCommandSchema.parse({ ...existing, expandCreatedFrom: null })).toHaveProperty(
+    "expandCreatedFrom",
+    null,
+  );
+  expect(
+    historyCommandSchema.safeParse({ ...existing, expandCreatedFrom: "2019-12-01T00:00:00Z" })
+      .success,
+  ).toBe(true);
+  for (const candidate of [
+    { ...historyCommand(), expandCreatedFrom: "2019-12-01T00:00:00Z" },
+    { ...existing, expandCreatedFrom: "2019-12-01T00:00:00Z", rescan: true },
+    { ...existing, expandCreatedFrom: "2020-02-31T00:00:00Z" },
+    { ...existing, expandCreatedFrom: "2019-12-01T00:00:00.000001Z" },
+  ]) {
+    expect(historyCommandSchema.safeParse(candidate).success).toBe(false);
+  }
+});
 test.each([
   { installationId: true },
   { repositoryId: "1" },
@@ -128,6 +155,7 @@ test.each([
   "operation_conflict",
   "capacity_reached",
   "dataset_fenced",
+  "pending_work",
   "invalid_population",
 ])("mutation %s has exactly the admitted snapshot relationship", (outcome) => {
   for (const snapshot of [null, historyDataset()]) {

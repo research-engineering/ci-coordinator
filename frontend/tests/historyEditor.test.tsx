@@ -83,7 +83,72 @@ test("explicit range, retention, workflow and quota configure once then pause an
   });
   expect(commands[0]?.configuration.quota.jobs).toBe(50_000);
   expect(commands[0]).not.toHaveProperty("actor");
+  expect(commands[0]).not.toHaveProperty("expandCreatedFrom");
   expect(new Set(commands.map((command) => command.operationId)).size).toBe(3);
+});
+test("an existing archive extends only to an earlier UTC date with unchanged settings", async () => {
+  const commands: HistoryCommand[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      const command: HistoryCommand = await request.json();
+      commands.push(command);
+      return Response.json(historyMutation(command));
+    }),
+  );
+  const view = render(<HistoryEditor {...props()} />);
+  const save = screen.getByRole("button", { name: "Save history" });
+  const date = screen.getByLabelText("Extend import back to (UTC)");
+
+  fireEvent.change(date, { target: { value: "2020-01-01" } });
+  expect(save).toBeDisabled();
+  fireEvent.change(date, { target: { value: "2019-12-01" } });
+  expect(save).toBeEnabled();
+  expect(screen.getByText(/rereads existing history/)).toBeVisible();
+  await userEvent.click(save);
+
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    expectedRevision: 1,
+    initialCreatedFrom: null,
+    expandCreatedFrom: "2019-12-01T00:00:00Z",
+    rescan: false,
+    configuration: historyConfiguration(),
+  });
+  await screen.findByText(/Saved revision 2\./);
+  expect(screen.getByLabelText("Extend import back to (UTC)")).toHaveValue("");
+  fireEvent.change(date, { target: { value: "2019-12-15" } });
+  expect(save).toBeDisabled();
+  const refreshed = historyStatus(historyDataset(historyConfiguration(), 2));
+  if (refreshed.scan === null) throw new Error("configured history requires scan progress");
+  view.rerender(
+    <HistoryEditor
+      {...props()}
+      status={{
+        ...refreshed,
+        scan: {
+          ...refreshed.scan,
+          createdFrom: "2019-12-01T00:00:00Z",
+          windowFrom: "2019-12-01T00:00:00Z",
+          windowThrough: "2019-12-08T00:00:00Z",
+        },
+      }}
+    />,
+  );
+  fireEvent.change(date, { target: { value: "2019-11-01" } });
+  expect(save).toBeEnabled();
+});
+test("expansion cannot be combined with a rescan or another settings edit", async () => {
+  vi.stubGlobal("fetch", vi.fn());
+  render(<HistoryEditor {...props()} />);
+  const date = screen.getByLabelText("Extend import back to (UTC)");
+  const save = screen.getByRole("button", { name: "Save history" });
+  fireEvent.change(date, { target: { value: "2019-12-01" } });
+  await userEvent.click(screen.getByRole("checkbox", { name: "Collection enabled" }));
+  expect(save).toBeDisabled();
+  await userEvent.click(screen.getByRole("checkbox", { name: "Collection enabled" }));
+  await userEvent.click(screen.getByRole("checkbox", { name: "Rescan the configured history" }));
+  expect(screen.getByLabelText("Extend import back to (UTC)")).toHaveValue("");
 });
 test.each(["inherit", "disabled", "forever"])(
   "retention choice %s preserves a distinct contract",
@@ -153,6 +218,7 @@ test.each([
   "operation_conflict",
   "capacity_reached",
   "dataset_fenced",
+  "pending_work",
   "invalid_population",
 ])("rejection %s preserves the draft without pretending to save", async (outcome) => {
   vi.stubGlobal(

@@ -21,6 +21,7 @@ def configure_history_state(
     scan: HistoryScanState | None,
     now: datetime,
     initial_created_from: datetime | None = None,
+    expand_created_from: datetime | None = None,
     rescan: bool = False,
 ) -> tuple[HistoryDataset, HistoryScanState]:
     if type(scope) is not RepositoryScope or type(rescan) is not bool:
@@ -28,7 +29,7 @@ def configure_history_state(
     configuration = HistoryConfiguration.model_validate(configuration)
     now = utc_time(now)
     if prior is None:
-        if scan is not None or initial_created_from is None:
+        if scan is not None or initial_created_from is None or expand_created_from is not None:
             raise ValueError(
                 "initial history requires its population lower bound and no prior scan"
             )
@@ -63,6 +64,22 @@ def configure_history_state(
     cursor = scan.checkpoint.cursor
     if now < max(prior.configured_at, cursor.cycle_started_at):
         raise ValueError("history configuration clock precedes current authority")
+    if expand_created_from is not None:
+        expanded = utc_time(expand_created_from)
+        if (
+            expanded.microsecond
+            or expanded >= cursor.created_from
+            or configuration != prior.configuration
+            or rescan
+        ):
+            raise ValueError("history expansion requires an earlier bound and unchanged policy")
+    restart = (
+        rescan
+        or configuration.workflow_ids != prior.configuration.workflow_ids
+        or expand_created_from is not None
+    )
+    if expand_created_from is not None and scan.checkpoint.pending is not None:
+        raise ValueError("history expansion cannot discard pending attempt work")
     successor = replace(
         prior,
         configuration_revision=prior.configuration_revision + 1,
@@ -70,9 +87,12 @@ def configure_history_state(
         configured_at=now,
         state="active" if configuration.enabled else "paused",
     )
-    if rescan or configuration.workflow_ids != prior.configuration.workflow_ids:
+    if restart:
         cursor = HistoryCursor.start(
-            scope, cursor.created_from, now.replace(microsecond=0), cycle_started_at=now
+            scope,
+            cursor.created_from if expand_created_from is None else expand_created_from,
+            now.replace(microsecond=0),
+            cycle_started_at=now,
         )
         successor_scan = HistoryScanState(
             scope,
