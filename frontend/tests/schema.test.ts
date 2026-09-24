@@ -341,6 +341,11 @@ describe("provider inventory response admission", () => {
       repositoryPageSchema,
     ],
     ["contradictory terminal page", repositoryPageFixture({ totalCount: 2 }), repositoryPageSchema],
+    [
+      "invalid repository creation timestamp",
+      repositoryPageFixture({ repositories: [repositoryFixture({ createdAt: "not-a-date" })] }),
+      repositoryPageSchema,
+    ],
   ])("rejects %s", (_label, value, schema) => {
     expect(schema.safeParse(value).success).toBe(false);
   });

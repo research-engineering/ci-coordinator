@@ -3856,6 +3856,8 @@ export interface components {
         readonly RepositoryResponse: {
             /** Archived */
             readonly archived: boolean;
+            /** Createdat */
+            readonly createdAt: string | null;
             /** Defaultbranch */
             readonly defaultBranch: string;
             /** Disabled */

@@ -24,6 +24,7 @@ export function repositoryFixture(
 ): RepositoryPage["repositories"][number] {
   return {
     archived: false,
+    createdAt: "2020-01-01T00:00:00Z",
     defaultBranch: "master",
     disabled: false,
     fork: false,

@@ -88,6 +88,7 @@ class RepositoryResponse(ProjectedResponseModel):
     disabled: bool
     fork: bool
     workbench_authorized: bool
+    created_at: datetime | None
 
 
 class RepositoryPageResponse(ResponseModel):

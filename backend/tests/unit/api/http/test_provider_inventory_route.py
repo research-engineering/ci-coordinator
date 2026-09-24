@@ -112,6 +112,7 @@ def test_repository_route_returns_scope_bound_page() -> None:
         "repositoryId": 10,
     }
     assert response.json()["repositories"][0]["workbenchAuthorized"] is True
+    assert response.json()["repositories"][0]["createdAt"] == "2026-07-18T12:00:00Z"
     assert use_case.calls == [("repositories", ACTOR, 1, 2, 1)]
 
 
@@ -253,5 +254,6 @@ def _page() -> RepositoryPage:
         disabled=False,
         fork=False,
         workbench_authorized=True,
+        created_at=NOW,
     )
     return RepositoryPage(_installation(), NOW, 2, 1, 2, False, (repository,))

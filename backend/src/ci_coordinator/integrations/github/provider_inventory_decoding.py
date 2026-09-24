@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import cast
 
@@ -155,6 +156,8 @@ def _decode_repository(value: object, *, installation_id: int) -> RepositorySumm
     owner_id = positive_safe_integer(owner.get("id"))
     owner_login = _bounded_text(owner.get("login"), maximum_bytes=512)
     flags = tuple(repository.get(name) for name in ("archived", "disabled", "fork"))
+    raw_created_at = repository.get("created_at")
+    created_at = _repository_created_at(raw_created_at)
     if (
         repository_id is None
         or node_id is None
@@ -165,6 +168,7 @@ def _decode_repository(value: object, *, installation_id: int) -> RepositorySumm
         or owner_id is None
         or owner_login is None
         or any(type(flag) is not bool for flag in flags)
+        or (raw_created_at is not None and created_at is None)
     ):
         return None
     try:
@@ -180,8 +184,20 @@ def _decode_repository(value: object, *, installation_id: int) -> RepositorySumm
             archived=cast(bool, flags[0]),
             disabled=cast(bool, flags[1]),
             fork=cast(bool, flags[2]),
+            created_at=created_at,
         )
     except (TypeError, ValueError):
+        return None
+
+
+def _repository_created_at(value: object) -> datetime | None:
+    if value is None or type(value) is not str:
+        return None
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z", value) is None:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
         return None
 
 

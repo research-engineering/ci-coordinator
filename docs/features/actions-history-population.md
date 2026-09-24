@@ -27,6 +27,16 @@ to handle the provider's 1,000-result search cap. Overall history has no age-bas
 its lower bound comes from repository creation metadata or an explicit bounded
 administrator request, not from the active-evidence registration window.
 
+The [installation repository catalog](https://docs.github.com/en/rest/apps/installations#list-repositories-accessible-to-the-app-installation)
+may expose an admitted repository creation timestamp as a
+UI shortcut for that explicit request. The timestamp is advisory: missing or
+malformed metadata cannot authorize a guessed bound, and a creation date does
+not prove that GitHub still retains every run. The administrator must select
+the shortcut and save the configuration; a deep link without catalog metadata
+continues to accept a manually entered date. The UTC calendar day is rounded
+down to midnight so a run created earlier on the same day is not omitted.
+Selection is scoped to the current repository and browser authority revision.
+
 ## Frozen Identity And Progress
 
 The historical cursor binds exact installation/repository scope, the requested

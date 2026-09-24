@@ -18,6 +18,27 @@ function renderCatalog(handler: (request: Request) => Promise<Response>) {
   return fetch;
 }
 
+test("repository selection carries admitted creation metadata without changing scope", async () => {
+  const onSelect = vi.fn();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) =>
+      Response.json(
+        new URL(request.url).pathname.endsWith("/installations")
+          ? installationCatalogFixture()
+          : repositoryPageFixture(),
+      ),
+    ),
+  );
+  render(<RepositoryCatalog itemLimit={10} onSelect={onSelect} />);
+  await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+  expect(onSelect).toHaveBeenCalledWith(
+    { installationId: 1, repositoryId: 1, limit: 10 },
+    "example-org/ci-coordinator",
+    "2020-01-01T00:00:00Z",
+  );
+});
+
 test.each([
   [false, false],
   [true, false],

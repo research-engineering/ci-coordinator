@@ -23,7 +23,7 @@ const EMPTY_INSTALLATIONS: readonly Installation[] = [];
 
 interface RepositoryCatalogProps {
   readonly itemLimit: number;
-  readonly onSelect: (scope: WorkbenchScope, repositoryName?: string) => void;
+  readonly onSelect: (scope: WorkbenchScope, repositoryName?: string, createdAt?: string) => void;
 }
 
 export function RepositoryCatalog({ itemLimit, onSelect }: RepositoryCatalogProps) {
@@ -138,6 +138,7 @@ export function RepositoryCatalog({ itemLimit, onSelect }: RepositoryCatalogProp
                 limit: itemLimit,
               },
               repository.fullName,
+              repository.createdAt ?? undefined,
             )
           }
         >

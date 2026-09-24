@@ -27,6 +27,60 @@ function props() {
   return { scope: HISTORY_SCOPE, status: historyStatus(), session, stale: false, onSaved: vi.fn() };
 }
 
+test("repository creation date is an explicit UTC shortcut, not an automatic write", async () => {
+  vi.stubGlobal("fetch", vi.fn());
+  render(
+    <HistoryEditor
+      {...props()}
+      status={historyStatus(null)}
+      repositoryCreatedAt="2020-01-01T12:34:56Z"
+    />,
+  );
+  expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("");
+  expect(screen.getByRole("button", { name: "Save history" })).toBeDisabled();
+  await userEvent.click(
+    screen.getByRole("button", { name: "Use repository creation date (2020-01-01)" }),
+  );
+  expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("2020-01-01");
+  expect(screen.getByRole("button", { name: "Save history" })).toBeEnabled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("creation shortcut only offers a genuinely earlier bound and leaves manual dates available", async () => {
+  vi.stubGlobal("fetch", vi.fn());
+  const view = render(<HistoryEditor {...props()} repositoryCreatedAt="2019-12-01T12:00:00Z" />);
+  await userEvent.click(screen.getByRole("button", { name: /Use repository creation date/ }));
+  expect(screen.getByLabelText("Extend import back to (UTC)")).toHaveValue("2019-12-01");
+  view.rerender(<HistoryEditor {...props()} repositoryCreatedAt="2025-01-01T00:00:00Z" />);
+  expect(screen.queryByRole("button", { name: /Use repository creation date/ })).toBeNull();
+  fireEvent.change(screen.getByLabelText("Extend import back to (UTC)"), {
+    target: { value: "2019-11-01" },
+  });
+  expect(screen.getByLabelText("Extend import back to (UTC)")).toHaveValue("2019-11-01");
+});
+
+test.each([
+  [undefined, false],
+  ["2026-09-12T10:00:01Z", false],
+  ["2026-09-12T10:00:00Z", true],
+  ["2019-12-31T23:59:59Z", true],
+] as const)("initial creation bound %s offers shortcut=%s", (createdAt, offered) => {
+  vi.stubGlobal("fetch", vi.fn());
+  render(
+    <HistoryEditor {...props()} status={historyStatus(null)} repositoryCreatedAt={createdAt} />,
+  );
+  expect(Boolean(screen.queryByRole("button", { name: /Use repository creation date/ }))).toBe(
+    offered,
+  );
+  expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("");
+});
+
+test("creation date equal to the existing lower bound cannot request an empty expansion", () => {
+  vi.stubGlobal("fetch", vi.fn());
+  render(<HistoryEditor {...props()} repositoryCreatedAt="2020-01-01T00:00:00Z" />);
+  expect(screen.queryByRole("button", { name: /Use repository creation date/ })).toBeNull();
+});
+
 test("explicit range, retention, workflow and quota configure once then pause and rescan", async () => {
   const commands: HistoryCommand[] = [];
   vi.stubGlobal(

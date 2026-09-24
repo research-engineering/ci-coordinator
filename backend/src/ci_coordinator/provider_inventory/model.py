@@ -87,6 +87,7 @@ class RepositorySummary:
     disabled: bool
     fork: bool
     workbench_authorized: bool = False
+    created_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if type(self.scope) is not RepositoryScope:
@@ -104,6 +105,8 @@ class RepositorySummary:
         for value in (self.archived, self.disabled, self.fork, self.workbench_authorized):
             if type(value) is not bool:
                 raise TypeError("repository flags must be exact booleans")
+        if self.created_at is not None:
+            _require_aware_instant(self.created_at)
 
 
 @dataclass(frozen=True, slots=True)

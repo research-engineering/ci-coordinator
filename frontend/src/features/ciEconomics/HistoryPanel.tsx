@@ -14,10 +14,12 @@ const ArchiveBrowser = lazy(() =>
 
 export function HistoryPanel({
   scope,
+  repositoryCreatedAt,
   session,
   active = true,
 }: {
   readonly scope: WorkbenchScope;
+  readonly repositoryCreatedAt?: string | undefined;
   readonly session: ControlPlaneSession | undefined;
   readonly active?: boolean;
 }) {
@@ -101,6 +103,7 @@ export function HistoryPanel({
           <div hidden={state.value.snapshot !== null && view !== "settings"}>
             <HistoryEditor
               scope={scope}
+              repositoryCreatedAt={repositoryCreatedAt}
               status={state.value}
               session={session}
               stale={state.failure !== undefined}
