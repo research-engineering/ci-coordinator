@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from scripts import devcontainer_witness
 from scripts.bounded_process import CommandResult, ResidualProcessGroupPolicy
+from scripts.dev_environment.identity import InstanceIdentity, derive_instance_identity
+from scripts.dev_environment.private_files import bounded_private_lock, ensure_private_directory
 from scripts.devcontainer_witness import (
     admitted_devcontainer_source,
     verify_devcontainer,
@@ -594,6 +596,68 @@ def test_source_finalization_is_clipped_by_the_nonrenewable_outer_phase(
 ) -> None:
     monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: 2_050.0)
     assert devcontainer_witness._finalization_deadline(1_920) == 2_100
+
+
+def _main_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> InstanceIdentity:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    identity = derive_instance_identity(repository, state_home=tmp_path / "state")
+    (repository / ".git").mkdir()
+    monkeypatch.setattr(devcontainer_witness, "REPO_ROOT", repository)
+    monkeypatch.setattr(devcontainer_witness, "derive_instance_identity", lambda _root: identity)
+    return identity
+
+
+def test_main_shares_work_deadline_and_finalizes_source_before_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    identity = _main_identity(tmp_path, monkeypatch)
+    now = [0.0]
+    monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: now[0])
+    git_deadlines: list[float] = []
+
+    def git(cwd: Path, arguments: Sequence[str], deadline: float) -> CommandResult:
+        assert cwd == identity.repo_root
+        git_deadlines.append(deadline)
+        now[0] += 10
+        if tuple(arguments) == ("rev-parse", "HEAD"):
+            return CommandResult(0, "a" * 40, "")
+        assert tuple(arguments) == ("status", "--porcelain", "--untracked-files=all")
+        return CommandResult(0, "", "")
+
+    def witness(*, witness_id: str, workspace_root: Path, execution_deadline: float) -> None:
+        assert witness_id == identity.project_name
+        assert workspace_root == identity.repo_root
+        assert now[0] == 20
+        assert execution_deadline == 1_920
+        now[0] = 2_030
+
+    monkeypatch.setattr(devcontainer_witness, "_git", git)
+    monkeypatch.setattr(devcontainer_witness, "verify_devcontainer", witness)
+    assert devcontainer_witness.main() == 0
+    assert git_deadlines == [1_920, 1_920, 2_090, 2_090]
+    assert now[0] == 2_050
+    assert json.loads(capsys.readouterr().out)["state"] == "passed"
+
+
+def test_busy_main_ownership_rejects_before_source_or_provider_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    identity = _main_identity(tmp_path, monkeypatch)
+    directory = identity.state_home / "witness-locks"
+    ensure_private_directory(identity.state_home)
+    ensure_private_directory(directory)
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("busy witness must not admit source or access provider")
+
+    monkeypatch.setattr(devcontainer_witness, "admitted_devcontainer_source", forbidden)
+    monkeypatch.setattr(devcontainer_witness, "verify_devcontainer", forbidden)
+    with bounded_private_lock(directory / f"{identity.project_name}.lock"):
+        assert devcontainer_witness.main() == 1
+    captured = capsys.readouterr()
+    assert "lock is busy" in captured.err
+    assert captured.out == ""
 
 
 def test_witness_rejects_untrusted_cleanup_identity() -> None:
