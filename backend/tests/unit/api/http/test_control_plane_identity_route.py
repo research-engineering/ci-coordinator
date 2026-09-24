@@ -368,14 +368,22 @@ def test_back_channel_logout_preserves_failure_algebra(
     assert response.headers["cache-control"] == "no-store"
 
 
-def test_back_channel_logout_accepts_only_the_exact_form_boundary() -> None:
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        "application/x-www-form-urlencoded",
+        "APPLICATION/X-WWW-FORM-URLENCODED",
+    ],
+)
+def test_back_channel_logout_accepts_only_the_exact_form_boundary(content_type: str) -> None:
     identity = _Identity()
     verifier = _LogoutVerifier()
     client = _client(identity, verifier=verifier)
 
     accepted = client.post(
         KEYCLOAK_BACK_CHANNEL_LOGOUT_PATH,
-        data={"logout_token": "signed-token"},
+        content=b"logout_token=signed-token",
+        headers={"Content-Type": content_type},
     )
     rejected = (
         client.post(
@@ -402,10 +410,68 @@ def test_back_channel_logout_accepts_only_the_exact_form_boundary() -> None:
     assert accepted.status_code == 204
     assert accepted.headers["cache-control"] == "no-store"
     assert verifier.calls == ["signed-token"]
+    assert identity.calls == [("back-channel", _logout_evidence())]
     assert all(
         (response.status_code, response.json()) == (400, {"ok": False, "error": "invalid_logout"})
         for response in rejected
     )
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        [],
+        [("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")],
+        [("Content-Type", 'application/x-www-form-urlencoded; charset="UTF-8"')],
+        [("Content-Type", "application/x-www-form-urlencoded; charset=ISO-8859-1")],
+        [("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8; charset=UTF-8")],
+        [("Content-Type", "application/x-www-form-urlencoded; charset=")],
+        [("Content-Type", "application/x-www-form-urlencoded; unknown=value")],
+        [("Content-Type", "application/x-www-form-urlencoded, application/x-www-form-urlencoded")],
+        [
+            ("Content-Type", "application/x-www-form-urlencoded"),
+            ("Content-Type", "application/x-www-form-urlencoded"),
+        ],
+    ],
+)
+def test_back_channel_logout_unadmitted_media_type_stops_before_verification(
+    headers: list[tuple[str, str]],
+) -> None:
+    identity, verifier = _Identity(), _LogoutVerifier()
+    response = _client(identity, verifier=verifier).post(
+        KEYCLOAK_BACK_CHANNEL_LOGOUT_PATH,
+        content=b"logout_token=signed-token",
+        headers=headers,
+    )
+    assert (response.status_code, response.json()) == (
+        400,
+        {"ok": False, "error": "invalid_logout"},
+    )
+    assert response.headers["cache-control"] == "no-store"
+    assert verifier.calls == []
+    assert identity.calls == []
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        ("Authorization", "Bearer signed-token"),
+        ("Cookie", "session=value"),
+        ("Origin", _PUBLIC_ORIGIN),
+    ],
+)
+def test_back_channel_logout_form_never_admits_ambiguous_credentials(
+    header: tuple[str, str],
+) -> None:
+    identity, verifier = _Identity(), _LogoutVerifier()
+    response = _client(identity, verifier=verifier).post(
+        KEYCLOAK_BACK_CHANNEL_LOGOUT_PATH,
+        content=b"logout_token=signed-token",
+        headers=[("Content-Type", "application/x-www-form-urlencoded"), header],
+    )
+    assert response.status_code == 400
+    assert verifier.calls == []
+    assert identity.calls == []
 
 
 def _client(

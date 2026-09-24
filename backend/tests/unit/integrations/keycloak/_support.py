@@ -153,7 +153,6 @@ def claims(kind: TokenKind) -> dict[str, object]:
             "typ": "Bearer",
             "aud": [API_CLIENT_ID, "account"],
             "azp": "automation-client",
-            "nbf": NOW - 1,
             "resource_access": {API_CLIENT_ID: {"roles": ["read", "audit"]}},
         }
     return {

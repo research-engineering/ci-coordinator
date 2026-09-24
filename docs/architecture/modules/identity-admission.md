@@ -25,7 +25,11 @@ network I/O. `verify_actions_oidc` is the later adapter that must compose JWT
 signature verification with this claim predicate before production use.
 
 The adapter accepts a bounded, caller-fetched JWK snapshot and admits exactly
-an `RS256` compact JWT with `alg`, `kid`, and an optional `typ=JWT` header.
+an `RS256` compact JWT with `alg`, `kid`, optional `typ=JWT`, and optional
+`x5t` metadata. When present, `x5t` must be a canonical unpadded base64url
+encoding of exactly 20 bytes. It never selects a key or establishes certificate
+trust. Header JSON must be a bounded object with unique members; malformed
+values, critical extensions, and all other header fields remain rejected.
 It never follows token-supplied key URLs. The selected JWK must be a unique
 `RSA`, `use=sig`, `alg=RS256` verification key projected only from recognized
 public verification members. Unknown provider metadata is discarded before
@@ -173,3 +177,25 @@ ci_coordinator/identity_admission/claims.py
 - workflow identity allowlist tests.
 - no selected plan can be issued from rejected identity.
 - audit fact redaction tests for raw JWT, secrets, and signatures.
+
+## 12. Provider Header Compatibility
+
+[GitHub's OIDC profile](https://docs.github.com/en/actions/concepts/security/openid-connect)
+includes optional `x5t`. Its shape follows
+[RFC 7515 section 4.1.7](https://www.rfc-editor.org/rfc/rfc7515.html#section-4.1.7);
+it is metadata, never key authority. Canonical shape admission leaves unique
+`kid`, signature, issuer, audience and temporal verification unchanged.
+
+The JOSE library remains the compact JWS/signature owner. Its JSON extraction
+does not reject duplicate members, so the existing bounded strict JSON loader
+guards this boundary before extraction. No remote key URL or additional
+header extension is admitted.
+
+Independent signed-token witnesses cover headers with and without `x5t`,
+malformed and duplicate members, critical extensions, key substitution and
+signature tampering. Re-signing different valid metadata must preserve claim
+identity; changing signed bytes without re-signing must fail.
+
+Revisit this profile on provider header changes, parsing-library changes or a
+contrary live receipt. A documented example does not prove every issued token
+has that shape, and local conformance does not prove live enrollment.
