@@ -80,6 +80,10 @@ export const historyCommandSchema: z.ZodType<HistoryCommand> = z
     rescan: z.boolean(),
     operationId,
   })
+  .transform((value): HistoryCommand => {
+    const { expandCreatedFrom, ...command } = value;
+    return expandCreatedFrom === undefined ? command : { ...command, expandCreatedFrom };
+  })
   .refine(
     (value) =>
       (value.expectedRevision === 0) === (value.initialCreatedFrom !== null) &&

@@ -83,6 +83,7 @@ test("explicit range, retention, workflow and quota configure once then pause an
   });
   expect(commands[0]?.configuration.quota.jobs).toBe(50_000);
   expect(commands[0]).not.toHaveProperty("actor");
+  expect(commands[0]).not.toHaveProperty("expandCreatedFrom");
   expect(new Set(commands.map((command) => command.operationId)).size).toBe(3);
 });
 test("an existing archive extends only to an earlier UTC date with unchanged settings", async () => {

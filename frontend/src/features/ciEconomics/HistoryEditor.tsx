@@ -63,7 +63,7 @@ export function HistoryEditor({
     expectedRevision: base?.configurationRevision ?? 0,
     configuration: draft,
     initialCreatedFrom: base === null && initialDate ? `${initialDate}T00:00:00Z` : null,
-    expandCreatedFrom: base !== null && expandedDate ? `${expandedDate}T00:00:00Z` : null,
+    ...(base !== null && expandedDate ? { expandCreatedFrom: `${expandedDate}T00:00:00Z` } : {}),
     rescan,
     operationId,
   });

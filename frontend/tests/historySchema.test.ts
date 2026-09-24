@@ -30,9 +30,17 @@ test.each(Object.keys(historyCommand()))("requires command operand %s", (key) =>
 });
 test("optional expansion is distinct from rescan and rejects invalid UTC boundaries", () => {
   const existing = { ...historyCommand(), expectedRevision: 1, initialCreatedFrom: null };
-  expect(historyCommandSchema.safeParse(existing).success).toBe(true);
-  expect(historyCommandSchema.safeParse({ ...existing, expandCreatedFrom: null }).success).toBe(
-    true,
+  expect(historyCommandSchema.parse(existing)).toEqual(existing);
+  expect(Object.hasOwn(historyCommandSchema.parse(existing), "expandCreatedFrom")).toBe(false);
+  expect(
+    Object.hasOwn(
+      historyCommandSchema.parse({ ...existing, expandCreatedFrom: undefined }),
+      "expandCreatedFrom",
+    ),
+  ).toBe(false);
+  expect(historyCommandSchema.parse({ ...existing, expandCreatedFrom: null })).toHaveProperty(
+    "expandCreatedFrom",
+    null,
   );
   expect(
     historyCommandSchema.safeParse({ ...existing, expandCreatedFrom: "2019-12-01T00:00:00Z" })
