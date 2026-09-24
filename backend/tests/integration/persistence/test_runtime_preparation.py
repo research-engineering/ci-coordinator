@@ -14,6 +14,7 @@ from app.test_candidate_planning import _admitted_draft
 from cryptography.hazmat.primitives.asymmetric import rsa
 from fastapi.testclient import TestClient
 from integrations.test_github_repository_context import (
+    _comparison,
     _contents_response,
     _file,
     _graph,
@@ -90,7 +91,7 @@ def test_connected_webhook_preparation_keeps_current_request_authority(
                 name="renamed" if changed and change == "repository_drift" else "ci",
             )
         elif path.startswith("/repos/example/ci/compare/"):
-            body = json.dumps({"files": [_file("src/module.py")]}).encode()
+            body = _comparison([_file("src/module.py")])
         elif path == f"/repos/example/ci/contents/{DEPENDENCY_GRAPH_PATH}":
             body = _contents_response(DEPENDENCY_GRAPH_PATH, json.dumps(graph).encode())
         else:
