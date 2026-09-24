@@ -616,9 +616,17 @@ def test_main_shares_work_deadline_and_finalizes_source_before_success(
     monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: now[0])
     git_deadlines: list[float] = []
 
+    def admit_identity(_root: Path) -> InstanceIdentity:
+        now[0] = 5
+        return identity
+
+    monkeypatch.setattr(devcontainer_witness, "derive_instance_identity", admit_identity)
+
     def git(cwd: Path, arguments: Sequence[str], deadline: float) -> CommandResult:
         assert cwd == identity.repo_root
         git_deadlines.append(deadline)
+        if len(git_deadlines) > 2:
+            assert capsys.readouterr().out == ""
         now[0] += 10
         if tuple(arguments) == ("rev-parse", "HEAD"):
             return CommandResult(0, "a" * 40, "")
@@ -628,7 +636,7 @@ def test_main_shares_work_deadline_and_finalizes_source_before_success(
     def witness(*, witness_id: str, workspace_root: Path, execution_deadline: float) -> None:
         assert witness_id == identity.project_name
         assert workspace_root == identity.repo_root
-        assert now[0] == 20
+        assert now[0] == 25
         assert execution_deadline == 1_920
         now[0] = 2_030
 
