@@ -78,6 +78,15 @@ Preserve independent FullCI and non-enforcing observation. Coherent owner-bound
 repairs, tests and documentation may share a PR across the cohorts; unrelated
 Nits do not block the whole pilot, and live evidence is never inferred locally.
 
+[PR #13](https://github.com/research-engineering/ci-coordinator/pull/13)
+merged graph-change and comparison admission, independent verifier fallback,
+and public omission-validator binding repairs after exact-head native checks.
+These close their bounded source counterexamples, not CI-054 as a whole,
+baseline graph completeness, provider enforcement or production omission.
+The next coherent repairs cover provider-token compatibility, bounded workflow
+and policy admission, and release-evidence selection; remaining findings keep
+their per-source dispositions in the external evidence register.
+
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.
 CI-005 measures comparable execution using CI-027/CI-028; CI-006 optimizes the
