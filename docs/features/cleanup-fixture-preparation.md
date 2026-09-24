@@ -1,6 +1,6 @@
 # Cleanup Fixture Preparation
 
-Status: bounded test-only design; native equivalence and timing pending
+Status: prior fixture admitted; measured write follow-up awaits exact-head CI
 
 Execution: [preparation plan](cleanup-fixture-preparation-plan.md).
 Baseline: `dc4fadd145b31754de2d857d37c94c2bff22b9e9`.
@@ -92,3 +92,45 @@ before commit; decreased corpus, changed selection or weakened cleanup deadline.
 Production sources, shared helper cohorts, registries and existing designs are
 outside this delta. Runtime speedup and exhaustive causal attribution remain
 unresolved until native qualification on the integrated head.
+
+## Follow-up: Measured Expansion Write
+
+The exact-master serial receipt at `640a463` measured 88.97 seconds of
+preparation, including 12.47 seconds of committed seed calls. Two local
+Docker/PostgreSQL observations on the later source separated the remaining
+work: retention shifts across all 100 expired subjects took 0.52 and 0.45
+seconds, while expansion took 22.57 and 21.58 seconds. In the second run,
+construction of all canonical bodies and hashes took 2.25 seconds; the
+expansion transaction took 19.29 seconds. That interval includes connection
+acquisition, header and trigger-mode changes, row transfer, commit and pool
+return, not only insertion. These exploratory local observations derive from
+`master@0ed8dec` with uncommitted timing instrumentation; no frozen before
+patch receipt exists. They identify a candidate, not a qualified or portable
+speedup or production-capacity claim.
+
+Keep the same 200,000 constructed job rows and use
+[psycopg's row-wise `COPY`](https://www.psycopg.org/psycopg3/docs/basic/copy.html)
+only for the privileged fixture insertion, on the SQLAlchemy-owned raw driver
+connection inside the existing transaction. SQLAlchemy documents this
+[raw-connection boundary](https://docs.sqlalchemy.org/en/20/faq/connections.html).
+The table and column identifiers
+come from the SQLAlchemy table and the existing row mapping. Restore normal
+trigger mode before insertion as before. For each source, the input row list,
+column order, transaction, and final queryable relation stay the same; only
+the PostgreSQL transfer protocol changes. The one fully decoded 2,000-job
+sample, counts, live survivor, canonical digest, rollback and cleanup oracle
+remain independent checks. A different row, bytea adaptation, trigger state,
+transaction boundary, or full-read result falsifies the equivalence.
+
+The rejected alternative is batching retention shifts: their measured total
+is below one second and changing their intermediate transaction order buys
+little while adding a new proof obligation. Do not move this fixture-only
+`COPY` into the runtime persistence adapter without a separate owner decision.
+
+One same-host before/after pair retained all test assertions: preparation
+31.60 to 17.42 seconds, expansion transaction 19.29 to 4.00 seconds, and complete
+test wall time 36.43 to 22.54 seconds. Construction remained 2.25 versus
+2.00 seconds. These are individual observations with Docker/cache variance;
+the exact-head hosted result must be measured before claiming a portable
+speedup, and this fixture optimization says nothing about production cleanup
+capacity.

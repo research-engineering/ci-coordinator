@@ -3,6 +3,7 @@ import json
 from dataclasses import replace
 from datetime import timedelta
 from time import perf_counter_ns
+from typing import Literal
 
 import pytest
 from ci_economics.budget_factories import budget_command
@@ -59,6 +60,10 @@ def test_maximum_cleanup_batch_preserves_live_children_and_finishes_within_profi
             now = await database_now(engine)
             preparation_started = perf_counter_ns()
             committed_seed_elapsed = 0
+            expansion_elapsed = 0
+            expansion_construction_elapsed = 0
+            expansion_transaction_elapsed = 0
+            retention_shift_elapsed = 0
             async with asyncio.timeout(180):
                 for index in range(101):
                     prototype = snapshot(subject(1000 + index), now)
@@ -80,7 +85,13 @@ def test_maximum_cleanup_batch_preserves_live_children_and_finishes_within_profi
                     await seed_cleanup_attempt(engine, source, evidence, report)
                     committed_seed_elapsed += perf_counter_ns() - seed_started
                     if index < 100:
-                        digest = await expand_cleanup_snapshot(admin, evidence, 2000)
+                        expansion_started = perf_counter_ns()
+                        digest, construction, write_duration = await expand_cleanup_snapshot(
+                            admin, evidence, 2000
+                        )
+                        expansion_elapsed += perf_counter_ns() - expansion_started
+                        expansion_construction_elapsed += construction
+                        expansion_transaction_elapsed += write_duration
                         if index == 0:
                             decoded = await collection.load_measurements(source.attempt)
                             assert decoded is not None
@@ -90,9 +101,11 @@ def test_maximum_cleanup_batch_preserves_live_children_and_finishes_within_profi
                             assert len(restored.jobs) == 2000
                             assert restored.jobs[0].provider_job_id == 1
                             assert restored.jobs[-1].provider_job_id == 2000
+                        shift_started = perf_counter_ns()
                         await shift_retention_epoch(
                             admin, source.source_id, timedelta(days=90, hours=1)
                         )
+                        retention_shift_elapsed += perf_counter_ns() - shift_started
                     else:
                         live_source = source
             preparation_elapsed = perf_counter_ns() - preparation_started
@@ -221,6 +234,10 @@ def test_maximum_cleanup_batch_preserves_live_children_and_finishes_within_profi
                             "expiredSignals": 100,
                             "preparationNanoseconds": preparation_elapsed,
                             "committedSeedNanoseconds": committed_seed_elapsed,
+                            "expansionNanoseconds": expansion_elapsed,
+                            "expansionConstructionNanoseconds": expansion_construction_elapsed,
+                            "expansionTransactionNanoseconds": expansion_transaction_elapsed,
+                            "retentionShiftNanoseconds": retention_shift_elapsed,
                             "cleanupStatements": len(statements),
                             "committedCleanupNanoseconds": elapsed,
                             "populatedSelectionPlan": plan[0],
@@ -353,6 +370,67 @@ def test_cleanup_seed_admits_once_and_rolls_back_partial_construction(
                 assert await connection.scalar(text("SHOW session_replication_role")) == "origin"
             assert isinstance(engine.pool, AsyncAdaptedQueuePool) and engine.pool.checkedout() == 0
         finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("failure", ["error", "cancelled"])
+def test_expansion_copy_rolls_back_and_allows_exact_retry(
+    runtime_postgres_database_url: str,
+    postgres_database_url: str,
+    failure: Literal["error", "cancelled"],
+) -> None:
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        admin = create_postgres_engine(postgres_database_url)
+        try:
+            now = await database_now(engine)
+            prototype = snapshot(subject(1000), now)
+            source = ProviderRunCollectionSource(prototype.attempt, now, "2026-03-10", "a" * 64)
+            evidence = replace(prototype, subject_id=source.source_id)
+            report = replace(measurement_report(attempt=source.attempt), reported_at=now)
+            budgets = TransactionalBudgetPolicyStore(lambda: PostgresCiEconomicsUnitOfWork(engine))
+            assert isinstance(
+                await budgets.configure_policy(budget_command(report)), BudgetPolicyCommitted
+            )
+            await seed_cleanup_attempt(engine, source, evidence, report)
+            expected_error = asyncio.CancelledError if failure == "cancelled" else RuntimeError
+            with pytest.raises(expected_error):
+                await expand_cleanup_snapshot(
+                    admin,
+                    evidence,
+                    404,
+                    interrupt_after_first_copy_row=failure,
+                )
+            assert isinstance(admin.pool, AsyncAdaptedQueuePool)
+            assert admin.pool.checkedout() == 0
+            async with admin.connect() as connection:
+                header = (
+                    await connection.execute(
+                        select(ci_workflow_attempt_snapshots).where(
+                            ci_workflow_attempt_snapshots.c.subject_id == source.source_id
+                        )
+                    )
+                ).mappings().one()
+                assert header["job_count"] == 1
+                assert header["snapshot_digest"] == evidence.snapshot_digest
+                assert (
+                    await connection.scalar(
+                        select(func.count()).select_from(ci_workflow_attempt_snapshot_jobs)
+                    )
+                    == 1
+                )
+                assert await connection.scalar(text("SHOW session_replication_role")) == "origin"
+            digest, _, _ = await expand_cleanup_snapshot(admin, evidence, 404)
+            decoded = await store(engine).load_measurements(source.attempt)
+            assert decoded is not None
+            assert isinstance(decoded.snapshot, IndependentAttemptSnapshot)
+            assert decoded.snapshot.evidence.snapshot_digest == digest
+            assert len(decoded.snapshot.evidence.jobs) == 404
+            assert admin.pool.checkedout() == 0
+        finally:
+            await admin.dispose()
             await engine.dispose()
 
     asyncio.run(scenario())

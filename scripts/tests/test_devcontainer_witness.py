@@ -356,14 +356,14 @@ def test_witness_provisions_proves_and_cleans_one_owned_container() -> None:
     ) in commands
     timeout_by_command = dict(runner.calls)
     assert timeout_by_command[commands[0]] == 600
-    assert timeout_by_command[commands[proof_index]] == 1_200
+    assert timeout_by_command[commands[proof_index]] == 1_380
     assert timeout_by_command[commands[node_index]] == 60
     plan = load_quality_plan()
     python_test = plan.commands["python.test"]
     assert python_test.timeout_ms == int((PYTHON_TEST_PROCESS_TIMEOUT_SECONDS + 60) * 1_000)
     maximum_portable_timeout_ms = max(command.timeout_ms for command in plan.portable_commands())
     assert timeout_by_command[commands[proof_index]] == (maximum_portable_timeout_ms / 1_000 + 240)
-    assert plan.commands["devcontainer.verify"].timeout_ms == (600 + 60 + 1_200 + 120) * 1_000
+    assert plan.commands["devcontainer.verify"].timeout_ms == (600 + 60 + 1_380 + 120) * 1_000
     assert disconnect_index < node_index < proof_index
     assert commands[-1] == ("docker", "rm", "--force", _CONTAINER_ID)
 
@@ -389,7 +389,7 @@ def test_witness_rejects_a_longer_portable_command_outside_the_parent_budget(
         devcontainer_witness._admit_portable_proof_deadlines(_REPOSITORY_ROOT)
 
 
-@pytest.mark.parametrize("timeout_ms", [None, 1_979_999])
+@pytest.mark.parametrize("timeout_ms", [None, 2_159_999])
 def test_witness_rejects_a_missing_or_short_container_stage_budget(
     monkeypatch: pytest.MonkeyPatch,
     timeout_ms: int | None,

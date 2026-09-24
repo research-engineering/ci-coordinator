@@ -269,8 +269,8 @@ def test_coverage_witness_preserves_complete_selection_and_process_bound(
         "../scripts/tests",
         "../scripts/conformance/audit_persistence_byte_contract_test.py",
     )
-    assert observed["timeout_seconds"] == 900.0
-    assert load_quality_plan().commands["python.test"].timeout_ms == 960_000
+    assert observed["timeout_seconds"] == 1_080.0
+    assert load_quality_plan().commands["python.test"].timeout_ms == 1_140_000
 
 
 def test_dependency_audit_covers_supported_python_and_frontend_locks(
