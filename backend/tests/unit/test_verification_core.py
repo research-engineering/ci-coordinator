@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import replace
+from typing import NoReturn
 
 import pytest
 from planning_core._support import make_input_value, make_policy_value
@@ -19,6 +20,8 @@ from ci_coordinator.planning_core import (
     OmissionProof,
     PlanningPolicy,
     PlanningRejected,
+    SelectedObligation,
+    SelectedWitness,
     build_omission_proof,
     close_selected_witnesses,
     full_ci_fallback_plan,
@@ -28,10 +31,13 @@ from ci_coordinator.planning_core import planner as planner_module
 from ci_coordinator.repo_context import DiffFileChangeInput, PlanningInput
 from ci_coordinator.validation_contract import ValidationObligation
 from ci_coordinator.verification_core import (
+    admit_deterministic_plan,
     compare_coverage,
     validate_omission_proof,
     verify,
 )
+from ci_coordinator.verification_core import model as verified_model
+from ci_coordinator.verification_core.model import make_verified_plan
 
 
 def test_agent_advice_can_only_strengthen_obligation_and_witness_coverage() -> None:
@@ -104,13 +110,44 @@ def test_full_ci_candidate_rejects_a_mismatched_policy_context(
     assert verified.fallback.reason == "deterministic_plan_mismatch"
 
 
-def test_agent_obligation_cannot_expand_execution_authority() -> None:
+@pytest.mark.parametrize(
+    "authority_field",
+    (
+        "runner_profile_id",
+        "permission_profile_id",
+        "credential_profile_id",
+        "fixture_profile_id",
+        "service_profile_ids",
+        "capacity_class_id",
+    ),
+)
+def test_agent_obligation_cannot_expand_execution_authority(
+    authority_field: str,
+) -> None:
     base_policy = make_policy_value()
     catalog = base_policy.catalog
+    profile = catalog.execution_profiles[0]
     privileged_profile = replace(
-        catalog.execution_profiles[0],
+        profile,
         profile_id="python-privileged",
-        credential_profile_id="deploy",
+        runner_profile_id="privileged-runner"
+        if authority_field == "runner_profile_id"
+        else profile.runner_profile_id,
+        permission_profile_id="contents-write"
+        if authority_field == "permission_profile_id"
+        else profile.permission_profile_id,
+        credential_profile_id="deploy"
+        if authority_field == "credential_profile_id"
+        else profile.credential_profile_id,
+        fixture_profile_id="integration"
+        if authority_field == "fixture_profile_id"
+        else profile.fixture_profile_id,
+        service_profile_ids=("database",)
+        if authority_field == "service_profile_ids"
+        else profile.service_profile_ids,
+        capacity_class_id="privileged-capacity"
+        if authority_field == "capacity_class_id"
+        else profile.capacity_class_id,
     )
     witnesses = tuple(
         replace(item, execution_profile_id="python-privileged")
@@ -143,6 +180,199 @@ def test_agent_obligation_cannot_expand_execution_authority() -> None:
     assert verified.agent_advice is not None
     assert verified.agent_advice.accepted is False
     assert verified.agent_advice.reasons == ("agent_advice_authority_expansion",)
+
+
+@pytest.mark.parametrize("recommendation", (False, True), ids=("rejection", "recommendation"))
+def test_fallback_is_independent_of_a_planner_that_returns_an_incomplete_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+    recommendation: bool,
+) -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = replace(
+        make_policy_value(),
+        agent_advice=AgentAdvicePolicy(True, ("model",), (_PROMPT_HASH,), 0.8, True),
+    )
+    reason = "agent_advice_recommended_full_ci" if recommendation else "deterministic_plan_mismatch"
+    expected = full_ci_fallback_plan(input, policy, reason)
+    malformed = _with_selection(expected, (), ())
+    candidate = _candidate(plan(input, policy)) if recommendation else malformed
+    advice = (
+        _envelope(input.input_hash, _advice(fallback_recommendation="full-ci"))
+        if recommendation
+        else None
+    )
+    assert admit_deterministic_plan(input, policy, malformed) == "deterministic_plan_mismatch"
+    monkeypatch.setattr(planner_module, "_full_ci_plan", lambda *_args: malformed)
+
+    verified = verify(input, policy, candidate, advice)
+
+    assert verified.fallback.triggered is True
+    assert verified.fallback.reason == reason
+    assert verified.omitted_obligations == ()
+    assert {item.obligation_id: item.depth for item in verified.selected_obligations} == {
+        "backend-tests": "full",
+        "docs-lint": "standard",
+        "required-baseline": "full",
+    }
+    assert verified.source_plan == expected
+    assert verified.source_plan.plan_id == expected.plan_id
+    assert verified.source_plan.identity_mapping() == expected.identity_mapping()
+
+
+def test_advice_closure_does_not_execute_planner_closure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = replace(
+        make_policy_value(),
+        agent_advice=AgentAdvicePolicy(True, ("model",), (_PROMPT_HASH,), 0.8, True),
+    )
+    candidate = _candidate(plan(input, policy))
+
+    def unexpected_planner_call(_depth: object) -> NoReturn:
+        raise AssertionError("verification executed planner witness closure")
+
+    monkeypatch.setattr(planner_module, "depth_rank", unexpected_planner_call)
+
+    verified = verify(
+        input,
+        policy,
+        candidate,
+        _envelope(input.input_hash, _advice(add_obligations=["backend-tests"])),
+    )
+
+    assert verified.fallback.triggered is False
+    assert verified.agent_advice is not None
+    assert verified.agent_advice.accepted is True
+    assert verified.selected_witnesses == (
+        SelectedWitness("backend-witness", "targeted", ("backend-tests",)),
+        SelectedWitness("baseline-witness", "standard", ("required-baseline",)),
+        SelectedWitness("docs-witness", "smoke", ("docs-lint",)),
+        SelectedWitness("shared-quality", "targeted", ("backend-tests", "docs-lint")),
+    )
+
+
+def test_verified_model_rejects_missing_added_witnesses_despite_shared_validator_defect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = make_policy_value()
+    candidate = _candidate(plan(input, policy))
+    selected = (
+        SelectedObligation("backend-tests", "targeted", ("backend-witness", "shared-quality")),
+        *candidate.selected_obligations,
+    )
+    monkeypatch.setattr(
+        verified_model, "validate_witness_closure", lambda *_args: None, raising=False
+    )
+
+    with pytest.raises(ValueError, match="verified witnesses must exactly close"):
+        make_verified_plan(
+            source_plan=candidate,
+            catalog=policy.catalog,
+            selected_obligations=selected,
+            selected_witnesses=candidate.selected_witnesses,
+            omitted_obligations=(),
+            fallback=candidate.fallback,
+            deterministic_evidence=candidate.evidence,
+            verification_evidence=(),
+            agent_advice=None,
+        )
+
+
+@pytest.mark.parametrize("incomplete", (False, True), ids=("depth", "catalog"))
+def test_verified_model_rejects_structurally_valid_but_inadequate_full_ci(incomplete: bool) -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = make_policy_value()
+    source = full_ci_fallback_plan(input, policy, "provider_unavailable")
+    selected = (
+        ()
+        if incomplete
+        else tuple(
+            SelectedObligation(item.obligation_id, item.default_depth, item.required_witness_ids)
+            for item in policy.catalog.obligations
+        )
+    )
+    witnesses = close_selected_witnesses(policy.catalog, selected)
+    source = _with_selection(source, selected, witnesses)
+    reason = "classify every catalog obligation" if incomplete else "full catalog at full depth"
+
+    with pytest.raises(ValueError, match=reason):
+        make_verified_plan(
+            source_plan=source,
+            catalog=policy.catalog,
+            selected_obligations=selected,
+            selected_witnesses=witnesses,
+            omitted_obligations=(),
+            fallback=source.fallback,
+            deterministic_evidence=source.evidence,
+            verification_evidence=(),
+            agent_advice=None,
+        )
+
+
+def test_advice_cannot_exceed_the_obligation_full_depth_cap() -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = replace(
+        make_policy_value(),
+        agent_advice=AgentAdvicePolicy(True, ("model",), (_PROMPT_HASH,), 0.8, True),
+    )
+    candidate = full_ci_fallback_plan(input, policy, "provider_unavailable")
+
+    verified = verify(
+        input,
+        policy,
+        candidate,
+        _envelope(
+            input.input_hash,
+            _advice(
+                increase_depth=[{"obligationId": "required-baseline", "minDepth": "exhaustive"}]
+            ),
+        ),
+    )
+
+    assert verified.fallback == candidate.fallback
+    assert verified.agent_advice is not None
+    assert verified.agent_advice.accepted is False
+    assert verified.agent_advice.reasons == ("agent_advice_depth_unsupported",)
+    assert verified.selected_obligations == candidate.selected_obligations
+    assert verified.selected_witnesses == candidate.selected_witnesses
+
+
+def test_verified_model_preserves_stronger_full_ci_without_granting_advice_authority() -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = make_policy_value()
+    candidate = full_ci_fallback_plan(input, policy, "provider_unavailable")
+    selected = tuple(
+        replace(item, depth="exhaustive") if item.obligation_id == "required-baseline" else item
+        for item in candidate.selected_obligations
+    )
+    witnesses = tuple(
+        replace(item, depth="exhaustive") if item.witness_id == "baseline-witness" else item
+        for item in candidate.selected_witnesses
+    )
+
+    verified = make_verified_plan(
+        source_plan=candidate,
+        catalog=policy.catalog,
+        selected_obligations=selected,
+        selected_witnesses=witnesses,
+        omitted_obligations=(),
+        fallback=candidate.fallback,
+        deterministic_evidence=candidate.evidence,
+        verification_evidence=(),
+        agent_advice=None,
+    )
+
+    assert verified.agent_advice is None
+    assert verified.fallback == candidate.fallback
+    assert verified.selected_obligations[-1].depth == "exhaustive"
+    assert (
+        next(
+            item for item in verified.selected_witnesses if item.witness_id == "baseline-witness"
+        ).depth
+        == "exhaustive"
+    )
 
 
 @pytest.mark.parametrize(
@@ -380,3 +610,19 @@ def _candidate(value: DeterministicPlan | PlanningRejected) -> DeterministicPlan
     if isinstance(value, PlanningRejected):
         pytest.fail("unexpected planning rejection")
     return value
+
+
+def _with_selection(
+    source: DeterministicPlan,
+    selected: tuple[SelectedObligation, ...],
+    witnesses: tuple[SelectedWitness, ...],
+) -> DeterministicPlan:
+    identity = source.identity_mapping()
+    identity["selectedObligations"] = [item.to_identity_mapping() for item in selected]
+    identity["selectedWitnesses"] = [item.to_identity_mapping() for item in witnesses]
+    return replace(
+        source,
+        plan_id="dynamic_ci_plan_" + hash_object(identity)[:32],
+        selected_obligations=selected,
+        selected_witnesses=witnesses,
+    )

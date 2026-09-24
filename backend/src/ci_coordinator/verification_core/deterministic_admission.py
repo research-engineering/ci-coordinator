@@ -13,7 +13,6 @@ from ci_coordinator.planning_core.model import (
     OmittedObligation,
     PlanEvidence,
     SelectedObligation,
-    SelectedWitness,
 )
 from ci_coordinator.planning_core.policy import PlanningPolicy
 from ci_coordinator.repo_context import PlanningInput
@@ -21,8 +20,8 @@ from ci_coordinator.repo_context.freshness import matches_path_pattern
 from ci_coordinator.validation_contract import (
     ValidationCatalog,
     ValidationObligation,
-    depth_rank,
 )
+from ci_coordinator.verification_core.witnesses import close_selected_witnesses
 
 type DeterministicPlanRejectionReason = Literal[
     "deterministic_plan_mismatch",
@@ -71,7 +70,7 @@ def admit_deterministic_plan(
         return "deterministic_plan_mismatch"
     if candidate.fallback.triggered:
         return None if _is_exact_full_ci(candidate, policy) else "deterministic_plan_mismatch"
-    if not _selective_context_is_admitted(input, policy):
+    if not _selective_context_is_admitted(input):
         return "deterministic_plan_mismatch"
     if (
         candidate.fallback.timeout_seconds != policy.fallback_timeout_seconds
@@ -97,7 +96,9 @@ def validate_omission_proof(
     policy: PlanningPolicy,
     omitted: OmittedObligation,
 ) -> bool:
-    if not _selective_context_is_admitted(input, policy):
+    if not _input_coordinates_are_current(input, policy) or not _selective_context_is_admitted(
+        input
+    ):
         return False
     impact = _derive_impact(input)
     obligations = {item.obligation_id: item for item in policy.catalog.obligations}
@@ -121,6 +122,21 @@ def _coordinates_are_current(
     candidate: DeterministicPlan,
 ) -> bool:
     repo_epoch_hash = hash_object(input.repo_epoch.to_identity_mapping())
+    return (
+        _input_coordinates_are_current(input, policy)
+        and candidate.plan_id == "dynamic_ci_plan_" + hash_object(candidate.identity_mapping())[:32]
+        and candidate.config_epoch_id == input.policy.epoch_id
+        and candidate.repo_epoch_hash == repo_epoch_hash
+        and candidate.input_hash == input.input_hash
+        and candidate.diff_hash == input.diff.diff_hash
+        and candidate.compiled_policy_hash == policy.compiled_policy_hash
+        and candidate.policy_hash == policy.policy_hash
+        and candidate.dependency_graph_hash == input.dependency_graph.graph_hash
+        and candidate.catalog_hash == policy.catalog_hash
+    )
+
+
+def _input_coordinates_are_current(input: PlanningInput, policy: PlanningPolicy) -> bool:
     recomputed_diff_hash = hash_object(input.diff.to_identity_mapping())
     recomputed_input_hash = hash_object(
         {
@@ -136,22 +152,10 @@ def _coordinates_are_current(
         _policy_context_is_current(input, policy)
         and input.diff.diff_hash == recomputed_diff_hash
         and input.input_hash == recomputed_input_hash
-        and candidate.plan_id == "dynamic_ci_plan_" + hash_object(candidate.identity_mapping())[:32]
-        and candidate.config_epoch_id == input.policy.epoch_id
-        and candidate.repo_epoch_hash == repo_epoch_hash
-        and candidate.input_hash == input.input_hash
-        and candidate.diff_hash == input.diff.diff_hash
-        and candidate.compiled_policy_hash == policy.compiled_policy_hash
-        and candidate.policy_hash == policy.policy_hash
-        and candidate.dependency_graph_hash == input.dependency_graph.graph_hash
-        and candidate.catalog_hash == policy.catalog_hash
     )
 
 
-def _selective_context_is_admitted(
-    input: PlanningInput,
-    policy: PlanningPolicy,
-) -> bool:
+def _selective_context_is_admitted(input: PlanningInput) -> bool:
     graph = input.dependency_graph
     repo_epoch_hash = hash_object(input.repo_epoch.to_identity_mapping())
     return (
@@ -193,7 +197,8 @@ def _is_exact_full_ci(
         candidate.fallback.timeout_seconds == policy.fallback_timeout_seconds
         and candidate.fallback.reason is not None
         and candidate.selected_obligations == expected_selected
-        and candidate.selected_witnesses == _close_witnesses(policy.catalog, expected_selected)
+        and candidate.selected_witnesses
+        == close_selected_witnesses(policy.catalog, expected_selected)
         and not candidate.omitted_obligations
         and candidate.evidence == (PlanEvidence("fallback", None, candidate.fallback.reason),)
     )
@@ -218,7 +223,7 @@ def _is_complete_selective_structure(
         for selected in candidate.selected_obligations
     ):
         return False
-    if candidate.selected_witnesses != _close_witnesses(
+    if candidate.selected_witnesses != close_selected_witnesses(
         catalog,
         candidate.selected_obligations,
     ):
@@ -251,46 +256,6 @@ def _expected_selected(
             obligation.required_witness_ids,
         )
         for obligation in catalog.obligations
-    )
-
-
-def _close_witnesses(
-    catalog: ValidationCatalog,
-    selected: tuple[SelectedObligation, ...],
-) -> tuple[SelectedWitness, ...]:
-    obligations = {item.obligation_id: item for item in catalog.obligations}
-    witnesses = {item.witness_id: item for item in catalog.witnesses}
-    required_by: dict[str, list[SelectedObligation]] = {}
-    for selected_obligation in selected:
-        obligation = obligations.get(selected_obligation.obligation_id)
-        if (
-            obligation is None
-            or selected_obligation.required_witness_ids != obligation.required_witness_ids
-        ):
-            return ()
-        for witness_id in selected_obligation.required_witness_ids:
-            witness = witnesses.get(witness_id)
-            if witness is None or selected_obligation.depth not in witness.supported_depths:
-                return ()
-            required_by.setdefault(witness_id, []).append(selected_obligation)
-    return tuple(
-        SelectedWitness(
-            witness_id=witness_id,
-            depth=max(
-                (item.depth for item in requirements),
-                key=depth_rank,
-            ),
-            required_by_obligation_ids=tuple(
-                sorted(
-                    (item.obligation_id for item in requirements),
-                    key=utf16_sort_key,
-                )
-            ),
-        )
-        for witness_id, requirements in sorted(
-            required_by.items(),
-            key=lambda item: utf16_sort_key(item[0]),
-        )
     )
 
 

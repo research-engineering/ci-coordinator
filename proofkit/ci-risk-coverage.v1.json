@@ -2213,7 +2213,7 @@
           "requirementId": "REQ-CI-RUNTIME-005",
           "witnessPath": "backend/tests/unit/integrations/test_github_self_ci_inventory.py",
           "assertion": "test_provider_inventory_failure_forces_full_selection_before_omission",
-          "sourceSha256": "ea66c3c4a11abb9849addf3aa91b6a1a063cdecec702c55e32667529dbb4666f",
+          "sourceSha256": "ef8564afbecc989738fcb187b032eb7e537fb14c3c5ae5d3ba6db8e45ef4bf16",
           "commandIds": [
             "python.test"
           ],
@@ -2310,7 +2310,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "732d2a95956200ff0297b29de37742e87d10ee3f777c7f7b175a5b3a223c26b3"
+          "sourceSha256": "3e695d772829ef8345ddae0b8b72d6b58e01974efc7c6072913759b5c293b22f"
         }
       ]
     },
@@ -2339,7 +2339,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "732d2a95956200ff0297b29de37742e87d10ee3f777c7f7b175a5b3a223c26b3"
+          "sourceSha256": "3e695d772829ef8345ddae0b8b72d6b58e01974efc7c6072913759b5c293b22f"
         }
       ]
     },

@@ -2,7 +2,7 @@
 
 Status: module specification
 
-Date: 2026-07-20
+Date: 2026-09-25
 
 ## 1. Owned Invariant
 
@@ -41,6 +41,19 @@ closure. It may share canonical immutable value contracts, hashing, ordering,
 and path matching. Selecting more obligations than the minimum safe set is
 admissible; weakening selected coverage or emitting an unproved omission is
 not.
+
+Fallback and post-advice construction use verifier-owned witness closure,
+not planner builders. `VerifiedPlan` independently requires a complete catalog
+partition and exact catalog witness closure; a triggered fallback selects every
+obligation at least at its full depth. The value model permits conservative
+stronger coverage within witness support; this does not grant advice authority
+above the separate obligation `full_depth` cap. A partial planner fallback cannot
+become a verified fallback. Canonical plan value types and hashing remain shared;
+this is mechanism independence, not isolation of Python package loading.
+
+The public `validate_omission_proof` also checks current config epoch, compiled
+policy and policy hashes, and recomputes input/diff identities. Calling this
+entrypoint directly cannot bypass context checks owned by `verify`.
 
 ## 4. Agent Advice Admission
 
@@ -86,6 +99,7 @@ ci_coordinator/verification_core/coverage.py
 ci_coordinator/verification_core/deterministic_admission.py
 ci_coordinator/verification_core/model.py
 ci_coordinator/verification_core/verifier.py
+ci_coordinator/verification_core/witnesses.py
 ```
 
 ## 7. Acceptance Tests

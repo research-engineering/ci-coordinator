@@ -9,18 +9,17 @@ from ci_coordinator.agent_risk_advice import (
     RejectedAdvice,
     admit_advice,
 )
-from ci_coordinator.kernel import utf16_sort_key
-from ci_coordinator.planning_core import (
+from ci_coordinator.kernel import hash_object, utf16_sort_key
+from ci_coordinator.planning_core.model import (
     DeterministicPlan,
-    PlanningPolicy,
+    PlanEvidence,
+    PlanFallback,
     SelectedObligation,
     SelectedWitness,
-    close_selected_witnesses,
-    full_ci_fallback_plan,
-    max_depth,
 )
+from ci_coordinator.planning_core.policy import PlanningPolicy
 from ci_coordinator.repo_context import PlanningInput
-from ci_coordinator.validation_contract import ValidationCatalog, ValidationObligation
+from ci_coordinator.validation_contract import ValidationCatalog, ValidationObligation, max_depth
 from ci_coordinator.verification_core.coverage import compare_coverage
 from ci_coordinator.verification_core.deterministic_admission import (
     admit_deterministic_plan,
@@ -30,6 +29,7 @@ from ci_coordinator.verification_core.model import (
     VerifiedPlan,
     make_verified_plan,
 )
+from ci_coordinator.verification_core.witnesses import close_selected_witnesses
 
 
 def verify(
@@ -84,7 +84,7 @@ def _fallback(
     reason: str,
     advice: AdviceAuditMetadata | None,
 ) -> VerifiedPlan:
-    fallback = full_ci_fallback_plan(input, policy, reason)
+    fallback = _full_ci_fallback_plan(input, policy, reason)
     if advice is not None and type(advice) is not AdviceAuditMetadata:
         raise TypeError("advice audit metadata must be typed")
     return make_verified_plan(
@@ -109,7 +109,7 @@ def _apply_advice(
     advice = admitted.advice
     if advice.fallback_recommendation == "full-ci":
         reason = "agent_advice_recommended_full_ci"
-        fallback = full_ci_fallback_plan(input, policy, reason)
+        fallback = _full_ci_fallback_plan(input, policy, reason)
         return make_verified_plan(
             source_plan=fallback,
             catalog=policy.catalog,
@@ -192,6 +192,56 @@ def _apply_advice(
             *evidence,
         ),
         agent_advice=admitted.audit,
+    )
+
+
+def _full_ci_fallback_plan(
+    input: PlanningInput,
+    policy: PlanningPolicy,
+    reason: str,
+) -> DeterministicPlan:
+    selected = tuple(
+        SelectedObligation(item.obligation_id, item.full_depth, item.required_witness_ids)
+        for item in policy.catalog.obligations
+    )
+    witnesses = close_selected_witnesses(policy.catalog, selected)
+    fallback = PlanFallback(policy.fallback_timeout_seconds, True, reason)
+    evidence = (PlanEvidence("fallback", None, reason),)
+    repo_epoch_hash = hash_object(input.repo_epoch.to_identity_mapping())
+    identity = {
+        "schemaVersion": "deterministic-plan/v1",
+        "plannerVersion": "planning-core/v1",
+        "configEpochId": input.policy.epoch_id,
+        "repoEpochHash": repo_epoch_hash,
+        "inputHash": input.input_hash,
+        "diffHash": input.diff.diff_hash,
+        "compiledPolicyHash": policy.compiled_policy_hash,
+        "policyHash": policy.policy_hash,
+        "dependencyGraphHash": input.dependency_graph.graph_hash,
+        "catalogHash": policy.catalog_hash,
+        "selectedObligations": [item.to_identity_mapping() for item in selected],
+        "selectedWitnesses": [item.to_identity_mapping() for item in witnesses],
+        "omittedObligations": [],
+        "fallback": fallback.to_identity_mapping(),
+        "evidence": [item.to_identity_mapping() for item in evidence],
+    }
+    return DeterministicPlan(
+        plan_id="dynamic_ci_plan_" + hash_object(identity)[:32],
+        schema_version="deterministic-plan/v1",
+        planner_version="planning-core/v1",
+        config_epoch_id=input.policy.epoch_id,
+        repo_epoch_hash=repo_epoch_hash,
+        input_hash=input.input_hash,
+        diff_hash=input.diff.diff_hash,
+        compiled_policy_hash=policy.compiled_policy_hash,
+        policy_hash=policy.policy_hash,
+        dependency_graph_hash=input.dependency_graph.graph_hash,
+        catalog_hash=policy.catalog_hash,
+        selected_obligations=selected,
+        selected_witnesses=witnesses,
+        omitted_obligations=(),
+        fallback=fallback,
+        evidence=evidence,
     )
 
 

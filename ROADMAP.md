@@ -70,6 +70,14 @@ workflow grammar CI-017, custom-epoch review CI-018 and plan TTL CI-055 only
 where the exercised path requires them. Read-only observation does not wait
 for every configuration, analytics or optional UI feature.
 
+The 2026-09-25 [current-source audit intake](docs/features/current-source-audit-validation.md)
+adds 471 unvalidated report IDs to CI-054, not 471 confirmed defects or a second
+backlog. First adjudicate the reported trust/omission, proof-oracle and trusted-CI
+input risks; repair confirmed prerequisites before their affected scenario.
+Preserve independent FullCI and non-enforcing observation. Coherent owner-bound
+repairs, tests and documentation may share a PR across the cohorts; unrelated
+Nits do not block the whole pilot, and live evidence is never inferred locally.
+
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.
 CI-005 measures comparable execution using CI-027/CI-028; CI-006 optimizes the
@@ -253,7 +261,7 @@ State: open; hypothesis validation, source repair and external qualification rem
 
 | ID | Work And Closure | Depends On |
 | --- | --- | --- |
-| CI-054 | **validate** all residual admitted audit findings, including the 180 unresolved predicate mappings from two retained legacy inputs. Match current owner and falsifier, merge duplicates and preserve scoped rejection triggers; do not recreate retired TypeScript. Regenerate current SARIF when needed; deleted report `3ed45d...` is retired-unadjudicated, not a passing review. [Audit acceptance](docs/features/assurance-audit-hardening-plan.md). | Exact current snapshot; no required reconstruction of deleted reports |
+| CI-054 | **validate** all residual admitted audit findings, including the 180 unresolved predicate mappings from two retained legacy inputs and the 471 source-bound IDs in the [current-source audit recipe](docs/features/current-source-audit-validation.md). Validate each atomic claim before deduplication or repair; conserve source aliases, evidence, current owners and scoped rejection triggers. Counts are not confirmed defects; do not recreate retired TypeScript. Regenerate current SARIF when needed; deleted report `3ed45d...` is retired-unadjudicated, not a passing review. [Audit acceptance](docs/features/assurance-audit-hardening-plan.md). | Exact current snapshot; no required reconstruction of deleted reports |
 | CI-055 | **source repaired; qualify deployment compatibility**. Producer settings, signer and local verifier now admit only 1-300 seconds and exercise the actual target at 1/300/301. Before live selected execution, establish that the new environment contains no previously issued incompatible envelopes or admit an explicit migration/compatibility receipt. | Current signing/target owners; before affected selected execution |
 | CI-056 | **validate** unjustified abstractions, ownership/co-location, test duplication and contract size. Check the unused `ReconciliationPublisher` against real consumers before removal; prefer existing Pydantic/FastAPI/standard-library capabilities where behavior is preserved. Metrics select review, not god-file verdicts; no indiscriminate DTO/repository classes or whole rewrite. | CI-054; exact invariants and protected observations |
 | CI-057 | **validate** the current shared dynamic-CI blueprint against own-CI requirements and native consumed-input/evidence inventories. Freeze the candidate, disposition every applicable validation class, implement only real gaps, preserve independent baseline and profile coverage before self-optimization. Existing CF01/CF03 source repairs are not the entire comparison. | CI-001; [input coverage](docs/features/own-ci-input-coverage.md) |

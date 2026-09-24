@@ -8,6 +8,12 @@ Owner rationale and the complete grouped audit disposition are in the
 [ROADMAP](../../ROADMAP.md); this batch advances B7 and removes B1 qualification
 friction without replacing the existing eight-batch plan.
 
+The [current-source audit validation recipe](current-source-audit-validation.md)
+extends CI-054 with the 2026-09-25 intake: 471 individually conserved hypotheses,
+atomic-claim adjudication, semantic cohort routing and exact-source repair
+criteria. It does not supersede the legacy-input obligations below, accept the
+report's verdicts, or create another task/status owner.
+
 ## Ordered Delivery
 
 1. Bind report hash, source/base and new GitHub repository identity. Preserve

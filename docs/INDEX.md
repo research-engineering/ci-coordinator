@@ -117,6 +117,7 @@ does not by itself make the document obsolete.
 - [Runtime base qualification and security repairs](features/runtime-base-qualification.md)
 - [Assurance audit hardening and finding dispositions](features/assurance-audit-hardening.md)
 - [Assurance audit hardening implementation plan](features/assurance-audit-hardening-plan.md)
+- [Current-source audit validation and repair recipe](features/current-source-audit-validation.md)
 - [Runtime admission cost plan](features/runtime-admission-cost-plan.md)
 - [Concurrent archive reads](features/concurrent-archive-reads.md)
 - [Concurrent archive reads plan](features/concurrent-archive-reads-plan.md)

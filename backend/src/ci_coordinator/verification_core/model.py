@@ -5,17 +5,16 @@ from typing import Literal
 
 from ci_coordinator.agent_risk_advice import AdviceAuditMetadata
 from ci_coordinator.kernel import hash_object, utf16_sort_key
-from ci_coordinator.planning_core import (
+from ci_coordinator.planning_core.model import (
     DeterministicPlan,
     OmittedObligation,
     PlanEvidence,
     PlanFallback,
     SelectedObligation,
     SelectedWitness,
-    depth_rank,
-    validate_witness_closure,
 )
-from ci_coordinator.validation_contract import ValidationCatalog
+from ci_coordinator.validation_contract import ValidationCatalog, depth_rank
+from ci_coordinator.verification_core.witnesses import close_selected_witnesses
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +53,10 @@ class VerifiedPlan:
             tuple(item.obligation_id for item in self.omitted_obligations),
             field_name="verified omitted obligations",
         )
-        validate_witness_closure(self.selected_obligations, self.selected_witnesses)
+        if self.selected_witnesses != close_selected_witnesses(
+            self.catalog, self.selected_obligations
+        ):
+            raise ValueError("verified witnesses must exactly close catalog requirements")
 
         source_selected = {
             item.obligation_id: item for item in self.source_plan.selected_obligations
@@ -64,6 +66,18 @@ class VerifiedPlan:
         candidate_omitted = {item.obligation_id: item for item in self.omitted_obligations}
         if set(candidate_selected).intersection(candidate_omitted):
             raise ValueError("verified plan obligations must be disjoint")
+        catalog_obligations = {item.obligation_id: item for item in self.catalog.obligations}
+        if set(candidate_selected).union(candidate_omitted) != set(catalog_obligations):
+            raise ValueError("verified plan must classify every catalog obligation")
+        if self.fallback.triggered and (
+            candidate_omitted
+            or any(
+                depth_rank(item.depth)
+                < depth_rank(catalog_obligations[item.obligation_id].full_depth)
+                for item in self.selected_obligations
+            )
+        ):
+            raise ValueError("verified fallback must select the full catalog at full depth")
         if set(candidate_selected).union(candidate_omitted) != set(source_selected).union(
             source_omitted
         ):

@@ -54,7 +54,7 @@ class _Factory:
         return self.transport
 
 
-def test_happy_path_binds_every_contents_read_to_exact_head() -> None:
+def test_happy_path_binds_contents_reads_to_exact_base_and_head() -> None:
     transport = _Transport(_valid_handler())
     factory = _Factory(transport)
     result = asyncio.run(GitHubRepositoryContextProvider(factory).load(_request(), _policy()))
@@ -72,7 +72,7 @@ def test_happy_path_binds_every_contents_read_to_exact_head() -> None:
     assert all(
         request.path.startswith("/repos/acme/repository/") for request in transport.requests[1:]
     )
-    assert [request.query[0].value for request in content_requests] == [HEAD_SHA]
+    assert [request.query[0].value for request in content_requests] == [HEAD_SHA, BASE_SHA]
 
 
 def test_repository_id_mismatch_stops_before_owner_name_lookup() -> None:
@@ -175,7 +175,7 @@ def test_pull_request_diff_reads_a_known_next_page(prefix: str) -> None:
                 ),
             )
         if request.operation == "diff.compare":
-            return _response(_json({"files": [_file("src/first.py"), _file("src/second.py")]}))
+            return _response(_comparison([_file("src/first.py"), _file("src/second.py")]))
         return _valid_handler()(request)
 
     transport = _Transport(handler)
@@ -267,7 +267,7 @@ def test_pull_request_update_during_pagination_invalidates_collected_files() -> 
 def test_pull_request_files_must_equal_the_immutable_sha_comparison() -> None:
     def handler(request: GitHubRequest) -> GitHubTransportResult:
         if request.operation == "diff.compare":
-            return _response(_json({"files": [_file("src/intermediate.py")]}))
+            return _response(_comparison([_file("src/intermediate.py")]))
         return _valid_handler()(request)
 
     result = asyncio.run(
@@ -287,7 +287,7 @@ def test_compare_file_limit_is_ambiguous_without_a_complete_pull_request_listing
 
     def handler(request: GitHubRequest) -> GitHubTransportResult:
         if request.operation == "diff.compare":
-            return _response(_json({"files": compared}))
+            return _response(_comparison(compared))
         return _valid_handler()(request)
 
     result = asyncio.run(_provider(_Transport(handler)).load(_request(), _policy()))
@@ -302,7 +302,7 @@ def test_compare_below_provider_file_limit_is_complete_without_synthetic_count()
 
     def handler(request: GitHubRequest) -> GitHubTransportResult:
         if request.operation == "diff.compare":
-            return _response(_json({"files": compared}))
+            return _response(_comparison(compared))
         return _valid_handler()(request)
 
     result = asyncio.run(_provider(_Transport(handler)).load(_request(), _policy()))
@@ -341,7 +341,7 @@ def test_complete_pull_request_listing_disambiguates_exact_compare_file_limit() 
                 )
             return _response(_json(page_files), pagination=pagination)
         if request.operation == "diff.compare":
-            return _response(_json({"files": compared}))
+            return _response(_comparison(compared))
         return _valid_handler()(request)
 
     result = asyncio.run(
@@ -449,7 +449,8 @@ def test_capped_pull_request_pagination_is_full_ci_invalidating() -> None:
 def test_duplicate_provider_json_keys_invalidates_diff() -> None:
     def handler(request: GitHubRequest) -> GitHubTransportResult:
         if request.operation == "diff.compare":
-            return _response(b'{"files":[],"files":[]}')
+            body = _comparison([_file("src/module.py")])
+            return _response(body[:-1] + b',"files":[]}')
         return _valid_handler()(request)
 
     result = asyncio.run(_provider(_Transport(handler)).load(_request(), _policy()))
@@ -565,7 +566,7 @@ def _valid_handler() -> ResultHandler:
         if request.operation == "diff.list_pull_request_files":
             return _response(_json([_file("src/module.py")]))
         if request.operation == "diff.compare":
-            return _response(_json({"files": [_file("src/module.py")]}))
+            return _response(_comparison([_file("src/module.py")]))
         if request.operation == "workflow_catalog.get_content" and request.path.endswith(
             DEPENDENCY_GRAPH_PATH
         ):
@@ -602,6 +603,21 @@ def _pull_request_metadata(
             "number": number,
             "base": {"sha": base_sha},
             "head": {"sha": head_sha},
+        }
+    )
+
+
+def _comparison(files: list[dict[str, object]]) -> bytes:
+    return _json(
+        {
+            "base_commit": {"sha": BASE_SHA},
+            "merge_base_commit": {"sha": BASE_SHA},
+            "status": "ahead",
+            "ahead_by": 1,
+            "behind_by": 0,
+            "total_commits": 1,
+            "commits": [{"sha": HEAD_SHA}],
+            "files": files,
         }
     )
 

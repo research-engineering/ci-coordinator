@@ -1,8 +1,8 @@
 # Selective Planning Safety Implementation Plan
 
-Status: implemented and locally verified; provider witness pending merge
+Status: implementation plan; qualification state is owned by ROADMAP
 
-Date: 2026-07-29
+Date: 2026-09-25
 
 Design authority:
 [Selective Planning Safety](selective-planning-safety.md)
@@ -60,6 +60,36 @@ Accept iff
   and Proofkit reports no unknown changed-path edges
   and the final exact branch head passes Full Check
 ```
+
+## Current-Source Trust Repair
+
+The 2026-09-25 repair keeps the existing safety model and binds findings to
+the current source rather than accepting the report's labels.
+
+1. Conserve all intake IDs in CI-054 and independently classify each subclaim.
+2. In the GitHub graph adapter, reject graph-file changes before trusting
+   candidate metadata; require exact base/head byte equality and retain the
+   existing graph, Contents, cancellation and self-CI inventory predicates.
+3. Admit comparison metadata under its actual event semantics. Preserve PR
+   merge-base behavior; reject unsupported before/after ancestry and substituted
+   base/head evidence for push and merge-group contexts.
+4. Revalidate the verifier-independence claim against the actual independent
+   admission module, fallback construction and post-advice paths. Repair only
+   a demonstrated gap; preserve refutations and their reopening conditions.
+5. Add isolated operand falsifiers and an unchanged selective positive control.
+   Cover graph edge/invalidator removal, unavailable baseline, equal snapshots,
+   graph rename/deletion and malformed provider ancestry. No test may pass merely
+   because unrelated source setup failed or all graphs became ineligible.
+6. Run current static, import, documentation and Proofkit route admission;
+   independently review the frozen patch; qualify affected native tests and the
+   exact-head required GitHub gate before squash merge.
+
+Writer boundaries: graph acquisition belongs to repository context; diff
+decoding belongs to the GitHub adapter; plan admission belongs to verification
+core. Test fixtures are not provider authority. Preserve byte/resource bounds,
+current hashes and signed wire contracts, repository scope and caller
+cancellation. Changing business eligibility is explicitly limited to inputs
+whose trust/ancestry was not established by the previous implementation.
 
 ## 5. Rollback
 
