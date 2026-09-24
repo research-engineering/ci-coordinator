@@ -206,6 +206,13 @@ def test_replay_uses_post_lock_time_and_serializes_with_retention_cleanup(
             async def replay() -> MeasurementReportWriteResult:
                 async with PostgresCiEconomicsUnitOfWork(engine) as transaction:
                     writer = transaction.ci_measurement_reports
+                    # This witness deliberately holds the lock across expiry and cleanup.
+                    assert (
+                        await writer._connection.scalar(
+                            select(func.set_config("lock_timeout", "15s", True))
+                        )
+                        == "15s"
+                    )
                     pid, began_at = (
                         await writer._connection.execute(
                             select(func.pg_backend_pid(), func.statement_timestamp())
