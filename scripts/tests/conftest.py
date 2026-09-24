@@ -6,7 +6,6 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-
 from scripts.ci_utility_inventory import go_modules
 from scripts.self_ci_generate import SelfCiArtifacts, render_self_ci
 
