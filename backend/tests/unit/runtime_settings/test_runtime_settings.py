@@ -904,6 +904,13 @@ def test_incompatible_plan_ttl_is_rejected_at_configuration(ttl_seconds: str) ->
     )
 
 
+def test_direct_settings_construction_cannot_bypass_plan_ttl_bound() -> None:
+    admitted = admit_runtime_settings(_non_enforcing_mapping())
+    assert isinstance(admitted, NonEnforcingRuntimeSettings)
+    with pytest.raises(ValueError, match="target lifetime bound"):
+        replace(admitted, plan_ttl_seconds=301)
+
+
 def _non_enforcing_mapping() -> dict[str, str]:
     return {
         "CI_COORDINATOR_RUNTIME_MODE": "non_enforcing",
