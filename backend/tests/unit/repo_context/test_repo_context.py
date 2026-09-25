@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from ci_coordinator.kernel import path_patterns
 from ci_coordinator.repo_context import (
     DependencyGraphArtifact,
     DependencyGraphNode,
@@ -17,6 +18,7 @@ from ci_coordinator.repo_context import (
     build_dependency_graph,
     build_diff_context,
     build_planning_input,
+    freshness,
 )
 from ci_coordinator.repo_context.freshness import matches_path_pattern, validate_path_pattern
 
@@ -24,6 +26,13 @@ BASE_SHA = "a" * 40
 HEAD_SHA = "b" * 40
 EPOCH_HASH = "0" * 64
 POLICY_HASH = "1" * 64
+
+
+def test_freshness_preserves_the_public_path_functions_as_exact_kernel_aliases() -> None:
+    assert freshness.validate_path_pattern is path_patterns.validate_path_pattern
+    assert freshness.matches_path_pattern is path_patterns.matches_path_pattern
+    assert freshness.is_safe_relative_path is path_patterns.is_safe_relative_path
+    assert freshness.is_unicode_scalar_string is path_patterns.is_unicode_scalar_string
 
 
 @pytest.mark.parametrize(
@@ -37,6 +46,15 @@ POLICY_HASH = "1" * 64
         ("**/test_{unit,integration}.py", "backend/test_integration.py", True),
         ("assets/**", "assets/icons/logo.svg", True),
         ("assets/**", "src/assets/logo.svg", False),
+        ("src", "src", True),
+        ("src", "src/a.py", False),
+        ("src/", "src/a.py", False),
+        ("src/**/", "src/a/b.py", False),
+        ("**/", "a.py", False),
+        ("caf\u00e9/**", "caf\u00e9/a.py", True),
+        ("caf\u00e9/**", "cafe\u0301/a.py", False),
+        ("cafe\u0301/**", "cafe\u0301/a.py", True),
+        ("cafe\u0301/**", "caf\u00e9/a.py", False),
     ],
 )
 def test_path_pattern_automaton_preserves_the_admitted_glob_language(
@@ -57,6 +75,19 @@ def test_path_pattern_automaton_bounds_adversarial_wildcard_state() -> None:
     assert not matches_path_pattern(pattern, path)
     assert validate_path_pattern(pattern + "*") == "path pattern exceeds admitted size"
     assert not matches_path_pattern("*", path + "z")
+
+
+def test_diff_preserves_distinct_unicode_paths_and_rename_coordinates() -> None:
+    nfc, nfd = "caf\u00e9/a.py", "cafe\u0301/a.py"
+    renamed = valid_diff(DiffFileChangeInput(path=nfd, previous_path=nfc, status="renamed"))
+    first = valid_diff(DiffFileChangeInput(path=nfc, status="modified"))
+    second = valid_diff(DiffFileChangeInput(path=nfd, status="modified"))
+
+    assert not renamed.full_ci_invalidating
+    assert (renamed.files[0].path, renamed.files[0].previous_path) == (nfd, nfc)
+    assert first.diff_hash != second.diff_hash
+    assert first.files[0].path == nfc
+    assert second.files[0].path == nfd
 
 
 def test_diff_hash_is_stable_under_file_permutation() -> None:

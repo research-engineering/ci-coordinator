@@ -22,14 +22,44 @@ try_hash_object(value) -> ResultValue[Sha256Digest]
 utf16_sort_key(value) -> bytes
 ResultValue[T] = Ok[T] | Err
 Clock.now() -> Instant
+kernel.path_patterns.is_unicode_scalar_string(value) -> bool
+kernel.path_patterns.is_safe_relative_path(value) -> bool
+kernel.path_patterns.validate_path_pattern(pattern) -> str | None
+kernel.path_patterns.matches_path_pattern(pattern, path) -> bool
 ```
 
 ## 3. Private Boundary
 
 The module owns canonical JSON rules, strict untrusted JSON-byte admission,
-UTF-16 ordering keys, typed result values, and clocks. It must
+UTF-16 ordering keys, shared bounded path syntax/matching, typed result values,
+and clocks. It must
 not own product policy, GitHub semantics, persistence, or cryptographic key
 management.
+
+### Shared Path Language
+
+`kernel.path_patterns` owns the pure grammar and offset automaton shared by
+config admission and repository-context/planning consumers. It preserves the
+existing 512-character pattern bound, 4,096-character match bound, diagnostic
+strings, exact Unicode comparison, tokenization and matching behavior. It has
+only standard-library dependencies and performs no normalization, file lookup,
+hashing, provider action or fallback selection. The config-specific rejection
+of a terminal `/` stays in `config_control`, outside this shared language.
+
+The lower-cost repair is an exact move of the existing pure implementation,
+not another grammar or a new package. `repo_context.freshness` explicitly
+re-exports its four public functions as the same function objects; existing
+consumers need no import migration. Kernel package-root exports remain unchanged.
+This removes the forbidden config-to-context dependency without broadening any
+allowlist or importing the context facade into config admission.
+
+Protected observations are identical return values and diagnostics for the
+same arguments, stable historical path strings and hashes, and unchanged
+caller-owned admission/fallback policies. Static implementation-body equality
+against the base, literal matcher oracles, alias identity, and a fresh-process
+config import with context imports blocked are the independent falsifiers.
+The actual `scripts.python_witness import-boundary` gate must pass after the
+move; its pre-repair failure is not waived by lint or syntax checks.
 
 ## 4. Input Completeness Rules
 

@@ -232,6 +232,22 @@ false, because an unresolved remote edge is represented as an explicit safety
 unknown. Such evidence cannot authorize omission. Local traversal is bounded
 to the platform nesting limit and rejects cycles deterministically.
 
+Cycle classification uses iterative strongly connected components: a local
+edge belongs to a cycle exactly when its endpoints share a component (including
+self-loops). Two graph traversals take `O(V + E)` time and space, independent
+of the number of distinct paths. The previous path-local recursive search
+could repeatedly enumerate a layered DAG, despite the 64-workflow bound.
+Repeated per-edge reachability would stop the exponential growth but retain
+avoidable repeated work; a new general graph dependency is unnecessary here.
+
+Component numbers are internal and never enter evidence identity. Cycle edges
+are removed before the existing longest-path depth check; call identities,
+canonical ordering, facts, unknowns and remote-call handling remain unchanged.
+Independent transitive-closure oracles cover all three-vertex directed graphs;
+the complete 64-workflow layered DAG exercises the public analysis path. These
+witnesses qualify classification and bounded traversal, not deployment capacity.
+Revisit if call semantics, graph bounds or required provider nesting change.
+
 ## 7. Proposal Law
 
 The generator reuses `config_control` and never invents a second repository

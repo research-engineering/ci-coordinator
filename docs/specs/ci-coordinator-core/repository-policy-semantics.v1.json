@@ -99,10 +99,13 @@
     "ruleOrder": "rule ids in Unicode scalar order; diagnostics are selected by the document profile"
   },
   "pathLanguage": {
+    "runtimeAdmissionOwner": "ci_coordinator.kernel.path_patterns.validate_path_pattern",
+    "maximumCharacters": 512,
+    "characterUnit": "Unicode scalar",
     "relativePath": {
       "nonEmpty": true,
       "forbidLeading": ["/", "./"],
-      "forbidSubstring": ["\\"],
+      "forbidSubstring": ["\\", "\u0000"],
       "forbidSegments": [".."],
       "segmentSeparator": "/"
     },
@@ -113,6 +116,7 @@
       "forbiddenOperatorCharacters": ["]", "[", "!", "(", ")", "+", "@"],
       "braceAlternativeForbiddenCharacters": ["*", "?", "{", "}"],
       "rejectUnclosedOrUnmatchedBrace": true,
+      "rejectTrailingSeparator": true,
       "matching": "anchored full-string Unicode-scalar match"
     }
   },
@@ -134,7 +138,7 @@
     "agent.enabled-model-required": {"predicate": "agentAdvice.enabled implies modelIdAllowlist is non-empty", "compatibility": "retained-exact"},
     "agent.enabled-prompt-required": {"predicate": "agentAdvice.enabled implies promptHashAllowlist is non-empty", "compatibility": "retained-exact"},
     "agent.injection-eval-required": {"predicate": "agentAdvice.enabled implies promptInjectionEvalRequired = true", "compatibility": "retained-exact"},
-    "path.valid-pattern": {"predicate": "every path-pattern satisfies pathLanguage.relativePath and pathLanguage.glob", "compatibility": "retained-exact"},
+    "path.valid-pattern": {"predicate": "every admitted path-pattern passes pathLanguage.runtimeAdmissionOwner and satisfies pathLanguage.relativePath and pathLanguage.glob, including trailing-separator rejection on fresh or repeated source admission", "compatibility": "monotonic-strengthening"},
     "obligation.unique-id": {"predicate": "obligationId values are unique under exactString", "compatibility": "retained-exact"},
     "witness.unique-id": {"predicate": "witnessId values are unique under exactString", "compatibility": "retained-exact"},
     "profile.unique-id": {"predicate": "profileId values are unique under exactString", "compatibility": "retained-exact"},
