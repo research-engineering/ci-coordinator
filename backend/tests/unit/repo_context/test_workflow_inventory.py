@@ -82,7 +82,7 @@ jobs:
         ("${{ matrix.runner }}", None),
         ("[self-hosted, '${{ matrix.os }}']", None),
         ("d\u00e9v", None),
-        ("\n      labels: [linux, x64]", None),
+        ("\n      labels: [linux, x64]", (("linux", "x64"), None)),
         ("\n      group: build-runners\n      unknown: value", None),
     ],
     ids=[
@@ -93,7 +93,7 @@ jobs:
         "dynamic-scalar",
         "dynamic-sequence",
         "non-ascii-label",
-        "unsupported-mapping-sequence",
+        "mapping-sequence",
         "unsupported-mapping-key",
     ],
 )
