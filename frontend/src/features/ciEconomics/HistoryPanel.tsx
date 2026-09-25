@@ -2,6 +2,7 @@ import { RefreshCw } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
 import type { WorkbenchScope } from "../../api/workbench/client";
+import { ApplicationErrorBoundary } from "../../components/ApplicationErrorBoundary";
 import { LoadingState } from "../../components/LoadingState";
 import { EconomicsError, EconomicsRefresh } from "./EconomicsControls";
 import { HistoryEditor } from "./HistoryEditor";
@@ -77,28 +78,32 @@ export function HistoryPanel({
             ))}
           </fieldset>
           <div hidden={view !== "records"}>
-            <Suspense fallback={<LoadingState label="Loading archive" />}>
-              <ArchiveBrowser
-                scope={scope}
-                status={state.value}
-                session={session}
-                kind="records"
-                active={active && view === "records"}
-                onChanged={refresh}
-              />
-            </Suspense>
+            <ApplicationErrorBoundary panelName="Archive">
+              <Suspense fallback={<LoadingState label="Loading archive" />}>
+                <ArchiveBrowser
+                  scope={scope}
+                  status={state.value}
+                  session={session}
+                  kind="records"
+                  active={active && view === "records"}
+                  onChanged={refresh}
+                />
+              </Suspense>
+            </ApplicationErrorBoundary>
           </div>
           <div hidden={view !== "gaps"}>
-            <Suspense fallback={<LoadingState label="Loading archive gaps" />}>
-              <ArchiveBrowser
-                scope={scope}
-                status={state.value}
-                session={session}
-                kind="gaps"
-                active={active && view === "gaps"}
-                onChanged={refresh}
-              />
-            </Suspense>
+            <ApplicationErrorBoundary panelName="Archive gaps">
+              <Suspense fallback={<LoadingState label="Loading archive gaps" />}>
+                <ArchiveBrowser
+                  scope={scope}
+                  status={state.value}
+                  session={session}
+                  kind="gaps"
+                  active={active && view === "gaps"}
+                  onChanged={refresh}
+                />
+              </Suspense>
+            </ApplicationErrorBoundary>
           </div>
           <div hidden={state.value.snapshot !== null && view !== "settings"}>
             <HistoryEditor

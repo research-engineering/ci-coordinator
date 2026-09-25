@@ -1,6 +1,7 @@
 import { type KeyboardEvent, lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
 import type { WorkbenchScope } from "../../api/workbench/client";
+import { ApplicationErrorBoundary } from "../../components/ApplicationErrorBoundary";
 import { LoadingState } from "../../components/LoadingState";
 import { ECONOMICS_TABS as TABS, type EconomicsTab as Tab } from "../../domain/consoleSelection";
 import { CiEconomicsPanel } from "../workbench/CiEconomicsPanel";
@@ -137,14 +138,16 @@ function ScopedEconomicsConsole({
               active={active && tab === item}
             />
           ) : item === "analytics" ? (
-            <Suspense fallback={<LoadingState label="Loading analytics" />}>
-              <AnalyticsPanel
-                scope={scope}
-                session={session}
-                active={active && tab === item}
-                onHistory={() => selectTab("history")}
-              />
-            </Suspense>
+            <ApplicationErrorBoundary panelName="Analytics">
+              <Suspense fallback={<LoadingState label="Loading analytics" />}>
+                <AnalyticsPanel
+                  scope={scope}
+                  session={session}
+                  active={active && tab === item}
+                  onHistory={() => selectTab("history")}
+                />
+              </Suspense>
+            </ApplicationErrorBoundary>
           ) : item === "budgets" ? (
             <BudgetPoliciesPanel scope={scope} session={session} />
           ) : item === "signals" ? (

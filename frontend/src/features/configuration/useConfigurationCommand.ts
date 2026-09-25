@@ -49,7 +49,11 @@ export function useConfigurationCommand(session: ControlPlaneSession) {
         command.kind === "registration"
           ? await registerSource(command, session.csrfToken, active.signal)
           : await rollbackConfig(command, session.csrfToken, active.signal);
-      if (active.signal.aborted || Date.parse(session.expiresAt) <= Date.now()) return;
+      if (active.signal.aborted) return;
+      if (Date.parse(session.expiresAt) <= Date.now()) {
+        publish({ kind: "uncertain", command });
+        return;
+      }
       if (result.kind === "ready") publish({ kind: "complete", command, value: result.value });
       else if (
         prior.kind !== "uncertain" &&
