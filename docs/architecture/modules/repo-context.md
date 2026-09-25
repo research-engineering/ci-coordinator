@@ -86,6 +86,11 @@ transition; an unchanged graph retains selective eligibility under the other
 existing predicates. Each Contents read retains its own byte bounds and the
 outer acquisition deadline; no unbounded history scan or new cache is added.
 
+The pure path language and matcher are owned by `kernel.path_patterns`.
+`repo_context.freshness` retains explicit re-exports of its four public
+functions for existing consumers. Repository/graph freshness and fallback
+decisions remain here; moving syntax does not reinterpret persisted paths.
+
 Path-pattern admission is bounded to 512 pattern characters and 4,096 path
 characters. Matching uses explicit reachable path offsets rather than a regex
 engine. For pattern length `P` and path length `S`, tokenization is `O(P)`, each

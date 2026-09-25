@@ -52,11 +52,7 @@ def analyze_call_graph(workflows: tuple[ParsedWorkflow, ...]) -> GraphAnalysis:
         for draft in drafts
         if draft.kind == "local" and draft.status == "resolved" and draft.target_path is not None
     }
-    cycle_pairs = {
-        pair
-        for pair in local_pairs
-        if _reachable(pair[1], pair[0], local_pairs, visited=frozenset())
-    }
+    cycle_pairs = _cycle_pairs(local_pairs)
     depth_exceeded_pairs = _depth_exceeded_pairs(local_pairs - cycle_pairs)
     classified = [
         replace(draft, status="cycle")
@@ -206,23 +202,41 @@ def _graph_evidence(edges: tuple[CallEdge, ...]) -> tuple[tuple[Fact, ...], tupl
     )
 
 
-def _reachable(
-    start: str,
-    target: str,
-    edges: set[tuple[str, str]],
-    *,
-    visited: frozenset[str],
-) -> bool:
-    if start == target:
-        return True
-    if start in visited:
-        return False
-    next_visited = visited | {start}
-    return any(
-        _reachable(destination, target, edges, visited=next_visited)
-        for source, destination in edges
-        if source == start
-    )
+def _cycle_pairs(edges: set[tuple[str, str]]) -> set[tuple[str, str]]:
+    successors: dict[str, set[str]] = {}
+    predecessors: dict[str, set[str]] = {}
+    for source, destination in edges:
+        successors.setdefault(source, set()).add(destination)
+        successors.setdefault(destination, set())
+        predecessors.setdefault(destination, set()).add(source)
+        predecessors.setdefault(source, set())
+
+    # Kosaraju's finish order avoids enumerating distinct paths through a DAG.
+    visited: set[str] = set()
+    finished: list[str] = []
+    for root in successors:
+        pending = [(root, False)]
+        while pending:
+            node, exiting = pending.pop()
+            if exiting:
+                finished.append(node)
+            elif node not in visited:
+                visited.add(node)
+                pending.append((node, True))
+                pending.extend((child, False) for child in successors[node] if child not in visited)
+
+    components: dict[str, str] = {}
+    for root in reversed(finished):
+        if root in components:
+            continue
+        members = [root]
+        while members:
+            node = members.pop()
+            if node not in components:
+                components[node] = root
+                members.extend(parent for parent in predecessors[node] if parent not in components)
+
+    return {pair for pair in edges if components[pair[0]] == components[pair[1]]}
 
 
 def _depth_exceeded_pairs(edges: set[tuple[str, str]]) -> set[tuple[str, str]]:

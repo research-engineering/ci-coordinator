@@ -6,6 +6,7 @@ from typing import cast
 
 from ci_coordinator.config_control._resources import ContractResource, contract_document
 from ci_coordinator.config_control.contracts import PolicyDiagnostic
+from ci_coordinator.kernel.path_patterns import validate_path_pattern
 
 type JsonObject = dict[str, object]
 
@@ -407,38 +408,7 @@ def _pattern_occurrences(
 
 
 def _valid_path_pattern(value: str) -> bool:
-    if not _valid_relative_path(value):
-        return False
-    forbidden = frozenset("]![()+@")
-    if any(character in forbidden for character in value):
-        return False
-    index = 0
-    while index < len(value):
-        character = value[index]
-        if character == "}":
-            return False
-        if character != "{":
-            index += 1
-            continue
-        close = value.find("}", index + 1)
-        if close == -1:
-            return False
-        alternatives = value[index + 1 : close].split(",")
-        if len(alternatives) < 2 or any(not alternative for alternative in alternatives):
-            return False
-        if any(any(token in alternative for token in "*?{}") for alternative in alternatives):
-            return False
-        index = close + 1
-    return True
-
-
-def _valid_relative_path(value: str) -> bool:
-    return (
-        bool(value)
-        and not value.startswith(("/", "./"))
-        and "\\" not in value
-        and ".." not in value.split("/")
-    )
+    return validate_path_pattern(value) is None and not value.endswith("/")
 
 
 _ECMASCRIPT_TRIM_CODE_POINTS = frozenset(

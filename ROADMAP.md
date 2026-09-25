@@ -85,9 +85,13 @@ These close their bounded source counterexamples, not CI-054 as a whole,
 baseline graph completeness, provider enforcement or production omission.
 [PR #14](https://github.com/research-engineering/ci-coordinator/pull/14) also
 merged bounded provider-token compatibility repairs after its own native gates.
-Live provider enrollment remains separate. The next coherent repairs cover
-bounded workflow and policy admission and release-evidence selection; remaining
-findings keep their per-source dispositions in the external evidence register.
+Live provider enrollment remains separate.
+[PR #15](https://github.com/research-engineering/ci-coordinator/pull/15) merged
+bounded release-evidence selection, a pinned SBOM generator and disclosure
+guidance after its own exact-head gates. Artifact publication and qualification
+remain separate. The next coherent repair aligns policy path admission with
+execution and bounds workflow cycle analysis; remaining findings keep their
+per-source dispositions in the external evidence register.
 
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.

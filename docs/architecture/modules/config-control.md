@@ -124,7 +124,7 @@ check order.
 |-------------------------------------------------------------------------------------|----------------------------------------------------|
 | formats, parser restrictions, resources, defaults, diagnostics, compilation, hashes | `config-document-profile.v1.json`                  |
 | input document structure                                                            | `repository-policy.schema.v1.json`                 |
-| semantic predicates, pointer classes, path grammar, compatibility allowlist         | `repository-policy-semantics.v1.json`              |
+| semantic predicates, pointer classes, path grammar, compatibility classifications  | `repository-policy-semantics.v1.json`              |
 | compiled policy structure                                                           | `compiled-repository-policy.schema.v1.json`        |
 | public result algebra, exact fields, identities, immutability, Python projection    | `policy-admission-result-profile.v1.json`          |
 | finite producer variants, sentinels, measurement, and feasibility failure           | `config-producer-feasibility-profile.v1.json`      |
@@ -216,11 +216,55 @@ Python. Branch selection, glob matching, allowlist membership, and exact-value
 duplicate checks remain case-sensitive; Unicode scalar values remain legal in
 fields outside the named key set.
 
-The semantics profile marks every predicate `retained-exact` or
-`monotonic-strengthening` and owns the complete additional-rejection allowlist
-by `(code, ruleId, pointerClass)`. A generic semantic rejection cannot prove safe
-strengthening. The conformance fixture is a byte-exact executable
-projection of that canonical allowlist, not an independent policy owner.
+The semantics profile classifies predicates as `retained-exact` or
+`monotonic-strengthening`. An additional rejection needs an explicit owner-bound
+safety argument and exact diagnostic witnesses; a generic semantic failure is
+not that proof. The current `python-config-policy-admission-mutants.v1.json`
+fixture describes a finite inventory of code mutations and commands, not a
+compatibility allowlist. Its consumers in `scripts/mutation/mutation_manifest.py`
+and `mutation_suite_specs.py` validate mutation execution and CP inventory;
+neither they nor runtime admission interpret `additionalRejectionAllowlist`.
+No such enforcement is claimed.
+
+### Path Admission Compatibility
+
+Responsibility and global-risk patterns reuse
+`kernel.path_patterns.validate_path_pattern`: nonempty scalar relative
+paths, no NUL, at most 512 characters and the bounded glob grammar.
+Config admission additionally rejects a terminal `/`; it neither translates
+directory-like patterns nor requires a currently existing file.
+
+```text
+AdmitNew(D) => AdmitPrevious(D)
+              and every policy path passes RuntimePathAdmission
+              and no policy path ends with '/'.
+AdmitNew(D) and dynamicCi enabled
+  => both path-consuming projections can construct their path facts.
+For retained admitted inputs: source/compiled bytes, hashes and matching unchanged.
+```
+
+This narrows the former admission language. Diagnostics retain
+`semantics.invalid`, `path.valid-pattern`, exact offending pointers, empty
+parameters and the existing whitespace-diagnostic precedence. Historical bytes
+and hashes are never rewritten. Durable loads repeat source admission, so an
+old invalid pattern now requires explicit replacement instead of silent
+reinterpretation; the application takes its missing-active-candidate path.
+Direct callers bypassing re-admission are not thereby given a total recovery
+guarantee, and live signed fallback remains a separate qualification.
+
+`src` can identify a file exactly; future-file patterns remain legal.
+NFC and NFD remain distinct strings, consistent with
+[Git tree paths](https://git-scm.com/docs/git-ls-tree#_output_format) and
+[JCS string preservation](https://www.rfc-editor.org/rfc/rfc8785.html#section-3.1).
+No provider read or general dead-pattern analysis belongs to pure admission.
+
+The shared implementation moves unchanged into the existing kernel; the context
+facade retains its public aliases. Config cannot depend on that facade, and
+the import allowlist is not broadened. Literal JSON/YAML witnesses cover both
+path fields, NUL, 512/513 characters, trailing separators, exact Unicode,
+historical re-admission and both consumers. The packaged semantics resource
+must match the canonical profile. Revisit on changed grammar, normalization,
+directory semantics or historical-recovery requirements.
 
 ## 7. Compilation
 
