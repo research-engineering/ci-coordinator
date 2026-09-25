@@ -53,6 +53,7 @@ from ci_coordinator.reconciliation import (
     ReconciliationResult,
     ReconciliationSnapshot,
     ReconciliationSubject,
+    ReconciliationTerminalRequired,
     ResultDuplicate,
     ResultRecord,
     ResultRecorded,
@@ -343,9 +344,11 @@ class TransactionalReconciliationStore(ReconciliationPersistence):
     async def defer_claim(
         self,
         claim: ReconciliationAttemptClaim,
-    ) -> ReconciliationConvergenceState | ReconciliationClaimLost:
+    ) -> ReconciliationConvergenceState | ReconciliationClaimLost | ReconciliationTerminalRequired:
         async with self._unit_of_work() as transaction:
             deferred = await transaction.reconciliation.defer_claim(claim)
+            if isinstance(deferred, ReconciliationTerminalRequired):
+                return deferred
             await transaction.commit()
             return deferred
 

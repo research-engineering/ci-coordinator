@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import Never
+from typing import Literal, Never
 
 import pytest
 
@@ -24,6 +25,7 @@ from ci_coordinator.reconciliation import (
     ReconciliationResult,
     ReconciliationSnapshot,
     ReconciliationSubject,
+    ReconciliationTerminalRequired,
     ResultRecord,
     SignalConclusion,
     SignalObservation,
@@ -127,11 +129,44 @@ class _Persistence:
     async def defer_claim(
         self,
         claim: ReconciliationAttemptClaim,
-    ) -> ReconciliationConvergenceState | ReconciliationClaimLost:
+    ) -> ReconciliationConvergenceState | ReconciliationClaimLost | ReconciliationTerminalRequired:
         self.defer_calls.append(claim)
         if self.claim_lost:
             return ReconciliationClaimLost(SUBJECT.subject_id)
         return initial_convergence_state(NOW, POLICY)
+
+
+class _DeadlinePersistence(_Persistence):
+    def __init__(
+        self, after_requirement: Literal["none", "revision", "lost", "cancel", "foreign"] = "none"
+    ) -> None:
+        super().__init__()
+        self.after_requirement = after_requirement
+        self.recorded_revisions: list[int] = []
+
+    async def defer_claim(
+        self, claim: ReconciliationAttemptClaim
+    ) -> ReconciliationTerminalRequired:
+        self.defer_calls.append(claim)
+        outcome = ReconciliationTerminalRequired(claim, self.snapshot.revision)
+        if self.after_requirement == "revision":
+            await self.append_observation(claim, self.snapshot.revision, _observation()[0])
+        elif self.after_requirement == "lost":
+            self.claim_lost = True
+        elif self.after_requirement == "cancel":
+            raise asyncio.CancelledError
+        elif self.after_requirement == "foreign":
+            return replace(outcome, claim=replace(claim, token="b" * 64))
+        return outcome
+
+    async def record_result(
+        self,
+        claim: ReconciliationAttemptClaim,
+        expected_revision: int,
+        result: ReconciliationResult,
+    ) -> ResultRecord | ReconciliationClaimLost:
+        self.recorded_revisions.append(expected_revision)
+        return await super().record_result(claim, expected_revision, result)
 
 
 class _Poller:
@@ -198,6 +233,7 @@ class _NoEvidenceProjector:
 
 
 def _claim(*, attempt: int = 1, at: datetime = NOW) -> ReconciliationAttemptClaim:
+    snapshot = ReconciliationSnapshot(SUBJECT, CONTRACT, 0, ())
     state = initial_convergence_state(NOW, POLICY)
     acquired: ReconciliationClaimAcquired | None = None
     for index in range(attempt):
@@ -205,7 +241,7 @@ def _claim(*, attempt: int = 1, at: datetime = NOW) -> ReconciliationAttemptClai
             state,
             SUBJECT,
             CONTRACT,
-            0,
+            snapshot.revision,
             worker_id=WORKER_ID,
             now=at + timedelta(seconds=index),
             policy=POLICY,
@@ -216,6 +252,7 @@ def _claim(*, attempt: int = 1, at: datetime = NOW) -> ReconciliationAttemptClai
                 acquired.state,
                 acquired.claim,
                 at + timedelta(seconds=index),
+                snapshot_revision=snapshot.revision,
             )
             assert isinstance(deferred, ReconciliationConvergenceState)
             state = deferred
@@ -309,6 +346,82 @@ def test_pending_result_is_deferred_instead_of_persisted() -> None:
 
     assert persistence.result is None
     assert len(persistence.defer_calls) == 1
+
+
+@pytest.mark.parametrize("poll_path", ["pending", "unavailable"])
+@pytest.mark.parametrize("with_evidence_port", [False, True])
+def test_locked_deadline_requirement_uses_actual_revision_on_both_defer_paths(
+    poll_path: Literal["pending", "unavailable"], with_evidence_port: bool
+) -> None:
+    acquired = _claim()
+    persistence = _DeadlinePersistence()
+    progress = _observation("in_progress", None)
+    outcome: ReconciliationPollOutcome | BaseException = progress
+    if poll_path == "unavailable":
+        persistence.snapshot = ReconciliationSnapshot(SUBJECT, CONTRACT, 1, progress)
+        outcome = ReconciliationPollUnavailable("provider")
+    terminal = _TerminalPersistence(persistence) if with_evidence_port else None
+    assert acquired.deadline_at > NOW
+
+    asyncio.run(
+        _service(acquired, persistence, _Poller(outcome), terminal=terminal)(asyncio.Event())
+    )
+
+    assert acquired.revision == 0
+    assert persistence.snapshot.revision == 1
+    assert persistence.defer_calls == [acquired]
+    assert persistence.recorded_revisions == [1]
+    assert persistence.result is not None
+    assert persistence.result.state == "failure"
+    assert persistence.result.findings[0].kind == "reconciliation_timed_out"
+    if terminal is not None:
+        assert terminal.calls == [(acquired, 1, persistence.result)]
+
+
+@pytest.mark.parametrize("change", ["revision", "lost"])
+def test_terminal_requirement_cannot_promote_a_changed_snapshot_or_lost_claim(
+    change: Literal["revision", "lost"],
+) -> None:
+    persistence = _DeadlinePersistence(change)
+    terminal = _TerminalPersistence(persistence)
+
+    asyncio.run(
+        _service(
+            _claim(),
+            persistence,
+            _Poller(_observation("in_progress", None)),
+            terminal=terminal,
+        )(asyncio.Event())
+    )
+
+    assert persistence.recorded_revisions == [1]
+    assert persistence.result is None
+    assert len(terminal.calls) == 1
+    if change == "revision":
+        assert persistence.snapshot.revision == 2
+
+
+@pytest.mark.parametrize("change", ["cancel", "foreign"])
+def test_invalid_or_cancelled_requirement_never_reaches_terminal_writer(
+    change: Literal["cancel", "foreign"],
+) -> None:
+    persistence = _DeadlinePersistence(change)
+    terminal = _TerminalPersistence(persistence)
+    error = asyncio.CancelledError if change == "cancel" else ValueError
+
+    with pytest.raises(error):
+        asyncio.run(
+            _service(
+                _claim(),
+                persistence,
+                _Poller(_observation("in_progress", None)),
+                terminal=terminal,
+            )(asyncio.Event())
+        )
+
+    assert persistence.recorded_revisions == []
+    assert persistence.result is None
+    assert terminal.calls == []
 
 
 def test_pending_last_attempt_becomes_terminal_failure() -> None:

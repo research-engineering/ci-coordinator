@@ -27,6 +27,7 @@ from ci_coordinator.persistence.schema import (
 from ci_coordinator.reconciliation import (
     ObservationAppended,
     ReconciliationClaimLost,
+    ReconciliationConvergenceState,
     ReconciliationResult,
     ReconciliationSubject,
     ResultDuplicate,
@@ -231,7 +232,7 @@ def test_defer_persists_due_time_attempt_and_backoff_across_restart(
             async with PostgresShadowReconciliationUnitOfWork(engine) as transaction:
                 deferred = await transaction.reconciliation.defer_claim(first)
                 await transaction.commit()
-            assert not isinstance(deferred, ReconciliationClaimLost)
+            assert isinstance(deferred, ReconciliationConvergenceState)
             after = await _database_time(engine)
             assert before + timedelta(seconds=1) <= deferred.next_attempt_at
             assert deferred.next_attempt_at <= after + timedelta(

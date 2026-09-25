@@ -13,7 +13,10 @@ from ci_coordinator.reconciliation import (
     ReconciliationContract,
     ReconciliationConvergencePolicy,
     ReconciliationConvergenceState,
+    ReconciliationSnapshot,
     ReconciliationSubject,
+    ReconciliationTerminalRequired,
+    SignalObservation,
     acquire_reconciliation_claim,
     convergence_failure,
     defer_reconciliation_claim,
@@ -50,6 +53,7 @@ POLICY = ReconciliationConvergencePolicy(
     poll_timeout_seconds=10,
     lease_seconds=15,
 )
+EMPTY_SNAPSHOT = ReconciliationSnapshot(SUBJECT, CONTRACT, 0, ())
 
 
 @pytest.mark.parametrize(
@@ -157,16 +161,26 @@ def test_defer_advances_bounded_backoff_and_rejects_a_stale_token() -> None:
     )
     assert first is not None
 
-    deferred = defer_reconciliation_claim(first.state, first.claim, NOW + timedelta(seconds=1))
+    deferred = defer_reconciliation_claim(
+        first.state,
+        first.claim,
+        NOW + timedelta(seconds=1),
+        snapshot_revision=EMPTY_SNAPSHOT.revision,
+    )
 
-    assert not isinstance(deferred, ReconciliationClaimLost)
+    assert isinstance(deferred, ReconciliationConvergenceState)
     delay = int((deferred.next_attempt_at - (NOW + timedelta(seconds=1))).total_seconds())
     assert (POLICY.initial_backoff_seconds + 1) // 2 <= delay <= POLICY.initial_backoff_seconds
     assert deferred.backoff_seconds == 10
     assert deferred.lease_token is None
     assert deferred.lease_acquired_at is None
     assert isinstance(
-        defer_reconciliation_claim(first.state, first.claim, NOW + timedelta(seconds=15)),
+        defer_reconciliation_claim(
+            first.state,
+            first.claim,
+            NOW + timedelta(seconds=15),
+            snapshot_revision=EMPTY_SNAPSHOT.revision,
+        ),
         ReconciliationClaimLost,
     )
 
@@ -183,15 +197,134 @@ def test_retry_jitter_is_bounded_and_subject_stable() -> None:
     )
     assert first is not None
 
-    outcomes = tuple(defer_reconciliation_claim(first.state, first.claim, NOW) for _ in range(2))
+    outcomes = tuple(
+        defer_reconciliation_claim(
+            first.state, first.claim, NOW, snapshot_revision=EMPTY_SNAPSHOT.revision
+        )
+        for _ in range(2)
+    )
 
-    assert all(not isinstance(outcome, ReconciliationClaimLost) for outcome in outcomes)
+    assert all(isinstance(outcome, ReconciliationConvergenceState) for outcome in outcomes)
     admitted = [
         outcome for outcome in outcomes if isinstance(outcome, ReconciliationConvergenceState)
     ]
     assert admitted[0].next_attempt_at == admitted[1].next_attempt_at
     delay = int((admitted[0].next_attempt_at - NOW).total_seconds())
     assert (POLICY.initial_backoff_seconds + 1) // 2 <= delay <= POLICY.initial_backoff_seconds
+
+
+@pytest.mark.parametrize("offset_us", [-1, 0, 1])
+def test_defer_deadline_keeps_claim_and_binds_the_observed_snapshot(offset_us: int) -> None:
+    initial = initial_convergence_state(NOW, POLICY)
+    acquired = acquire_reconciliation_claim(
+        initial,
+        SUBJECT,
+        CONTRACT,
+        EMPTY_SNAPSHOT.revision,
+        worker_id=WORKER,
+        now=initial.deadline_at - timedelta(seconds=1),
+        policy=POLICY,
+    )
+    assert acquired is not None
+    observed = SignalObservation(
+        "progress",
+        SUBJECT.subject_id,
+        CONTRACT.provider_signals[0].signal_id,
+        SUBJECT.workflow_run_id,
+        SUBJECT.run_attempt,
+        1,
+        "in_progress",
+        None,
+    )
+    snapshot = ReconciliationSnapshot(SUBJECT, CONTRACT, 1, (observed,))
+    at = initial.deadline_at + timedelta(microseconds=offset_us)
+
+    outcome = defer_reconciliation_claim(
+        acquired.state, acquired.claim, at, snapshot_revision=snapshot.revision
+    )
+
+    if offset_us < 0:
+        assert isinstance(outcome, ReconciliationConvergenceState)
+        assert outcome.next_attempt_at == initial.deadline_at
+        assert outcome.backoff_seconds == POLICY.initial_backoff_seconds * 2
+        assert outcome.lease_token is None
+    else:
+        assert isinstance(outcome, ReconciliationTerminalRequired)
+        assert outcome.claim is acquired.claim
+        assert outcome.claim.revision == 0
+        assert outcome.snapshot_revision == snapshot.revision == 1
+        assert outcome.reason == "deadline_exceeded"
+        assert acquired.state.lease_token == acquired.claim.token
+        assert acquired.state.backoff_seconds == POLICY.initial_backoff_seconds
+
+
+def test_terminal_requirement_does_not_replace_stale_claim_or_attempt_only_errors() -> None:
+    initial = initial_convergence_state(NOW, POLICY)
+    acquired = acquire_reconciliation_claim(
+        replace(initial, attempt_count=POLICY.max_attempts - 1, claim_generation=2),
+        SUBJECT,
+        CONTRACT,
+        EMPTY_SNAPSHOT.revision,
+        worker_id=WORKER,
+        now=initial.deadline_at - timedelta(seconds=1),
+        policy=POLICY,
+    )
+    assert acquired is not None
+    assert acquired.claim.attempt_count == POLICY.max_attempts
+    with pytest.raises(ValueError, match="terminal reconciliation claim cannot be deferred"):
+        defer_reconciliation_claim(
+            acquired.state,
+            acquired.claim,
+            acquired.claim.claimed_at,
+            snapshot_revision=EMPTY_SNAPSHOT.revision,
+        )
+    required = defer_reconciliation_claim(
+        acquired.state,
+        acquired.claim,
+        initial.deadline_at,
+        snapshot_revision=EMPTY_SNAPSHOT.revision,
+    )
+    assert isinstance(required, ReconciliationTerminalRequired)
+    for stale_state in (
+        replace(acquired.state, lease_token="2" * 64),
+        replace(acquired.state, claim_generation=acquired.state.claim_generation + 1),
+    ):
+        assert isinstance(
+            defer_reconciliation_claim(
+                stale_state,
+                acquired.claim,
+                initial.deadline_at,
+                snapshot_revision=EMPTY_SNAPSHOT.revision,
+            ),
+            ReconciliationClaimLost,
+        )
+    assert isinstance(
+        defer_reconciliation_claim(
+            acquired.state,
+            acquired.claim,
+            acquired.claim.lease_expires_at,
+            snapshot_revision=EMPTY_SNAPSHOT.revision,
+        ),
+        ReconciliationClaimLost,
+    )
+
+
+@pytest.mark.parametrize("revision", [-1, True, 9_007_199_254_740_992])
+def test_terminal_requirement_rejects_invalid_snapshot_revision(revision: int) -> None:
+    acquired = acquire_reconciliation_claim(
+        initial_convergence_state(NOW, POLICY),
+        SUBJECT,
+        CONTRACT,
+        EMPTY_SNAPSHOT.revision,
+        worker_id=WORKER,
+        now=NOW,
+        policy=POLICY,
+    )
+    assert acquired is not None
+    with pytest.raises(ValueError, match="snapshot revision"):
+        ReconciliationTerminalRequired(acquired.claim, revision)
+    with pytest.raises(ValueError, match="snapshot revision"):
+        defer_reconciliation_claim(acquired.state, acquired.claim, NOW, snapshot_revision=revision)
 
 
 @pytest.mark.parametrize(

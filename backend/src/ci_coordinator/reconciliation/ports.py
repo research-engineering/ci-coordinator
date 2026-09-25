@@ -9,6 +9,7 @@ from ci_coordinator.reconciliation.convergence import (
     ReconciliationAttemptClaim,
     ReconciliationClaimLost,
     ReconciliationConvergenceState,
+    ReconciliationTerminalRequired,
 )
 from ci_coordinator.reconciliation.findings import ReconciliationResult
 from ci_coordinator.reconciliation.observation import SignalObservation
@@ -55,7 +56,9 @@ class ReconciliationPersistence(Protocol):
     async def defer_claim(
         self,
         claim: ReconciliationAttemptClaim,
-    ) -> ReconciliationConvergenceState | ReconciliationClaimLost: ...
+    ) -> (
+        ReconciliationConvergenceState | ReconciliationClaimLost | ReconciliationTerminalRequired
+    ): ...
 
 
 class ReconciliationPublisher(Protocol):

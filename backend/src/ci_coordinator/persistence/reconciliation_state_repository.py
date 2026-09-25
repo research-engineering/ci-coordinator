@@ -45,6 +45,7 @@ from ci_coordinator.reconciliation import (
     ReconciliationResult,
     ReconciliationSnapshot,
     ReconciliationSubject,
+    ReconciliationTerminalRequired,
     SignalObservation,
     acquire_reconciliation_claim,
     defer_reconciliation_claim,
@@ -349,7 +350,7 @@ class _PostgresReconciliationRepository:
     async def defer_claim(
         self,
         claim: ReconciliationAttemptClaim,
-    ) -> ReconciliationConvergenceState | ReconciliationClaimLost:
+    ) -> ReconciliationConvergenceState | ReconciliationClaimLost | ReconciliationTerminalRequired:
         _require_claim(claim)
         self._ensure_active()
         try:
@@ -358,8 +359,13 @@ class _PostgresReconciliationRepository:
                 for_update=True,
             )
             _require_claim_contract(snapshot, claim)
-            deferred = defer_reconciliation_claim(convergence, claim, await self._database_time())
-            if isinstance(deferred, ReconciliationClaimLost):
+            deferred = defer_reconciliation_claim(
+                convergence,
+                claim,
+                await self._database_time(),
+                snapshot_revision=snapshot.revision,
+            )
+            if isinstance(deferred, ReconciliationClaimLost | ReconciliationTerminalRequired):
                 return deferred
             if not await self._update_convergence(claim, deferred):
                 return ReconciliationClaimLost(claim.subject.subject_id)

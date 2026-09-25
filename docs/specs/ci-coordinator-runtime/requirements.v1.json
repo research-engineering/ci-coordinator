@@ -54,7 +54,7 @@
     {
       "requirementId": "REQ-CI-RUNTIME-003",
       "ownerId": "ci-coordinator.runtime",
-      "invariant": "Reconciliation may publish a successful coordinator check only when the persisted decision is still authorized by current policy, the coordinator check slot is unambiguous, expected workflow success is observed or safely polled, omitted workflow absence is verified for the required window, and state persistence succeeds through compare-and-set semantics.",
+      "invariant": "Reconciliation may publish a successful coordinator check only when the persisted decision is still authorized by current policy, the coordinator check slot is unambiguous, expected workflow success is observed or safely polled, omitted workflow absence is verified for the required window, and state persistence succeeds through compare-and-set semantics. An active claim whose deadline has elapsed at database-time deferral returns a no-write terminal requirement bound to the original claim and locked snapshot revision, only after transaction cleanup. Its continuation uses the existing terminal writer with fresh revision and lease admission; the deadline observation alone is not write authority.",
       "claimLevel": "blocking",
       "riskClass": "critical",
       "proofBindingRefs": ["proofkit/requirement-bindings.json"],

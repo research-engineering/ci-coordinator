@@ -43,7 +43,7 @@ register_subject(subject, contract) -> SubjectRegistration
 claim_next(worker_id, now, policy) -> ReconciliationAttemptClaim | absent
 load_snapshot(claim) -> ReconciliationSnapshot | ClaimLost
 append_observation(claim, expected_revision, observation) -> ObservationAppend | ClaimLost
-defer_claim(claim) -> ConvergenceState | ClaimLost
+defer_claim(claim) -> ConvergenceState | ClaimLost | ReconciliationTerminalRequired
 record_result(claim, expected_revision, terminal_result) -> ResultRecord | ClaimLost
 poll(subject, provider_signals) -> observations | ProviderSignalAmbiguity
 reconcile(snapshot) -> ReconciliationResult
@@ -198,6 +198,14 @@ Cancellation propagates unchanged and cannot commit. Exact replay after an
 uncertain commit is idempotent; byte-different replay is a conflict. Duplicate
 classification precedes revision conflict only for the exact retained effect,
 so retrying a successful commit is safe without allowing a new stale write.
+
+A defer that observes the database deadline under the subject lock returns a
+terminal requirement bound to the original claim and the actual snapshot revision,
+without changing the lease or schedule. This observation is not write authority:
+the existing terminal transaction rechecks the revision and current database-time
+lease before a new atomic result, audit, and required shadow effect. A concurrent
+revision change or lost lease cannot become terminal success; exact retained replay
+keeps its existing precedence. Nonterminal backoff and audit timestamps are unchanged.
 
 ## 6. Runtime and Failure Behavior
 
