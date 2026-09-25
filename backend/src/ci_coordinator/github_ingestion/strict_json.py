@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
@@ -8,6 +9,11 @@ from typing import Literal, Self
 
 from ci_coordinator.github_ingestion.payload_limits import WebhookPayloadLimits
 from ci_coordinator.kernel import is_safe_json_integer
+
+_STRING_BOUNDARY = re.compile(r'["\\\x00-\x1f]')
+_WHITESPACE_RUN = re.compile(r"[ \t\r\n]*")
+_SCALAR_RUN = re.compile(r"[^,\]}\s]+")
+_SURROGATE = re.compile(r"[\ud800-\udfff]")
 
 
 class JsonPayloadError(ValueError):
@@ -165,14 +171,25 @@ class _StructuralPreflight:
             if ord(character) < 0x20:
                 raise JsonPayloadError("invalid_json")
             if character != "\\":
-                code_point_count = self._add_string_code_point(code_point_count)
+                start = self._index - 1
+                # Inspect at most the first excess code point before reporting the limit.
+                end = min(
+                    len(self._source),
+                    start + self._limits.maximum_string_code_points - code_point_count + 1,
+                )
+                boundary = _STRING_BOUNDARY.search(self._source, self._index, end)
+                next_index = end if boundary is None else boundary.start()
+                code_point_count = self._add_string_code_points(
+                    code_point_count, next_index - start
+                )
+                self._index = next_index
                 continue
             if self._index >= len(self._source):
                 raise JsonPayloadError("invalid_json")
             escape = self._source[self._index]
             self._index += 1
             if escape in {'"', "\\", "/", "b", "f", "n", "r", "t"}:
-                code_point_count = self._add_string_code_point(code_point_count)
+                code_point_count = self._add_string_code_points(code_point_count, 1)
                 continue
             if escape != "u":
                 raise JsonPayloadError("invalid_json")
@@ -186,7 +203,7 @@ class _StructuralPreflight:
                     raise JsonPayloadError("invalid_json")
             elif 0xDC00 <= code_unit <= 0xDFFF:
                 raise JsonPayloadError("invalid_json")
-            code_point_count = self._add_string_code_point(code_point_count)
+            code_point_count = self._add_string_code_points(code_point_count, 1)
         raise JsonPayloadError("invalid_json")
 
     def _parse_unicode_escape(self) -> int:
@@ -198,21 +215,17 @@ class _StructuralPreflight:
         self._index += 4
         return int(hex_digits, 16)
 
-    def _add_string_code_point(self, count: int) -> int:
-        next_count = count + 1
+    def _add_string_code_points(self, count: int, increment: int) -> int:
+        next_count = count + increment
         if next_count > self._limits.maximum_string_code_points:
             raise JsonPayloadError("webhook_payload_string_limit_exceeded")
         return next_count
 
     def _parse_scalar(self) -> None:
-        start = self._index
-        while self._index < len(self._source):
-            character = self._source[self._index]
-            if character in ",]}" or character.isspace():
-                break
-            self._index += 1
-        if self._index == start:
+        token = _SCALAR_RUN.match(self._source, self._index)
+        if token is None:
             raise JsonPayloadError("invalid_json")
+        self._index = token.end()
 
     def _add_member(self, parent: _Frame | None) -> None:
         if parent is None:
@@ -247,8 +260,9 @@ class _StructuralPreflight:
         return False
 
     def _skip_whitespace(self) -> None:
-        while self._index < len(self._source) and self._source[self._index] in " \t\r\n":
-            self._index += 1
+        whitespace = _WHITESPACE_RUN.match(self._source, self._index)
+        if whitespace is not None:
+            self._index = whitespace.end()
 
 
 class _FreezeState:
@@ -298,7 +312,7 @@ class _FreezeState:
     def _admit_string(self, value: str) -> None:
         if len(value) > self._limits.maximum_string_code_points:
             raise JsonPayloadError("webhook_payload_string_limit_exceeded")
-        if any(0xD800 <= ord(character) <= 0xDFFF for character in value):
+        if not value.isascii() and _SURROGATE.search(value) is not None:
             raise JsonPayloadError("invalid_json")
 
     def _add_node(self) -> None:
