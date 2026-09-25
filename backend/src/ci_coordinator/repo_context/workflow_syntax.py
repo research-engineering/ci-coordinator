@@ -56,15 +56,13 @@ def parse_workflow_capability(
         return None
     try:
         text = content.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
-    if text.startswith("\ufeff") or "\x00" in text:
-        return None
+        if text.startswith("\ufeff") or "\x00" in text:
+            return None
 
-    yaml = YAML(typ="safe", pure=True)
-    yaml.version = (1, 2)
-    yaml.allow_duplicate_keys = False
-    try:
+        yaml = YAML(typ="safe", pure=True)
+        yaml.version = (1, 2)
+        yaml.allow_duplicate_keys = False
+        yaml.max_depth = _MAX_WORKFLOW_DEPTH
         root = yaml.compose(text)
         if not isinstance(root, MappingNode):
             return None
@@ -77,6 +75,7 @@ def parse_workflow_capability(
         loaded_yaml = YAML(typ="safe", pure=True)
         loaded_yaml.version = (1, 2)
         loaded_yaml.allow_duplicate_keys = False
+        loaded_yaml.max_depth = _MAX_WORKFLOW_DEPTH
         loaded = loaded_yaml.load(text)
         if type(loaded) is not dict or type(loaded.get("jobs")) is not dict:
             return None
@@ -104,7 +103,7 @@ def parse_workflow_capability(
             declares_workflow_defaults="defaults" in root_fields,
             job_runner_selectors=_job_runner_selectors(job_fields),
         )
-    except (TypeError, ValueError, YAMLError):
+    except (MemoryError, RecursionError, TypeError, ValueError, YAMLError):
         return None
 
 
@@ -211,30 +210,32 @@ def _job_runner_selectors(
 
 
 def _static_runner_selector(node: Node | None) -> StaticRunnerSelector | None:
-    if isinstance(node, ScalarNode):
-        label = _static_runner_text(node)
-        return None if label is None else static_runner_selector(labels=(label,), group=None)
-    if isinstance(node, SequenceNode):
-        labels = tuple(_static_runner_text(item) for item in node.value)
-        if not labels or any(label is None for label in labels):
-            return None
-        return static_runner_selector(
-            labels=tuple(label for label in labels if label is not None),
-            group=None,
-        )
     if not isinstance(node, MappingNode):
-        return None
+        labels = _static_runner_labels(node)
+        return None if labels is None else static_runner_selector(labels=labels, group=None)
     fields = _mapping_fields(node)
     if not fields or not set(fields).issubset({"group", "labels"}):
         return None
     group = _static_runner_text(fields.get("group"))
-    label = _static_runner_text(fields.get("labels"))
-    if ("group" in fields and group is None) or ("labels" in fields and label is None):
+    labels = _static_runner_labels(fields["labels"]) if "labels" in fields else ()
+    if ("group" in fields and group is None) or labels is None:
         return None
     return static_runner_selector(
-        labels=() if label is None else (label,),
+        labels=labels,
         group=group,
     )
+
+
+def _static_runner_labels(node: Node | None) -> tuple[str, ...] | None:
+    if isinstance(node, ScalarNode):
+        label = _static_runner_text(node)
+        return None if label is None else (label,)
+    if not isinstance(node, SequenceNode):
+        return None
+    labels = tuple(_static_runner_text(item) for item in node.value)
+    if not labels or any(label is None for label in labels):
+        return None
+    return tuple(label for label in labels if label is not None)
 
 
 def _static_runner_text(node: Node | None) -> str | None:
