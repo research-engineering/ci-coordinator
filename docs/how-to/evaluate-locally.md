@@ -64,7 +64,7 @@ Fresh generated development state selects App-wide inventory but does not
 create an external Keycloak identity or a real App credential. Authentication
 still stops catalog reads before provider I/O. Existing state retains its
 previous explicit or default inventory policy. End-to-end authenticated UI use
-requires the separate Keycloak and GitHub App deployment procedure; `dev:up`
+requires [Keycloak and GitHub App onboarding](configure-provider-identity.md); `dev:up`
 does not silently create or impersonate those external authorities.
 See [installation discovery](discover-installed-organizations.md) for explicit
 connected configuration.
@@ -147,7 +147,8 @@ path pnpm selects for this multi-volume workspace. The container can therefore p
 Linux artifacts without replacing the host installation, exposing cache bytes
 to repository proof, or sharing mutable dependency state with another worktree.
 
-Inside the container, run the provider-free proof projection:
+The CI Dev Container witness runs the provider-free proof projection inside
+the container:
 
 ```sh
 mise run check:portable
@@ -160,11 +161,20 @@ The CI Dev Container witness removes every container network and proves the
 absence of a Docker socket before invoking this task. A direct host invocation
 does not claim an operating-system network sandbox.
 
-Run `dev:up`, `dev:smoke`, and provider-backed full proof on the trusted host.
-The repository does not maintain a second application topology for the editor
-container.
+The `dev:up`, `dev:smoke`, and provider-backed proof entrypoints use a trusted
+host, not this editor container. Host placement does not grant execution
+permission: follow the [verification placement rule](../architecture/cross-cutting/testing-and-proofkit.md#6-required-gates-and-execution-placement).
+The repository does not maintain a second application topology for the editor container.
 
-## Run Full Repository Proof
+## Full Repository Proof Entrypoints
+
+The commands below identify the existing proof facade; they are not a local
+behavioral-test recipe. Local engineering checks are restricted to admitted
+static work. Behavioral, database, browser, container, coverage and mutation
+witnesses run through the repository's GitHub workflows under the
+[same placement rule](../architecture/cross-cutting/testing-and-proofkit.md#6-required-gates-and-execution-placement).
+Use the [API campaign procedure](test-api-contracts.md#run-in-github-actions)
+for a targeted dispatch and verify the tested commit before using its result.
 
 ```sh
 mise run install
@@ -184,7 +194,8 @@ provider cannot be reached.
 
 Set `BASE_SHA` to the exact reviewed-base commit and `HEAD_SHA` to the exact
 current commit. `CI=true` is an explicit acknowledgement that this gate may
-create and remove isolated Docker resources; it is not a readiness claim.
+create and remove isolated Docker resources; it is neither an execution-policy
+exception nor a readiness claim.
 
 ## Direct Command Fallback
 

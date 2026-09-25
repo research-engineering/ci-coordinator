@@ -6,9 +6,12 @@ GitHub, Keycloak or a database. It is a development dependency, not part of the
 runtime image. See the [design](../features/schema-driven-api-testing.md) for
 the exact three-operation population, independent oracles and non-claims.
 
-## Run Locally
+## Campaign Entrypoints
 
-Prepare the locked backend environment, then choose a campaign:
+The following commands identify the locked campaign entrypoints. Their
+portability does not authorize local behavioral execution: use the
+[GitHub route below](#run-in-github-actions), following the repository's
+[verification placement rule](../architecture/cross-cutting/testing-and-proofkit.md#6-required-gates-and-execution-placement).
 
 ```sh
 mise run install:backend
@@ -20,8 +23,7 @@ The default seed is `20260919`. Fast is the ordinary CI profile; deep explores
 more inputs without changing the operation set or relaxing any check. The
 process deadlines are 180 and 300 seconds, including generation, shrinking and
 authentication follow-ups. A timeout or incomplete test process fails.
-Agents must still follow the organization's GitHub-only behavioral execution
-policy; these commands do not grant a local execution exception.
+These commands do not grant an execution-policy exception.
 
 Results are retained in a unique `.api-contract/<profile>-*/` directory:
 bounded stdout/stderr, failure diagnostics and `summary.json`. The summary
@@ -62,7 +64,8 @@ security or browser gates.
 
 1. Retain the exact source checkout, lock, profile, schema identity, phase and
    synthetic case together. A seed alone does not reproduce changed code.
-2. Repeat the same profile and seed on that checkout. Hypothesis can shrink
+2. Repeat the same profile and seed on that checkout through the admitted
+   GitHub campaign. Hypothesis can shrink
    generated failures; explicit and coverage cases are retained as exact cases,
    not promised to be minimized.
 3. Classify the refusal under the operation's actual contract. A schema-valid

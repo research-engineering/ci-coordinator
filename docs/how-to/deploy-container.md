@@ -1,8 +1,8 @@
 # Deploy The Container Artifact
 
-Status: supported deployment procedure
+Status: as-built deployment procedure; artifact publication and production admission required separately
 
-Last verified: 2026-07-20
+Source reviewed: 2026-09-25; live deployment qualification not claimed
 
 ## Outcome
 
@@ -18,6 +18,16 @@ DeploymentProcedureComplete does not imply ProductionAdmissionComplete
 Provider wiring, live fallback exercises, shadow evidence, stable required
 checks, and deployment SLOs remain governed by
 [Production Admission](../architecture/cross-cutting/production-admission.md).
+
+The public [Releases API](https://api.github.com/repos/research-engineering/ci-coordinator/releases)
+returned no published releases on 2026-09-25. Consult
+[Releases](https://github.com/research-engineering/ci-coordinator/releases) and
+the exact publication receipt before proceeding; neither an example GHCR path
+nor an empty release list proves what exists in a registry. For source-based
+evaluation without an admitted artifact, use the [local guide](evaluate-locally.md).
+Configure [provider identity](configure-provider-identity.md) before normal
+authenticated operation; keep [emergency controls](emergency-controls.md)
+available to the deployment owner.
 
 ## 1. Freeze The Artifact
 
@@ -134,8 +144,9 @@ must never receive it.
 ## 4. Start Non-Enforcing Runtime
 
 Inject the variables listed in [`.env.example`](../../.env.example) from the
-deployment secret and configuration owners. `CI_COORDINATOR_DATABASE_DSN` must
-identify the restricted runtime principal, not the migration principal.
+deployment secret and configuration owners. The resolved
+`CI_COORDINATOR_DATABASE_DSN` must identify the restricted runtime principal,
+not the migration principal.
 
 If the deployment requires a corporate egress proxy, set the one canonical
 credential-free `CI_COORDINATOR_OUTBOUND_PROXY_URL` shown in `.env.example`.
@@ -155,17 +166,73 @@ inherit that switch or either proxy variable. Never declare proxy values with a
 Dockerfile `ARG` or `ENV`, because that would retain deployment topology in
 image metadata or layers.
 
+### Mount Secret Files
+
+Docker [`--env-file`](https://docs.docker.com/reference/cli/docker/container/run/#set-environment-variables--e---env---env-file)
+uses one variable per line. Do not place multiline PEM values there or replace
+their newlines with literal `\n`: the runtime does not unescape them. Put only
+non-secret settings and container file paths in the env file, for example:
+
+```dotenv
+CI_COORDINATOR_RUNTIME_MODE=non_enforcing
+CI_COORDINATOR_DATABASE_DSN_FILE=/run/secrets/database-dsn
+CI_COORDINATOR_WEBHOOK_SECRET_FILE=/run/secrets/webhook-secret
+CI_COORDINATOR_GITHUB_PRIVATE_KEY_FILE=/run/secrets/github-private-key.pem
+CI_COORDINATOR_PLAN_SIGNING_PRIVATE_KEY_FILE=/run/secrets/plan-signing-private-key.pem
+CI_COORDINATOR_BREAK_GLASS_BEARER_TOKEN_FILE=/run/secrets/break-glass-bearer-token
+CI_COORDINATOR_METRICS_BEARER_TOKEN_FILE=/run/secrets/metrics-bearer-token
+```
+
+This is the secret-wiring portion, not a complete connected configuration.
+Add the required non-secret settings from `.env.example`. With Keycloak enabled,
+also use `CI_COORDINATOR_KEYCLOAK_BROWSER_CLIENT_SECRET_FILE`,
+`CI_COORDINATOR_CONTROL_PLANE_SESSION_KEY_FILE`, and
+`CI_COORDINATOR_GITHUB_APP_CLIENT_SECRET_FILE` as described in
+[provider onboarding](configure-provider-identity.md). The tenth admitted name,
+`CI_COORDINATOR_PRODUCTION_ADMISSION_PUBLIC_KEY_PEM_FILE`, is enforcing-only.
+There is no generic `_FILE` expansion for other variables, including the
+separate Alembic migration DSN.
+
+Provision `/deployment-owned/runtime-secrets` outside the checkout with only
+this service's runtime files; never include the migration credential. Mount it
+read-only at `/run/secrets` as below. The image runs as `10001:10001`; arrange
+directory traversal and file read access for that identity, for example files
+owned by that UID with mode `0400`. The
+[environment owner](../../backend/src/ci_coordinator/runtime/environment.py)
+requires an absolute normalized path to a readable regular file, no group or
+other write bits, bounded UTF-8 content and no NUL. It removes at most one final
+LF and retains embedded PEM newlines. Limits are 64 KiB for DSN/webhook/private
+keys, 4 KiB for bearer/client secrets, 64 bytes for the session-key text, and
+16 KiB for the admission public key; the resolved setting is validated again.
+
+Choose exactly one direct or `_FILE` form for each setting, even if a direct
+value would be empty. Direct environment injection remains supported, but file
+mounts avoid putting PEM bytes in the container's configured environment.
+File mounts do not protect secrets from a privileged host operator. Do not
+print file contents, commit them, or bake them into the image. Rotation requires
+restarting the service; these files are startup inputs, not a hot-reload API.
+
+The example publishes only to host loopback for a host-local ingress proxy.
+Do not use `--publish 3000:3000`: Docker's
+[default publication](https://docs.docker.com/engine/network/port-publishing/)
+exposes all host interfaces. If the ingress runs in a separate container, omit
+host publication and use a deployment-owned isolated network accessible only
+to the approved ingress and probes. Before exposing any public endpoint,
+satisfy [public ingress admission](#public-ingress-admission) below; loopback
+publication alone is not proof that every bypass path is closed.
+
 ```sh
 docker run --detach \
   --init \
   --name ci-coordinator \
-  --publish 3000:3000 \
+  --publish 127.0.0.1:3000:3000 \
   --read-only \
   --cap-drop ALL \
   --security-opt no-new-privileges=true \
   --pids-limit 256 \
   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
   --env-file /deployment-owned/ci-coordinator.env \
+  --mount type=bind,src=/deployment-owned/runtime-secrets,dst=/run/secrets,readonly \
   "${CI_COORDINATOR_IMAGE}"
 ```
 
@@ -194,6 +261,12 @@ and control-plane commands separately; use
 [Manage Repository Policy](manage-repository-policy.md) for epoch registration
 and activation without process restart.
 
+The container health probe intentionally also accepts a pre-ASGI `503` as a
+responsive process, avoiding overload-driven restart amplification. Container
+`healthy` therefore proves neither readiness nor available request capacity.
+Retain separate readiness and edge admission/saturation observations; do not
+change this liveness contract to treat every overload as a restart condition.
+
 ## 6. Promote To Receipt-Gated Enforcement
 
 Perform this step only after the external conjunction in
@@ -210,15 +283,17 @@ public key and exact binding inputs through the deployment configuration owner:
 CI_COORDINATOR_RUNTIME_MODE=enforcing
 CI_COORDINATOR_PRODUCTION_ADMISSION_RECEIPT_PATH=/var/run/ci-coordinator/production-admission.json
 CI_COORDINATOR_PRODUCTION_ADMISSION_KEY_ID=<receipt-key-id>
-CI_COORDINATOR_PRODUCTION_ADMISSION_PUBLIC_KEY_PEM=<receipt-ed25519-public-key-pem>
+CI_COORDINATOR_PRODUCTION_ADMISSION_PUBLIC_KEY_PEM_FILE=/run/secrets/production-admission-public-key.pem
 CI_COORDINATOR_DEPLOYED_ARTIFACT_DIGEST=sha256:<exact-oci-manifest-digest>
 CI_COORDINATOR_ENVIRONMENT_ID=<canonical-environment-id>
 CI_COORDINATOR_ENFORCEMENT_SCOPE_ALLOWLIST=<installation:repository,...>
 ```
 
 The enforcement scope must be a subset of
-`CI_COORDINATOR_CONTROL_PLANE_SCOPE_ALLOWLIST`. Mount the receipt read-only and
-restart the exact image digest. The `45`-second example below assumes the
+`CI_COORDINATOR_CONTROL_PLANE_SCOPE_ALLOWLIST`. Provision the real multiline
+public-key PEM at the file path above, without also configuring its direct
+environment form. Mount the receipt read-only and restart the exact image
+digest. The `45`-second example below assumes the
 documented `30`-second application shutdown budget; deployment owners must keep
 the container grace period strictly above the configured application budget:
 
@@ -228,13 +303,14 @@ docker rm ci-coordinator
 docker run --detach \
   --init \
   --name ci-coordinator \
-  --publish 3000:3000 \
+  --publish 127.0.0.1:3000:3000 \
   --read-only \
   --cap-drop ALL \
   --security-opt no-new-privileges=true \
   --pids-limit 256 \
   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777 \
   --env-file /deployment-owned/ci-coordinator-enforcing.env \
+  --mount type=bind,src=/deployment-owned/runtime-secrets,dst=/run/secrets,readonly \
   --mount type=bind,src=/deployment-owned/production-admission.json,dst=/var/run/ci-coordinator/production-admission.json,readonly \
   "${CI_COORDINATOR_IMAGE}"
 ```
@@ -275,7 +351,7 @@ and `ready_for_review` pull-request actions; `checks_requested` merge-group
 actions; and `requested`, `in_progress`, and `completed` workflow-run actions.
 GitHub configures event subscriptions at event granularity, so other actions
 within those events are rejected by the runtime profile rather than treated as
-planning evidence. Do not grant write permissions: this release does not own a
+planning evidence. Do not grant write permissions: the current runtime does not own a
 provider-write capability.
 
 The matrix follows GitHub's endpoint and webhook contracts for
@@ -288,6 +364,41 @@ The matrix follows GitHub's endpoint and webhook contracts for
 [webhook events](https://docs.github.com/en/webhooks/webhook-events-and-payloads).
 The platform administrator must verify the live App configuration against this
 matrix; repository code and local tests cannot prove provider-side settings.
+
+### Public Ingress Admission
+
+Public exposure requires deployment-owned admission **before ASGI**. The
+current Uvicorn h11 path counts open connections against the shared limit of
+128 and has no first-request header-read deadline; its keep-alive timeout is
+not that deadline. Application authentication and body limits cannot protect
+this earlier connection phase.
+
+The deployment owner must configure and qualify all of the following:
+
+- Finite first-byte, total header-completion and idle-connection deadlines;
+  incremental header bytes must not extend the total deadline indefinitely.
+  Complete header admission at the edge before forwarding to the backend.
+  Incomplete client requests must not reserve backend connections.
+- Finite global and per-client connection, request-concurrency and pending-work
+  bounds, with overload rejection. Define client identity at the trusted edge,
+  not from arbitrary caller-supplied forwarding headers. Bound the aggregate
+  across edge replicas and upstream pools, including idle upstream connections,
+  with headroom for backend admission and operational probes.
+- No public bypass to the backend through a published port, container address,
+  alternate interface or IPv6 route. Only the approved edge and authorized
+  operational paths may reach it; verify effective network policy, not merely
+  the intended TLS hostname or a saved proxy declaration.
+- Separate edge rejection/timeout and availability evidence. Pre-ASGI rejections
+  can occur without application request metrics, and healthy container status
+  is not a substitute for these observations.
+
+Choose explicit values against the owned capacity and provider latency budgets;
+this guide supplies no qualified universal thresholds or proxy configuration.
+Before production exposure, retain exact edge configuration/version and an
+authorized external witness of blocked bypass, bounded empty/slow-header
+connections, overload recovery and valid provider/browser traffic. These are
+separate deployment receipts. This documentation does not close the runtime
+TCP-flood finding or establish that an actual edge enforces these controls.
 
 The edge proxy owns accepted public hostnames, TLS termination, source-wide
 rate controls, and forwarding metadata. The application runtime does not use
@@ -304,7 +415,10 @@ provider callers without an interactive redirect or source-IP policy that
 excludes GitHub. They remain fail-closed behind their application-owned HMAC
 and GitHub Actions OIDC admission respectively. The reverse proxy must preserve
 the request body and the `X-GitHub-*`, `X-Hub-Signature-256`, and
-`Authorization` headers exactly. A successful internal probe does not prove
+`Authorization` headers exactly. Preserve browser `Cookie`, `Origin` and
+`X-CSRF-Token`, the admitted `Content-Type`, and exact callback query values;
+do not log credentials or OAuth query secrets. Keycloak back-channel logout
+also requires a non-interactive provider path. A successful internal probe does not prove
 public provider reachability; retain one signed webhook delivery and one
 OIDC-authenticated plan request as separate external receipts.
 
@@ -318,6 +432,10 @@ Follow the [Target Repository Adoption Playbook](../target-repository-migration.
 before treating any provider observation as rollout evidence.
 
 ## 8. Rotate Or Revoke The Break-Glass Bearer
+
+Use the request and response examples in [emergency controls](emergency-controls.md)
+for the admitted emergency request below. Do not use an enable command to test
+the break-glass credential: that principal is forbidden from releasing the latch.
 
 The break-glass bearer is a deployment-owned emergency credential, not a
 durable session or administrator login. It has no in-band expiry or overlap
@@ -361,5 +479,6 @@ still-valid production admission.
 - migration start/end, revision, and principal identity without secret values;
 - runtime settings identity with secrets redacted;
 - liveness/readiness receipts and shutdown duration;
+- exact edge bounds, backend isolation and pre-ASGI admission receipts;
 - GitHub App installation, OIDC, bootstrap, fallback, and stable-gate receipts;
 - rollback exercise and database compatibility result.
