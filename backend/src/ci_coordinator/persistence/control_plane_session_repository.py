@@ -42,14 +42,8 @@ from ci_coordinator.persistence.compatibility_profile import (
     load_bundled_profile,
 )
 from ci_coordinator.persistence.connection import configure_read_committed, verify_read_committed
-from ci_coordinator.persistence.control_plane_identity_schema_attestation import (
-    control_plane_identity_schema_matches_contract,
-)
 from ci_coordinator.persistence.control_plane_session_codec import record_from_row, record_values
-from ci_coordinator.persistence.errors import (
-    DatabaseCapabilityUnavailable,
-    PersistenceError,
-)
+from ci_coordinator.persistence.errors import PersistenceError
 from ci_coordinator.persistence.schema import (
     control_plane_logout_replays,
     control_plane_sessions,
@@ -297,10 +291,6 @@ async def _identity_transaction(
                 profile,
                 tuple(sorted({*required_capabilities, ADMINISTRATOR_ACTIVITY.declaration()})),
             )
-            if not await control_plane_identity_schema_matches_contract(connection):
-                raise DatabaseCapabilityUnavailable(
-                    "control-plane identity schema facts do not match"
-                )
             yield connection
 
 
