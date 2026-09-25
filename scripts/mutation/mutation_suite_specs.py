@@ -40,6 +40,7 @@ type SuiteName = Literal[
     "python-config-policy-admission",
     "python-database-compatibility",
     "python-http-admission",
+    "python-plan-identity",
     "python-persistence",
 ]
 
@@ -185,6 +186,15 @@ SUITES: Final[dict[SuiteName, MutationSuiteSpec]] = {
         ),
         command_id="mutation.python-http-admission",
         inventory_policy=InventoryPolicy.HTTP_ADMISSION,
+    ),
+    "python-plan-identity": MutationSuiteSpec(
+        config=_config(
+            dependencies=("backend/.venv",),
+            manifest_relative_path="fixtures/conformance/v1/python-plan-identity-mutants.v1.json",
+            report_id="ci-coordinator.python-plan-identity-mutation",
+            temp_prefix="ci-python-plan-identity-mutation-",
+        ),
+        command_id="mutation.python-plan-identity",
     ),
     "python-persistence": MutationSuiteSpec(
         config=_config(

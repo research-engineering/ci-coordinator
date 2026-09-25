@@ -4,9 +4,11 @@ import asyncio
 import base64
 import json
 import subprocess
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -46,6 +48,7 @@ from ci_coordinator.plan_issuance import (
     production_guard_binds_record,
     verify_signed_plan,
 )
+from ci_coordinator.plan_issuance.trusted_identity import bind_trusted_identity
 from ci_coordinator.planning_core import plan
 from ci_coordinator.production_admission import (
     AuthorizedProductionAdmission,
@@ -58,6 +61,43 @@ from ci_coordinator.verification_core import VerifiedPlan, verify
 
 NOW = datetime(2026, 7, 14, tzinfo=UTC)
 EXECUTION_SHA = "c" * 40
+_IDENTITY_MISMATCH_CASES = (
+    pytest.param(
+        lambda identity: replace(identity, repository="example-org/other-repository"),
+        "plan_identity_repository_mismatch",
+        id="repository",
+    ),
+    pytest.param(
+        lambda identity: replace(identity, repository_id=201),
+        "plan_identity_repository_id_mismatch",
+        id="repository_id",
+    ),
+    pytest.param(
+        lambda identity: replace(identity, ref="refs/pull/43/merge"),
+        "plan_identity_ref_mismatch",
+        id="ref",
+    ),
+    pytest.param(
+        lambda identity: replace(identity, run_id=7002),
+        "plan_identity_run_mismatch",
+        id="run_id",
+    ),
+    pytest.param(
+        lambda identity: replace(identity, run_attempt=2),
+        "plan_identity_run_mismatch",
+        id="run_attempt",
+    ),
+    pytest.param(
+        lambda identity: replace(identity, event_name="push"),
+        "plan_identity_event_mismatch",
+        id="event_name",
+    ),
+    pytest.param(
+        lambda identity: replace(identity, execution_sha="d" * 40),
+        "plan_identity_execution_sha_mismatch",
+        id="execution_sha",
+    ),
+)
 _TARGET_VALIDATOR = (
     Path(__file__).resolve().parents[2]
     / "src/ci_coordinator/target_artifacts/control_source/validation_envelope.cjs"
@@ -108,6 +148,72 @@ def test_signer_rejects_target_incompatible_ttl(ttl_seconds: int) -> None:
             ttl_seconds=ttl_seconds,
             clock=FixedClock(NOW),
         )
+
+
+@pytest.mark.parametrize(("change", "reason"), _IDENTITY_MISMATCH_CASES)
+def test_trusted_identity_binding_rejects_each_mismatched_operand(
+    change: Callable[[TrustedActionsRun], TrustedActionsRun], reason: str
+) -> None:
+    request = _plan_request()
+    identity = _trusted_identity()
+
+    assert bind_trusted_identity(request, identity) is None
+
+    mismatch = change(identity)
+    assert mismatch != identity
+    assert bind_trusted_identity(request, mismatch) == reason
+
+
+@pytest.mark.parametrize(("change", "reason"), _IDENTITY_MISMATCH_CASES)
+def test_signed_issuer_rejects_identity_mismatch_before_effects(
+    change: Callable[[TrustedActionsRun], TrustedActionsRun], reason: str
+) -> None:
+    request = _plan_request()
+    identity = _trusted_identity()
+    context = PlanIssuanceContext(
+        RepositoryBinding(100, 200, "example-org", "ci-coordinator"), None, None
+    )
+    signer = SignedPlanSigner(
+        key_id="test-key",
+        private_key_pem=Ed25519PrivateKey.generate().private_bytes(
+            Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()
+        ),
+        ttl_seconds=60,
+        clock=FixedClock(NOW),
+    )
+    store = InMemoryIssuanceStore()
+    issuer = SignedPlanIssuer(store=store, signer=signer)
+
+    with (
+        patch.object(signer, "sign", wraps=signer.sign) as sign,
+        patch.object(store, "save", wraps=store.save) as save,
+    ):
+        positive = asyncio.run(issuer.issue(request, identity, context))
+
+        assert isinstance(positive, Issued)
+        assert positive.duplicate is False
+        assert isinstance(positive.record.envelope.payload.execution, FullCiExecution)
+        assert positive.record.envelope.payload.fallback_reason == "verified_plan_unavailable"
+        assert (
+            verify_signed_plan(
+                positive.record.envelope,
+                public_key_pem=signer.public_key_pem(),
+                clock=FixedClock(NOW),
+            )
+            is None
+        )
+        sign.assert_called_once_with(positive.record.envelope.payload, not_after=None)
+        save.assert_awaited_once_with(positive.record, None)
+        sign.reset_mock()
+        save.reset_mock()
+
+        mismatch = change(identity)
+        assert mismatch != identity
+        rejected = asyncio.run(issuer.issue(request, mismatch, context))
+
+        assert rejected == IssuanceRejected(reason)
+        sign.assert_not_called()
+        save.assert_not_called()
 
 
 @pytest.mark.parametrize("ttl_seconds", [1, 60, 300])

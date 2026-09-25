@@ -483,6 +483,7 @@ jobs:
           - python-config-policy-admission
           - python-capacity-evidence
           - python-http-admission
+          - python-plan-identity
           - python-persistence
           - audit-persistence-byte-limits
           - python-database-compatibility

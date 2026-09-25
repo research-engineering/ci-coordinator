@@ -2717,6 +2717,38 @@
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
           "sourceSha256": "7956c89e1f8b11d7c0ebf139be53102058a2c3fc53c5a1584cf9b7002b5bd015"
+        },
+        {
+          "requirementId": "REQ-CI-RUNTIME-006",
+          "witnessPath": "backend/tests/unit/test_plan_issuance.py",
+          "assertion": "test_trusted_identity_binding_rejects_each_mismatched_operand",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "d6ef23a20f73a7df14e2b770110b00e9ab34160f1f17630a46f357790ed39ef1"
+        },
+        {
+          "requirementId": "REQ-CI-RUNTIME-006",
+          "witnessPath": "backend/tests/unit/test_plan_issuance.py",
+          "assertion": "test_signed_issuer_rejects_identity_mismatch_before_effects",
+          "commandIds": [
+            "python.test"
+          ],
+          "executionModes": [
+            "pull-request",
+            "merge-group",
+            "manual"
+          ],
+          "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
+          "evidenceState": "configured-not-executed",
+          "sourceSha256": "d6ef23a20f73a7df14e2b770110b00e9ab34160f1f17630a46f357790ed39ef1"
         }
       ]
     },
@@ -2984,7 +3016,7 @@
     "Existing Proofkit requirements, route bindings and command catalogs retain authority."
   ],
   "executionInputs": {
-    ".github/workflows/python-persistence.yml": "ea3168a4bc265d51d88ce7734d4c91e2adc04973894eca3727e40f84640705e5",
+    ".github/workflows/python-persistence.yml": "4d324b75285e843dcd47e522e5b8af9b96eef62f2b3c91c15b4de97a6a016684",
     "docker/ci/connected-administrator.compose.yaml": "f827fc7b9d93123f8710d41fe19de97316a7ee4596d6e4a4b84fd614c42fca24",
     "docker/ci/connected-browser.Dockerfile": "98d669c9e2bb25062aefaa084e097bfa2eb45acc0a1a6817343a529ae8abce25",
     "frontend/connected.playwright.config.ts": "c8a3e6a7f8671d2bef34a7d9fa9b3dd9a465f242819b493d9c212e0558566603",

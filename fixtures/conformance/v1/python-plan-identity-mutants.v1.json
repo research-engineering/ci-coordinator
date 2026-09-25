@@ -1,0 +1,209 @@
+{
+  "schemaVersion": "ci-python-plan-identity-mutation-suite/v1",
+  "suiteId": "ci-python-plan-identity/v1",
+  "timeoutMs": 5000,
+  "outerTimeoutMs": 140000,
+  "expectedKilled": 8,
+  "expectedMutantIds": [
+    "PI01",
+    "PI02",
+    "PI03",
+    "PI04",
+    "PI05",
+    "PI06",
+    "PI07",
+    "PI08"
+  ],
+  "mutants": [
+    {
+      "id": "PI01",
+      "requirementIds": [
+        "REQ-CI-CORE-001",
+        "REQ-CI-RUNTIME-006"
+      ],
+      "file": "backend/src/ci_coordinator/plan_issuance/trusted_identity.py",
+      "operator": "disable-repository-name-binding",
+      "original": "    if identity.repository != request.owner + \"/\" + request.repository:\n",
+      "replacement": "    if False:\n",
+      "witnessId": "plan-identity.repository",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/test_plan_issuance.py::test_trusted_identity_binding_rejects_each_mismatched_operand[repository]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "PI02",
+      "requirementIds": [
+        "REQ-CI-CORE-001",
+        "REQ-CI-RUNTIME-006"
+      ],
+      "file": "backend/src/ci_coordinator/plan_issuance/trusted_identity.py",
+      "operator": "disable-repository-id-binding",
+      "original": "    if identity.repository_id != request.repository_id:\n",
+      "replacement": "    if False:\n",
+      "witnessId": "plan-identity.repository_id",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/test_plan_issuance.py::test_trusted_identity_binding_rejects_each_mismatched_operand[repository_id]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "PI03",
+      "requirementIds": [
+        "REQ-CI-CORE-001",
+        "REQ-CI-RUNTIME-006"
+      ],
+      "file": "backend/src/ci_coordinator/plan_issuance/trusted_identity.py",
+      "operator": "disable-ref-binding",
+      "original": "    if identity.ref != request.ref:\n",
+      "replacement": "    if False:\n",
+      "witnessId": "plan-identity.ref",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/test_plan_issuance.py::test_trusted_identity_binding_rejects_each_mismatched_operand[ref]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "PI04",
+      "requirementIds": [
+        "REQ-CI-CORE-001",
+        "REQ-CI-RUNTIME-006"
+      ],
+      "file": "backend/src/ci_coordinator/plan_issuance/trusted_identity.py",
+      "operator": "disable-run-id-binding",
+      "original": "    if identity.run_id != request.workflow_run_id or identity.run_attempt != request.run_attempt:\n",
+      "replacement": "    if identity.run_attempt != request.run_attempt:\n",
+      "witnessId": "plan-identity.run_id",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/test_plan_issuance.py::test_trusted_identity_binding_rejects_each_mismatched_operand[run_id]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "PI05",
+      "requirementIds": [
+        "REQ-CI-CORE-001",
+        "REQ-CI-RUNTIME-006"
+      ],
+      "file": "backend/src/ci_coordinator/plan_issuance/trusted_identity.py",
+      "operator": "disable-run-attempt-binding",
+      "original": "    if identity.run_id != request.workflow_run_id or identity.run_attempt != request.run_attempt:\n",
+      "replacement": "    if identity.run_id != request.workflow_run_id:\n",
+      "witnessId": "plan-identity.run_attempt",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/test_plan_issuance.py::test_trusted_identity_binding_rejects_each_mismatched_operand[run_attempt]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "PI06",
+      "requirementIds": [
+        "REQ-CI-CORE-001",
+        "REQ-CI-RUNTIME-006"
+      ],
+      "file": "backend/src/ci_coordinator/plan_issuance/trusted_identity.py",
+      "operator": "disable-event-binding",
+      "original": "    if identity.event_name != request.event_name:\n",
+      "replacement": "    if False:\n",
+      "witnessId": "plan-identity.event_name",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/test_plan_issuance.py::test_trusted_identity_binding_rejects_each_mismatched_operand[event_name]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "PI07",
+      "requirementIds": [
+        "REQ-CI-CORE-001",
+        "REQ-CI-RUNTIME-006"
+      ],
+      "file": "backend/src/ci_coordinator/plan_issuance/trusted_identity.py",
+      "operator": "disable-execution-sha-binding",
+      "original": "    if identity.execution_sha != request.execution_sha:\n",
+      "replacement": "    if False:\n",
+      "witnessId": "plan-identity.execution_sha",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/test_plan_issuance.py::test_trusted_identity_binding_rejects_each_mismatched_operand[execution_sha]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "PI08",
+      "requirementIds": [
+        "REQ-CI-CORE-001",
+        "REQ-CI-RUNTIME-006"
+      ],
+      "file": "backend/src/ci_coordinator/plan_issuance/issuer.py",
+      "operator": "bypass-issuer-identity-binding-call",
+      "original": "        binding_error = bind_trusted_identity(request, identity)\n",
+      "replacement": "        binding_error = None\n",
+      "witnessId": "plan-identity.issuer-binding-callsite",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/test_plan_issuance.py::test_signed_issuer_rejects_identity_mismatch_before_effects[repository_id]",
+        "-q"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    }
+  ],
+  "nonClaims": [
+    "This finite suite proves only that the named identity witnesses reject the eight named patches.",
+    "Direct binder cases isolate seven identity operands; the issuer case independently detects a binding callsite bypass.",
+    "Passing local source admission is not native baseline, mutation execution, OIDC provider, signer custody or production readiness evidence.",
+    "This suite does not close complete TEST-4 mutation coverage."
+  ]
+}

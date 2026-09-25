@@ -603,6 +603,19 @@
       "allowedArgv": [
         "backend/.venv/bin/python",
         "-m",
+        "scripts.mutation.mutation_suite_specs",
+        "python-plan-identity"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-python-plan-identity",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
         "ci_coordinator.target_artifacts.cli",
         "check",
         "--source",

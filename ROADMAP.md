@@ -78,42 +78,42 @@ Preserve independent FullCI and non-enforcing observation. Coherent owner-bound
 repairs, tests and documentation may share a PR across the cohorts; unrelated
 Nits do not block the whole pilot, and live evidence is never inferred locally.
 
-[PR #13](https://github.com/research-engineering/ci-coordinator/pull/13)
-merged graph-change and comparison admission, independent verifier fallback,
-and public omission-validator binding repairs after exact-head native checks.
-These close their bounded source counterexamples, not CI-054 as a whole,
-baseline graph completeness, provider enforcement or production omission.
-[PR #14](https://github.com/research-engineering/ci-coordinator/pull/14) also
-merged bounded provider-token compatibility repairs after its own native gates.
-Live provider enrollment remains separate.
-[PR #15](https://github.com/research-engineering/ci-coordinator/pull/15) merged
-bounded release-evidence selection, a pinned SBOM generator and disclosure
-guidance after its own exact-head gates. Artifact publication and qualification
-remain separate.
-[PR #16](https://github.com/research-engineering/ci-coordinator/pull/16) merged
-shared policy path admission and linear workflow cycle classification after
-exact-head native checks. The next coherent repairs close derived-proof refresh,
-delivered UI module identity and bounded source-authority enforcement; remaining
-findings keep their per-source dispositions in the external evidence register.
+The following bounded repairs are merged after their exact-head native checks.
+Their scopes are delivery evidence, not a second task register or closure of
+the complete audit parents:
 
-[PR #17](https://github.com/research-engineering/ci-coordinator/pull/17) subsequently
-qualified the explicit complete derived-proof refresh operation. It preserves
-semantic approval as a separate obligation.
-[PR #18](https://github.com/research-engineering/ci-coordinator/pull/18) qualified
-canonical delivered UI module identity and its real-ASGI browser witness.
-Mocked API responses do not qualify live authentication or deployment recovery.
-Source-authority enforcement and received-byte body admission are the next
-prepared repairs; UI failure containment is in progress. CI-054 remains open,
-with all source aliases, partial dispositions and refutations conserved.
+| Qualified PR | Scope |
+| --- | --- |
+| [#13](https://github.com/research-engineering/ci-coordinator/pull/13) | Graph/comparison admission, independent verifier fallback and omission-validator binding. |
+| [#14](https://github.com/research-engineering/ci-coordinator/pull/14) | Bounded provider-token compatibility. |
+| [#15](https://github.com/research-engineering/ci-coordinator/pull/15) | Release-evidence selection, pinned SBOM tooling and private disclosure guidance. |
+| [#16](https://github.com/research-engineering/ci-coordinator/pull/16) | Shared policy path admission and linear workflow cycle classification. |
+| [#17](https://github.com/research-engineering/ci-coordinator/pull/17) | Explicit complete derived-proof refresh, separate from semantic approval. |
+| [#18](https://github.com/research-engineering/ci-coordinator/pull/18) | Canonical delivered UI module identity and real-ASGI asset witness. |
+| [#19](https://github.com/research-engineering/ci-coordinator/pull/19) | Named pure-core and process-authority source rules, not arbitrary Python sandboxing. |
+| [#20](https://github.com/research-engineering/ci-coordinator/pull/20) | Received-byte body admission and lifecycle/mutation witnesses. |
+| [#21](https://github.com/research-engineering/ci-coordinator/pull/21) | Panel failure containment and explicit uncertain mutation outcomes. |
+| [#22](https://github.com/research-engineering/ci-coordinator/pull/22) | JSON lexical preflight preserving the existing strict admission contract. |
+| [#23](https://github.com/research-engineering/ci-coordinator/pull/23) | Bounded YAML composition and static runner-label arrays. |
+| [#24](https://github.com/research-engineering/ci-coordinator/pull/24) | Anonymous diagnostic counters isolated from the activity journal mutex. |
+| [#25](https://github.com/research-engineering/ci-coordinator/pull/25) | Source-bound onboarding, emergency and private-credential operator recipes. |
 
-[PR #19](https://github.com/research-engineering/ci-coordinator/pull/19) qualified
-the named pure-core and process-authority enforcement repairs; it does not
-establish arbitrary Python sandboxing or complete semantic purity.
-[PR #20](https://github.com/research-engineering/ci-coordinator/pull/20) qualified
-received-byte body admission, lifecycle conservation and expanded causal
-mutation witnesses. Connection-level ingress protection, fairness and measured
-capacity remain separate. Workflow parsing, provider hot paths, database
-contention and the remaining audit cohorts retain their current CI-054 scope.
+CI-054 remains open with every original source alias, partial disposition,
+refutation and unknown conserved in the external evidence register. Baseline
+graph completeness, complete semantic purity, connection-level ingress
+protection, fairness and measured capacity are not established by this table.
+Live provider enrollment, authentication and deployment recovery remain separate;
+mocked APIs are not their evidence. Artifact publication, artifact qualification
+and production omission authority are still distinct.
+
+The next prepared audit repairs qualify plan-identity operands and the issuer
+call site, close proposal-review identity schema admission, preserve bounded
+provider failure evidence, and remove runtime-image path-selection gaps.
+The confirmed reconciliation deadline/defer boundary follows its owner-bound
+transition design. Readiness freshness and plan-failure telemetry need their
+own lifecycle and outcome contracts. None of these pending scopes is qualified
+by the preceding PRs; all remain routed through CI-054 and the existing task
+dependencies below.
 
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.
