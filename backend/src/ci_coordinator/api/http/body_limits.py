@@ -7,15 +7,21 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from anyio.lowlevel import checkpoint
 from starlette.routing import compile_path
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from ci_coordinator.kernel import NoQueueAdmission, WeightedNoQueueAdmission
+from ci_coordinator.kernel import (
+    GrowingAdmissionLease,
+    NoQueueAdmission,
+    WeightedNoQueueAdmission,
+)
 
 MAX_CONCURRENT_BODY_REQUESTS: Final = 8
 DEFAULT_MAXIMUM_RETAINED_BODY_BYTES: Final = 32 * 1_024 * 1_024
 _ASCII_ZERO: Final = ord("0")
 _INVALID_CONTENT_LENGTH: Final = -1
+_BODY_READ_CHECKPOINT_MESSAGES: Final = 64
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,30 +101,39 @@ class RequestBodyLimitMiddleware:
         if path_lease is None:
             await _send_json(send, 503, policy.overload_response)
             return
-        reservation = policy.maximum_body_bytes if content_length is None else content_length
-        body_lease = self._retained_body_budget.try_acquire(reservation)
-        if body_lease is None:
-            path_lease.release()
-            await _send_json(send, 503, policy.overload_response)
-            return
+        body_lease = None
         try:
+            body_lease = self._retained_body_budget.try_acquire_growing()
+            if body_lease is None:
+                await _send_json(send, 503, policy.overload_response)
+                return
             # Both leases remain owned while downstream can retain the replayed
             # body; releasing after reading would not bound retained bytes.
-            body = await _read_bounded_body(
-                receive,
-                policy.maximum_body_bytes,
-                expected_body_bytes=content_length,
-            )
+            try:
+                body = await _read_bounded_body(
+                    receive,
+                    policy.maximum_body_bytes,
+                    expected_body_bytes=content_length,
+                    body_lease=body_lease,
+                )
+            except _BodyLengthMismatch:
+                await _send_json(send, 400, policy.invalid_content_length_response)
+                return
+            except _BodyTooLarge:
+                await _send_json(send, 413, policy.too_large_response)
+                return
+            except _BodyBudgetExceeded:
+                await _send_json(send, 503, policy.overload_response)
+                return
             if body is None:
                 return
             await self._app(scope, _replay_body(body, receive), send)
-        except _BodyLengthMismatch:
-            await _send_json(send, 400, policy.invalid_content_length_response)
-        except _BodyTooLarge:
-            await _send_json(send, 413, policy.too_large_response)
         finally:
-            body_lease.release()
-            path_lease.release()
+            try:
+                if body_lease is not None:
+                    body_lease.release()
+            finally:
+                path_lease.release()
 
     def _policy_for_scope(self, scope: Scope) -> BodyLimitPolicy | None:
         path = scope["path"]
@@ -156,33 +171,51 @@ async def _read_bounded_body(
     maximum_body_bytes: int,
     *,
     expected_body_bytes: int | None,
+    body_lease: GrowingAdmissionLease,
 ) -> bytes | None:
-    chunks: list[bytes] = []
+    body: bytes | bytearray = b""
     body_bytes = 0
+    messages_since_checkpoint = 0
     while True:
+        if messages_since_checkpoint == _BODY_READ_CHECKPOINT_MESSAGES:
+            await checkpoint()
+            messages_since_checkpoint = 0
         message = await receive()
+        messages_since_checkpoint += 1
         if message["type"] == "http.disconnect":
             return None
         if message["type"] != "http.request":
+            del message
             continue
         chunk = message.get("body", b"")
         if type(chunk) is not bytes:
             raise _BodyLengthMismatch
-        body_bytes += len(chunk)
-        if body_bytes > maximum_body_bytes:
+        chunk_bytes = len(chunk)
+        candidate_bytes = body_bytes + chunk_bytes
+        if candidate_bytes > maximum_body_bytes:
             raise _BodyTooLarge
-        if expected_body_bytes is not None and body_bytes > expected_body_bytes:
+        if expected_body_bytes is not None and candidate_bytes > expected_body_bytes:
             raise _BodyLengthMismatch
-        if chunk:
-            chunks.append(chunk)
-        if not message.get("more_body", False):
-            if expected_body_bytes is not None and body_bytes != expected_body_bytes:
-                raise _BodyLengthMismatch
-            if not chunks:
-                return b""
-            if len(chunks) == 1:
-                return chunks[0]
-            return b"".join(chunks)
+        complete = not message.get("more_body", False)
+        if complete and expected_body_bytes is not None and candidate_bytes != expected_body_bytes:
+            raise _BodyLengthMismatch
+        if chunk_bytes:
+            if not body_lease.try_grow(chunk_bytes):
+                raise _BodyBudgetExceeded
+            if body_bytes == 0:
+                body = chunk
+            else:
+                if isinstance(body, bytes):
+                    body = bytearray(body)
+                body.extend(chunk)
+            body_bytes = candidate_bytes
+        del chunk, message
+        if complete:
+            if isinstance(body, bytes):
+                return body
+            result = bytes(body)
+            del body
+            return result
 
 
 def _replay_body(body: bytes, receive_after_body: Receive) -> Receive:
@@ -203,6 +236,10 @@ class _BodyTooLarge(Exception):
 
 
 class _BodyLengthMismatch(Exception):
+    pass
+
+
+class _BodyBudgetExceeded(Exception):
     pass
 
 

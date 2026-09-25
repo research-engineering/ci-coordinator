@@ -2,10 +2,10 @@
   "schemaVersion": "ci-python-http-admission-mutation-suite/v1",
   "suiteId": "ci-python-http-admission/v1",
   "timeoutMs": 5000,
-  "outerTimeoutMs": 250000,
-  "expectedKilled": 19,
-  "canonicalInventoryIds": ["HA01", "HA02", "HA03", "HA04", "HA05", "HA06", "HA07", "HA08", "HA09", "HA10", "HA11", "HA12", "HA13", "HA14", "HA15", "HA16", "HA17", "HA18", "HA19"],
-  "expectedMutantIds": ["HA01", "HA02", "HA03", "HA04", "HA05", "HA06", "HA07", "HA08", "HA09", "HA10", "HA11", "HA12", "HA13", "HA14", "HA15", "HA16", "HA17", "HA18", "HA19"],
+  "outerTimeoutMs": 280000,
+  "expectedKilled": 22,
+  "canonicalInventoryIds": ["HA01", "HA02", "HA03", "HA04", "HA05", "HA06", "HA07", "HA08", "HA09", "HA10", "HA11", "HA12", "HA13", "HA14", "HA15", "HA16", "HA17", "HA18", "HA19", "HA20", "HA21", "HA22"],
+  "expectedMutantIds": ["HA01", "HA02", "HA03", "HA04", "HA05", "HA06", "HA07", "HA08", "HA09", "HA10", "HA11", "HA12", "HA13", "HA14", "HA15", "HA16", "HA17", "HA18", "HA19", "HA20", "HA21", "HA22"],
   "expectedInvalidMutantIds": [],
   "ownerClassCoverage": {
     "declared-body-admission": ["HA01"],
@@ -17,7 +17,8 @@
     "transport-error-cache": ["HA11"],
     "operator-authentication": ["HA12", "HA13"],
     "ping-admission": ["HA14", "HA15", "HA16"],
-    "administrator-membership": ["HA17", "HA18", "HA19"]
+    "administrator-membership": ["HA17", "HA18", "HA19"],
+    "received-body-admission": ["HA20", "HA21", "HA22"]
   },
   "mutants": [
     {
@@ -415,6 +416,78 @@
         "-q",
         "-k",
         "membership_uses_app_identity_and_positive_installation_repository_evidence"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA20",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-035"
+      ],
+      "file": "backend/src/ci_coordinator/api/http/body_limits.py",
+      "operator": "restore-speculative-body-reservation",
+      "original": "body_lease = self._retained_body_budget.try_acquire_growing()",
+      "replacement": "body_lease = self._retained_body_budget.try_acquire_growing(content_length if content_length is not None else policy.maximum_body_bytes)",
+      "witnessId": "http-admission.idle-body-no-reservation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_body_budget.py",
+        "-q",
+        "-k",
+        "two_idle_unauthenticated_bodies_do_not_reserve"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA21",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-035"
+      ],
+      "file": "backend/src/ci_coordinator/api/http/body_limits.py",
+      "operator": "omit-received-body-growth",
+      "original": "if not body_lease.try_grow(chunk_bytes):",
+      "replacement": "if False:",
+      "witnessId": "http-admission.received-byte-conservation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_body_budget.py",
+        "-q",
+        "-k",
+        "partial_prefix_charge_is_retained"
+      ],
+      "environment": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "backend/src"
+      }
+    },
+    {
+      "id": "HA22",
+      "requirementIds": [
+        "REQ-CI-RUNTIME-035"
+      ],
+      "file": "backend/src/ci_coordinator/api/http/body_limits.py",
+      "operator": "omit-body-stream-checkpoint",
+      "original": "await checkpoint()",
+      "replacement": "pass",
+      "witnessId": "http-admission.always-ready-cancellation",
+      "command": [
+        "backend/.venv/bin/python",
+        "-m",
+        "pytest",
+        "backend/tests/unit/api/http/test_body_budget_buffering.py",
+        "-q",
+        "-k",
+        "ready_message_stream_reaches"
       ],
       "environment": {
         "PYTHONDONTWRITEBYTECODE": "1",

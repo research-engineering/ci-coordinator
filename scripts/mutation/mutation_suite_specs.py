@@ -424,7 +424,7 @@ def _validate_numbered_inventory(
 
 
 def _validate_http_admission_inventory(value: JsonObject) -> InventoryEvidence:
-    canonical_ids = [f"HA{index:02d}" for index in range(1, 20)]
+    canonical_ids = [f"HA{index:02d}" for index in range(1, 23)]
     parts = _inventory_parts(value)
     classified_ids = _classified_ids(value)
     if parts is None or classified_ids is None:
