@@ -1,5 +1,11 @@
 # Repository Agent Contract
 
+For setup and command ownership, start with
+[developer workflows](docs/how-to/development-workflows.md). Apply the
+[verification placement rule](docs/architecture/cross-cutting/testing-and-proofkit.md#6-required-gates-and-execution-placement)
+before running any check: a listed command is not permission to execute local
+behavioral, database, browser, container, coverage or mutation witnesses.
+
 Independent batch reviews use `gpt-6-astra` with `max` reasoning unless the user
 explicitly overrides this selection. Normally use one reviewer; add a further
 pass only for a material unresolved finding or an uncovered independent scope.

@@ -3,6 +3,14 @@
 **Observe GitHub Actions, understand CI costs, and control validation with
 deterministic, FullCI-safe plans.**
 
+> [!IMPORTANT]
+> **Pre-release.** As of 2026-09-25, the public
+> [Releases API](https://api.github.com/repos/research-engineering/ci-coordinator/releases)
+> lists no published releases. Check [Releases](https://github.com/research-engineering/ci-coordinator/releases)
+> before choosing an artifact. Source CI, a local build, and these deployment
+> instructions do not establish production qualification; enforcement requires
+> independent [production admission](docs/architecture/cross-cutting/production-admission.md).
+
 [![Full Check](https://github.com/research-engineering/ci-coordinator/actions/workflows/python-persistence.yml/badge.svg)](https://github.com/research-engineering/ci-coordinator/actions/workflows/python-persistence.yml)
 [![Release Artifact](https://github.com/research-engineering/ci-coordinator/actions/workflows/release-artifact.yml/badge.svg)](https://github.com/research-engineering/ci-coordinator/actions/workflows/release-artifact.yml)
 
@@ -67,9 +75,12 @@ provides the API path for automation without the UI.
 
 ### Deploy Your Own Service
 
-Use the [container deployment guide](docs/how-to/deploy-container.md). It covers
-the digest-addressed image, PostgreSQL migration and runtime roles, GitHub App,
-Keycloak administrator authentication, mounted secrets and health checks.
+Use the [container deployment guide](docs/how-to/deploy-container.md) once an
+exact image and its publication evidence are available; its example digest is
+not a published artifact. It covers PostgreSQL migration and runtime roles,
+mounted secrets and health checks. Configure the
+[GitHub App and Keycloak](docs/how-to/configure-provider-identity.md) before
+authenticated workbench use.
 Start non-enforcing; follow the
 [repository adoption playbook](docs/target-repository-migration.md) before
 connecting a consumer workflow to planning.
@@ -154,6 +165,7 @@ separate in the [roadmap](ROADMAP.md).
 | Collect history and compare CI runs        | [Repository observation](docs/how-to/observe-repository-runs.md), [measurement guide](docs/how-to/measure-and-compare-ci.md)                                                                    |
 | Configure policies without the UI          | [Policy lifecycle](docs/how-to/manage-repository-policy.md), [HTTP reference](docs/reference/http-surface.md)                                                                                   |
 | Deploy and operate the service             | [Container deployment](docs/how-to/deploy-container.md), [observability](docs/how-to/operate-production-observability.md), [capacity qualification](docs/how-to/qualify-production-capacity.md) |
+| Set up identity or respond to an incident  | [Provider onboarding](docs/how-to/configure-provider-identity.md), [emergency controls](docs/how-to/emergency-controls.md) |
 | Understand the architecture and contracts  | [Architecture overview](docs/architecture/ARCHITECTURE.md), [specification index](docs/architecture/INDEX.md)                                                                                   |
 | Develop and verify changes                 | [Developer workflows](docs/how-to/development-workflows.md), [testing and Proofkit](docs/architecture/cross-cutting/testing-and-proofkit.md)                                                    |
 | Investigate security or audit evidence     | [Security boundaries](docs/architecture/cross-cutting/security-and-oidc.md), [audit replay](docs/how-to/replay-audit-evidence.md)                                                               |

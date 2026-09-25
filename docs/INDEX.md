@@ -298,6 +298,11 @@ does not by itself make the document obsolete.
 - [Workflow discovery UI](features/workflow-discovery-ui.md)
 
 Closed designs and plans preserve their original argument and execution epoch.
+Some retained baselines and bare PR numbers belong to pre-export history,
+not this public repository's Git/PR namespace, and are not publicly reproducible
+from this checkout. They are historical context, not current qualification.
+Do not substitute a new commit or PR number for an unavailable old receipt;
+use the roadmap's explicit current public evidence and the current owners below.
 For current target-job dependencies use
 [GitHub Actions semantics](architecture/cross-cutting/github-actions-semantics.md),
 including the separate requester before the plan job. For the current target
