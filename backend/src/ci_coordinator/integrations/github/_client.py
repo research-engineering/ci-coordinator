@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ci_coordinator.integrations.github._rate_limits import has_secondary_rate_limit_message
 from ci_coordinator.integrations.github.contracts import (
     GitHubFailure,
     GitHubFailureKind,
@@ -95,6 +96,11 @@ class GitHubProtocolClient:
         response: GitHubResponse,
     ) -> GitHubOutcome:
         if response.api_version is None:
+            if response.status in {500, 502, 503, 504} and not any(
+                header.name.casefold() == "x-github-api-version-selected"
+                for header in response.headers
+            ):
+                return self._status_unavailable(request, response)
             return self._unavailable(
                 kind="missing_api_version_provenance",
                 request=request,
@@ -165,9 +171,9 @@ def _is_rate_limited(response: GitHubResponse) -> bool:
 
     if response.status == 429:
         return True
+    if response.status != 403:
+        return False
     rate_limit = response.rate_limit
-    return (
-        response.status == 403
-        and rate_limit is not None
-        and (rate_limit.remaining == 0 or rate_limit.retry_after is not None)
-    )
+    if rate_limit is not None and (rate_limit.remaining == 0 or rate_limit.retry_after is not None):
+        return True
+    return has_secondary_rate_limit_message(response.body)

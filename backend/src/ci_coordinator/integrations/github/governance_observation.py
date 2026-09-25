@@ -12,6 +12,7 @@ from ci_coordinator.governance_observation import (
     GovernanceRepository,
     GovernanceState,
 )
+from ci_coordinator.integrations.github._rate_limits import retry_after_seconds
 from ci_coordinator.integrations.github._routes import (
     GitHubPage,
     repository_id_path,
@@ -215,7 +216,7 @@ def _unavailable(outcome: GitHubUnavailable) -> GovernanceObservationUnavailable
     if failure.kind == "rate_limited":
         return GovernanceObservationUnavailable(
             "rate_limited",
-            _retry_after_seconds(failure.rate_limit.retry_after if failure.rate_limit else None),
+            retry_after_seconds(failure),
         )
     if failure.kind == "not_found":
         return GovernanceObservationUnavailable("not_found")
@@ -225,10 +226,3 @@ def _unavailable(outcome: GitHubUnavailable) -> GovernanceObservationUnavailable
     }:
         return GovernanceObservationUnavailable("provider_binding_mismatch")
     return GovernanceObservationUnavailable("unavailable")
-
-
-def _retry_after_seconds(value: str | None) -> int | None:
-    if value is None or not value.isascii() or not value.isdecimal() or len(value) > 4:
-        return None
-    result = int(value)
-    return result if result <= 3_600 else None

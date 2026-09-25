@@ -110,6 +110,7 @@ class GitHubAppTransportFactory:
         unavailable_observer: GitHubUnavailableObserver | None = None,
     ) -> None:
         _validate_github_app_identity(app_id, private_key_pem)
+        self._clock = clock
         self._http_client = _GitHubAppHttpClient(
             transport,
             outbound_proxy_url=outbound_proxy_url,
@@ -245,6 +246,7 @@ class GitHubAppTransportFactory:
             body=exchange.body,
             pagination=_pagination_evidence(_header_values(exchange.headers, "link")),
             rate_limit=_rate_limit_evidence(exchange.headers),
+            received_at=self._clock.now() if exchange.status in {403, 429} else None,
         )
 
     def _observe_result(self, request: GitHubRequest, result: GitHubTransportResult) -> None:
