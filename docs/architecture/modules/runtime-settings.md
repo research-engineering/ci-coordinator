@@ -291,6 +291,14 @@ its complete canonical content. Thus a new member, changed command, changed
 workflow, or new file in a declared root cannot inherit a disposition: the
 native witness fails until a reviewed resource update classifies it.
 
+The [bounded self-CI refresh](../cross-cutting/testing-and-proofkit.md#derived-proof-refresh)
+may prepare the five existing non-runtime fingerprint values and mirror the
+canonical resource only with explicit hash-refresh consent. It cannot add a
+member, change a discovery root, classify a source or change caller bindings.
+Its full-profile static check supplements, but does not replace, the independent
+native enumeration and installed-resource witnesses. A refreshed digest is a
+candidate for review, not evidence that the new content retains its disposition.
+
 The generated target consumer under `.ci-coordinator` is a `non_runtime`
 source group: its Node control bundle and data artifacts request, validate and
 consume CI plans without starting the coordinator service. The complete sorted

@@ -14,11 +14,19 @@ from ci_coordinator.repo_context import (
     ProviderWorkflowInventory,
     parse_workflow_capability,
 )
+from ci_coordinator.target_artifacts.model import (
+    DEPENDENCY_GRAPH_FILENAME,
+    EXECUTION_REGISTRY_FILENAME,
+    TARGET_CONTROL_FILENAME,
+    TEST_MANIFEST_FILENAME,
+)
 from ci_coordinator.target_artifacts.renderer import render_target_artifacts
 from ci_coordinator.target_artifacts.source_codec import parse_target_artifacts_source
 from ci_coordinator.target_artifacts.workflow import write_exact_file
 from ci_coordinator.validation_contract import ValidationCatalog
+from scripts.ci_matrix_inventory import MAX_TOTAL_BYTES
 from scripts.proofkit_common import JsonObject, as_array, as_object
+from scripts.repository_paths import read_repository_regular_file
 from scripts.self_ci_catalog import FamilySettings, policy_document, validation_catalog
 from scripts.self_ci_controls import (
     COORDINATED_GATE_ID,
@@ -27,6 +35,13 @@ from scripts.self_ci_controls import (
     PLAN_ID,
     REQUEST_ID,
     render_workflow,
+)
+from scripts.self_ci_proof_refresh import (
+    PROOF_PATHS,
+    RISK_PATH,
+    ProofSources,
+    entrypoint_projection,
+    risk_projection,
 )
 from scripts.self_ci_responsibility import ResponsibilityProjection, responsibility_projection
 from scripts.self_ci_source import (
@@ -41,13 +56,31 @@ from scripts.self_ci_source import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+MAX_OUTPUT_BYTES = 4_194_304
+INVENTORY_PATH = ".ci-coordinator/self-ci-inventory.v1.json"
 GENERATOR_FILES = (
     "scripts/self_ci_catalog.py",
     "scripts/self_ci_controls.py",
     "scripts/self_ci_generate.py",
+    "scripts/self_ci_proof_refresh.py",
     "scripts/self_ci_responsibility.py",
     "scripts/self_ci_source.py",
 )
+REFRESH_OUTPUT_PATHS = PROOF_PATHS | {
+    WORKFLOW_PATH,
+    ".ci-coordinator/target-artifacts-source.v1.json",
+    ".ci-coordinator/validation-catalog.v1.json",
+    INVENTORY_PATH,
+    *(
+        f".ci-coordinator/{name}"
+        for name in (
+            DEPENDENCY_GRAPH_FILENAME,
+            EXECUTION_REGISTRY_FILENAME,
+            TARGET_CONTROL_FILENAME,
+            TEST_MANIFEST_FILENAME,
+        )
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -149,7 +182,7 @@ def render_self_ci(
         ".ci-coordinator/target-artifacts-source.v1.json": source_bytes,
         ".ci-coordinator/validation-catalog.v1.json": canonical_json(catalog.to_identity_mapping())
         + b"\n",
-        ".ci-coordinator/self-ci-inventory.v1.json": canonical_json(report) + b"\n",
+        INVENTORY_PATH: canonical_json(report) + b"\n",
         **{f".ci-coordinator/{name}": content for name, content in rendered.by_filename()},
     }
     result = SelfCiArtifacts(
@@ -295,16 +328,86 @@ def _digest(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def render_proof_refresh(root: Path) -> tuple[ProofSources, dict[str, bytes]]:
+    sources = ProofSources.capture(root)
+    entrypoint_projection(sources, {})
+    risk = risk_projection(sources)
+    artifacts = render_self_ci(root)
+    outputs = {RISK_PATH: risk, **artifacts.outputs}
+    inventory = as_object(json.loads(outputs[INVENTORY_PATH]), "self CI inventory")
+    risk_inputs = [
+        as_object(row, "self CI source input")
+        for row in as_array(inventory["sourceInputs"], "self CI source inputs")
+        if as_object(row, "self CI source input")["path"] == RISK_PATH
+    ]
+    if len(risk_inputs) != 1 or risk_inputs[0]["sha256"] != _digest(sources.read(RISK_PATH)):
+        raise ValueError("self CI inventory lost its exact risk input binding")
+    risk_inputs[0]["sha256"] = _digest(risk)
+    outputs[INVENTORY_PATH] = canonical_json(inventory) + b"\n"
+    outputs.update(entrypoint_projection(sources, outputs))
+    if outputs.keys() != REFRESH_OUTPUT_PATHS:
+        raise ValueError("proof refresh output population needs explicit owner admission")
+    sources.assert_current()
+    return sources, outputs
+
+
+def write_proof_refresh(
+    sources: ProofSources,
+    outputs: dict[str, bytes],
+    *,
+    refresh_proof_hashes: bool = False,
+) -> None:
+    if outputs.keys() != REFRESH_OUTPUT_PATHS:
+        raise ValueError("proof refresh output population needs explicit owner admission")
+    for content in outputs.values():
+        if type(content) is not bytes or not content or len(content) > MAX_OUTPUT_BYTES:
+            raise ValueError("proof refresh output must be nonempty bounded bytes")
+    changed = {
+        path: content
+        for path, content in outputs.items()
+        if sources.read(path, MAX_OUTPUT_BYTES) != content
+    }
+    if not refresh_proof_hashes and PROOF_PATHS.intersection(changed):
+        raise ValueError(
+            "stale proof hashes require --write --refresh-proof-hashes and source review"
+        )
+    if outputs[RISK_PATH] != risk_projection(sources):
+        raise ValueError("proof refresh risk output differs from its admitted projection")
+    sources.assert_current()
+    if any(
+        outputs[path] != content
+        for path, content in entrypoint_projection(sources, outputs).items()
+    ):
+        raise ValueError("proof refresh disposition differs from its complete projection")
+    if sum(len(content) for content in (sources.files | changed).values()) > MAX_TOTAL_BYTES:
+        raise ValueError("proof refresh postimage exceeds the matrix aggregate byte bound")
+    for path, content in changed.items():
+        if read_repository_regular_file(
+            sources.root,
+            Path(path),
+            "proof refresh output preimage",
+            maximum_bytes=MAX_OUTPUT_BYTES,
+        ) != sources.read(path):
+            raise ValueError("proof refresh output preimage changed")
+        write_exact_file(sources.root / path, content)
+        (sources.root / path).chmod(sources.modes[path])
+    sources.assert_current(changed)
+    entrypoint_projection(sources, outputs)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--write", action="store_true")
     modes.add_argument("--check", action="store_true")
     modes.add_argument("--policy", action="store_true")
+    parser.add_argument("--refresh-proof-hashes", action="store_true")
     parser.add_argument("--installation-id", type=int)
     parser.add_argument("--repository-id", type=int)
     parser.add_argument("--default-branch")
     arguments = parser.parse_args()
+    if arguments.refresh_proof_hashes and not arguments.write:
+        parser.error("--refresh-proof-hashes requires --write; CI checks never refresh")
     if arguments.policy != all(
         value is not None
         for value in (
@@ -327,8 +430,8 @@ def main() -> int:
             "--policy requires exactly installation, repository and default-branch identity"
         )
     try:
-        artifacts = render_self_ci(ROOT)
         if arguments.policy:
+            artifacts = render_self_ci(ROOT)
             sys.stdout.buffer.write(
                 policy_document(
                     artifacts.catalog,
@@ -339,20 +442,28 @@ def main() -> int:
                 )
             )
             return 0
+        sources, outputs = render_proof_refresh(ROOT)
         if arguments.write:
-            for relative, content in artifacts.outputs.items():
-                write_exact_file(ROOT / relative, content)
-            artifacts.assert_inputs_current(ROOT)
+            write_proof_refresh(
+                sources, outputs, refresh_proof_hashes=arguments.refresh_proof_hashes
+            )
         else:
             drift = [
                 relative
-                for relative, content in artifacts.outputs.items()
-                if not (ROOT / relative).is_file()
-                or read_regular(ROOT, relative, 4_194_304) != content
+                for relative, content in outputs.items()
+                if sources.read(relative, MAX_OUTPUT_BYTES) != content
             ]
             if drift:
                 raise ValueError("self CI artifacts drift: " + ", ".join(drift))
-        print(json.dumps({"state": "passed", "artifacts": sorted(artifacts.outputs)}))
+        print(
+            json.dumps(
+                {
+                    "state": "passed",
+                    "artifacts": sorted(outputs),
+                    "semanticApproval": "not-established",
+                }
+            )
+        )
     except (OSError, KeyError, TypeError, ValueError) as error:
         print(str(error), file=sys.stderr)
         return 1

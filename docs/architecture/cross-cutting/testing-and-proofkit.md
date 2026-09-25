@@ -135,6 +135,53 @@ the committed range only when every predicate above remains true before and
 after execution. Mutation evidence is bounded to the declared mutant manifest;
 it does not imply mutation adequacy outside that set.
 
+### Derived Proof Refresh
+
+Under CI-054 / TOOL-4 and CI-006, `scripts.self_ci_generate` owns only the
+mechanical refresh of existing proof projections. The
+[current-source audit workflow](../../features/current-source-audit-validation.md)
+continues to own review and gate placement. Refresh MUST NOT produce semantic
+approval or replace an independently executed witness.
+
+`--write --refresh-proof-hashes` explicitly requests a reviewable candidate:
+existing risk binding `sourceSha256` values and `executionInputs` digests,
+existing self-CI outputs, and the five existing non-runtime entrypoint
+`currentTarget` fingerprints plus canonical/bundled byte equality. Ordinary
+`--write` MUST reject stale proof hashes without that flag. CI uses `--check`,
+which MUST NOT write or accept the refresh flag.
+
+Requirements, selectors, commands, modes, applicability, evidence states,
+discovery roots, member identities, dispositions and caller bindings remain
+owner-authored. Preserve whole-file hashes, including helpers. The
+externally qualified empty-module exception in `ci_test_plan` is not a derived
+output. Missing/new members, missing fingerprint classes, malformed or unsafe
+sources and observed source drift MUST reject before publication starts.
+
+The bounded dependency order is risk hashes, self-CI outputs, then all five
+fingerprint groups: workflow, generated, deployment directories, root
+deployment files and workflow-lint container. Final disposition bytes MUST NOT
+feed back into self-CI `sourceInputs`. Freeze Git-observed source bytes, paths
+and modes; separately enumerate complete declared directories, including
+ignored members. Compare preimages before publication and the exact expected
+postimage afterwards. Existing bounded reads and atomic per-file writes do not
+provide multi-file transactions or isolation from hostile concurrent changes.
+An interruption, detected drift or write failure MUST NOT return success.
+
+Independent native enumeration and installed-resource equality remain required:
+two identical copies can have the same stale workflow fingerprint. Preserve
+native test/command populations, GitHub gate operands, independent trust roots
+and unknown/incomplete-to-FullCI. Retain Proofkit 0.14.18's seven-command
+consumer; no new materialization flow is admitted.
+
+Completing the existing generator and one cohesive projection helper avoids
+manual cascade repair with less owner/schema/trust migration than moving pins
+to run receipts. It does not remove shared changed files or establish CPU,
+elapsed or conflict-free savings. Reopen on an unbound input, new owner class,
+changed classification policy, unsafe write or measured adverse cost. Native
+falsifiers MUST independently cover workflow/helper edits, every missing class,
+stale copies, membership, malformed inputs, source changes, deterministic fixed
+points and population preservation; producer self-equality alone is insufficient.
+
 ## 6. Required Gates And Execution Placement
 
 The commands below identify witness entrypoints, not permission to execute
