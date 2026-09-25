@@ -575,6 +575,7 @@
     ["016","repository-policy-management-how-to","repository-policy-management-how-to","contract","docs/how-to/manage-repository-policy.md",["proofkit.verify","requirements.admission","selective.plan","text.policy"],["local-python"]],
     ["016","684","684","contract","docs/specs/ci-coordinator-core/requirements.v1.json",["proofkit.verify","requirements.admission","text.policy"],["local-python"]],
     ["016","687","687","technical","proofkit/requirement-bindings.json",["proofkit.verify","requirements.admission","selective.plan"],["local-python"]],
+    ["016","core-operational-guide-016-falsifiers","core-operational-guide-016-falsifiers","falsification","scripts/tests/test_operational_documentation.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["017","702","702","technical","backend/pyproject.toml",["proofkit.verify","python.install-check","python.lint","python.lock-check","python.test","python.typecheck","text.policy"],["local-python","local-python-external"]],
     ["017","709","709","technical","backend/src/ci_coordinator/identity_admission/__init__.py",["proofkit.verify","python.import-boundary","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["017","706","706","contract","backend/src/ci_coordinator/identity_admission/jwks_contracts.py",["proofkit.verify","python.import-boundary","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],

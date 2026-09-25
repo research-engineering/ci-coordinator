@@ -23,8 +23,8 @@ LocalEvaluation does not imply ProductionAdmission or ProviderReadiness
 Supported hosts are x86-64 or ARM64 Linux, Apple Silicon macOS, or those Linux
 architectures under WSL2 with Docker integration. Native Windows and Intel
 macOS are not supported. Prerequisites are Docker Engine 29.6.1 or compatible,
-Docker Compose 2.39.4 or newer, and mise 2026.9.0 or newer. Run from the
-repository root:
+Docker Compose 2.39.4 or newer, and mise 2026.9.11 or newer. The minimum mise
+version is owned by [`mise.toml`](../../mise.toml). Run from the repository root:
 
 ```sh
 mise trust

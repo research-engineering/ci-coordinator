@@ -31,19 +31,44 @@ The behavior contract is owned by
 - an admitted secret-free policy source, such as `config.example.yaml` after
   replacing repository identities with real values.
 
-Set shell values without committing credentials:
+Have the secret owner provision a file outside the checkout containing exactly
+one `Authorization: Bearer <workload-access-token>` line for the intended actor.
+The operator must own it with mode `0600` in a mode `0700` directory. Do not
+paste the token into shell commands, export it, print the file, or enable shell
+or curl tracing. Do not mix browser cookies or other authorization fields with
+this workload credential. File permissions do not isolate secrets from the
+same host account or privileged operators.
+
+Set only non-secret shell values:
 
 ```sh
 export COORDINATOR_URL=https://ci-coordinator.example.com
-export CONTROL_PLANE_ACCESS_TOKEN='replace-with-short-lived-keycloak-access-token'
+export CONTROL_PLANE_HEADER_FILE=/deployment-owned/control-plane-authorization.header
 export INSTALLATION_ID=100
 export REPOSITORY_ID=200
 export PROPOSAL_MANIFEST_ID='proposal:replace-with-32-lowercase-hex-characters'
 export REGISTRATION_OPERATION_ID='register-policy-001'
 ```
 
-Send exactly one `Authorization` field. Do not place credentials in the policy
-document.
+The commands use [`curl --header @file`](https://curl.se/docs/manpage.html#-H),
+with `--disable` first to ignore ambient curl configuration. They do not follow
+redirects or retry automatically. Do not place credentials in policy source.
+
+Create unique private storage once for this procedure, in an operator-controlled
+temporary location outside the checkout. Keep this shell's restrictive umask
+for every command below; directories are `0700`, new files are `0600`:
+
+```sh
+umask 077
+policy_dir="$(mktemp -d "${TMPDIR:-/tmp}/ci-policy.XXXXXXXX")"
+```
+
+Stop if any step fails. Retain the request and response files, including failed
+or uncertain responses, in the authorized change record. Do not rerun setup or
+overwrite receipts to retry: first reconcile the outcome, then retain the same
+actor, source, scope and operation id for an exact replay in fresh private
+storage. No automatic cleanup is performed; remove only this exact directory
+after reconciliation and the owner's retention decision.
 
 ## Validate Source Without Effects
 
@@ -56,14 +81,15 @@ jq -n \
     schemaVersion: "ci-config-epoch-validation/v1",
     sourceFormat: "yaml-1.2",
     source: $source
-  }' > /tmp/ci-config-validation.json
-
-curl --fail-with-body --silent --show-error \
+  }' > "${policy_dir:?}/validation.request.json" &&
+curl --disable --fail-with-body --silent --show-error \
   --request POST \
-  --header "Authorization: Bearer ${CONTROL_PLANE_ACCESS_TOKEN}" \
+  --header "@${CONTROL_PLANE_HEADER_FILE}" \
   --header 'Content-Type: application/json' \
-  --data @/tmp/ci-config-validation.json \
-  "${COORDINATOR_URL}/api/v1/config/validations" | jq .
+  --data "@${policy_dir}/validation.request.json" \
+  --output "${policy_dir}/validation.response.json" \
+  "${COORDINATOR_URL}/api/v1/config/validations" &&
+jq . "${policy_dir}/validation.response.json"
 ```
 
 A successful response has schema
@@ -73,9 +99,11 @@ provider effect.
 
 ## Register an Epoch
 
-Build the JSON envelope without shell-interpolating YAML:
+Build the JSON envelope without shell-interpolating YAML, register and retain
+the receipt. Clear any previous epoch value before admitting a new response:
 
 ```sh
+unset epoch_id
 jq -n \
   --arg operationId "${REGISTRATION_OPERATION_ID}" \
   --rawfile source config.example.yaml \
@@ -84,23 +112,16 @@ jq -n \
     sourceFormat: "yaml-1.2",
     source: $source,
     operationId: $operationId
-  }' > /tmp/ci-config-registration.json
-```
-
-Register and retain the receipt:
-
-```sh
-registration="$(
-  curl --fail-with-body --silent --show-error \
-    --request POST \
-    --header "Authorization: Bearer ${CONTROL_PLANE_ACCESS_TOKEN}" \
-    --header 'Content-Type: application/json' \
-    --data @/tmp/ci-config-registration.json \
-    "${COORDINATOR_URL}/api/v1/config/epochs"
-)"
-
-printf '%s\n' "${registration}" | jq .
-epoch_id="$(printf '%s' "${registration}" | jq -er '.epochId')"
+  }' > "${policy_dir:?}/registration.request.json" &&
+curl --disable --fail-with-body --silent --show-error \
+  --request POST \
+  --header "@${CONTROL_PLANE_HEADER_FILE}" \
+  --header 'Content-Type: application/json' \
+  --data "@${policy_dir}/registration.request.json" \
+  --output "${policy_dir}/registration.response.json" \
+  "${COORDINATOR_URL}/api/v1/config/epochs" &&
+jq . "${policy_dir}/registration.response.json" &&
+epoch_id="$(jq -er '.epochId' "${policy_dir}/registration.response.json")"
 ```
 
 The first exact registration returns HTTP 201 with schema
@@ -121,47 +142,60 @@ registered above must equal its target epoch: registration of an unrelated
 `config.example.yaml` does not make a proposal activatable. If they differ,
 stop and register the exact reviewed policy; do not substitute identities.
 
-Before constructing the activation body, verify the retained target:
+Set the independently retained target and baseline. Use JSON `null` only for a
+reviewed baseline with no active configuration; otherwise use its exact integer
+revision. Use a stable operation id for retries of the same logical command:
 
 ```sh
 reviewed_epoch_id='replace-with-target-epoch-from-the-same-reviewed-proposal'
-test "${epoch_id}" = "${reviewed_epoch_id}" || exit 1
+expected_revision=null
+operation_id='activate-policy-001'
 ```
 
-For a reviewed baseline with no active configuration, use
-`expectedRevision: null`. Otherwise use its exact retained revision. Use a
-stable operation id for retries of the same logical command.
+Invoke this whole block. The subshell contains the guard, body construction
+and request, so a mismatch sends nothing and cannot exit the parent shell.
+The conditional call also keeps a parent using `set -e` alive on failure:
 
 ```sh
-operation_id='activate-policy-001'
+activate_reviewed_policy() (
+  test "${epoch_id:?}" = "${reviewed_epoch_id:?}" || {
+    printf '%s\n' 'Epoch mismatch; no activation sent.' >&2
+    exit 1
+  }
+  umask 077
+  jq -n \
+    --arg epochId "${epoch_id}" \
+    --arg operationId "${operation_id:?}" \
+    --arg proposalManifestId "${PROPOSAL_MANIFEST_ID:?}" \
+    --argjson installationId "${INSTALLATION_ID:?}" \
+    --argjson repositoryId "${REPOSITORY_ID:?}" \
+    --argjson expectedRevision "${expected_revision:?}" \
+    '{
+      schemaVersion: "ci-config-epoch-activation/v1",
+      installationId: $installationId,
+      repositoryId: $repositoryId,
+      targetEpochId: $epochId,
+      proposalManifestId: $proposalManifestId,
+      expectedRevision: $expectedRevision,
+      operationId: $operationId
+    }' > "${policy_dir:?}/activation.request.json" || exit 1
 
-jq -n \
-  --arg epochId "${epoch_id}" \
-  --arg operationId "${operation_id}" \
-  --arg proposalManifestId "${PROPOSAL_MANIFEST_ID}" \
-  --argjson installationId "${INSTALLATION_ID}" \
-  --argjson repositoryId "${REPOSITORY_ID}" \
-  '{
-    schemaVersion: "ci-config-epoch-activation/v1",
-    installationId: $installationId,
-    repositoryId: $repositoryId,
-    targetEpochId: $epochId,
-    proposalManifestId: $proposalManifestId,
-    expectedRevision: null,
-    operationId: $operationId
-  }' > /tmp/ci-config-activation.json
-
-activation="$(
-  curl --fail-with-body --silent --show-error \
+  curl --disable --fail-with-body --silent --show-error \
     --request POST \
-    --header "Authorization: Bearer ${CONTROL_PLANE_ACCESS_TOKEN}" \
+    --header "@${CONTROL_PLANE_HEADER_FILE:?}" \
     --header 'Content-Type: application/json' \
-    --data @/tmp/ci-config-activation.json \
-    "${COORDINATOR_URL}/api/v1/config/activations"
-)"
+    --data "@${policy_dir}/activation.request.json" \
+    --output "${policy_dir}/activation.response.json" \
+    "${COORDINATOR_URL:?}/api/v1/config/activations" || exit 1
+  jq -er '.revision' "${policy_dir}/activation.response.json"
+)
 
-printf '%s\n' "${activation}" | jq .
-active_revision="$(printf '%s' "${activation}" | jq -er '.revision')"
+if active_revision="$(activate_reviewed_policy)"; then
+  printf 'Active revision: %s\n' "${active_revision}"
+else
+  unset active_revision
+  printf '%s\n' 'No admitted activation receipt. Stop and reconcile before retrying.' >&2
+fi
 ```
 
 For a later transition, replace `null` with the exact retained current
@@ -183,7 +217,7 @@ jq -n \
   --arg epochId "${PREVIOUS_EPOCH_ID}" \
   --arg operationId "${rollback_operation_id}" \
   --arg reason 'Restore the last admitted policy after failed shadow validation.' \
-  --argjson expectedRevision "${active_revision}" \
+  --argjson expectedRevision "${active_revision:?}" \
   --argjson installationId "${INSTALLATION_ID}" \
   --argjson repositoryId "${REPOSITORY_ID}" \
   '{
@@ -194,14 +228,15 @@ jq -n \
     expectedRevision: $expectedRevision,
     operationId: $operationId,
     reason: $reason
-  }' > /tmp/ci-config-rollback.json
-
-curl --fail-with-body --silent --show-error \
+  }' > "${policy_dir:?}/rollback.request.json" &&
+curl --disable --fail-with-body --silent --show-error \
   --request POST \
-  --header "Authorization: Bearer ${CONTROL_PLANE_ACCESS_TOKEN}" \
+  --header "@${CONTROL_PLANE_HEADER_FILE}" \
   --header 'Content-Type: application/json' \
-  --data @/tmp/ci-config-rollback.json \
-  "${COORDINATOR_URL}/api/v1/config/rollbacks" | jq .
+  --data "@${policy_dir}/rollback.request.json" \
+  --output "${policy_dir}/rollback.response.json" \
+  "${COORDINATOR_URL}/api/v1/config/rollbacks" &&
+jq . "${policy_dir}/rollback.response.json"
 ```
 
 Rollback fails closed when target coverage is lower, incomparable, unknown, or
@@ -212,25 +247,25 @@ unavailable.
 Read the active pointer and one authenticated, repository-scoped epoch page:
 
 ```sh
-curl --fail-with-body --silent --show-error \
-  --header "Authorization: Bearer ${CONTROL_PLANE_ACCESS_TOKEN}" \
-  "${COORDINATOR_URL}/api/v1/config/repositories/${INSTALLATION_ID}/${REPOSITORY_ID}/status?limit=20" \
-  | tee /tmp/ci-config-status.json \
-  | jq '{active, epochs, nextCursor}'
+curl --disable --fail-with-body --silent --show-error \
+  --header "@${CONTROL_PLANE_HEADER_FILE}" \
+  --output "${policy_dir:?}/status.response.json" \
+  "${COORDINATOR_URL}/api/v1/config/repositories/${INSTALLATION_ID}/${REPOSITORY_ID}/status?limit=20" &&
+jq '{active, epochs, nextCursor}' "${policy_dir}/status.response.json"
 ```
 
 When `nextCursor` is non-null, request the next page using its exact value:
 
 ```sh
-after_epoch_id="$(jq -er '.nextCursor' /tmp/ci-config-status.json)"
-
-curl --fail-with-body --silent --show-error \
+after_epoch_id="$(jq -er '.nextCursor' "${policy_dir:?}/status.response.json")" &&
+curl --disable --fail-with-body --silent --show-error \
   --get \
-  --header "Authorization: Bearer ${CONTROL_PLANE_ACCESS_TOKEN}" \
+  --header "@${CONTROL_PLANE_HEADER_FILE}" \
   --data-urlencode "afterEpochId=${after_epoch_id}" \
   --data-urlencode 'limit=20' \
-  "${COORDINATOR_URL}/api/v1/config/repositories/${INSTALLATION_ID}/${REPOSITORY_ID}/status" \
-  | jq .
+  --output "${policy_dir}/status-next.response.json" \
+  "${COORDINATOR_URL}/api/v1/config/repositories/${INSTALLATION_ID}/${REPOSITORY_ID}/status" &&
+jq . "${policy_dir}/status-next.response.json"
 ```
 
 Pages are keyset-ordered by immutable epoch id. They are bounded live reads,
@@ -243,13 +278,12 @@ The active pointer is the sole owner of activation revision.
 Export one epoch only through its repository scope and retain response headers:
 
 ```sh
-curl --fail-with-body --silent --show-error \
-  --dump-header /tmp/ci-config-source.headers \
-  --output /tmp/ci-config-source.yaml \
-  --header "Authorization: Bearer ${CONTROL_PLANE_ACCESS_TOKEN}" \
-  "${COORDINATOR_URL}/api/v1/config/repositories/${INSTALLATION_ID}/${REPOSITORY_ID}/epochs/${epoch_id}/source"
-
-cat /tmp/ci-config-source.headers
+curl --disable --fail-with-body --silent --show-error \
+  --dump-header "${policy_dir:?}/source.headers" \
+  --output "${policy_dir}/source.yaml" \
+  --header "@${CONTROL_PLANE_HEADER_FILE}" \
+  "${COORDINATOR_URL}/api/v1/config/repositories/${INSTALLATION_ID}/${REPOSITORY_ID}/epochs/${epoch_id}/source" &&
+cat "${policy_dir}/source.headers"
 ```
 
 The body is the exact retained and re-admitted source. `Content-Digest` is the

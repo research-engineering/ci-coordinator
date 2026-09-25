@@ -111,6 +111,7 @@
     ["006","mutation-manifest-falsifiers","mutation-manifest-falsifiers","falsification","scripts/tests/test_mutation_manifest.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["006","289","289","falsification","scripts/tests/test_mutation_suite_runner.py",["proofkit.verify","python.test","selective.plan"],["local-python"]],
     ["006","mutation-suite-spec-falsifiers","mutation-suite-spec-falsifiers","falsification","scripts/tests/test_mutation_suite_specs.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
+    ["006","proofkit-adoption-operational-guide-006-falsifiers","proofkit-adoption-operational-guide-006-falsifiers","falsification","scripts/tests/test_operational_documentation.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["006","290","290","falsification","scripts/tests/test_proofkit_branch_head.py",["proofkit.verify","python.test","selective.plan"],["local-python"]],
     ["006","584","584","technical","scripts/tests/test_proofkit_branch_head.py",["proofkit.verify","python.test","python.typecheck","selective.plan"],["local-python"]],
     ["006","pending-review-falsifiers","pending-review-falsifiers","falsification","scripts/tests/test_proofkit_pending_review.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan"],["local-python"]],

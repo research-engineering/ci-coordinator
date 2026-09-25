@@ -241,15 +241,26 @@ mode cannot construct selected-execution authority.
 
 ## 5. Probe And Admit The Instance
 
+Have the deployment secret owner provision a private header file outside the
+checkout containing exactly one `Authorization: Bearer <metrics-token>` line,
+using the distinct metrics credential. The operator must own the file with
+mode `0600` in a mode `0700` directory. Do not type the token into shell commands,
+export it, print the file, or enable shell/curl tracing. Header-file access does
+not isolate credentials from the same host account or privileged operators.
+
+[`curl --disable`](https://curl.se/docs/manpage.html#-q) is the first argument to
+prevent ambient curl configuration from enabling tracing, redirects or retries;
+[`--header @file`](https://curl.se/docs/manpage.html#-H) keeps token bytes out of
+argv. Use the deployment-owned file path, not the token-only runtime secret:
+
 ```sh
-curl --fail-with-body http://127.0.0.1:3000/healthz
-metrics_token="$(cat /deployment-owned/metrics-bearer-token)"
-curl --fail-with-body \
-  --header "Authorization: Bearer ${metrics_token}" \
+export METRICS_HEADER_FILE=/deployment-owned/metrics-authorization.header
+curl --disable --fail-with-body http://127.0.0.1:3000/healthz
+curl --disable --fail-with-body \
+  --header "@${METRICS_HEADER_FILE}" \
   http://127.0.0.1:3000/metrics
-unset metrics_token
-curl --fail-with-body http://127.0.0.1:3000/readyz
-curl --fail-with-body http://127.0.0.1:3000/workbench
+curl --disable --fail-with-body http://127.0.0.1:3000/readyz
+curl --disable --fail-with-body http://127.0.0.1:3000/workbench
 ```
 
 Liveness proves only process responsiveness. Readiness becomes successful only
@@ -293,9 +304,10 @@ The enforcement scope must be a subset of
 `CI_COORDINATOR_CONTROL_PLANE_SCOPE_ALLOWLIST`. Provision the real multiline
 public-key PEM at the file path above, without also configuring its direct
 environment form. Mount the receipt read-only and restart the exact image
-digest. The `45`-second example below assumes the
-documented `30`-second application shutdown budget; deployment owners must keep
-the container grace period strictly above the configured application budget:
+digest. `CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS` is required and has no default;
+the `45`-second example below assumes it is configured to `30` as in
+[`.env.example`](../../.env.example). Deployment owners must keep the container
+grace period strictly above the configured application budget:
 
 ```sh
 docker stop --time 45 ci-coordinator
@@ -454,8 +466,8 @@ the others.
 ## 9. Stop Or Roll Back
 
 Set the container grace period strictly above
-`CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS`; the example below assumes the
-documented default of `30` seconds:
+`CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS`. This setting is required, with no
+default; the example below assumes it is configured to `30` seconds:
 
 ```sh
 docker stop --time 45 ci-coordinator
