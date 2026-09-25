@@ -157,7 +157,7 @@
         ]
       }
     ],
-    "maxTimeoutMs": 32336000,
+    "maxTimeoutMs": 32476000,
     "nonCacheableCredentialClasses": [],
     "parallelGroups": [
       "build",
@@ -1010,6 +1010,38 @@
         "backend/.venv/bin/python",
         "-m",
         "scripts.mutation.mutation_suite_specs",
+        "python-plan-identity"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "mutation.python-plan-identity",
+      "networkPolicy": "none",
+      "parallelGroup": "test",
+      "schemaVersion": 1,
+      "timeoutMs": 140000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
         "frontend-safety-kernels"
       ],
       "cachePolicy": "write-local",
@@ -1678,7 +1710,7 @@
       "networkPolicy": "external",
       "parallelGroup": "quality",
       "schemaVersion": 1,
-      "timeoutMs": 32336000
+      "timeoutMs": 32476000
     },
     {
       "argv": [

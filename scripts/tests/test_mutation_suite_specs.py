@@ -10,6 +10,7 @@ from typing import Final, cast
 
 import pytest
 from ruamel.yaml import YAML
+from scripts.mutation.mutation_manifest import decode_mutation_manifest
 from scripts.mutation.mutation_suite_specs import (
     EXECUTION_ENVELOPE_AUTHORITY_RELATIVE_PATHS,
     OPERATOR_WORKBENCH_TIMEOUT_MINUTES,
@@ -121,6 +122,14 @@ def test_suite_configuration_is_a_canonical_data_table() -> None:
             "prefix": "ci-python-http-admission-mutation-",
             "policy": InventoryPolicy.HTTP_ADMISSION,
         },
+        "python-plan-identity": {
+            "command": "mutation.python-plan-identity",
+            "dependencies": ("backend/.venv",),
+            "manifest": "fixtures/conformance/v1/python-plan-identity-mutants.v1.json",
+            "report": "ci-coordinator.python-plan-identity-mutation",
+            "prefix": "ci-python-plan-identity-mutation-",
+            "policy": InventoryPolicy.NONE,
+        },
         "python-persistence": {
             "command": "mutation.python-persistence",
             "dependencies": ("backend/.venv",),
@@ -150,6 +159,103 @@ def test_suite_configuration_is_a_canonical_data_table() -> None:
         "proofkit/quality-plan.v1.json",
         "proofkit/witness-plan-input.json",
     )
+
+
+def test_plan_identity_manifest_has_exactly_eight_causal_witnesses() -> None:
+    spec = SUITES["python-plan-identity"]
+    path = REPO_ROOT / spec.config.manifest_relative_path
+    manifest = decode_mutation_manifest(path.read_bytes())
+    expected_ids = ["PI01", "PI02", "PI03", "PI04", "PI05", "PI06", "PI07", "PI08"]
+    assert manifest["expectedKilled"] == 8
+    assert manifest["expectedMutantIds"] == expected_ids
+    assert [mutant["id"] for mutant in manifest["mutants"]] == expected_ids
+    assert manifest["timeoutMs"] == 5000
+    assert manifest["outerTimeoutMs"] == 140000
+    quality = load_quality_plan()
+    assert quality.commands[spec.command_id].timeout_ms == 140000
+    assert spec.command_id in quality.branch_head_command_ids
+    direct_test = "test_trusted_identity_binding_rejects_each_mismatched_operand"
+    issuer_test = "test_signed_issuer_rejects_identity_mismatch_before_effects"
+    run_guard = (
+        "    if identity.run_id != request.workflow_run_id "
+        "or identity.run_attempt != request.run_attempt:\n"
+    )
+    expected = (
+        (
+            "trusted_identity.py",
+            '    if identity.repository != request.owner + "/" + request.repository:\n',
+            "    if False:\n",
+            direct_test,
+            "repository",
+        ),
+        (
+            "trusted_identity.py",
+            "    if identity.repository_id != request.repository_id:\n",
+            "    if False:\n",
+            direct_test,
+            "repository_id",
+        ),
+        (
+            "trusted_identity.py",
+            "    if identity.ref != request.ref:\n",
+            "    if False:\n",
+            direct_test,
+            "ref",
+        ),
+        (
+            "trusted_identity.py",
+            run_guard,
+            "    if identity.run_attempt != request.run_attempt:\n",
+            direct_test,
+            "run_id",
+        ),
+        (
+            "trusted_identity.py",
+            run_guard,
+            "    if identity.run_id != request.workflow_run_id:\n",
+            direct_test,
+            "run_attempt",
+        ),
+        (
+            "trusted_identity.py",
+            "    if identity.event_name != request.event_name:\n",
+            "    if False:\n",
+            direct_test,
+            "event_name",
+        ),
+        (
+            "trusted_identity.py",
+            "    if identity.execution_sha != request.execution_sha:\n",
+            "    if False:\n",
+            direct_test,
+            "execution_sha",
+        ),
+        (
+            "issuer.py",
+            "        binding_error = bind_trusted_identity(request, identity)\n",
+            "        binding_error = None\n",
+            issuer_test,
+            "repository_id",
+        ),
+    )
+    for mutant, (filename, original, replacement, test, operand) in zip(
+        manifest["mutants"], expected, strict=True
+    ):
+        assert mutant["file"] == f"backend/src/ci_coordinator/plan_issuance/{filename}"
+        assert mutant["original"] == original
+        assert mutant["replacement"] == replacement
+        assert mutant["requirementIds"] == ["REQ-CI-CORE-001", "REQ-CI-RUNTIME-006"]
+        assert mutant["command"] == [
+            "backend/.venv/bin/python",
+            "-m",
+            "pytest",
+            f"backend/tests/unit/test_plan_issuance.py::{test}[{operand}]",
+            "-q",
+        ]
+        assert mutant["environment"] == {
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONPATH": "backend/src",
+        }
 
 
 def _direct_suite_invocations(mutation_job: JsonObject) -> tuple[str, ...]:

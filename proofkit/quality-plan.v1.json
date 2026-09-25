@@ -84,6 +84,7 @@
     "mutation.python-config-policy-admission",
     "mutation.python-database-compatibility",
     "mutation.python-http-admission",
+    "mutation.python-plan-identity",
     "mutation.python-persistence",
     "mutation.audit-persistence-bytes",
     "mutation.audit-json-resources",

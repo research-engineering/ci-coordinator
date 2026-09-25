@@ -425,6 +425,12 @@
       "kind": "native"
     },
     {
+      "commandId": "mutation.python-plan-identity",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.python-plan-identity",
+      "purpose": "Run the repository-owned mutation.python-plan-identity predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
       "commandId": "mutation.python-persistence",
       "executionOwner": "proofkit/witness-plan-input.json#mutation.python-persistence",
       "purpose": "Run the repository-owned mutation.python-persistence predicate with its declared environment, timeout and failure contract.",
