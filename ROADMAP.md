@@ -96,6 +96,16 @@ exact-head native checks. The next coherent repairs close derived-proof refresh,
 delivered UI module identity and bounded source-authority enforcement; remaining
 findings keep their per-source dispositions in the external evidence register.
 
+[PR #17](https://github.com/research-engineering/ci-coordinator/pull/17) subsequently
+qualified the explicit complete derived-proof refresh operation. It preserves
+semantic approval as a separate obligation.
+[PR #18](https://github.com/research-engineering/ci-coordinator/pull/18) qualified
+canonical delivered UI module identity and its real-ASGI browser witness.
+Mocked API responses do not qualify live authentication or deployment recovery.
+Source-authority enforcement and received-byte body admission are the next
+prepared repairs; UI failure containment is in progress. CI-054 remains open,
+with all source aliases, partial dispositions and refutations conserved.
+
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.
 CI-005 measures comparable execution using CI-027/CI-028; CI-006 optimizes the

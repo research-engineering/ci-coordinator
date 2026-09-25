@@ -81,6 +81,7 @@ def imported_modules(
     *,
     ambient_authority_prefixes: tuple[str, ...] = (),
     restricted_module_objects: tuple[str, ...] = (),
+    qualified_authority_prefixes: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     resolved_path = path.resolve()
     resolved_source_root = source_root.resolve()
@@ -94,6 +95,7 @@ def imported_modules(
         current_package=current_package,
         ambient_authority_prefixes=ambient_authority_prefixes,
         restricted_module_objects=restricted_module_objects,
+        qualified_authority_prefixes=qualified_authority_prefixes,
     )
 
 

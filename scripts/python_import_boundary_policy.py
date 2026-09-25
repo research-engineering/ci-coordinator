@@ -130,10 +130,18 @@ _DYNAMIC_LOADING_AUTHORITIES = (
 )
 
 _PROCESS_ENVIRONMENT_AUTHORITIES = (
+    "nt.environ",
+    "nt.putenv",
+    "nt.unsetenv",
     "os.environ",
+    "os.environb",
     "os.getenv",
+    "os.getenvb",
     "os.putenv",
     "os.unsetenv",
+    "posix.environ",
+    "posix.putenv",
+    "posix.unsetenv",
 )
 
 
@@ -142,8 +150,30 @@ _STANDARD_LAYER_FORBIDDEN = (
     "dotenv",
     "fastapi",
     "httpx",
+    "httpx2",
     "requests",
     "sqlalchemy",
+)
+
+
+_CLOCK_READ_AUTHORITIES = (
+    "datetime.date.today",
+    "datetime.datetime.now",
+    "datetime.datetime.today",
+    "datetime.datetime.utcnow",
+)
+
+_PURE_CORE_EXTERNAL_PREFIXES = (
+    "__future__.annotations",
+    "collections.abc",
+    "dataclasses",
+    "datetime.datetime",
+    "datetime.timedelta",
+    "heapq",
+    "json",
+    "math",
+    "re",
+    "typing",
 )
 
 
@@ -367,6 +397,7 @@ def imported_modules(path: Path, source_root: Path) -> tuple[str, ...]:
             "sys.modules",
         ),
         restricted_module_objects=_HTTP_RESTRICTED_MODULE_OBJECTS,
+        qualified_authority_prefixes=("ci_coordinator", *_CLOCK_READ_AUTHORITIES),
     )
 
 
@@ -390,6 +421,27 @@ def _standard_layer_rule(
         forbidden=_STANDARD_LAYER_FORBIDDEN,
         allowed_first_party_prefixes=allowed_first_party_prefixes,
         allowed_import_prefixes=allowed_import_prefixes,
+        rule_id=rule_id,
+    )
+
+
+def _pure_core_rule(
+    path: str,
+    *,
+    allowed_first_party_prefixes: tuple[str, ...],
+    rule_id: str,
+) -> ImportRule:
+    return ImportRule(
+        applies=_path_contains(path),
+        forbidden=(
+            *_STANDARD_LAYER_FORBIDDEN,
+            *_CLOCK_READ_AUTHORITIES,
+            "ci_coordinator.kernel.clock",
+            "ci_coordinator.kernel.SystemClock",
+            "ci_coordinator.kernel.SystemMonotonicClock",
+        ),
+        allowed_first_party_prefixes=allowed_first_party_prefixes,
+        allowed_external_prefixes=_PURE_CORE_EXTERNAL_PREFIXES,
         rule_id=rule_id,
     )
 
@@ -437,12 +489,21 @@ IMPORT_RULES = (
         applies=lambda path: path.endswith(
             "/ci_coordinator/consumer_contract_lab/node_executable.py"
         ),
-        forbidden=("os.getenv", "os.putenv", "os.unsetenv"),
+        forbidden=(
+            "nt.putenv",
+            "nt.unsetenv",
+            "os.getenv",
+            "os.getenvb",
+            "os.putenv",
+            "os.unsetenv",
+            "posix.putenv",
+            "posix.unsetenv",
+        ),
         rule_id="python.import-boundary.consumer-tool-environment",
     ),
     ImportRule(
         applies=_os_capability_rule_applies,
-        forbidden=("os",),
+        forbidden=("nt", "os", "posix"),
         rule_id="python.import-boundary.os-capability",
     ),
     ImportRule(
@@ -475,6 +536,7 @@ IMPORT_RULES = (
             "dotenv",
             "fastapi",
             "httpx",
+            "httpx2",
             "sqlalchemy",
         ),
         rule_id="python.import-boundary.runtime-environment",
@@ -487,6 +549,7 @@ IMPORT_RULES = (
             "dotenv",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "os.environ",
             "requests",
@@ -545,6 +608,7 @@ IMPORT_RULES = (
             "ci_coordinator.verification_core",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "requests",
             "sqlalchemy",
@@ -578,6 +642,7 @@ IMPORT_RULES = (
             "ci_coordinator.verification_core",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "requests",
             "sqlalchemy",
@@ -603,6 +668,7 @@ IMPORT_RULES = (
             "ci_coordinator.persistence",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "requests",
             "sqlalchemy",
@@ -648,13 +714,14 @@ IMPORT_RULES = (
             "ci_coordinator.planning_core",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "requests",
             "sqlalchemy",
         ),
         rule_id="python.import-boundary.repo-context",
     ),
-    _standard_layer_rule(
+    _pure_core_rule(
         "/ci_coordinator/planning_core/",
         allowed_first_party_prefixes=(
             "ci_coordinator.config_control",
@@ -909,6 +976,7 @@ IMPORT_RULES = (
             "ci_coordinator.verification_core",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "requests",
             "sqlalchemy",
@@ -1137,6 +1205,7 @@ IMPORT_RULES = (
             "dotenv",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "requests",
         ),
@@ -1170,7 +1239,7 @@ IMPORT_RULES = (
         ),
         rule_id="python.import-boundary.agent-risk-advice",
     ),
-    _standard_layer_rule(
+    _pure_core_rule(
         "/ci_coordinator/verification_core/",
         allowed_first_party_prefixes=(
             "ci_coordinator.agent_risk_advice",
@@ -1221,7 +1290,7 @@ IMPORT_RULES = (
         ),
         rule_id="python.import-boundary.plan-issuance",
     ),
-    _standard_layer_rule(
+    _pure_core_rule(
         "/ci_coordinator/runner_capacity/",
         allowed_first_party_prefixes=(
             "ci_coordinator.execution_orchestration",
@@ -1315,6 +1384,7 @@ IMPORT_RULES = (
             "dotenv",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "requests",
         ),
@@ -1334,6 +1404,7 @@ IMPORT_RULES = (
             "dotenv",
             "fastapi",
             "httpx",
+            "httpx2",
             "os",
             "requests",
         ),
@@ -1372,6 +1443,7 @@ IMPORT_RULES = (
             *_DYNAMIC_LOADING_AUTHORITIES,
             "dotenv",
             "httpx",
+            "httpx2",
             "os",
             "os.environ",
             "requests",
