@@ -363,7 +363,7 @@ def test_process_byte_budget_is_shared_across_route_lanes() -> None:
         await first
         return downstream_calls, second_body_reads, rejected[-1]["body"]
 
-    assert asyncio.run(scenario()) == (1, 0, b'{"code":"overload"}')
+    assert asyncio.run(scenario()) == (1, 1, b'{"code":"overload"}')
 
 
 @pytest.mark.parametrize(

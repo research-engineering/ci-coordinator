@@ -250,19 +250,31 @@ preparation, a reconciliation transition, or a planning decision. `202` is forbi
 Every non-liveness HTTP route is inside one runtime-owned absolute deadline.
 Body-bearing routes additionally require an exact method-and-path byte maximum,
 a path-isolated no-queue body lane, and one process-wide weighted retained-body
-lease. A request that cannot acquire either lease receives an immediate typed
-overload rejection and never becomes a semaphore waiter. The weighted lease
-reserves the canonical `Content-Length` when present and the route maximum when
-absent, and remains held through downstream completion while replayed bytes can
-still be retained. Therefore the sum of admitted body reservations never
-exceeds `maximum_retained_body_bytes`, independently of the sum of path-local
-maxima. Lanes remain path-isolated, so slow planning cannot consume rollback or
-configuration permits.
+lease. A full path lane rejects before reading. The weighted lease starts at
+zero for both declared and absent lengths and grows atomically by each valid
+received increment before retention or copying. Invalid length headers and
+oversized declarations retain their pre-read 400/413 precedence. For received
+chunks, exact byte type, route maximum, declared overrun and final length
+equality are checked before growth. Failed growth returns the route's typed
+overload 503 without a capacity waiter or downstream dispatch; unlike the old
+forecast reservation, it can require receiving one unadmitted chunk first.
+Both leases remain held through downstream completion or unwind. The sum of
+admitted logical payload weights never exceeds `maximum_retained_body_bytes`.
+Lanes remain path-isolated; idle requests still occupy their own path permits,
+but no speculative body bytes. Real-byte floods can still exhaust the shared
+budget; no fairness or emergency-route availability guarantee follows.
 
-The common single-chunk path reuses the received immutable `bytes`; a
-multi-chunk body requires one join allocation. The retained-body budget does
-not claim an allocator or RSS bound, so capacity qualification measures the
-transient copy envelope separately. The absolute deadline continues across
+One nonempty chunk reuses its immutable `bytes` even with surrounding empty
+chunks. A second nonempty chunk promotes storage to one growing `bytearray`,
+converted once to immutable bytes at completion. No per-chunk list or lease
+collection is retained. Superseded chunk/message references are dropped before
+the next receive; every 64 processed messages an AnyIO checkpoint permits
+cancellation even when receive is always ready. This does not make synchronous
+copies or downstream work preemptible. The retained-body budget does not bound
+the ASGI chunk already delivered before validation, conversion/reallocation
+copies, buffer capacity, allocator overhead, upstream buffering, or RSS.
+Capacity qualification measures that envelope separately. The absolute deadline
+continues across
 admission, buffering, authentication, provider/database work, and response
 completion. Deadline expiry and admission overload have distinct stable typed
 responses. A downstream `TimeoutError` without owner-deadline expiry remains

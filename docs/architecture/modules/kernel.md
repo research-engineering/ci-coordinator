@@ -26,6 +26,12 @@ kernel.path_patterns.is_unicode_scalar_string(value) -> bool
 kernel.path_patterns.is_safe_relative_path(value) -> bool
 kernel.path_patterns.validate_path_pattern(pattern) -> str | None
 kernel.path_patterns.matches_path_pattern(pattern, path) -> bool
+AdmissionLease.release() -> None
+NoQueueAdmission.try_acquire() -> AdmissionLease | None
+WeightedNoQueueAdmission.try_acquire(weight) -> AdmissionLease | None
+WeightedNoQueueAdmission.try_acquire_growing(weight=0) -> GrowingAdmissionLease | None
+GrowingAdmissionLease.try_grow(delta) -> bool
+GrowingAdmissionLease.release() -> None
 ```
 
 ## 3. Private Boundary
@@ -62,6 +68,32 @@ The actual `scripts.python_witness import-boundary` gate must pass after the
 move; its pre-repair failure is not waived by lint or syntax checks.
 
 ## 4. Input Completeness Rules
+
+### Process-Local Admission
+
+Fixed leases retain their existing construction, zero-weight acquisition, and
+exactly-once release API. The weighted owner additionally creates growing leases;
+their mutable balance and released state are private, not caller-owned counters.
+Its one budget mutex linearizes all growing-lease growth/release operations and
+the aggregate weight shared with fixed leases. This is an ownership contract,
+not protection against arbitrary Python reflection or mutation of private state.
+
+Limits are positive exact integers. Initial weights and growth deltas are exact
+integers in `[0, maximum_weight]`; invalid values raise `ValueError` before state
+changes. A valid growth on a released lease and every repeated release raise
+`RuntimeError`. Capacity exhaustion returns `None` on acquisition or `False`
+on growth without a partial charge or waiter. Zero-weight acquisition and zero
+growth remain valid even at a full budget. Lease allocation precedes counter
+publication, so construction failure cannot orphan an acquired permit.
+
+For open fixed weights `f` and growing balances `w`,
+`T = sum(f) + sum(w)` stays in `[0, maximum_weight]`: successful growth changes
+both `T` and one `w` by the same delta, failed growth changes neither, and release
+subtracts the entire owned weight exactly once. Callers own the resource lifetime
+and must not refund weight while downstream retains that resource. These
+primitives promise neither fairness, distributed admission, nor an RSS bound.
+
+### Canonical Values
 
 Let `M = 2^53 - 1`. The Python kernel number domain is:
 

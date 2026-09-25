@@ -157,7 +157,7 @@
         ]
       }
     ],
-    "maxTimeoutMs": 32306000,
+    "maxTimeoutMs": 32336000,
     "nonCacheableCredentialClasses": [],
     "parallelGroups": [
       "build",
@@ -1003,7 +1003,7 @@
       "networkPolicy": "none",
       "parallelGroup": "test",
       "schemaVersion": 1,
-      "timeoutMs": 250000
+      "timeoutMs": 280000
     },
     {
       "argv": [
@@ -1678,7 +1678,7 @@
       "networkPolicy": "external",
       "parallelGroup": "quality",
       "schemaVersion": 1,
-      "timeoutMs": 32306000
+      "timeoutMs": 32336000
     },
     {
       "argv": [

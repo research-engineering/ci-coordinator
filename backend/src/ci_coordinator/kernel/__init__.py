@@ -2,6 +2,7 @@
 
 from ci_coordinator.kernel.admission import (
     AdmissionLease,
+    GrowingAdmissionLease,
     NoQueueAdmission,
     WeightedNoQueueAdmission,
 )
@@ -36,6 +37,7 @@ __all__ = [
     "Clock",
     "Err",
     "FixedClock",
+    "GrowingAdmissionLease",
     "JsonResourceLimits",
     "MonotonicClock",
     "NoQueueAdmission",
