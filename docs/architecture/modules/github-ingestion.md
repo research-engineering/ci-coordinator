@@ -85,6 +85,14 @@ integers, unpaired surrogates, non-object roots, and profile-limit violations
 are typed rejections. Rejection messages contain stable codes only and never
 copy raw payload values.
 
+Lexical preflight advances plain string, whitespace and scalar spans with
+bounded standard-library character-class matches; it does not construct their
+decoded values. Plain spans stop no later than the first code point exceeding
+the remaining string budget. Escape validation and surrogate-pair counting
+retain their ordered checks. This preserves preconstruction admission and
+stable error precedence without a Python callback for every plain character.
+Measured throughput and process/ingress capacity remain separate obligations.
+
 ## 5. Event Algebra
 
 | Family         | Admitted result                            | Planning consequence                                                     |
