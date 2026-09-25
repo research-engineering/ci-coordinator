@@ -9,7 +9,7 @@ export default defineConfig({
   webServer: {
     command:
       "/usr/bin/env -i PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src " +
-      "backend/.venv/bin/python -B scripts/operator_ui_browser_server.py frontend/dist",
+      "backend/.venv/bin/python -B scripts/operator_ui_browser_server.py",
     cwd: "..",
     gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
     name: "Operator ASGI transport",

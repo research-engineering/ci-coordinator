@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import socket
-import sys
 from pathlib import Path
 
 import uvicorn
@@ -34,7 +33,7 @@ def main() -> None:
         HttpRouteDependencies(
             observability=ObservabilityRouteDependencies(readiness=_ready, metrics=RuntimeMetrics())
         ),
-        operator_ui_directory=Path(sys.argv[1]),
+        operator_ui_directory=Path(__file__).resolve().parents[1] / "frontend" / "dist",
     )
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(("127.0.0.1", 0))
