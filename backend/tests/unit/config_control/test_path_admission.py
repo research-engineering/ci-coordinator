@@ -158,8 +158,8 @@ def test_literal_policy_rejects_unsafe_path_at_its_exact_pointer(
         ("future/new-file.py", "future/new-file.py", "future/other.py"),
         ("src/**", "src/a/b.py", "other/a.py"),
         ("src/{api,app}/?.py", "src/api/a.py", "src/api/ab.py"),
-        ("caf\u00e9/**", "caf\u00e9/a.py", "cafe\u0301/a.py"),
-        ("cafe\u0301/**", "cafe\u0301/a.py", "caf\u00e9/a.py"),
+        ("file-\u00e9/**", "file-\u00e9/a.py", "file-e\u0301/a.py"),
+        ("file-e\u0301/**", "file-e\u0301/a.py", "file-\u00e9/a.py"),
         ("A" * 512, "A" * 512, "A" * 511),
         ("\U0001f600" * 512, "\U0001f600" * 512, "\U0001f600" * 511),
     ],
@@ -197,8 +197,8 @@ def test_unicode_path_forms_keep_distinct_compiled_and_policy_identities(field: 
     drafts = [
         admit_policy_document(_source(field, raw), "json")
         for raw in (
-            b'"caf\\u00e9/**"',
-            b'"cafe\\u0301/**"',
+            b'"file-\\u00e9/**"',
+            b'"file-e\\u0301/**"',
         )
     ]
     first, second = drafts

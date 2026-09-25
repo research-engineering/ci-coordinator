@@ -4,12 +4,11 @@ from collections.abc import Iterator
 from itertools import product
 
 import pytest
+from workflow_discovery.test_workflow_discovery import REVISION, SCOPE, _source
 
 from ci_coordinator.workflow_discovery.graph import _cycle_pairs, analyze_call_graph
 from ci_coordinator.workflow_discovery.parser import parse_workflow
 from ci_coordinator.workflow_discovery.summary import ParsedWorkflow
-
-from .test_workflow_discovery import REVISION, SCOPE, _source
 
 
 @pytest.mark.parametrize("mask", range(1 << 9))
