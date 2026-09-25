@@ -279,7 +279,7 @@ def test_direct_provider_job_envelope_fails_closed() -> None:
         ("python-database-compatibility", 36),
         ("frontend-safety-kernels", 12),
         ("python-capacity-evidence", 27),
-        ("python-http-admission", 19),
+        ("python-http-admission", 22),
     ],
 )
 def test_current_inventory_is_admitted(suite_name: str, expected_count: int) -> None:
