@@ -183,6 +183,13 @@ cleanup. Required session, logout replay and journal effects remain atomic.
 Existing maintenance and ordered writers retain activity-event cleanup; counter
 retention, timeouts, admission limits and cursor semantics are unchanged.
 
+Proposal-review transactions require the identity-state capability as well as
+their review, configuration, audit, and compatibility capabilities. Common
+admission attests identity schema facts under the same compatibility fence
+before exposing the repository. Session and activity transactions use that
+same attestor once per admission, without a second wrapper-level catalog pass.
+Earlier authentication is not schema admission for a later transaction.
+
 `workflow_proposal_reviews` is the durable repository-attestation receipt. In
 addition to the existing exact proposal and audit binding it retains reviewer
 identity, observed `maintain` or `admin` permission, initiating Keycloak actor,

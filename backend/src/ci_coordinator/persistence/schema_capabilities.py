@@ -576,6 +576,7 @@ def proposal_review_registration_requirements(
             AUDIT_LEDGER.declaration(),
             CONFIG_EPOCH_LIFECYCLE.declaration(),
             PROPOSAL_REVIEW_REGISTRATION.declaration(),
+            CONTROL_PLANE_IDENTITY_STATE.declaration(),
         ),
     )
 

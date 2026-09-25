@@ -19,6 +19,7 @@ from ci_coordinator.persistence.compatibility_profile import load_bundled_profil
 from ci_coordinator.persistence.schema_capabilities import (
     AUDIT_LEDGER,
     CONFIG_EPOCH_LIFECYCLE,
+    CONTROL_PLANE_IDENTITY_STATE,
     DATABASE_COMPATIBILITY_PROTOCOL,
     PRODUCTION_GENERATION_CUTOVER,
     PROPOSAL_REVIEW_REGISTRATION,
@@ -193,6 +194,7 @@ def test_proposal_review_unit_of_work_requires_the_atomic_dependency_closure() -
             AUDIT_LEDGER.declaration(),
             CONFIG_EPOCH_LIFECYCLE.declaration(),
             PROPOSAL_REVIEW_REGISTRATION.declaration(),
+            CONTROL_PLANE_IDENTITY_STATE.declaration(),
         ),
     )
 

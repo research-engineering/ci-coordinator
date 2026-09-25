@@ -34,6 +34,9 @@ from ci_coordinator.persistence.config_epoch_registration_schema_attestation imp
 from ci_coordinator.persistence.config_epoch_schema_attestation import (
     config_epoch_lifecycle_schema_matches_contract,
 )
+from ci_coordinator.persistence.control_plane_identity_schema_attestation import (
+    control_plane_identity_schema_matches_contract,
+)
 from ci_coordinator.persistence.data_attestation import (
     application_schema_is_empty_of_public_default_privileges,
     audit_ledger_bridge_constraints_are_validated,
@@ -243,4 +246,9 @@ async def admit_schema_dependent_operation(
         raise DatabaseCompatibilityError(
             "could not collect database capability attestation facts"
         ) from error
+    # Preserve identity callers' existing SQLAlchemy error and cancellation handling.
+    if "control-plane-identity-state/v1" in capability_ids and not (
+        await control_plane_identity_schema_matches_contract(connection)
+    ):
+        raise DatabaseCapabilityUnavailable("control-plane identity schema facts do not match")
     return current
