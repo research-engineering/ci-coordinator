@@ -7,7 +7,7 @@
     ["ci-coordinator.routes.control-plane","proofkit/routes/control-plane.v2.json","4441aa36ea0309ab7f30e63fa2a9e4be132ebba4784df76d09473ba12104b911"],
     ["ci-coordinator.routes.core","proofkit/routes/core.v2.json","f121bc3deed751f4c5b094500b4cbe07fb63b15fb49a8cf7a5c7deee7180551c"],
     ["ci-coordinator.routes.developer-environment","proofkit/routes/developer-environment.v2.json","8d878470a3b7afe50429d1e932caeda7dc7a6ae17cff4d6109eb726435550bf6"],
-    ["ci-coordinator.routes.operator-ui","proofkit/routes/operator-ui.v2.json","0196fda73b8d2010f0e7cd1b207d36307305600d9f4b88fadf1fb5cd1aa56682"],
+    ["ci-coordinator.routes.operator-ui","proofkit/routes/operator-ui.v2.json","7cca96b947fffb7cf98fd1738aab061f176c5536ff83c8547bf1003e7bcc32de"],
     ["ci-coordinator.routes.proofkit-adoption","proofkit/routes/proofkit-adoption.v2.json","ad10dde6eb65559ab98a76dbc641841557bad96158860890b01012f29197636e"],
     ["ci-coordinator.routes.release","proofkit/routes/release.v2.json","f5c9269de7f4b6683417d647ced437bea85acce88ba762c475d748580cd53f2c"],
     ["ci-coordinator.routes.runtime","proofkit/routes/runtime.v2.json","2b59e5b014db313eee7d1e3d587ad6b1d790fa6a0b93fc88f83bb3505d1d0f48"]

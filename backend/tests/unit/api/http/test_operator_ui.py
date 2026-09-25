@@ -20,7 +20,9 @@ from ci_coordinator.api.http.dependencies import (
 from ci_coordinator.observability import ReadinessStatus, RuntimeMetrics
 
 _CONTENT_TYPES = {
+    ".css": "text/css; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
 }
 
 
@@ -134,6 +136,136 @@ def test_etag_admission_reads_every_repeated_header_line() -> None:
     )
 
     assert operator_ui_module._etag_matches(scope, '"expected"') is True
+
+
+@pytest.mark.parametrize("prefix", ("./assets/", "/assets/"))
+def test_shell_projects_only_resource_attributes_after_raw_verification(
+    tmp_path: Path, prefix: str
+) -> None:
+    raw_index = (
+        "<!doctype html>\n<html><head><title>./assets/app.js &amp; unchanged</title>\n"
+        f'<script type="module" crossorigin src="{prefix}app.js"></script>\n'
+        f'<link rel="modulepreload" href="{prefix}lazy.js">\n'
+        f'<link rel="stylesheet" href="{prefix}app.css"></head>\n'
+        f'<body><img alt="&quot;logo&quot;" src="{prefix}logo.svg" />'
+        "<p>./assets/app.js</p></body></html>"
+    ).encode()
+    payloads = {
+        "app.js": b'import "./lazy.js"; export {};',
+        "lazy.js": b'import "./app.js"; export {};',
+        "app.css": b"body { color: black; }",
+        "logo.svg": b'<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+    }
+    (tmp_path / "index.html").write_bytes(raw_index)
+    (tmp_path / "assets").mkdir()
+    for name, content in payloads.items():
+        (tmp_path / "assets" / name).write_bytes(content)
+    _write_manifest(tmp_path)
+    manifest = (tmp_path / "asset-manifest.v1.json").read_bytes()
+    bundle_id = hashlib.sha256(manifest).hexdigest()
+    expected_prefix = f"/assets/_bundle/{bundle_id}/"
+
+    with TestClient(create_app(_dependencies(), operator_ui_directory=tmp_path)) as client:
+        assert (tmp_path / "index.html").read_bytes() == raw_index
+        for path in ("/workbench", "/workbench/"):
+            shell = client.get(path)
+            expected = raw_index.decode()
+            for name in payloads:
+                expected = expected.replace(f'="{prefix}{name}"', f'="{expected_prefix}{name}"')
+            assert shell.text == expected
+            assert shell.headers["cache-control"] == "no-store"
+            assert "base-uri 'none'" in shell.headers["content-security-policy"]
+            assert "unsafe-inline" not in shell.headers["content-security-policy"]
+            head = client.head(path)
+            assert head.content == b""
+            for header in (
+                "content-type",
+                "content-length",
+                "cache-control",
+                "content-security-policy",
+            ):
+                assert head.headers[header] == shell.headers[header]
+            assert int(head.headers["content-length"]) == len(shell.content)
+        for name, content in payloads.items():
+            response = client.get(expected_prefix + name, follow_redirects=False)
+            assert response.status_code == 200
+            assert response.content == content
+            assert response.headers["etag"] == f'"{hashlib.sha256(content).hexdigest()}"'
+            assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
+            head = client.head(expected_prefix + name, follow_redirects=False)
+            assert head.content == b""
+            for header in ("content-type", "content-length", "cache-control", "etag"):
+                assert head.headers[header] == response.headers[header]
+        old = client.get(f"/assets/_bundle/{'0' * 64}/app.js", follow_redirects=False)
+        assert old.status_code == 404
+        assert old.headers["cache-control"] == "no-store"
+        (tmp_path / "index.html").write_text("changed after admission", encoding="utf-8")
+        assert client.get("/workbench").text == expected
+
+    assert (tmp_path / "asset-manifest.v1.json").read_bytes() == manifest
+    for name, content in payloads.items():
+        assert (tmp_path / "assets" / name).read_bytes() == content
+
+
+@pytest.mark.parametrize(
+    "index",
+    (
+        '<script src="./assets/missing.js"></script>',
+        '<script src="https://outside.invalid/assets/app.js"></script>',
+        '<script src="//outside.invalid/assets/app.js"></script>',
+        '<script src="./assets/../app.js"></script>',
+        '<script src="./assets/%61pp.js"></script>',
+        '<script src="./assets/app.js?alias=1"></script>',
+        '<script src="./assets/app.js#alias"></script>',
+        '<script src="/assets/_bundle/old/app.js"></script>',
+        '<script src="./assets/app.js" SRC="./assets/app.js"></script>',
+        '<script type="module">import "./assets/app.js";</script>',
+        '<link rel="modulepreload" href="./assets/missing.js">',
+        '<base href="/assets/"><script src="./assets/app.js"></script>',
+    ),
+)
+def test_shell_resource_admission_rejects_literal_nonmember_and_alias_inputs(
+    tmp_path: Path, index: str
+) -> None:
+    (tmp_path / "index.html").write_text(index, encoding="utf-8")
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "app.js").write_text("export {};", encoding="utf-8")
+    _write_manifest(tmp_path)
+
+    with pytest.raises(ValueError, match="operator UI index"):
+        create_app(_dependencies(), operator_ui_directory=tmp_path)
+
+
+@pytest.mark.parametrize("bound", ("_MAXIMUM_INDEX_BYTES", "_MAXIMUM_BUNDLE_BYTES"))
+def test_projected_shell_and_final_snapshot_still_obey_byte_bounds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, bound: str
+) -> None:
+    raw = b'<script src="./assets/app.js"></script>'
+    asset = b"export {};"
+    (tmp_path / "index.html").write_bytes(raw)
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "app.js").write_bytes(asset)
+    _write_manifest(tmp_path)
+    maximum = len(raw) + (len(asset) if bound == "_MAXIMUM_BUNDLE_BYTES" else 0)
+    monkeypatch.setattr(operator_ui_bundle_module, bound, maximum)
+
+    with pytest.raises(ValueError, match=r"projected .*byte bound"):
+        create_app(_dependencies(), operator_ui_directory=tmp_path)
+
+
+def test_projection_cannot_hide_raw_index_manifest_mismatch(tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text(
+        '<script src="./assets/app.js"></script>', encoding="utf-8"
+    )
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "app.js").write_text("export {};", encoding="utf-8")
+    _write_manifest(tmp_path)
+    (tmp_path / "index.html").write_text(
+        '<script src="./assets/bad.js"></script>', encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError, match="identity does not match the manifest"):
+        create_app(_dependencies(), operator_ui_directory=tmp_path)
 
 
 @pytest.mark.parametrize("method", ("GET", "HEAD"))

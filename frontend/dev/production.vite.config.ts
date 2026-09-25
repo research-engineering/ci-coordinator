@@ -6,5 +6,5 @@ export default defineConfig(async (environment) => {
   const application = await (typeof applicationConfig === "function"
     ? applicationConfig(environment)
     : applicationConfig);
-  return mergeConfig(application, { plugins: [productionBoundary()] });
+  return mergeConfig(application, { base: "./", plugins: [productionBoundary()] });
 });

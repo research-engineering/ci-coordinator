@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Final, cast
 
+from ci_coordinator.api.http.operator_ui_html import project_operator_ui_index
+
 ASSET_BUNDLE_NAMESPACE: Final = "_bundle"
 _ASSET_MANIFEST_NAME: Final = "asset-manifest.v1.json"
 _ASSET_MANIFEST_SCHEMA: Final = "ci-coordinator-operator-ui-assets/v1"
@@ -113,10 +115,21 @@ def admit_operator_ui_bundle(directory: Path) -> OperatorUiBundleSnapshot:
             raise ValueError("operator UI bundle changed while it was read")
         if index is None or not assets:
             raise ValueError("operator UI bundle shape exceeded its bound")
+        bundle_id = hashlib.sha256(manifest_content).hexdigest()
+        projected_index = project_operator_ui_index(
+            index,
+            asset_paths=frozenset(path for path, _asset in assets),
+            asset_prefix=f"/assets/{ASSET_BUNDLE_NAMESPACE}/{bundle_id}/",
+            maximum_bytes=_MAXIMUM_INDEX_BYTES,
+        )
+        if len(projected_index) + sum(len(asset.content) for _path, asset in assets) > (
+            _MAXIMUM_BUNDLE_BYTES
+        ):
+            raise ValueError("operator UI projected bundle exceeded its byte bound")
         return OperatorUiBundleSnapshot(
-            index=index,
+            index=projected_index,
             assets=tuple(assets),
-            bundle_id=hashlib.sha256(manifest_content).hexdigest(),
+            bundle_id=bundle_id,
         )
     finally:
         os.close(root_fd)

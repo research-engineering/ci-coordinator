@@ -2989,7 +2989,7 @@
     "docker/ci/connected-browser.Dockerfile": "98d669c9e2bb25062aefaa084e097bfa2eb45acc0a1a6817343a529ae8abce25",
     "frontend/connected.playwright.config.ts": "c8a3e6a7f8671d2bef34a7d9fa9b3dd9a465f242819b493d9c212e0558566603",
     "frontend/package.json": "0aab4c17c2f1b0e8f0853ce6dfa1fdf6c3dc33688f209d45d3da817ca574b2a7",
-    "frontend/playwright.config.ts": "5cb35a04c2a44f979c7fac95034fe05cac9d9d72b19fd98524753d500e6a1ebd",
+    "frontend/playwright.config.ts": "512418af5a903fab6f49e519d4b3d0fae5790e9f52e555495a3253d6668883b0",
     "frontend/vitest.config.ts": "24ce82049d6dc72467fbad3ee8871e42d9ca1d5e76358712522c0a08e327d9d4",
     "scripts/browser_test_admission.py": "d1fbe2a6777f5716ecdd74eda3a4159f6ef99c3b8e0b2e2e4dbedba9685eaf18",
     "scripts/browser_test_execution.py": "8de3c7573901b7cdf37fc12223c899a320125ed662aa5f47e560c9be9d75826b",
