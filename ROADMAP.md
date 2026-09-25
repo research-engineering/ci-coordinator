@@ -89,9 +89,12 @@ Live provider enrollment remains separate.
 [PR #15](https://github.com/research-engineering/ci-coordinator/pull/15) merged
 bounded release-evidence selection, a pinned SBOM generator and disclosure
 guidance after its own exact-head gates. Artifact publication and qualification
-remain separate. The next coherent repair aligns policy path admission with
-execution and bounds workflow cycle analysis; remaining findings keep their
-per-source dispositions in the external evidence register.
+remain separate.
+[PR #16](https://github.com/research-engineering/ci-coordinator/pull/16) merged
+shared policy path admission and linear workflow cycle classification after
+exact-head native checks. The next coherent repairs close derived-proof refresh,
+delivered UI module identity and bounded source-authority enforcement; remaining
+findings keep their per-source dispositions in the external evidence register.
 
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.
