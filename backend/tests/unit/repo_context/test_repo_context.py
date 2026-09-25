@@ -51,10 +51,10 @@ def test_freshness_preserves_the_public_path_functions_as_exact_kernel_aliases()
         ("src/", "src/a.py", False),
         ("src/**/", "src/a/b.py", False),
         ("**/", "a.py", False),
-        ("caf\u00e9/**", "caf\u00e9/a.py", True),
-        ("caf\u00e9/**", "cafe\u0301/a.py", False),
-        ("cafe\u0301/**", "cafe\u0301/a.py", True),
-        ("cafe\u0301/**", "caf\u00e9/a.py", False),
+        ("file-\u00e9/**", "file-\u00e9/a.py", True),
+        ("file-\u00e9/**", "file-e\u0301/a.py", False),
+        ("file-e\u0301/**", "file-e\u0301/a.py", True),
+        ("file-e\u0301/**", "file-\u00e9/a.py", False),
     ],
 )
 def test_path_pattern_automaton_preserves_the_admitted_glob_language(
@@ -78,7 +78,7 @@ def test_path_pattern_automaton_bounds_adversarial_wildcard_state() -> None:
 
 
 def test_diff_preserves_distinct_unicode_paths_and_rename_coordinates() -> None:
-    nfc, nfd = "caf\u00e9/a.py", "cafe\u0301/a.py"
+    nfc, nfd = "file-\u00e9/a.py", "file-e\u0301/a.py"
     renamed = valid_diff(DiffFileChangeInput(path=nfd, previous_path=nfc, status="renamed"))
     first = valid_diff(DiffFileChangeInput(path=nfc, status="modified"))
     second = valid_diff(DiffFileChangeInput(path=nfd, status="modified"))
