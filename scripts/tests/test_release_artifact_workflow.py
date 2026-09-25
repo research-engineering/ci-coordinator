@@ -116,11 +116,14 @@ def test_preflight_binds_exact_repository_source_event_and_full_check() -> None:
         "/actions/workflows/${GATE_WORKFLOW_ID}/runs",
         "--raw-field event=workflow_dispatch",
         '--raw-field head_sha="${SOURCE_COMMIT}"',
+        "--raw-field page=1",
+        "--raw-field per_page=10",
         "--raw-field status=success",
         "python3 -m scripts.release_artifact_identity",
         "--gate-workflow-path .github/workflows/python-persistence.yml",
     ):
         assert required in identity_command
+    assert "--paginate" not in identity_command
     assert steps[4]["env"] == {
         "GATE_WORKFLOW_ID": "${{ steps.publisher.outputs.gate_workflow_id }}",
         "GH_TOKEN": "${{ github.token }}",
@@ -169,7 +172,10 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
     assert build_inputs["provenance"] == "mode=max,version=v1"
     assert build_inputs["pull"] is True
     assert build_inputs["push"] is True
-    assert build_inputs["sbom"] is True
+    assert build_inputs["sbom"] == (
+        "generator=docker/buildkit-syft-scanner@sha256:"
+        "ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9"
+    )
     assert build_inputs["github-token"] == ""
     assert build_inputs["tags"] == (
         "${{ env.IMAGE_NAME }}:run-${{ github.run_id }}-${{ github.run_attempt }}"
@@ -258,6 +264,29 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
         '>> "${GITHUB_OUTPUT}"',
     ):
         assert required in predicate_validation
+
+
+def test_attestation_requires_successful_build_qualification_without_failure_masking() -> None:
+    workflow = _workflow()
+    build = _job(workflow, "build")
+    attest = _job(workflow, "attest")
+    assert attest["needs"] == ["preflight", "build"]
+    for job in (build, attest):
+        assert "if" not in job
+        assert "continue-on-error" not in job
+        assert all("continue-on-error" not in step for step in _steps(job))
+
+    qualifications = {
+        "Collect exact runtime repair evidence",
+        "Admit final-image vulnerability evidence",
+        "Validate registry predicates without signing authority",
+    }
+    observed = {step["name"] for step in _steps(build) if step.get("name") in qualifications}
+    assert observed == qualifications
+    for step in _steps(build):
+        if step.get("name") in qualifications:
+            assert "if" not in step
+    assert all("if" not in step for step in _steps(attest))
 
 
 def test_attestation_job_has_no_checkout_and_never_executes_the_image() -> None:

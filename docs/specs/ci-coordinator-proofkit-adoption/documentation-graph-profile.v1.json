@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "profileId": "ci-coordinator.documentation-graph",
-  "markdownGlobs": ["README.md", "ROADMAP.md", "docs/**/*.md"],
+  "markdownGlobs": ["README.md", "ROADMAP.md", "SECURITY.md", "docs/**/*.md"],
   "rootPaths": ["README.md", "ROADMAP.md"],
   "readinessClaim": {
     "marker": "State:",

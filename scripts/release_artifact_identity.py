@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Final, cast
 
 MAX_GATE_RESPONSE_BYTES: Final = 1_048_576
+MAX_GATE_RESPONSE_RUNS: Final = 10
 RELEASE_IDENTITY_SCHEMA: Final = "ci-coordinator-release-identity/v1"
 
 _GIT_SHA = re.compile(r"[0-9a-f]{40}")
@@ -91,12 +92,20 @@ def admit_gate_response(path: Path, expected: GateExpectation) -> GateRun:
     except (UnicodeError, json.JSONDecodeError, ReleaseAdmissionError) as error:
         raise ReleaseAdmissionError("Full Check response is not strict JSON") from error
     response = _object(value, "Full Check response")
-    if _integer(response.get("total_count"), "Full Check total count") != 1:
-        raise ReleaseAdmissionError("exactly one successful Full Check run is required")
+    total = _positive_api_integer(response.get("total_count"), "Full Check total count")
     runs = response.get("workflow_runs")
-    if not isinstance(runs, list) or len(runs) != 1:
-        raise ReleaseAdmissionError("Full Check response must contain exactly one run")
-    run = _object(runs[0], "Full Check run")
+    if not isinstance(runs, list) or not 1 <= len(runs) <= MAX_GATE_RESPONSE_RUNS:
+        raise ReleaseAdmissionError("Full Check response must contain 1..10 observed runs")
+    if total < len(runs):
+        raise ReleaseAdmissionError("Full Check total count is smaller than the observed run count")
+    admitted = [_admit_gate_run(value, expected) for value in runs]
+    if len({run.run_id for run in admitted}) != len(admitted):
+        raise ReleaseAdmissionError("Full Check response contains duplicate run ids")
+    return max(admitted, key=lambda run: run.run_id)
+
+
+def _admit_gate_run(value: object, expected: GateExpectation) -> GateRun:
+    run = _object(value, "Full Check run")
     _equal(run, "workflow_id", expected.workflow_id)
     _equal(run, "name", expected.workflow_name)
     _equal(run, "path", expected.workflow_path)
@@ -257,7 +266,8 @@ def _object(value: object, label: str) -> dict[str, object]:
 
 
 def _equal(value: dict[str, object], key: str, expected: object) -> None:
-    if value.get(key) != expected:
+    observed = value.get(key)
+    if type(observed) is not type(expected) or observed != expected:
         raise ReleaseAdmissionError(f"Full Check {key} does not match")
 
 

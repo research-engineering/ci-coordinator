@@ -4,6 +4,7 @@ import json
 import os
 from collections.abc import Callable
 from dataclasses import replace
+from itertools import permutations
 from pathlib import Path
 from typing import cast
 
@@ -11,6 +12,7 @@ import pytest
 from scripts.release_artifact_identity import (
     MAX_GATE_RESPONSE_BYTES,
     GateExpectation,
+    GateRun,
     ReleaseAdmissionError,
     ReleaseCoordinates,
     admit_gate_response,
@@ -62,7 +64,7 @@ def _write_response(path: Path, runs: list[dict[str, object]]) -> None:
     )
 
 
-def test_gate_admission_returns_the_unique_exact_success(tmp_path: Path) -> None:
+def test_gate_admission_returns_one_exact_success(tmp_path: Path) -> None:
     response = tmp_path / "runs.json"
     _write_response(response, [_run()])
 
@@ -74,6 +76,7 @@ def test_gate_admission_returns_the_unique_exact_success(tmp_path: Path) -> None
     ("field", "replacement"),
     [
         ("workflow_id", WORKFLOW_ID + 1),
+        ("workflow_id", float(WORKFLOW_ID)),
         ("name", "Other Check"),
         ("path", ".github/workflows/other.yml"),
         ("event", "push"),
@@ -85,21 +88,26 @@ def test_gate_admission_returns_the_unique_exact_success(tmp_path: Path) -> None
         ("head_sha", "b" * 40),
     ],
 )
+@pytest.mark.parametrize("neighbors", ["none", "before", "after"])
 def test_gate_admission_rejects_each_wrong_authority_field(
     tmp_path: Path,
     field: str,
     replacement: object,
+    neighbors: str,
 ) -> None:
     response = tmp_path / "runs.json"
     run = _run()
     run[field] = replacement
-    _write_response(response, [run])
+    valid = {**_run(), "id": 8_002}
+    runs = {"none": [run], "before": [valid, run], "after": [run, valid]}[neighbors]
+    _write_response(response, runs)
 
     with pytest.raises(ReleaseAdmissionError):
         admit_gate_response(response, _expectation())
 
 
 @pytest.mark.parametrize("repository_field", ["repository", "head_repository"])
+@pytest.mark.parametrize("neighbors", ["none", "before", "after"])
 @pytest.mark.parametrize(
     ("identity_field", "replacement"),
     [("id", REPOSITORY_ID + 1), ("full_name", "other/repository")],
@@ -109,27 +117,107 @@ def test_gate_admission_rejects_repository_identity_substitution(
     repository_field: str,
     identity_field: str,
     replacement: object,
+    neighbors: str,
 ) -> None:
     response = tmp_path / "runs.json"
     run = _run()
     repository = dict(cast(dict[str, object], run[repository_field]))
     repository[identity_field] = replacement
     run[repository_field] = repository
-    _write_response(response, [run])
+    valid = {**_run(), "id": 8_002}
+    runs = {"none": [run], "before": [valid, run], "after": [run, valid]}[neighbors]
+    _write_response(response, runs)
 
     with pytest.raises(ReleaseAdmissionError):
         admit_gate_response(response, _expectation())
 
 
-@pytest.mark.parametrize("runs", [[], [_run(), _run()]])
-def test_gate_admission_rejects_non_unique_successes(
+@pytest.mark.parametrize("attempt", [2, 3])
+def test_gate_admission_rejects_duplicate_run_ids_even_with_different_attempts(
     tmp_path: Path,
-    runs: list[dict[str, object]],
+    attempt: int,
 ) -> None:
     response = tmp_path / "runs.json"
-    _write_response(response, runs)
+    _write_response(response, [_run(), {**_run(), "run_attempt": attempt}])
 
-    with pytest.raises(ReleaseAdmissionError, match="exactly one"):
+    with pytest.raises(ReleaseAdmissionError, match="duplicate run ids"):
+        admit_gate_response(response, _expectation())
+
+
+def test_gate_selection_is_independent_of_provider_order_and_attempt_order(tmp_path: Path) -> None:
+    response = tmp_path / "runs.json"
+    runs = [
+        _run(),
+        {**_run(), "id": 8_003, "run_attempt": 1},
+        {**_run(), "id": 8_002, "run_attempt": 9},
+    ]
+
+    for ordered in permutations(runs):
+        _write_response(response, list(ordered))
+        assert admit_gate_response(response, _expectation()) == GateRun(8_003, 1)
+
+
+@pytest.mark.parametrize("total", [10, 11, 1_000])
+def test_gate_selection_uses_only_the_bounded_observed_snapshot(tmp_path: Path, total: int) -> None:
+    response = tmp_path / "runs.json"
+    runs = [{**_run(), "id": 8_001 + index} for index in range(10)]
+    response.write_text(json.dumps({"total_count": total, "workflow_runs": runs}), encoding="utf-8")
+
+    assert admit_gate_response(response, _expectation()) == GateRun(8_010, 2)
+
+
+def test_gate_selection_does_not_claim_a_complete_provider_history(tmp_path: Path) -> None:
+    response = tmp_path / "runs.json"
+    response.write_text(
+        json.dumps({"total_count": 20, "workflow_runs": [_run()]}), encoding="utf-8"
+    )
+
+    assert admit_gate_response(response, _expectation()) == GateRun(8_001, 2)
+
+
+@pytest.mark.parametrize("total", [None, True, 0, -1, 1.0, "1"])
+def test_gate_admission_rejects_invalid_total_counts(tmp_path: Path, total: object) -> None:
+    response = tmp_path / "runs.json"
+    response.write_text(
+        json.dumps({"total_count": total, "workflow_runs": [_run()]}), encoding="utf-8"
+    )
+
+    with pytest.raises(ReleaseAdmissionError):
+        admit_gate_response(response, _expectation())
+
+
+@pytest.mark.parametrize(
+    ("total", "runs"),
+    [
+        (0, []),
+        (1, []),
+        (1, None),
+        (1, {}),
+        (1, [None]),
+        (1, [_run(), {**_run(), "id": 8_002}]),
+        (11, [{**_run(), "id": 8_001 + index} for index in range(11)]),
+    ],
+)
+def test_gate_admission_rejects_empty_malformed_overbound_or_inconsistent_snapshots(
+    tmp_path: Path, total: int, runs: object
+) -> None:
+    response = tmp_path / "runs.json"
+    response.write_text(json.dumps({"total_count": total, "workflow_runs": runs}), encoding="utf-8")
+
+    with pytest.raises(ReleaseAdmissionError):
+        admit_gate_response(response, _expectation())
+
+
+@pytest.mark.parametrize("field", ["id", "run_attempt"])
+@pytest.mark.parametrize("replacement", [None, True, 0, -1, 2.0, "2"])
+def test_each_observed_run_requires_positive_integer_identity(
+    tmp_path: Path, field: str, replacement: object
+) -> None:
+    response = tmp_path / "runs.json"
+    malformed = {**_run(), "id": 8_002, field: replacement}
+    _write_response(response, [_run(), malformed])
+
+    with pytest.raises(ReleaseAdmissionError):
         admit_gate_response(response, _expectation())
 
 

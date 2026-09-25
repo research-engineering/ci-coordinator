@@ -86,6 +86,7 @@ jobs:
             --raw-field branch=master \
             --raw-field event=workflow_dispatch \
             --raw-field head_sha="${SOURCE_COMMIT}" \
+            --raw-field page=1 \
             --raw-field per_page=10 \
             --raw-field status=success \
             > "${response}"
@@ -169,7 +170,7 @@ jobs:
           provenance: mode=max,version=v1
           pull: true
           push: true
-          sbom: true
+          sbom: generator=docker/buildkit-syft-scanner@sha256:ae4f3b554449e7e25548e7d8ccc029d17357348e30c6e3df01b92bc93654d6a9
           tags: ${{ env.IMAGE_NAME }}:run-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Download and verify pinned Grype release
         env:

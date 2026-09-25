@@ -54,8 +54,9 @@ Let:
   publisher and its asserted repository name;
 - `S` be the exact lowercase 40-character commit at the admitted protected ref;
 - `F` be the exact admitted release workflow ref for that publisher;
-- `G` be exactly one completed successful source-gate run admitted by the current
-  release contract for the same repository, source commit and protected ref;
+- `O` be one bounded provider snapshot of completed successful source-gate runs;
+- `G` be one deterministically selected run from `O`, after every observed run
+  satisfies the same repository, source commit and protected-ref contract;
 - `W` be one admitted manual release-workflow run at `S`;
 - `I` be the derived release identity;
 - `D` be the digest returned by the registry push; and
@@ -69,7 +70,23 @@ must satisfy the executable release owner.
 `CI_COORDINATOR_FULL_CHECK_WORKFLOW_ID`, not an ID inferred from a candidate run.
 
 ```text
-ReleaseSourceAdmitted(R,S,G,W) iff
+ExactGate(g,R,S) iff
+  g.repositoryId = R.id
+  and g.repositoryName = R.name
+  and g.headRepositoryId = R.id
+  and g.headRepositoryName = R.name
+  and g.workflowId = admitted_full_check_workflow_id
+  and g.workflowName = Full Check
+  and g.workflowPath = .github/workflows/python-persistence.yml
+  and g.event = workflow_dispatch
+  and g.status = completed
+  and g.conclusion = success
+  and g.headBranch = master
+  and g.headSha = S
+  and PositiveInteger(g.id)
+  and PositiveInteger(g.attempt)
+
+ReleaseSourceAdmitted(R,S,O,G,W) iff
   W.event = workflow_dispatch
   and W.repositoryId = R.id
   and W.repositoryName = R.name
@@ -78,22 +95,31 @@ ReleaseSourceAdmitted(R,S,G,W) iff
   and W.workflowRef = F
   and W.workflowSha = S
   and CheckoutHead = S
-  and G.repositoryId = R.id
-  and G.headRepositoryId = R.id
-  and G.workflowId = admitted_full_check_workflow_id
-  and G.event = workflow_dispatch
-  and G.status = completed
-  and G.conclusion = success
-  and G.headBranch = master
-  and G.headSha = S
-  and ExactlyOne(G)
+  and 1 <= |O| <= 10
+  and PositiveInteger(response.totalCount)
+  and response.totalCount >= |O|
+  and every g in O satisfies ExactGate(g,R,S)
+  and DistinctRunIds(O)
+  and G = argmax(g.id for g in O)
 ```
 
-Every term is necessary. Removing the repository identity permits a renamed or
+These checks preserve exact-subject admission. Removing repository identity permits a renamed or
 cross-repository source. Removing the ref or checkout equality permits a
 different commit. Removing the event and gate fields permits a wrong-event,
-neutral, stale, or unrelated same-SHA run. Removing uniqueness makes release
-identity selection order-dependent.
+neutral, stale, or unrelated same-SHA run. Validating every observed candidate
+prevents a valid selected record from masking foreign or malformed evidence.
+The maximum run ID is only a deterministic selection key within `O`: it is not
+a claim about creation time, the globally newest success, complete history, or
+provider state after the read. Distinct valid executions do not create
+ambiguity; repeated run IDs, including conflicting attempts, do.
+
+The workflow requests only page 1 with `per_page=10`; the stable JSON read is
+capped at 1 MiB. A larger `total_count` is permitted because one exact success
+is sufficient, not because unseen records were validated. The
+[workflow-runs API](https://docs.github.com/en/rest/actions/workflow-runs#list-workflow-runs-for-a-workflow)
+supplies the filters and pagination, but response records still require local
+authority validation. Fetching every page adds no proof to this existence claim;
+selecting the first result would depend on provider ordering.
 
 The manual event is deliberate. A `workflow_run` handler can observe a passed
 run for `S1` while its own `github.sha` names a later default-branch commit
@@ -173,10 +199,14 @@ The build:
 
 - checks out exactly `S` without persisted Git credentials;
 - uses digest-pinned GitHub Actions, BuildKit `0.33.0`, and Buildx `0.37.1`;
+- selects the SBOM generator by the immutable image-index digest in the
+  workflow, independently of the BuildKit image pin;
 - pulls every Dockerfile base by its existing immutable digest;
 - embeds `I`, `S`, and `productionEligible=true`;
 - publishes one `linux/amd64` image;
 - explicitly requests maximum BuildKit SLSA v1 provenance and an SPDX 2.3 SBOM;
+- requires exact final-image vulnerability admission and admitted runtime
+  repair evidence before the signing job can run;
 - validates provenance with the repository-owned BuildKit/SLSA v1 profile and
   an independently provisioned lock-resolved `jsonschema 4.26.0` runtime whose
   repository-owned RFC 3339 checker rejects unknown or malformed date-time
@@ -184,6 +214,12 @@ The build:
 - validates the SBOM with the immutable official SPDX 2.3 schema plus the
   repository-owned non-vacuity and RFC 3339 creation-time profile; and
 - returns `D` from `docker/build-push-action`, not from a local daemon or tag.
+
+BuildKit `v0.33.0` otherwise selects
+[`docker/buildkit-syft-scanner:stable-1`](https://github.com/moby/buildkit/blob/v0.33.0/frontend/attestations/parse.go).
+The explicit [`generator` option](https://docs.docker.com/build/metadata/attestations/sbom/#sbom-generator)
+removes that mutable resolution from the release definition. The pin fixes
+generator bytes; it does not prove scanner correctness or SBOM completeness.
 
 The attest job:
 
@@ -203,6 +239,8 @@ Published(A) :=
   PushReturned(D)
   and PullByDigest(A,D)
   and EmbeddedIdentity(A) = (I,S,true)
+  and FinalImageVulnerabilityAdmissionPassed(A,D,S)
+  and RuntimeRepairEvidenceAdmitted(A,D,S)
   and BuildKitSlsaV1ProfileValid(A)
   and OfficialSpdx23SchemaValid(A)
   and BuildKitSpdxProfileValid(A)
@@ -216,24 +254,36 @@ Published(A) :=
 A provider run may claim `Published(A)` only when every step completes. A local
 workflow parser or linter cannot make this predicate true.
 
+`productionEligible=true` identifies a non-development build with bound source
+and release coordinates. It is a necessary input to the separately signed
+production-admission predicate, not a vulnerability verdict, successful release
+receipt, deployment authorization, or permission to omit CI. Registry presence
+and a `run-*` tag are not substitutes for the complete publication evidence.
+
 ## 7. Failure Semantics
 
 Every ambiguity fails the workflow:
 
 - wrong repository, ref, event, or checkout SHA;
-- zero or multiple exact successful Full Check runs;
+- no observed exact successful Full Check run, an invalid observed candidate,
+  duplicate run IDs, an inconsistent count, or an over-budget snapshot;
 - malformed, duplicate-key, unstable, empty, or oversized provider JSON;
 - mutable or malformed digest;
 - failed pull, absent canonical build identity, or mismatched coordinates;
+- failed, missing, stale, or unproved vulnerability or runtime repair evidence;
 - absent, malformed, structurally vacuous, schema-invalid, or substituted
   provenance or SBOM;
 - unavailable attestation service; or
 - signer, source, ref, runner, or predicate mismatch.
 
 No failed run publishes a production-admission receipt or grants deployment or
-omission authority. A build may have reached GHCR before later attestation
-fails; such a digest is an incomplete publication attempt and is inadmissible
-until a complete attestation run succeeds for that exact digest.
+omission authority. A build may have reached GHCR before vulnerability scanning,
+repair admission, predicate validation, attestation, or final verification
+fails. Such a digest remains an incomplete publication attempt; registry upload
+and its packaged identity do not make it admissible. Qualification requires the
+complete exact-subject publication evidence, not merely a later signature.
+This workflow does not quarantine or delete failed uploads. Registry visibility
+and retention are separate policies, not evidence that deployment was admitted.
 
 ## 8. Alternatives
 
@@ -242,6 +292,7 @@ until a complete attestation run succeeds for that exact digest.
 | Publish from every push                    | Consumes release resources without an admitted release decision.                                                                |
 | Trigger through `workflow_run`             | Signer SHA can differ from the passed run's source SHA.                                                                         |
 | Trust the mutable tag                      | A tag is a replaceable locator, not content identity.                                                                           |
+| Require only one success in provider history | Repeated exact valid executions add no authority ambiguity once selection is deterministic within the bounded snapshot.       |
 | Read a local Docker digest                 | Local cache and daemon state are lower authority than the registry push result.                                                 |
 | Build and sign in one job                  | Repository-controlled build execution receives OIDC signing authority.                                                          |
 | Execute the image in the attest job        | Unreviewed artifact code would run inside the signing trust boundary.                                                           |

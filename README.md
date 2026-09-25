@@ -8,7 +8,7 @@ deterministic, FullCI-safe plans.**
 
 [Get started](#get-started) | [How it works](#how-it-works) |
 [Documentation](docs/INDEX.md) | [API](docs/reference/http-surface.md) |
-[Roadmap](ROADMAP.md)
+[Security](SECURITY.md) | [Roadmap](ROADMAP.md)
 
 One self-hosted service connects GitHub App installations across organizations
 to an administrator workbench and API. Inspect workflows and run history,
