@@ -31,6 +31,7 @@ from ci_coordinator.persistence._schema_activity import activity_events
 from ci_coordinator.persistence._schema_audit import audit_events
 from ci_coordinator.persistence.activity_write import (
     cleanup_activity,
+    cleanup_diagnostic_buckets,
     lock_activity,
     record_diagnostic_count,
     record_principal_diagnostic,
@@ -145,11 +146,12 @@ class PostgresActivityStore:
             ):
                 await connection.execute(text("SET LOCAL statement_timeout = '250ms'"))
                 await connection.execute(text("SET LOCAL lock_timeout = '100ms'"))
-                await lock_activity(connection)
-                await cleanup_activity(connection)
                 if principal is None:
+                    await cleanup_diagnostic_buckets(connection)
                     await record_diagnostic_count(connection, action)
                 elif action in ("role_denied", "export"):
+                    await lock_activity(connection)
+                    await cleanup_activity(connection)
                     await record_principal_diagnostic(
                         connection, principal, cast(Literal["role_denied", "export"], action)
                     )

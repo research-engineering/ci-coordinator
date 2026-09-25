@@ -155,6 +155,13 @@ async def cleanup_activity(connection: AsyncConnection) -> int:
         .cte("activity_expired")
     )
     count = await connection.scalar(select(func.count()).select_from(removed))
+    await cleanup_diagnostic_buckets(connection)
+    if type(count) is not int:
+        raise ValueError("invalid activity cleanup count")
+    return count
+
+
+async def cleanup_diagnostic_buckets(connection: AsyncConnection) -> None:
     buckets = (
         select(activity_diagnostic_buckets.c.bucket, activity_diagnostic_buckets.c.action)
         .where(
@@ -171,6 +178,3 @@ async def cleanup_activity(connection: AsyncConnection) -> int:
             )
         )
     )
-    if type(count) is not int:
-        raise ValueError("invalid activity cleanup count")
-    return count

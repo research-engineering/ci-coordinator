@@ -172,6 +172,17 @@ Expiry, profile mismatch, malformed state, logout, and key rotation all remove
 authority. Back-channel logout replay identity is durable until no accepted
 clock interpretation can make the token valid.
 
+Anonymous login diagnostics update only fixed hourly counters. They retain the
+bounded inline cleanup of expired diagnostic buckets but neither acquire the
+activity journal mutex nor delete activity events. PostgreSQL UPSERT owns
+same-bucket increment atomicity and saturation; cleanup and the increment share
+one admitted transaction. Bucket-row contention remains a bounded best-effort
+diagnostic failure, not a reason to hold the journal mutex during that wait.
+Principal role-denial/export diagnostics retain ordered journal writes and full
+cleanup. Required session, logout replay and journal effects remain atomic.
+Existing maintenance and ordered writers retain activity-event cleanup; counter
+retention, timeouts, admission limits and cursor semantics are unchanged.
+
 `workflow_proposal_reviews` is the durable repository-attestation receipt. In
 addition to the existing exact proposal and audit binding it retains reviewer
 identity, observed `maintain` or `admin` permission, initiating Keycloak actor,
