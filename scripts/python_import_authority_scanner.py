@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import symtable
 from dataclasses import dataclass
+from itertools import pairwise
 
 _DYNAMIC_IMPORT_NAMES = frozenset(
     {
@@ -18,9 +19,12 @@ _DYNAMIC_IMPORT_NAMES = frozenset(
 _DYNAMIC_IMPORT_MEMBERS = frozenset(
     {
         "__builtins__",
+        "__dict__",
+        "__globals__",
         "__import__",
         "__loader__",
         "__spec__",
+        "__subclasses__",
         "f_globals",
         "f_locals",
     }
@@ -56,6 +60,7 @@ def scan_imported_modules(
     current_package: str,
     ambient_authority_prefixes: tuple[str, ...],
     restricted_module_objects: tuple[str, ...],
+    qualified_authority_prefixes: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     tree = ast.parse(source, filename=filename)
     root_symbols = symtable.symtable(source, filename, "exec")
@@ -64,6 +69,7 @@ def scan_imported_modules(
         current_package=current_package,
         ambient_authority_prefixes=ambient_authority_prefixes,
         restricted_module_objects=restricted_module_objects,
+        qualified_authority_prefixes=qualified_authority_prefixes,
         symbol_tables=_symbol_table_index(root_symbols),
         binding_index=binding_index,
         postponed_annotations=_has_postponed_annotations(tree),
@@ -92,12 +98,14 @@ class _ImportAuthorityScanner(ast.NodeVisitor):
         current_package: str,
         ambient_authority_prefixes: tuple[str, ...],
         restricted_module_objects: tuple[str, ...],
+        qualified_authority_prefixes: tuple[str, ...],
         symbol_tables: _SymbolTableIndex,
         binding_index: _ImportBindingIndex,
         postponed_annotations: bool,
     ) -> None:
         self._current_package = current_package
         self._ambient_authority_prefixes = ambient_authority_prefixes
+        self._qualified_authority_prefixes = qualified_authority_prefixes
         self._restricted_module_objects = frozenset(restricted_module_objects)
         self._symbol_tables = symbol_tables
         self._global_aliases = binding_index.global_aliases
@@ -150,7 +158,7 @@ class _ImportAuthorityScanner(ast.NodeVisitor):
             self.imports.add("reserved:dynamic-execution")
             return
         authorities = self._resolve_name(node.id)
-        self._record_ambient(authorities)
+        self._record_references(authorities)
         self._record_restricted_references(authorities)
         self._record_bare_authority_roots(authorities)
 
@@ -161,8 +169,13 @@ class _ImportAuthorityScanner(ast.NodeVisitor):
         if references is None:
             self.visit(node.value)
         else:
-            self._record_ambient(references)
+            self._record_references(references)
             self._record_restricted_references(references)
+            base = node.value
+            while isinstance(base, ast.Attribute):
+                base = base.value
+            if isinstance(base, ast.Call):
+                self.visit(base)
 
     def visit_Call(self, node: ast.Call) -> None:
         if _literal_getattr_member(node) in _DYNAMIC_IMPORT_TOKENS:
@@ -177,8 +190,10 @@ class _ImportAuthorityScanner(ast.NodeVisitor):
                 self.visit(expression)
             return
         self.visit(node.func)
-        self._record_ambient(literal_getattrs)
+        self._record_references(literal_getattrs)
         self._record_restricted_references(literal_getattrs)
+        if not isinstance(node.args[0], ast.Name):
+            self.visit(node.args[0])
         for expression in (
             *node.args[1:],
             *(keyword.value for keyword in node.keywords),
@@ -435,12 +450,19 @@ class _ImportAuthorityScanner(ast.NodeVisitor):
         for authority in authorities:
             self._record_restricted_module(authority)
 
-    def _record_ambient(self, authorities: frozenset[str]) -> None:
+    def _record_references(self, authorities: frozenset[str]) -> None:
         self.imports.update(
             authority
             for authority in authorities
-            if _matches_import_prefix(authority, self._ambient_authority_prefixes)
+            if _matches_import_prefix(
+                authority,
+                (*self._ambient_authority_prefixes, *self._qualified_authority_prefixes),
+            )
         )
+        for authority in authorities:
+            parts = authority.split(".")
+            if ("sys", "modules") in pairwise(parts):
+                self.imports.add("sys.modules")
 
     def _record_bare_authority_roots(self, authorities: frozenset[str]) -> None:
         for authority in authorities:
@@ -709,14 +731,20 @@ def _attribute_members(node: ast.Attribute) -> tuple[str, ...]:
 
 
 def _resolved_references(
-    node: ast.Attribute,
+    node: ast.expr,
     aliases: _AliasEnvironment,
 ) -> frozenset[str] | None:
     attributes: list[str] = []
     cursor: ast.expr = node
-    while isinstance(cursor, ast.Attribute):
-        attributes.append(cursor.attr)
-        cursor = cursor.value
+    while True:
+        if isinstance(cursor, ast.Attribute):
+            attributes.append(cursor.attr)
+            cursor = cursor.value
+        elif isinstance(cursor, ast.Call) and (member := _literal_getattr_member(cursor)):
+            attributes.append(member)
+            cursor = cursor.args[0]
+        else:
+            break
     if not isinstance(cursor, ast.Name):
         return None
     roots = aliases.get(cursor.id, frozenset({cursor.id}))
@@ -728,17 +756,9 @@ def _resolved_literal_getattrs(
     node: ast.Call,
     aliases: _AliasEnvironment,
 ) -> frozenset[str] | None:
-    member = _literal_getattr_member(node)
-    if member is None:
+    if _literal_getattr_member(node) is None:
         return None
-    base = node.args[0]
-    if isinstance(base, ast.Name):
-        roots = aliases.get(base.id, frozenset({base.id}))
-    elif isinstance(base, ast.Attribute):
-        roots = _resolved_references(base, aliases) or frozenset()
-    else:
-        return None
-    return frozenset(f"{root}.{member}" for root in roots)
+    return _resolved_references(node, aliases)
 
 
 def _literal_getattr_member(node: ast.Call) -> str | None:

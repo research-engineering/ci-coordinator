@@ -181,6 +181,26 @@ consistency semantics even when accessed through a local protocol.
 Mechanically decidable rules are enforced by the repository import-boundary and
 ownership gates. Semantic rules retain requirement-bound native falsifiers.
 
+The purity projection for `planning_core`, `verification_core`, and
+`runner_capacity` admits a closed set of external data/type and calculation
+imports in `scripts/python_import_boundary_policy.py`. It preserves
+`datetime.datetime` and `datetime.timedelta` as data, but rejects explicit
+clock-read methods and `kernel.clock`, `kernel.SystemClock`, and
+`kernel.SystemMonotonicClock` authority. Qualified first-party references,
+including import aliases and literal `getattr`, reach the same layer rules
+as direct imports. Exact OS-capability file exceptions do not imply process
+environment access: byte environment APIs and platform OS aliases retain
+separate checks. Owners that prohibit dynamic loading also reject known
+`__dict__`, `__globals__`, `__subclasses__`, and nested `sys.modules` paths.
+The protected `httpx2` Import Linter contract remains part of the same gate;
+legacy `httpx` denials remain valid source restrictions.
+
+This is a bounded, flow-insensitive source-policy projection, not an execution
+sandbox or a proof of arbitrary Python purity. It does not establish general
+assignment-alias propagation, computed reflection, transitive re-export
+provenance, callback effects, or the absence of effects inside admitted
+dependencies. These remain semantic review and native-test obligations.
+
 ## 5. Ownership Projection
 
 Not every package is a DDD bounded context. `Kind` states why a boundary exists;
