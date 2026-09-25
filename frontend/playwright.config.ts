@@ -1,4 +1,3 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
@@ -11,7 +10,7 @@ export default defineConfig({
     command:
       "/usr/bin/env -i PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src " +
       "backend/.venv/bin/python -B scripts/operator_ui_browser_server.py frontend/dist",
-    cwd: fileURLToPath(new URL("..", import.meta.url)),
+    cwd: "..",
     gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
     name: "Operator ASGI transport",
     reuseExistingServer: false,
