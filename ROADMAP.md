@@ -106,6 +106,15 @@ Source-authority enforcement and received-byte body admission are the next
 prepared repairs; UI failure containment is in progress. CI-054 remains open,
 with all source aliases, partial dispositions and refutations conserved.
 
+[PR #19](https://github.com/research-engineering/ci-coordinator/pull/19) qualified
+the named pure-core and process-authority enforcement repairs; it does not
+establish arbitrary Python sandboxing or complete semantic purity.
+[PR #20](https://github.com/research-engineering/ci-coordinator/pull/20) qualified
+received-byte body admission, lifecycle conservation and expanded causal
+mutation witnesses. Connection-level ingress protection, fairness and measured
+capacity remain separate. Workflow parsing, provider hot paths, database
+contention and the remaining audit cohorts retain their current CI-054 scope.
+
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.
 CI-005 measures comparable execution using CI-027/CI-028; CI-006 optimizes the

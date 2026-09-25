@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { lazy, Suspense } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { admitWorkbenchScope, type WorkbenchScope } from "../src/api/workbench/client";
 import { MAX_WORKBENCH_SECTION_ITEMS } from "../src/api/workbench/limits";
@@ -103,6 +104,7 @@ test("contains a descendant rendering failure without exposing or replaying it",
   );
   expect(screen.getByRole("heading", { name: "Console unavailable" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Refresh console" })).toBeEnabled();
+  expect(screen.getByText("Refreshing discards unsaved work in this tab.")).toBeVisible();
   expect(screen.queryByText(/private-credential/)).not.toBeInTheDocument();
   expect(log).toHaveBeenCalledExactlyOnceWith("Operator console rendering failed.");
   expect(fetch).not.toHaveBeenCalled();
@@ -115,6 +117,66 @@ test("leaves healthy descendants unchanged", () => {
     </ApplicationErrorBoundary>,
   );
   expect(screen.getByRole("heading", { name: "Repository portfolio" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Refresh console" })).not.toBeInTheDocument();
+});
+
+test("a rejected lazy panel preserves its sibling draft and reloads only after an explicit warning", async () => {
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
+  const reload = vi.fn();
+  const fetch = vi.fn();
+  vi.stubGlobal("location", { reload });
+  vi.stubGlobal("fetch", fetch);
+  const imported = Promise.withResolvers<{ default: () => null }>();
+  const load = vi.fn(() => imported.promise);
+  const Panel = lazy(load);
+  const shell = (
+    <main>
+      <h1>Workspace</h1>
+      <input aria-label="Sibling draft" defaultValue="" />
+      <ApplicationErrorBoundary panelName="Analytics">
+        <Suspense fallback={<p>Loading panel</p>}>
+          <Panel />
+        </Suspense>
+      </ApplicationErrorBoundary>
+    </main>
+  );
+  const view = render(shell, { onCaughtError: reportRenderFailure });
+  const draft = screen.getByRole("textbox", { name: "Sibling draft" });
+  await userEvent.type(draft, "unsaved source");
+  await act(async () => imported.reject(new Error("private-import-diagnostic")));
+
+  expect(
+    await screen.findByRole("heading", { name: "Analytics unavailable", level: 2 }),
+  ).toBeVisible();
+  expect(screen.getAllByRole("main")).toHaveLength(1);
+  expect(screen.getByRole("heading", { name: "Workspace", level: 1 })).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Sibling draft" })).toBe(draft);
+  expect(draft).toHaveValue("unsaved source");
+  expect(screen.queryByText(/private-import-diagnostic/)).not.toBeInTheDocument();
+  expect(screen.getByText("Refreshing discards unsaved work in this tab.")).toBeVisible();
+  expect(
+    screen.getByText("Check the current state before repeating an interrupted action."),
+  ).toBeVisible();
+  expect(reload).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+  view.rerender(shell);
+  expect(load).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Refresh console" }));
+  expect(reload).toHaveBeenCalledExactlyOnceWith();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("a healthy panel boundary adds no fallback or extra main", () => {
+  render(
+    <main>
+      <ApplicationErrorBoundary panelName="Activity">
+        <h2>Retained events</h2>
+      </ApplicationErrorBoundary>
+    </main>,
+  );
+  expect(screen.getAllByRole("main")).toHaveLength(1);
+  expect(screen.getByRole("heading", { name: "Retained events" })).toBeVisible();
   expect(screen.queryByRole("button", { name: "Refresh console" })).not.toBeInTheDocument();
 });
 

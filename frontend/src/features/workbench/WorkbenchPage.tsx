@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { lazy, type MouseEvent, Suspense, useEffect, useRef, useState } from "react";
 import type { WorkbenchScope } from "../../api/workbench/client";
+import { ApplicationErrorBoundary } from "../../components/ApplicationErrorBoundary";
 import { LoadingState } from "../../components/LoadingState";
 import { ControlPlaneIdentityControl } from "../auth/ControlPlaneIdentityControl";
 import { beginSessionLogin, consumeSessionReturn } from "../auth/sessionNavigation";
@@ -242,16 +243,18 @@ export function WorkbenchPage() {
               </details>
             </div>
             {view === "activity" ? (
-              <Suspense fallback={<LoadingState label="Loading activity" />}>
-                <ActivityPanel
-                  key={`activity:${identity.authorityRevision}:${scope?.installationId}:${scope?.repositoryId}`}
-                  scope={scope}
-                  source={navigation.route.activitySource ?? "security"}
-                  onSource={(activitySource) =>
-                    navigation.navigate({ ...navigation.route, activitySource })
-                  }
-                />
-              </Suspense>
+              <ApplicationErrorBoundary panelName="Activity">
+                <Suspense fallback={<LoadingState label="Loading activity" />}>
+                  <ActivityPanel
+                    key={`activity:${identity.authorityRevision}:${scope?.installationId}:${scope?.repositoryId}`}
+                    scope={scope}
+                    source={navigation.route.activitySource ?? "security"}
+                    onSource={(activitySource) =>
+                      navigation.navigate({ ...navigation.route, activitySource })
+                    }
+                  />
+                </Suspense>
+              </ApplicationErrorBoundary>
             ) : null}
             {scope ? (
               <RepositoryWorkspace
