@@ -24,7 +24,8 @@ test.each([
       writeFileSync(
         config,
         `import base from ${JSON.stringify(join(frontendRoot, "playwright.config.ts"))};
-export default { ...base, globalSetup: undefined, testDir: ${JSON.stringify(corpus)},
+export default { ...base, globalSetup: undefined, webServer: undefined,
+  testDir: ${JSON.stringify(corpus)},
   projects: [{ name: "policy" }], outputDir: ${JSON.stringify(join(directory, "results"))},
   reporter: "line", workers: 1, retries: 0, ${guardOff ? "forbidOnly: false," : ""} };
 `,
@@ -108,7 +109,8 @@ test.each([true, false])(
       writeFileSync(
         config,
         `import base from ${JSON.stringify(join(frontendRoot, "playwright.config.ts"))};
-export default { ...base, globalSetup: undefined, testDir: ${JSON.stringify(corpus)},
+export default { ...base, globalSetup: undefined, webServer: undefined,
+  testDir: ${JSON.stringify(corpus)},
   projects: [{ name: "policy" }], outputDir: ${JSON.stringify(join(directory, "results"))},
   reporter: "line", workers: 1, retries: 1, failOnFlakyTests: ${guard} };
 `,

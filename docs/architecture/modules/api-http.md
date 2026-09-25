@@ -66,6 +66,30 @@ validator, cache, and security metadata, but HEAD transfers no body. Weak and
 wildcard validators across all repeated `If-None-Match` field lines use HTTP
 conditional-request semantics.
 
+The no-store shell projects parsed `script`, `link` and `img` resource
+`src`/`href` attributes directly into that namespace once at startup, after raw
+snapshot verification. References
+must identify manifest members exactly; URL aliases, absent members, duplicate
+attributes, inline scripts, and `base` elements fail admission. Both the
+projected index and final snapshot retain the existing byte bounds. The raw
+index remains hashed by the unchanged manifest; the derived shell does not
+feed back into the bundle digest. JavaScript, CSS and on-disk files are unchanged.
+
+The production Vite build uses its native [relative base](https://vite.dev/guide/build.html#relative-base),
+`./`, for intra-bundle imports, preloads and assets. The
+[HTML module map](https://html.spec.whatwg.org/multipage/webappapis.html#fetch-a-single-module-script)
+keys modules by request URL but resolves imports against response URL. Therefore
+the built graph must request the canonical namespace directly, without using
+compatibility redirects. Neither a `base` element nor inline script/CSP changes
+are allowed. Authentication, no-follow snapshot admission, raw hashes and exact
+inventory, GET/HEAD metadata, immutable asset ETags and old-bundle 404 remain
+unchanged. Deployment recovery and automatic reload are separate contracts.
+
+The native browser oracle uses the actual `mount_operator_ui` transport, not
+Vite preview or a lookalike asset server. It checks canonical module identity,
+single entry evaluation, actual CSP and state retention across lazy navigation.
+Mocked API responses establish neither authentication nor provider evidence.
+
 Any production consumer must bind to these schemas explicitly. A future schema
 replacement requires a versioned contract or an admitted atomic consumer
 migration; local OpenAPI evidence cannot prove that external migration occurred.

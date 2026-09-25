@@ -156,14 +156,8 @@ test("renders the reference visual system with same-origin fonts under the shell
   page.on("console", (message) => {
     if (/content security policy/i.test(message.text())) violations.push(message.text());
   });
-  await page.route(consoleUrl(), async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({
-      response,
-      headers: { ...response.headers(), "content-security-policy": SHELL_CSP },
-    });
-  });
-  await page.goto(consoleUrl());
+  const shell = await page.goto(consoleUrl());
+  expect(shell?.headers()["content-security-policy"]).toBe(SHELL_CSP);
   await expect(page.getByText("6 loaded of 6")).toBeVisible();
   const fonts = await page.evaluate(async () => {
     const faces = await Promise.all([
