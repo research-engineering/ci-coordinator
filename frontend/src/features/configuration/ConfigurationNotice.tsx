@@ -9,6 +9,7 @@ export function ConfigurationNotice({ failure }: { readonly failure: LifecycleFa
     revision_conflict: "Active configuration changed. Refresh and review the new revision.",
     target_unavailable: "The selected epoch is no longer available.",
     attestation_invalid: "Repository attestation is missing or expired.",
+    legacy_new_operation_unsupported: "This command uses a retired contract. Start a new command.",
     coverage_reducing: "Rollback rejected: required validation coverage would be reduced.",
     coverage_unproven: "Rollback rejected: non-reducing coverage is not proved.",
     overloaded: "Configuration service is busy.",

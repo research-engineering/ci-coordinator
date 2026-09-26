@@ -27,6 +27,7 @@ interface ConfigActivationBinding {
   readonly scope: Pick<WorkbenchScope, "installationId" | "repositoryId">;
   readonly expectedRevision: number | null | undefined;
   readonly manifestId: string;
+  readonly reviewOperationId: string | undefined;
   readonly targetEpochId: string;
   readonly csrfToken: string;
   readonly authorityRevision: number;
@@ -118,6 +119,7 @@ export function useConfigActivation(binding: ConfigActivationBinding) {
       !authorized() ||
       !latest.newCommandAllowed ||
       latest.expectedRevision === undefined ||
+      latest.reviewOperationId === undefined ||
       controller.current ||
       (prior.kind !== "idle" &&
         prior.owner === owner &&
@@ -128,6 +130,7 @@ export function useConfigActivation(binding: ConfigActivationBinding) {
       expectedRevision: latest.expectedRevision,
       operationId: crypto.randomUUID(),
       proposalManifestId: latest.manifestId,
+      reviewOperationId: latest.reviewOperationId,
       scope: {
         installationId: latest.scope.installationId,
         repositoryId: latest.scope.repositoryId,

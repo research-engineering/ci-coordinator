@@ -17,6 +17,7 @@ from ci_coordinator.api.http.config_lifecycle_contracts import (
     ConfigEpochActivationBody,
     ConfigEpochRegistrationBody,
     ConfigEpochRollbackBody,
+    ExplicitConfigEpochActivationBody,
     PolicyDiagnosticBody,
     admit_config_request,
     config_admission_error,
@@ -201,7 +202,7 @@ def build_config_management_router(
         },
     )
     async def activate_config_epoch(
-        body: ConfigEpochActivationBody,
+        body: ConfigEpochActivationBody | ExplicitConfigEpochActivationBody,
         request: Request,
         _security: Annotated[
             HTTPAuthorizationCredentials | None,
@@ -223,6 +224,14 @@ def build_config_management_router(
                 scope=RepositoryScope(body.installation_id, body.repository_id),
                 target_epoch_id=body.target_epoch_id,
                 proposal_manifest_id=body.proposal_manifest_id,
+                activation_version=(
+                    2 if isinstance(body, ExplicitConfigEpochActivationBody) else 1
+                ),
+                review_operation_id=(
+                    body.review_operation_id
+                    if isinstance(body, ExplicitConfigEpochActivationBody)
+                    else None
+                ),
                 expected_revision=body.expected_revision,
                 operation_id=body.operation_id,
             )
@@ -305,6 +314,8 @@ def _activation_response(result: ConfigActivationOutcome) -> JSONResponse:
         return config_error(status.HTTP_409_CONFLICT, "conflict")
     if result.state == "attestation_invalid":
         return config_error(status.HTTP_409_CONFLICT, "attestation_invalid")
+    if result.state == "legacy_new_operation_unsupported":
+        return config_error(status.HTTP_409_CONFLICT, "legacy_new_operation_unsupported")
     if result.state == "coverage_reducing":
         return config_error(status.HTTP_409_CONFLICT, "coverage_reducing")
     if result.state == "coverage_unproven":

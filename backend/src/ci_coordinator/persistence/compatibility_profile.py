@@ -10,7 +10,7 @@ from importlib.resources import files
 from typing import Literal, cast
 
 PROFILE_RESOURCE_NAME = "database-compatibility-profile.v1.json"
-PROFILE_SHA256 = "b11e19c4240b22a45457c6a0d9603fc6b26bd950c50cb6d049e82c213923990d"
+PROFILE_SHA256 = "3ef586fe882ed135b9ce484fa8a39ab4b63c9f6851a83400867bc066b4a4a702"
 
 
 @dataclass(frozen=True, slots=True)

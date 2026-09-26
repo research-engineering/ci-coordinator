@@ -163,6 +163,26 @@ PROPOSAL_REVIEW_REGISTRATION = CapabilityDefinition(
     privilege_requirements=("runtime-repository-attestation-review-dml/v1",),
 )
 
+CONFIG_EPOCH_LIFECYCLE_V2 = replace(
+    CONFIG_EPOCH_LIFECYCLE,
+    capability_id="config-epoch-lifecycle/v2",
+    write_domain_id="explicit-review-config-epoch-lifecycle/v2",
+    codec_id="repository-attested-config-activation-audit/v2",
+)
+
+PROPOSAL_REVIEW_REGISTRATION_V2 = replace(
+    PROPOSAL_REVIEW_REGISTRATION,
+    capability_id="proposal-review-registration/v2",
+    schema_requirements=(
+        "ci_coordinator.repository_attestation_transactions/v1",
+        "ci_coordinator.workflow_proposal_reviews/v2",
+    ),
+    write_domain_id="one-use-independent-reviews-and-explicit-activation-guard/v2",
+    codec_id="repository-attested-explicit-proposal-review-authority/v2",
+    backfill_state_id="pre-cutover-pending-attestations-invalidated/v1",
+)
+
+
 GOVERNANCE_BASELINE_STATE = CapabilityDefinition(
     capability_id="governance-baseline-state/v1",
     schema_requirements=(
@@ -512,9 +532,11 @@ _CAPABILITY_DEFINITIONS = {
     DATABASE_COMPATIBILITY_PROTOCOL.capability_id: DATABASE_COMPATIBILITY_PROTOCOL,
     AUDIT_LEDGER.capability_id: AUDIT_LEDGER,
     CONFIG_EPOCH_LIFECYCLE.capability_id: CONFIG_EPOCH_LIFECYCLE,
+    CONFIG_EPOCH_LIFECYCLE_V2.capability_id: CONFIG_EPOCH_LIFECYCLE_V2,
     CONFIG_EPOCH_REGISTRATION_OPERATIONS.capability_id: CONFIG_EPOCH_REGISTRATION_OPERATIONS,
     OPERATOR_OVERRIDE_STATE.capability_id: OPERATOR_OVERRIDE_STATE,
     PROPOSAL_REVIEW_REGISTRATION.capability_id: PROPOSAL_REVIEW_REGISTRATION,
+    PROPOSAL_REVIEW_REGISTRATION_V2.capability_id: PROPOSAL_REVIEW_REGISTRATION_V2,
     GOVERNANCE_BASELINE_STATE.capability_id: GOVERNANCE_BASELINE_STATE,
     CONTROL_PLANE_IDENTITY_STATE.capability_id: CONTROL_PLANE_IDENTITY_STATE,
     RUNTIME_INGRESS_ISSUANCE_STATE.capability_id: RUNTIME_INGRESS_ISSUANCE_STATE,
@@ -547,7 +569,7 @@ def config_epoch_lifecycle_requirements(
         (
             DATABASE_COMPATIBILITY_PROTOCOL.declaration(),
             AUDIT_LEDGER.declaration(),
-            CONFIG_EPOCH_LIFECYCLE.declaration(),
+            CONFIG_EPOCH_LIFECYCLE_V2.declaration(),
         ),
     )
 
@@ -560,7 +582,7 @@ def config_epoch_registration_requirements(
         (
             DATABASE_COMPATIBILITY_PROTOCOL.declaration(),
             AUDIT_LEDGER.declaration(),
-            CONFIG_EPOCH_LIFECYCLE.declaration(),
+            CONFIG_EPOCH_LIFECYCLE_V2.declaration(),
             CONFIG_EPOCH_REGISTRATION_OPERATIONS.declaration(),
         ),
     )
@@ -574,8 +596,8 @@ def proposal_review_registration_requirements(
         (
             DATABASE_COMPATIBILITY_PROTOCOL.declaration(),
             AUDIT_LEDGER.declaration(),
-            CONFIG_EPOCH_LIFECYCLE.declaration(),
-            PROPOSAL_REVIEW_REGISTRATION.declaration(),
+            CONFIG_EPOCH_LIFECYCLE_V2.declaration(),
+            PROPOSAL_REVIEW_REGISTRATION_V2.declaration(),
             CONTROL_PLANE_IDENTITY_STATE.declaration(),
         ),
     )
@@ -692,7 +714,7 @@ def workbench_read_requirements(
         (
             DATABASE_COMPATIBILITY_PROTOCOL.declaration(),
             AUDIT_LEDGER.declaration(),
-            CONFIG_EPOCH_LIFECYCLE.declaration(),
+            CONFIG_EPOCH_LIFECYCLE_V2.declaration(),
             RUNTIME_INGRESS_ISSUANCE_STATE_V2.declaration(),
             SHADOW_RECONCILIATION_STATE_V2.declaration(),
         ),
@@ -711,7 +733,7 @@ def production_cutover_requirements(
             WEBHOOK_BODY_IDENTITY.declaration(),
             SHADOW_RECONCILIATION_STATE_V2.declaration(),
             PRODUCTION_GENERATION_CUTOVER.declaration(),
-            CONFIG_EPOCH_LIFECYCLE.declaration(),
+            CONFIG_EPOCH_LIFECYCLE_V2.declaration(),
             OPERATOR_OVERRIDE_STATE.declaration(),
         ),
     )

@@ -77,6 +77,8 @@ class ActivateConfigEpoch:
     proposal_manifest_id: str
     expected_revision: int | None
     operation_id: str
+    activation_version: Literal[1, 2] = 1
+    review_operation_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +130,7 @@ type ConfigActivationState = Literal[
     "target_unavailable",
     "operation_conflict",
     "attestation_invalid",
+    "legacy_new_operation_unsupported",
     "coverage_reducing",
     "coverage_unproven",
     "unavailable",
@@ -141,6 +144,7 @@ _CONFIG_ACTIVATION_STATES: Final[frozenset[str]] = frozenset(
         "target_unavailable",
         "operation_conflict",
         "attestation_invalid",
+        "legacy_new_operation_unsupported",
         "coverage_reducing",
         "coverage_unproven",
         "unavailable",
@@ -178,6 +182,7 @@ class RepositoryActivationAuthorizer(Protocol):
         scope: RepositoryScope,
         target_epoch_id: str,
         proposal_manifest_id: str,
+        review_operation_id: str,
     ) -> RepositoryActivationAuthorization: ...
 
 
@@ -278,17 +283,26 @@ class ConfigManagementService:
                     operation_id=command.operation_id,
                     actor=command.actor,
                     proposal_manifest_id=command.proposal_manifest_id,
+                    activation_version=command.activation_version,
+                    review_operation_id=command.review_operation_id,
                 )
             )
         except ConfigEpochStoreUnavailable:
             return self._observe_activation(ConfigActivationOutcome("unavailable"))
         if replay is not None:
             return self._activation_outcome(replay)
+        if command.activation_version == 1:
+            return self._observe_activation(
+                ConfigActivationOutcome("legacy_new_operation_unsupported")
+            )
+        if command.review_operation_id is None:
+            raise RuntimeError("admitted current activation omitted its review selector")
         authorization = await self._activation_authorizer.authorize(
             actor=command.actor,
             scope=command.scope,
             target_epoch_id=command.target_epoch_id,
             proposal_manifest_id=command.proposal_manifest_id,
+            review_operation_id=command.review_operation_id,
         )
         if isinstance(authorization, RepositoryActivationRejected):
             return self._observe_activation(ConfigActivationOutcome("attestation_invalid"))
@@ -307,6 +321,8 @@ class ConfigManagementService:
                 actor=command.actor,
                 occurred_at=occurred_at,
                 proposal_manifest_id=command.proposal_manifest_id,
+                activation_version=command.activation_version,
+                review_operation_id=command.review_operation_id,
                 authority_evidence_hash=authority.evidence_hash,
                 authority_observed_at=(
                     authority.rechecked_at.isoformat(timespec="milliseconds").replace("+00:00", "Z")

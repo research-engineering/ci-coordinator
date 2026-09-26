@@ -47,6 +47,7 @@ type RepositoryAttestationStartState = Literal[
     "baseline_conflict",
     "operation_conflict",
     "already_reviewed",
+    "legacy_new_operation_unsupported",
     "overloaded",
     "unavailable",
 ]
@@ -66,6 +67,7 @@ _START_STATES = frozenset(
         "baseline_conflict",
         "operation_conflict",
         "already_reviewed",
+        "legacy_new_operation_unsupported",
         "overloaded",
         "unavailable",
     }
@@ -111,6 +113,7 @@ class RepositoryAttestationUseCase(Protocol):
         *,
         principal: KeycloakHumanPrincipal,
         command: ProposalReviewCommand,
+        legacy_replay_only: bool = False,
     ) -> RepositoryAttestationStartOutcome: ...
 
     async def complete(
@@ -154,6 +157,7 @@ class RepositoryAttestationService:
         *,
         principal: KeycloakHumanPrincipal,
         command: ProposalReviewCommand,
+        legacy_replay_only: bool = False,
     ) -> RepositoryAttestationStartOutcome:
         if (
             type(principal) is not KeycloakHumanPrincipal
@@ -175,6 +179,8 @@ class RepositoryAttestationService:
                 return RepositoryAttestationStartOutcome("already_reviewed")
             if isinstance(replay, ProposalReviewOperationConflict):
                 return RepositoryAttestationStartOutcome("operation_conflict")
+            if legacy_replay_only:
+                return RepositoryAttestationStartOutcome("legacy_new_operation_unsupported")
             active = await self._store.load_active(command.scope)
         except ProposalReviewStoreUnavailable:
             return RepositoryAttestationStartOutcome("unavailable")

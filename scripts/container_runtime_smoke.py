@@ -39,8 +39,10 @@ _MIGRATION_REVISIONS = (
     "20260913_0013_analytics_purpose.py",
     "20260915_0014_retire_economics_evidence_v3.py",
     "20260915_0015_total_collection_state.py",
+    "20260926_0016_retire_pending_review_authority.py",
+    "20260926_0017_explicit_review_renewal.py",
 )
-_MIGRATION_HEAD = "20260915_0015 (head)"
+_MIGRATION_HEAD = "20260926_0017 (head)"
 _MIGRATION_ARTIFACT_CHECK = (
     "from pathlib import Path; "
     "root=Path('/app/backend'); "

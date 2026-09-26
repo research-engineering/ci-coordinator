@@ -123,7 +123,7 @@ _PROJECTED_RESPONSE_MODELS = {
     ("ci_coordinator.api.http.workflow_discovery_contracts", "WorkflowResponse"),
     ("ci_coordinator.api.http.workflow_discovery_contracts", "YamlLocationResponse"),
 }
-_EXPECTED_HTTP_MODEL_COUNT = 166
+_EXPECTED_HTTP_MODEL_COUNT = 169
 
 
 def test_every_http_model_uses_exactly_one_owned_policy() -> None:
@@ -133,6 +133,20 @@ def test_every_http_model_uses_exactly_one_owned_policy() -> None:
     assert ProjectedResponseModel.model_config.get("from_attributes") is True
     assert len(models) == _EXPECTED_HTTP_MODEL_COUNT
     assert KeycloakCallbackQuery in models
+    assert {
+        (
+            "ci_coordinator.api.http.config_lifecycle_contracts",
+            "_ConfigEpochActivationFields",
+        ),
+        (
+            "ci_coordinator.api.http.config_lifecycle_contracts",
+            "ExplicitConfigEpochActivationBody",
+        ),
+        (
+            "ci_coordinator.api.http.routers.repository_attestations",
+            "LegacyRepositoryAttestationStartRequest",
+        ),
+    } <= {_model_id(model) for model in models}
     for model in models:
         request = issubclass(model, RequestModel)
         response = issubclass(model, ResponseModel)

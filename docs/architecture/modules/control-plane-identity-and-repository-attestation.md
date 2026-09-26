@@ -206,6 +206,16 @@ session + repository + installation + provider revision + proposal digest
 + proposal manifest + expected active revision + operation id
 ```
 
+Current starts require ci-repository-attestation-start/v2. The exact original
+unversioned body is replay-only: a retained operation returns its historical
+result, while an unknown operation returns legacy_new_operation_unsupported
+before new provider, clock or pending work. Null or unknown schemaVersion never
+falls back to that legacy body. Explicit renewal uses a new operation and a
+fresh one-use attestation; it never rewrites an earlier actor's proof.
+The coordinated [renewal cutover](../../features/explicit-review-renewal.md)
+invalidates only unconsumed pending challenges, which must be restarted by the
+user. Completed receipts, sessions and audit are retained.
+
 The callback terminates exactly one transaction. It exchanges the GitHub code
 with PKCE, resolves the immutable reviewer, proves current `maintain` or
 `admin` permission for the same repository and installation, reproduces the
@@ -215,8 +225,13 @@ unavailable, expiry remains the bounded cleanup fallback and grants no
 authority. The redirect carries the original operation id only as an untrusted
 navigation hint; the UI must replay that id through the authenticated start
 endpoint before it may display retained review authority.
+The same hint carries reviewBaseEpochId and reviewBaseRevision, both empty for
+an absent original baseline. These are not authority: exact authenticated
+replay must compare them. The UI cannot substitute a newer active read for the
+original baseline or automatically submit after callback or reauthentication.
 
-Activation loads the exact unexpired receipt and compares its complete expected
+Current activation/v2 supplies required reviewOperationId. Activation loads
+that exact unexpired receipt, never a manifest-only or latest match, and compares its complete expected
 active pointer with current durable state before any provider call. It then
 uses the GitHub App to recheck the recorded reviewer's current repository
 permission. A changed proposal, revision, installation, reviewer, permission,

@@ -70,6 +70,7 @@ class ProposalReviewStore(Protocol):
         scope: RepositoryScope,
         target_epoch_id: str,
         proposal_manifest_id: str,
+        review_operation_id: str,
     ) -> ProposalReviewRecord | None: ...
 
     async def activate_config(
@@ -88,6 +89,7 @@ class RepositoryActivationStore(Protocol):
         scope: RepositoryScope,
         target_epoch_id: str,
         proposal_manifest_id: str,
+        review_operation_id: str,
     ) -> ProposalReviewRecord | None: ...
 
     async def load_active(self, scope: RepositoryScope) -> ActiveConfigEpochSnapshot | None: ...

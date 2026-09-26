@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { activateConfig } from "../src/api/configActivation/client";
+import { configActivationSchema } from "../src/api/configActivation/schema";
 import {
   fetchControlPlaneSession,
   logoutControlPlaneSession,
@@ -29,6 +30,7 @@ const activationCommand = {
   expectedRevision: null,
   operationId: "00000000-0000-4000-8000-000000000000",
   proposalManifestId: "proposal:c0169591134297170c6402e83fc6b67f",
+  reviewOperationId: "review-1",
   scope,
   targetEpochId: "4".repeat(64),
 } as const;
@@ -71,6 +73,7 @@ describe("control-plane identity, repository attestation, and activation clients
 
   test.each([
     [409, "already_reviewed", "already_reviewed"],
+    [409, "legacy_new_operation_unsupported", "legacy_new_operation_unsupported"],
     [409, "baseline_conflict", "baseline_conflict"],
     [409, "blocked", "blocked"],
     [409, "epoch_conflict", "epoch_conflict"],
@@ -164,6 +167,28 @@ describe("control-plane identity, repository attestation, and activation clients
     });
   });
 
+  test("sends current wire and the literal chosen receipt", async () => {
+    const requests: Request[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        requests.push(request);
+        return Response.json({ ok: false, error: "forbidden", diagnostics: [] }, { status: 403 });
+      }),
+    );
+    await activateConfig(activationCommand, csrfToken);
+    expect(await requests[0]?.json()).toEqual({
+      schemaVersion: "ci-config-epoch-activation/v2",
+      installationId: 1,
+      repositoryId: 1,
+      operationId: "00000000-0000-4000-8000-000000000000",
+      proposalManifestId: "proposal:c0169591134297170c6402e83fc6b67f",
+      reviewOperationId: "review-1",
+      expectedRevision: null,
+      targetEpochId: "4".repeat(64),
+    });
+  });
+
   test.each([false, true])(
     "binds the activation receipt target, duplicate=%s",
     async (duplicate) => {
@@ -190,6 +215,55 @@ describe("control-plane identity, repository attestation, and activation clients
     },
   );
 
+  test.each([false, true])("binds the activation successor, duplicate=%s", async (duplicate) => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    for (const [expectedRevision, revision, admitted] of [
+      [null, 1, true],
+      [1, 2, true],
+      [4, 5, true],
+      [null, 2, false],
+      [1, 1, false],
+      [1, 3, false],
+      [4, 4, false],
+      [4, 6, false],
+    ] as const) {
+      const receipt = configActivationFixture({ duplicate, revision });
+      expect(configActivationSchema.safeParse(receipt).success).toBe(true);
+      fetch.mockResolvedValueOnce(Response.json(receipt));
+      await expect(
+        activateConfig({ ...activationCommand, expectedRevision }, csrfToken),
+      ).resolves.toEqual(
+        admitted ? { kind: "complete", activation: receipt } : { kind: "invalid-response" },
+      );
+    }
+    expect(fetch).toHaveBeenCalledTimes(8);
+  });
+
+  test.each([
+    [5, true],
+    [9, false],
+  ] as const)("captures the original revision before receipt %s", async (revision, admitted) => {
+    const reply = Promise.withResolvers<Response>();
+    let request: Request | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((value: Request) => {
+        request = value;
+        return reply.promise;
+      }),
+    );
+    const command = { ...activationCommand, expectedRevision: 4 };
+    const response = activateConfig(command, csrfToken);
+    command.expectedRevision = 8;
+    const receipt = configActivationFixture({ duplicate: true, revision });
+    reply.resolve(Response.json(receipt));
+    await expect(response).resolves.toEqual(
+      admitted ? { kind: "complete", activation: receipt } : { kind: "invalid-response" },
+    );
+    await expect(request?.json()).resolves.toMatchObject({ expectedRevision: 4 });
+  });
+
   test("binds the reply to the target captured before awaiting transport", async () => {
     const reply = Promise.withResolvers<Response>();
     let request: Request | undefined;
@@ -214,6 +288,7 @@ describe("control-plane identity, repository attestation, and activation clients
     [403, "forbidden"],
     [404, "target_unavailable"],
     [409, "attestation_invalid"],
+    [409, "legacy_new_operation_unsupported"],
     [409, "conflict"],
     [409, "coverage_reducing"],
     [409, "coverage_unproven"],

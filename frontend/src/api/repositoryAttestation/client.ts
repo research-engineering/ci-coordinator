@@ -49,6 +49,7 @@ export async function startRepositoryAttestation(
         new URL("/api/v1/repository-attestations/github/start", globalThis.location.origin),
         {
           body: JSON.stringify({
+            schemaVersion: "ci-repository-attestation-start/v2",
             installationId: command.scope.installationId,
             repositoryId: command.scope.repositoryId,
             expectedActive: command.expectedActive,
@@ -91,6 +92,7 @@ async function attestationFailure(response: Response): Promise<RepositoryAttesta
     epoch_conflict: 409,
     forbidden: 403,
     invalid_callback: 400,
+    legacy_new_operation_unsupported: 409,
     operation_conflict: 409,
     overloaded: 503,
     rate_limited: 429,

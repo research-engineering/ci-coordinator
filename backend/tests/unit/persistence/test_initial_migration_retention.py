@@ -74,6 +74,8 @@ def test_published_bootstrap_is_the_root_of_the_forward_migration_chain() -> Non
         "20260913_0013_analytics_purpose.py",
         "20260915_0014_retire_economics_evidence_v3.py",
         "20260915_0015_total_collection_state.py",
+        "20260926_0016_retire_pending_review_authority.py",
+        "20260926_0017_explicit_review_renewal.py",
     )
     assert migration.revision == "20260716_0001"
     assert migration.down_revision is None

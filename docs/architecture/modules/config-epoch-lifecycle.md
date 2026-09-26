@@ -11,6 +11,10 @@ epoch changes only through one revision-safe, idempotent, audited transaction.
 No successful transition leaves only an audit record, only a transition record,
 or only a pointer mutation.
 
+[Explicit review renewal](../../features/explicit-review-renewal.md) and its
+[implementation plan](../../features/explicit-review-renewal-implementation-plan.md)
+govern the coordinated current request and selected-receipt cutover.
+
 The ownership boundary is intentionally vertical. Registration and activation
 share the same epoch identity and database capability; separating their runtime
 authority would create an unusable intermediate state without reducing a real
@@ -99,6 +103,16 @@ undefined UTC offset remains invalid; it is never interpreted in the host's
 local timezone. The existing command and audit validators retain their error
 precedence before any store write. Exact activation and rollback operation replay
 does not read the clock.
+
+Current activation requests use ci-config-epoch-activation/v2 and require an
+exact reviewOperationId. Their audit payload is config-epoch-activation-audit/v2
+and retains that selector. The pair-owned outer family remains
+config-epoch-activation/v1 under the unchanged ci-audit-event/v1 envelope.
+Legacy payload/v1 is read only with legacy wire/v1; current payload/v2 requires
+current wire/v2. Cross-generation or changed-selector replay conflicts. Unknown
+legacy operations reject before fresh authority, clock or writes, while exact
+retained legacy operations replay. Rollback, shared idempotency namespace,
+historical serializers/hashes and generic audit/Activity semantics are unchanged.
 
 ## 3. Safety Laws
 

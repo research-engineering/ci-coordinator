@@ -51,6 +51,7 @@ def test_authorization_ages_permission_from_db_time_before_provider_io() -> None
             scope=SCOPE,
             target_epoch_id=review.target_epoch_id,
             proposal_manifest_id=review.command.expected_manifest_id,
+            review_operation_id=review.command.operation_id,
         )
     )
 
@@ -64,6 +65,28 @@ def test_authorization_ages_permission_from_db_time_before_provider_io() -> None
         ("active", SCOPE),
         "current_time",
     ]
+
+
+def test_explicit_selector_does_not_accept_another_retained_review() -> None:
+    completed = completed_discovery()
+    review = review_record(completed)
+    store = _Store(review, NOW)
+    permission = _PermissionReader(REVIEWER)
+    discovery = _Discovery(completed)
+    result = asyncio.run(
+        _service(store, permission, discovery).authorize(
+            actor=ACTOR,
+            scope=SCOPE,
+            target_epoch_id=review.target_epoch_id,
+            proposal_manifest_id=review.command.expected_manifest_id,
+            review_operation_id="another-review",
+        )
+    )
+    assert isinstance(result, RepositoryActivationRejected)
+    assert store.selectors == ["another-review"]
+    assert "current_time" not in store.calls
+    assert permission.calls == []
+    assert discovery.calls == []
 
 
 def test_changed_active_baseline_stops_before_provider_io() -> None:
@@ -88,6 +111,7 @@ def test_changed_active_baseline_stops_before_provider_io() -> None:
             scope=SCOPE,
             target_epoch_id=review.target_epoch_id,
             proposal_manifest_id=review.command.expected_manifest_id,
+            review_operation_id=review.command.operation_id,
         )
     )
 
@@ -126,6 +150,7 @@ def test_each_changed_proposal_binding_fails_closed(
             scope=SCOPE,
             target_epoch_id=target_epoch_id or review.target_epoch_id,
             proposal_manifest_id=manifest_id or review.command.expected_manifest_id,
+            review_operation_id=review.command.operation_id,
         )
     )
 
@@ -160,6 +185,7 @@ def test_permission_change_revocation_and_unavailability_are_distinct_failures(
             scope=SCOPE,
             target_epoch_id=review.target_epoch_id,
             proposal_manifest_id=review.command.expected_manifest_id,
+            review_operation_id=review.command.operation_id,
         )
     )
 
@@ -187,6 +213,7 @@ def test_discovery_failure_uses_the_pre_provider_db_time_sample(
             scope=SCOPE,
             target_epoch_id=review.target_epoch_id,
             proposal_manifest_id=review.command.expected_manifest_id,
+            review_operation_id=review.command.operation_id,
         )
     )
 
@@ -208,6 +235,7 @@ def test_receipt_expiry_uses_database_time_and_rejects_the_boundary() -> None:
             scope=SCOPE,
             target_epoch_id=review.target_epoch_id,
             proposal_manifest_id=review.command.expected_manifest_id,
+            review_operation_id=review.command.operation_id,
         )
     )
 
@@ -232,6 +260,7 @@ def test_long_discovery_cannot_postdate_permission_evidence() -> None:
             scope=SCOPE,
             target_epoch_id=review.target_epoch_id,
             proposal_manifest_id=review.command.expected_manifest_id,
+            review_operation_id=review.command.operation_id,
         )
     )
 
@@ -261,6 +290,7 @@ def test_unclassified_provider_programming_errors_propagate(failure_owner: str) 
                 scope=SCOPE,
                 target_epoch_id=review.target_epoch_id,
                 proposal_manifest_id=review.command.expected_manifest_id,
+                review_operation_id=review.command.operation_id,
             )
         )
 
@@ -272,6 +302,7 @@ class _Store:
     unavailable_at: str | None = None
     active: ActiveConfigEpochSnapshot | None = None
     calls: list[object] = field(default_factory=list)
+    selectors: list[str] = field(default_factory=list)
 
     async def load_activation_candidate(
         self,
@@ -279,7 +310,9 @@ class _Store:
         scope: RepositoryScope,
         target_epoch_id: str,
         proposal_manifest_id: str,
+        review_operation_id: str,
     ) -> ProposalReviewRecord | None:
+        self.selectors.append(review_operation_id)
         self.calls.append((scope, target_epoch_id, proposal_manifest_id))
         if self.unavailable_at == "load":
             raise ProposalReviewStoreUnavailable

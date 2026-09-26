@@ -1,3 +1,4 @@
+import type { ExpectedActiveEpoch } from "../../api/repositoryAttestation/client";
 import { operationIdIsAdmitted } from "../../api/shared/operationId";
 import { admitWorkbenchScope, type WorkbenchScope } from "../../api/workbench/client";
 import {
@@ -79,6 +80,13 @@ export function consoleHref(route: ConsoleRoute, currentSearch = ""): string {
       query.set("repositoryAttestation", "reviewed");
       query.set("proposalManifestId", hint.manifestId);
       query.set("reviewOperationId", hint.operationId);
+      if (hint.expectedActive !== undefined) {
+        query.set("reviewBaseEpochId", hint.expectedActive?.epochId ?? "");
+        query.set(
+          "reviewBaseRevision",
+          hint.expectedActive ? String(hint.expectedActive.revision) : "",
+        );
+      }
     }
   }
   const view = scope || route.view === "activity" ? route.view : "repositories";
@@ -106,7 +114,7 @@ export function sameScope(left: WorkbenchScope | undefined, right: WorkbenchScop
   );
 }
 
-function reviewHint(query: URLSearchParams, scope: WorkbenchScope) {
+export function reviewHint(query: URLSearchParams, scope: WorkbenchScope) {
   const keys = [
     "repositoryAttestation",
     "installationId",
@@ -126,5 +134,25 @@ function reviewHint(query: URLSearchParams, scope: WorkbenchScope) {
     !operationIdIsAdmitted(operationId)
   )
     return undefined;
-  return { manifestId, operationId };
+  const epochValues = query.getAll("reviewBaseEpochId");
+  const revisionValues = query.getAll("reviewBaseRevision");
+  let expectedActive: ExpectedActiveEpoch | null | undefined;
+  if (epochValues.length === 0 && revisionValues.length === 0) expectedActive = undefined;
+  else if (epochValues.length === 1 && revisionValues.length === 1) {
+    const epochId = epochValues[0];
+    const revisionText = revisionValues[0];
+    const revision = Number(revisionText);
+    if (epochId === "" && revisionText === "") expectedActive = null;
+    else if (
+      epochId !== undefined &&
+      /^[0-9a-f]{64}$/.test(epochId) &&
+      revisionText !== undefined &&
+      /^[1-9][0-9]*$/.test(revisionText) &&
+      Number.isSafeInteger(revision) &&
+      revision > 0
+    )
+      expectedActive = { epochId, revision };
+    else return undefined;
+  } else return undefined;
+  return { manifestId, operationId, expectedActive };
 }

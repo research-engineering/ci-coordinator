@@ -23,6 +23,7 @@ function binding() {
     scope,
     expectedRevision: 1 as number | null | undefined,
     manifestId,
+    reviewOperationId: "review-1",
     targetEpochId: T2.epochId,
     csrfToken: session.csrfToken,
     authorityRevision: 1,
@@ -40,7 +41,7 @@ afterEach(() => {
   history.replaceState(null, "", "/");
 });
 
-test.each(["network", "invalid", "unavailable", "overloaded"] as const)(
+test.each(["network", "invalid", "revision", "unavailable", "overloaded"] as const)(
   "%s keeps Q across read loss and C/3; only an explicit retry confirms historical T/2",
   async (failure) => {
     const bodies: string[] = [];
@@ -51,6 +52,9 @@ test.each(["network", "invalid", "unavailable", "overloaded"] as const)(
         if (bodies.length === 1) {
           if (failure === "network") throw new TypeError("lost receipt");
           if (failure === "invalid") return Response.json({});
+          if (failure === "revision") {
+            return Response.json(configActivationFixture({ epochId: T2.epochId, revision: 3 }));
+          }
           return Response.json({ ok: false, error: failure }, { status: 503 });
         }
         return Response.json(
@@ -65,6 +69,8 @@ test.each(["network", "invalid", "unavailable", "overloaded"] as const)(
       result.current.submit();
     });
     await waitFor(() => expect(result.current.uncertain).toBe(true));
+    expect(props.onConfirmed).not.toHaveBeenCalled();
+    expect(props.onConflict).not.toHaveBeenCalled();
     expect(bodies).toHaveLength(1);
     rerender({ ...props, expectedRevision: undefined, newCommandAllowed: false });
     act(() => result.current.submit());
@@ -73,6 +79,7 @@ test.each(["network", "invalid", "unavailable", "overloaded"] as const)(
       expectedRevision: 3,
       newCommandAllowed: false,
       manifestId: "proposal:ffffffffffffffffffffffffffffffff",
+      reviewOperationId: "another-review",
       targetEpochId: C3.epochId,
     });
     expect(result.current.uncertain).toBe(true);
@@ -85,6 +92,7 @@ test.each(["network", "invalid", "unavailable", "overloaded"] as const)(
       expectedRevision: 1,
       targetEpochId: "4".repeat(64),
       proposalManifestId: manifestId,
+      reviewOperationId: "review-1",
     });
     expect(props.onConfirmed).toHaveBeenCalledWith(
       expect.objectContaining({ epochId: T2.epochId, revision: 2, duplicate: true }),
@@ -306,7 +314,9 @@ test("definitive conflict requires a fresh read and consumes the old callback hi
     "",
     "/?installationId=1&repositoryId=1&repositoryAttestation=reviewed&proposalManifestId=" +
       manifestId +
-      "&reviewOperationId=old-review",
+      "&reviewOperationId=old-review&reviewBaseEpochId=" +
+      A1.epochId +
+      "&reviewBaseRevision=1",
   );
   const bodies: { operationId: string; expectedActive?: unknown }[] = [];
   vi.stubGlobal(
@@ -350,4 +360,52 @@ test("definitive conflict requires a fresh read and consumes the old callback hi
   expect(bodies[2]?.expectedActive).toEqual(C3);
   expect(props.onConfirmed).not.toHaveBeenCalled();
   // A backend already_reviewed response is not proof of renewed manifest approval.
+});
+
+test("callback confirmation preserves its original baseline instead of rebasing to a newer read", async () => {
+  const search = new URLSearchParams({
+    installationId: "1",
+    repositoryId: "1",
+    repositoryAttestation: "reviewed",
+    proposalManifestId: manifestId,
+    reviewOperationId: "old-review",
+    reviewBaseEpochId: A1.epochId,
+    reviewBaseRevision: "1",
+  });
+  history.replaceState(null, "", `/?${search}`);
+  const bodies: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      bodies.push(await request.json());
+      return Response.json({ ok: false, error: "already_reviewed" }, { status: 409 });
+    }),
+  );
+  render(
+    <RepositoryActivationControl
+      scope={scope}
+      proposal={workflowDiscoveryFixture().proposal}
+      session={session}
+      expectedActive={C3}
+      authorityRevision={1}
+      snapshotReadRevision={1}
+      snapshotLoading={false}
+      onConfirmed={vi.fn()}
+      onRefreshSnapshot={vi.fn()}
+      onLockedChange={vi.fn()}
+    />,
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Confirm review" }));
+  await screen.findByRole("button", { name: "Verify authority again" });
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]).toMatchObject({
+    schemaVersion: "ci-repository-attestation-start/v2",
+    operationId: "old-review",
+    expectedActive: A1,
+  });
+  expect(screen.queryByRole("button", { name: "Activate proposal" })).not.toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Verify authority again" }));
+  await waitFor(() => expect(bodies).toHaveLength(2));
+  expect(bodies[1]).toMatchObject({ expectedActive: C3 });
+  expect(bodies[1]).not.toMatchObject({ operationId: "old-review" });
 });

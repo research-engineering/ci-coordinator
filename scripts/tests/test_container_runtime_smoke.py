@@ -20,7 +20,7 @@ _RESOURCE_PATTERN = re.compile(
 
 EXPECTED_SUCCESS_STDOUT = (
     "{\n"
-    '  "migrationHead": "20260915_0015 (head)",\n'
+    '  "migrationHead": "20260926_0017 (head)",\n'
     '  "migrationRevisions": [\n'
     '    "20260716_0001_initial_schema.py",\n'
     '    "20260901_0002_config_epoch_registration_operations.py",\n'
@@ -36,7 +36,9 @@ EXPECTED_SUCCESS_STDOUT = (
     '    "20260913_0012_administrator_activity.py",\n'
     '    "20260913_0013_analytics_purpose.py",\n'
     '    "20260915_0014_retire_economics_evidence_v3.py",\n'
-    '    "20260915_0015_total_collection_state.py"\n'
+    '    "20260915_0015_total_collection_state.py",\n'
+    '    "20260926_0016_retire_pending_review_authority.py",\n'
+    '    "20260926_0017_explicit_review_renewal.py"\n'
     "  ],\n"
     '  "operatorUiBundle": "admitted",\n'
     '  "pythonVersion": "Python 3.13.15",\n'
@@ -85,6 +87,11 @@ EXPECTED_STDERR = {
         "container log stdout\n"
         "container log stderr\n"
         "unexpected migration head: 20991231_9999 (head)\n"
+    ),
+    "stale_migration_head": (
+        "container log stdout\n"
+        "container log stderr\n"
+        "unexpected migration head: 20260915_0015 (head)\n"
     ),
     "migration_artifact_failure": (
         "container log stdout\n"
@@ -188,6 +195,7 @@ def _normalize(invocations: tuple[Invocation, ...]) -> tuple[Invocation, ...]:
         "operator_ui_failure",
         "migration_cli_failure",
         "migration_head_failure",
+        "stale_migration_head",
         "migration_artifact_failure",
         "root_user",
         "wrong_user",
@@ -255,7 +263,9 @@ def test_python_entrypoint_preserves_docker_and_http_argv(tmp_path: Path) -> Non
         "'20260913_0012_administrator_activity.py', "
         "'20260913_0013_analytics_purpose.py', "
         "'20260915_0014_retire_economics_evidence_v3.py', "
-        "'20260915_0015_total_collection_state.py']"
+        "'20260915_0015_total_collection_state.py', "
+        "'20260926_0016_retire_pending_review_authority.py', "
+        "'20260926_0017_explicit_review_renewal.py']"
     )
     expected_args = (
         ("build", "--pull", "--file", "Dockerfile", "--tag", image, "."),

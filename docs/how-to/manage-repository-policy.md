@@ -2,7 +2,7 @@
 
 Status: as-built HTTP how-to
 
-Last verified: 2026-09-04
+Source contract updated: 2026-09-26; native qualification remains release-owned.
 
 ## Outcome
 
@@ -135,19 +135,24 @@ diagnostics and creates no epoch, receipt, or audit event.
 
 Activation requires the exact durable repository review for the proposal
 manifest. Complete [Review And Activate A Workflow Proposal](review-workflow-proposal.md)
-through the review step before using the API. Retain the displayed manifest,
-target epoch and active baseline from that same current-head proposal.
-`PROPOSAL_MANIFEST_ID` must identify that exact retained review. The epoch
-registered above must equal its target epoch: registration of an unrelated
-`config.example.yaml` does not make a proposal activatable. If they differ,
+through the review step before using the API. Retain the completed review's
+operation id, manifest, target epoch and original active baseline from that same
+current-head proposal. Set `REVIEW_OPERATION_ID` to that exact selected receipt's
+operation id and `PROPOSAL_MANIFEST_ID` to its manifest. Do not select an implicit
+latest review: unchanged content can have multiple immutable review receipts.
+The epoch registered above must equal its target epoch: registration of an
+unrelated `config.example.yaml` does not make a proposal activatable. If they differ,
 stop and register the exact reviewed policy; do not substitute identities.
 
 Set the independently retained target and baseline. Use JSON `null` only for a
 reviewed baseline with no active configuration; otherwise use its exact integer
-revision. Use a stable operation id for retries of the same logical command:
+revision. The activation operation id identifies a separate command, not the
+review. Keep both operation ids and every other client-owned fact unchanged for
+an exact retry of that command:
 
 ```sh
 reviewed_epoch_id='replace-with-target-epoch-from-the-same-reviewed-proposal'
+REVIEW_OPERATION_ID='replace-with-operation-id-from-the-selected-review'
 expected_revision=null
 operation_id='activate-policy-001'
 ```
@@ -167,15 +172,17 @@ activate_reviewed_policy() (
     --arg epochId "${epoch_id}" \
     --arg operationId "${operation_id:?}" \
     --arg proposalManifestId "${PROPOSAL_MANIFEST_ID:?}" \
+    --arg reviewOperationId "${REVIEW_OPERATION_ID:?}" \
     --argjson installationId "${INSTALLATION_ID:?}" \
     --argjson repositoryId "${REPOSITORY_ID:?}" \
     --argjson expectedRevision "${expected_revision:?}" \
     '{
-      schemaVersion: "ci-config-epoch-activation/v1",
+      schemaVersion: "ci-config-epoch-activation/v2",
       installationId: $installationId,
       repositoryId: $repositoryId,
       targetEpochId: $epochId,
       proposalManifestId: $proposalManifestId,
+      reviewOperationId: $reviewOperationId,
       expectedRevision: $expectedRevision,
       operationId: $operationId
     }' > "${policy_dir:?}/activation.request.json" || exit 1
@@ -198,11 +205,25 @@ else
 fi
 ```
 
-For a later transition, replace `null` with the exact retained current
-revision. A `revision_conflict` is a stop signal: reload the repository
-configuration status and compare its active epoch with the independently
-retained command receipt. Do not guess a revision. A successful activation or
+For a later transition, obtain an explicitly selected review for that transition
+and use its exact retained baseline revision. A `revision_conflict` is a stop
+signal: reload the repository configuration status and compare its active epoch
+with the independently retained command receipt. Do not guess a revision. A successful activation or
 rollback response uses `ci-config-epoch-activation-result/v1`.
+
+At the coordinated UI/API cutover, unconsumed verification attempts are
+invalidated and must be explicitly restarted; completed review receipts,
+sessions and audit history are retained. An expired review requires an explicit
+new verification with a new review operation id under the current authorization
+and baseline. It does not rewrite the old receipt or retry an uncertain command.
+
+New activation requests use V2 and the selected `reviewOperationId` above.
+Retained V1 activation requests without a selector remain V1: only an exact
+already-recorded operation can replay. Unknown legacy operations return
+`legacy_new_operation_unsupported` and cannot create a new activation. Never
+relabel an old request as V2, invent a selector, or change the retained request
+to reconcile an uncertain outcome. Reconcile first, then explicitly prepare a
+separate new command if needed.
 
 ## Roll Back
 

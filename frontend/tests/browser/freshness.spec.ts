@@ -84,6 +84,52 @@ async function layout(page: Page, errors: string[], artifact: string) {
   await page.screenshot({ path: test.info().outputPath(artifact), fullPage: true });
 }
 
+test("explicit renewal creates a new review command while callback confirmation keeps its baseline", async ({
+  page,
+}) => {
+  const errors = await shell(page);
+  const bodies: {
+    operationId: string;
+    expectedActive: ExpectedActiveEpoch | null;
+    schemaVersion: string;
+  }[] = [];
+  await page.route("**/api/v1/workbench/repositories/1/1?*", (route) =>
+    route.fulfill({ json: snapshot(A1) }),
+  );
+  await page.route("**/api/v1/repository-attestations/github/start", async (route) => {
+    bodies.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: bodies.length === 1 ? 409 : 403,
+      json: { ok: false, error: bodies.length === 1 ? "already_reviewed" : "forbidden" },
+    });
+  });
+  const destination = new URL(url("workflows"));
+  destination.searchParams.set("repositoryAttestation", "reviewed");
+  destination.searchParams.set(
+    "proposalManifestId",
+    workflowDiscoveryFixture().proposal.manifestId,
+  );
+  destination.searchParams.set("reviewOperationId", "retained-review");
+  destination.searchParams.set("reviewBaseEpochId", A1.epochId);
+  destination.searchParams.set("reviewBaseRevision", "1");
+  await page.goto(destination.href);
+  await page.getByRole("button", { name: "Confirm review" }).click();
+  await expect(page.getByRole("button", { name: "Activate proposal" })).toBeVisible();
+  expect(bodies).toHaveLength(1);
+  expect(bodies[0]).toMatchObject({
+    operationId: "retained-review",
+    expectedActive: A1,
+    schemaVersion: "ci-repository-attestation-start/v2",
+  });
+  await layout(page, errors, "review-before-renewal.png");
+  await page.getByRole("button", { name: "Verify authority again" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  expect(bodies).toHaveLength(2);
+  expect(bodies[1]?.operationId).not.toBe("retained-review");
+  expect(bodies[1]?.expectedActive).toEqual(A1);
+  await expect(page.getByRole("button", { name: "Activate proposal" })).toHaveCount(0);
+});
+
 test("uncertain activation survives a display-limit change; duplicate T/2 is not current C/3", async ({
   page,
 }) => {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta, timezone, tzinfo
 from typing import Literal, cast
 
@@ -277,7 +278,9 @@ class _ActivationAuthorizer:
         scope: RepositoryScope,
         target_epoch_id: str,
         proposal_manifest_id: str,
+        review_operation_id: str,
     ) -> RepositoryActivationAuthorization:
+        assert review_operation_id == "review-1"
         assert actor == ACTOR
         assert scope == SCOPE
         assert target_epoch_id == _ACTIVATION_TARGET
@@ -492,7 +495,8 @@ def test_activation_is_scope_authorized_and_uses_the_service_clock() -> None:
         "expectedRevision": None,
         "operationId": "activate-1",
         "proposalManifestId": _ACTIVATION_MANIFEST,
-        "schemaVersion": "config-epoch-activation-audit/v1",
+        "schemaVersion": "config-epoch-activation-audit/v2",
+        "reviewOperationId": "review-1",
         "targetEpochId": _ACTIVATION_TARGET,
     }
 
@@ -538,7 +542,20 @@ def test_activation_authority_failure_never_reaches_the_attested_store(
     assert store.prepared is None
 
 
-def test_exact_activation_replay_precedes_repository_reauthorization() -> None:
+def test_unknown_legacy_activation_stops_after_exact_operation_lookup() -> None:
+    store = _Store()
+    authorizer = _ActivationAuthorizer(RepositoryActivationRejected())
+    service = _service(store, allowed=True, clock=_UnreadClock(), activation_authorizer=authorizer)
+    command = replace(_activation_command(), activation_version=1, review_operation_id=None)
+    outcome = asyncio.run(service.activate(command))
+    assert outcome.state == "legacy_new_operation_unsupported"
+    assert store.calls == ["resolve_operation"]
+    assert authorizer.calls == 0
+    assert store.prepared is None
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_exact_activation_replay_precedes_repository_reauthorization(version: int) -> None:
     duplicate = _activation_duplicate()
     store = _Store(operation_resolution=duplicate)
     activation_authorizer = _ActivationAuthorizer(RepositoryActivationRejected())
@@ -549,7 +566,11 @@ def test_exact_activation_replay_precedes_repository_reauthorization() -> None:
             allowed=True,
             activation_authorizer=activation_authorizer,
             clock=_UnreadClock(),
-        ).activate(_activation_command())
+        ).activate(
+            _activation_command()
+            if version == 2
+            else replace(_activation_command(), activation_version=1, review_operation_id=None)
+        )
     )
 
     assert result.state == "duplicate"
@@ -777,6 +798,8 @@ def _activation_command() -> ActivateConfigEpoch:
         proposal_manifest_id=_ACTIVATION_MANIFEST,
         expected_revision=None,
         operation_id="activate-1",
+        activation_version=2,
+        review_operation_id="review-1",
     )
 
 

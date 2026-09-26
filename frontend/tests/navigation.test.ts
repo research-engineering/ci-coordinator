@@ -12,6 +12,36 @@ const scope = { installationId: 7, repositoryId: 31, limit: 5 };
 const coordinates = "installationId=7&repositoryId=31&limit=5";
 const callback = `${coordinates}&repositoryAttestation=reviewed&proposalManifestId=proposal:one&reviewOperationId=review-one`;
 
+test("retains exact callback baseline as a hint, without filling an absent one", () => {
+  const selected = `${callback}&reviewBaseEpochId=${"a".repeat(64)}&reviewBaseRevision=7`;
+  const route = readConsoleRoute(selected);
+  const query = new URL(consoleHref(route, selected), "https://console.example").searchParams;
+  expect(query.get("reviewBaseEpochId")).toBe("a".repeat(64));
+  expect(query.get("reviewBaseRevision")).toBe("7");
+  const legacy = new URL(
+    consoleHref(readConsoleRoute(callback), callback),
+    "https://console.example",
+  );
+  expect(legacy.searchParams.has("reviewBaseEpochId")).toBe(false);
+  const absent = `${callback}&reviewBaseEpochId=&reviewBaseRevision=`;
+  const absentQuery = new URL(
+    consoleHref(readConsoleRoute(absent), absent),
+    "https://console.example",
+  ).searchParams;
+  expect(absentQuery.get("reviewBaseEpochId")).toBe("");
+  expect(absentQuery.get("reviewBaseRevision")).toBe("");
+});
+
+test.each([
+  "&reviewBaseEpochId=",
+  "&reviewBaseRevision=1",
+  `&reviewBaseEpochId=${"a".repeat(64)}&reviewBaseRevision=0`,
+  `&reviewBaseEpochId=${"a".repeat(64)}&reviewBaseRevision=1&reviewBaseRevision=2`,
+])("drops malformed or ambiguous baseline hints: %s", (suffix) => {
+  const search = callback + suffix;
+  expect(consoleHref(readConsoleRoute(search), search)).not.toContain("reviewOperationId");
+});
+
 test.each(ECONOMICS_TABS)("economics tab %s has one canonical active route", (economicsTab) => {
   const href = consoleHref({ scope, view: "economics", tab: "plans", economicsTab });
   const decoded = readConsoleRoute(new URL(href, "https://console.example").search);

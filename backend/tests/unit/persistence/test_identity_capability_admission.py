@@ -121,6 +121,7 @@ def admitted_connection(monkeypatch: pytest.MonkeyPatch) -> _Connection:
         "compatibility_protocol_schema_matches_contract",
         "config_epoch_lifecycle_schema_matches_contract",
         "proposal_review_registration_schema_matches_contract",
+        "proposal_review_renewal_schema_matches_contract",
         "repository_attestation_schema_matches_contract",
         "public_access_is_restricted",
         "application_routines_are_security_invoker",
@@ -175,6 +176,7 @@ def test_identity_fact_mismatch_rejects_after_existing_common_guards(
         asyncio.run(_admit(connection, proposal_review_registration_requirements))
     assert connection.events[-2:] == ["runtime_principal_is_restricted", "identity"]
     assert connection.events.count("identity") == 1
+    assert connection.events.count("proposal_review_renewal_schema_matches_contract") == 1
 
 
 def test_unrequired_identity_does_not_add_catalog_work(admitted_connection: _Connection) -> None:
@@ -187,6 +189,7 @@ def test_unrequired_identity_does_not_add_catalog_work(admitted_connection: _Con
 
     asyncio.run(_admit(admitted_connection, without_identity))
     assert "identity" not in admitted_connection.events
+    assert admitted_connection.events.count("proposal_review_renewal_schema_matches_contract") == 1
 
 
 @pytest.mark.parametrize("business", [False, True])

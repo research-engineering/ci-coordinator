@@ -55,6 +55,7 @@ export async function failure(response: Response): Promise<LifecycleFailure> {
     revision_conflict: [409],
     target_unavailable: [404],
     attestation_invalid: [409],
+    legacy_new_operation_unsupported: [409],
     coverage_reducing: [409],
     coverage_unproven: [409],
     overloaded: [503],

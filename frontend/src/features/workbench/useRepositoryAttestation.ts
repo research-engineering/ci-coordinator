@@ -125,7 +125,7 @@ export function useRepositoryAttestation(binding: RepositoryAttestationBinding) 
       latest.onConflict?.();
   }
 
-  function start(operationId?: string) {
+  function start(operationId?: string, originalActive?: ExpectedActiveEpoch | null) {
     const latest = live.current.binding;
     const prior = current.current;
     if (
@@ -137,8 +137,9 @@ export function useRepositoryAttestation(binding: RepositoryAttestationBinding) 
         (prior.kind !== "settled" || prior.uncertain))
     )
       return;
+    const expectedActive = originalActive === undefined ? latest.expectedActive : originalActive;
     const command: RepositoryAttestationCommand = {
-      expectedActive: latest.expectedActive === null ? null : { ...latest.expectedActive },
+      expectedActive: expectedActive === null ? null : { ...expectedActive },
       expectedManifestId: latest.manifestId,
       operationId: operationId ?? crypto.randomUUID(),
       scope: {
@@ -172,6 +173,8 @@ export function useRepositoryAttestation(binding: RepositoryAttestationBinding) 
     state: currentState,
     uncertain,
     reviewed,
+    reviewOperationId:
+      reviewed && currentState.kind === "settled" ? currentState.command.operationId : undefined,
     expired: currentState.kind === "settled" && currentState.expired,
     locked: currentState.kind === "starting" || currentState.kind === "redirecting" || uncertain,
   } as const;

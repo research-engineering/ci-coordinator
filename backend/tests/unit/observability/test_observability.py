@@ -39,6 +39,7 @@ _ACTIVATION_STATES = (
     "coverage_unproven",
     "duplicate",
     "forbidden",
+    "legacy_new_operation_unsupported",
     "operation_conflict",
     "revision_conflict",
     "target_unavailable",

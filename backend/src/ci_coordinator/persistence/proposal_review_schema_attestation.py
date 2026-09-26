@@ -172,6 +172,18 @@ async def proposal_review_registration_schema_matches_contract(
 def proposal_review_registration_schema_matches_contract_sync(
     connection: Connection,
 ) -> bool:
+    return _schema_matches_contract(connection, renewal=False)
+
+
+async def proposal_review_renewal_schema_matches_contract(connection: AsyncConnection) -> bool:
+    return await connection.run_sync(proposal_review_renewal_schema_matches_contract_sync)
+
+
+def proposal_review_renewal_schema_matches_contract_sync(connection: Connection) -> bool:
+    return _schema_matches_contract(connection, renewal=True)
+
+
+def _schema_matches_contract(connection: Connection, *, renewal: bool) -> bool:
     columns = tuple(
         connection.execute(
             text(RELATION_COLUMNS_SQL),
@@ -236,7 +248,12 @@ def proposal_review_registration_schema_matches_contract_sync(
     ).scalar_one()
     return (
         tuple(tuple(row) for row in columns) == _EXPECTED_COLUMNS
-        and frozenset((row[0], row[1]) for row in constraints) == _EXPECTED_CONSTRAINTS
+        and frozenset((row[0], row[1]) for row in constraints)
+        == (
+            _EXPECTED_CONSTRAINTS - {("uq_workflow_proposal_reviews_scope_manifest", "u")}
+            if renewal
+            else _EXPECTED_CONSTRAINTS
+        )
         and all(
             _EXPECTED_CONSTRAINT_DEFINITIONS[row[0]] == row[2]
             and row[3] is False
