@@ -20,6 +20,7 @@ from ci_coordinator.reconciliation import (
     ReconciliationPoller,
     ReconciliationPollUnavailable,
     ReconciliationResult,
+    ReconciliationTerminalRequired,
     ResultDuplicate,
     ResultRecord,
     ResultRecorded,
@@ -166,20 +167,31 @@ class ReconciliationRoundService:
                     convergence_failure(claim, "attempts_exhausted"),
                 )
             else:
-                await self._persistence.defer_claim(claim)
+                await self._defer_or_record_deadline(claim)
         else:
             await self._record_terminal(claim, snapshot.revision, result)
 
     async def _defer_or_fail(self, claim: ReconciliationAttemptClaim) -> None:
         reason = _terminal_reason(claim, self._clock.now())
         if reason is None:
-            await self._persistence.defer_claim(claim)
+            await self._defer_or_record_deadline(claim)
             return
         await self._record_terminal(
             claim,
             claim.revision,
             convergence_failure(claim, reason),
         )
+
+    async def _defer_or_record_deadline(self, claim: ReconciliationAttemptClaim) -> None:
+        outcome = await self._persistence.defer_claim(claim)
+        if isinstance(outcome, ReconciliationTerminalRequired):
+            if outcome.claim != claim:
+                raise ValueError("terminal requirement belongs to another reconciliation claim")
+            await self._record_terminal(
+                claim,
+                outcome.snapshot_revision,
+                convergence_failure(claim, outcome.reason),
+            )
 
     async def _record_terminal(
         self,

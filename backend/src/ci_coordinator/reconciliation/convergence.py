@@ -267,6 +267,24 @@ class ReconciliationClaimLost:
         _require_digest(self.subject_id, "lost reconciliation claim subject")
 
 
+@dataclass(frozen=True, slots=True)
+class ReconciliationTerminalRequired:
+    """A locked deadline observation, not authority to write a terminal result."""
+
+    claim: ReconciliationAttemptClaim
+    snapshot_revision: int
+    reason: Literal["deadline_exceeded"] = "deadline_exceeded"
+
+    def __post_init__(self) -> None:
+        if type(self.claim) is not ReconciliationAttemptClaim:
+            raise TypeError("terminal requirement needs an exact reconciliation claim")
+        _bounded_non_negative(
+            self.snapshot_revision, 9_007_199_254_740_991, "terminal snapshot revision"
+        )
+        if self.reason != "deadline_exceeded":
+            raise ValueError("terminal defer requirement must describe an observed deadline")
+
+
 def initial_convergence_state(
     now: datetime,
     policy: ReconciliationConvergencePolicy = DEFAULT_RECONCILIATION_CONVERGENCE_POLICY,
@@ -364,12 +382,19 @@ def defer_reconciliation_claim(
     state: ReconciliationConvergenceState,
     claim: ReconciliationAttemptClaim,
     now: datetime,
-) -> ReconciliationConvergenceState | ReconciliationClaimLost:
+    *,
+    snapshot_revision: int,
+) -> ReconciliationConvergenceState | ReconciliationClaimLost | ReconciliationTerminalRequired:
     """Release an active nonterminal claim and advance its bounded backoff."""
+    _bounded_non_negative(
+        snapshot_revision, 9_007_199_254_740_991, "reconciliation snapshot revision"
+    )
     deferred_at = _utc(now, "reconciliation defer time")
     if not reconciliation_claim_is_active(state, claim, deferred_at):
         return ReconciliationClaimLost(claim.subject.subject_id)
-    if deferred_at >= state.deadline_at or state.attempt_count >= state.max_attempts:
+    if deferred_at >= state.deadline_at:
+        return ReconciliationTerminalRequired(claim, snapshot_revision)
+    if state.attempt_count >= state.max_attempts:
         raise ValueError("terminal reconciliation claim cannot be deferred")
     delay_seconds = _subject_stable_retry_delay(state.backoff_seconds, claim)
     next_attempt_at = min(
