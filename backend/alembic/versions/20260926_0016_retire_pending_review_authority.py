@@ -15,4 +15,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    raise RuntimeError("Review cutoff requires forward repair or an admitted restore")
+    raise RuntimeError("Review cutoff requires forward repair or admitted restore")

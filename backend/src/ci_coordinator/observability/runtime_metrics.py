@@ -98,6 +98,7 @@ _CONFIG_ACTIVATION_RESULTS: Final = frozenset(
         "coverage_unproven",
         "duplicate",
         "forbidden",
+        "legacy_new_operation_unsupported",
         "operation_conflict",
         "other",
         "revision_conflict",

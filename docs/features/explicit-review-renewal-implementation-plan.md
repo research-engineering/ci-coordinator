@@ -62,6 +62,7 @@ are permitted with existing tools only.
 | C8 Requirement closure | Old config/proposal UoWs reject; each missing current capability rejects before domain SQL. Audit-only and Activity semantics stay valid; current Workbench/registration/production-cutover sets retain all dependencies. |
 | C9 UI continuity | Verify again creates a fresh ID only by user action. Uncertain retry uses identical ID, selector and baseline. Callback hint needs authenticated exact replay; stale/aborted/session-changed completions do not authorize activation. |
 | C10 Activation receipt | Require the captured command's exact target and successor revision for fresh and duplicate results. Independent literal positives and shape-valid revision-only substitutions distinguish relational admission from schema rejection; a deferred response must not reread mutable caller state. Wrong revision retains uncertainty without confirmation; identical retry can confirm the historical successor after a newer workspace read. |
+| C11 Integration projections | The HTTP-model policy census includes the three added request identities; every model still satisfies its owned policy. The new activation refusal has its own finite metric label and zero baseline. Identity-isolation witnesses keep the renewal schema guard as an independent complement. New migration downgrade refuses with the existing forward-repair category while preserving the exact fence and retained-data assertions. |
 
 Native oracles must use actual UoWs/migrations and the production browser
 fixture, not only mocked state or parser roundtrips. Authored cases are not
@@ -71,7 +72,7 @@ design premise stops this writer for root admission.
 
 ## Candidate Boundary
 
-The finite source implementation and C1-C10 witnesses are authored. This is not
+The finite source implementation and C1-C11 witnesses are authored. This is not
 an executed test verdict. Static checking uses existing tools without running
 application code, SQL, pytest, browser, build or provider operations.
 
