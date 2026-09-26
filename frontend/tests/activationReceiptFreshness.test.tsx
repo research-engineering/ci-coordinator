@@ -173,7 +173,10 @@ test("a failed confirmation cannot erase uncertainty or permit a new activation"
     vi.fn(async (request: Request) => {
       bodies.push(await request.text());
       if (bodies.length === 1) throw new TypeError("lost receipt");
-      return Response.json({ ok: false, error: "revision_conflict" }, { status: 409 });
+      return Response.json(
+        { ok: false, error: "revision_conflict", diagnostics: [] },
+        { status: 409 },
+      );
     }),
   );
   const props = binding();
@@ -311,10 +314,9 @@ test("definitive conflict requires a fresh read and consumes the old callback hi
     vi.fn(async (request: Request) => {
       bodies.push((await request.json()) as { operationId: string });
       return Response.json(
-        {
-          ok: false,
-          error: request.url.endsWith("/start") ? "already_reviewed" : "attestation_invalid",
-        },
+        request.url.endsWith("/start")
+          ? { ok: false, error: "already_reviewed" }
+          : { ok: false, error: "attestation_invalid", diagnostics: [] },
         { status: 409 },
       );
     }),

@@ -203,8 +203,8 @@
       ],
       "file": "frontend/src/features/workbench/useWorkbenchSnapshot.ts",
       "operator": "commit-response-after-scope-abandonment",
-      "original": "      (result) => {\n        if (active) setState({ kind: \"settled\", requestKey: request.key, result });\n      },",
-      "replacement": "      (result) => {\n        setState({ kind: \"settled\", requestKey: request.key, result });\n      },",
+      "original": "      (result) => {\n        if (active) {",
+      "replacement": "      (result) => {\n        if (true) {",
       "witnessId": "frontend-risk.abandoned-generation",
       "command": [
         "frontend/node_modules/.bin/vitest",

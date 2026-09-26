@@ -219,8 +219,9 @@ test("read replacement fences old A/1; old receipts cannot lower B/2; E retires 
   });
   act(() => result.current.invalidate(A1));
   expect(result.current.minimumActive).toEqual(B2);
-  rerender(2);
+  await act(async () => rerender(2));
   expect(result.current.minimumActive).toBeUndefined();
+  await waitFor(() => expect(result.current.state).toMatchObject({ result: { kind: "ready" } }));
   const count = fetch.mock.calls.length;
   act(() => retired(C3));
   expect(fetch).toHaveBeenCalledTimes(count);
@@ -268,12 +269,15 @@ test("real rollback admission notifies the snapshot owner with literal B/2; regi
         epochId: B2.epochId,
         revision: 2,
       });
-    return configJson({
-      schemaVersion: "ci-config-epoch-registration-result/v1",
-      ok: true,
-      duplicate: false,
-      epochId: draft.validation.epochId,
-    });
+    return configJson(
+      {
+        schemaVersion: "ci-config-epoch-registration-result/v1",
+        ok: true,
+        duplicate: false,
+        epochId: draft.validation.epochId,
+      },
+      201,
+    );
   });
   vi.stubGlobal("fetch", fetch);
   const { result } = renderHook(() => useConfigurationCommand(session, changed));
