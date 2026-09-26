@@ -101,9 +101,15 @@ def verify_backend_debugger(
     mains = [
         node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == "main"
     ]
-    if len(mains) != 1 or not mains[0].body or not isinstance(mains[0].body[0], ast.Assign):
+    if len(mains) != 1:
         raise DebugWitnessError("debugger entrypoint breakpoint is unavailable")
-    line = mains[0].body[0].lineno
+    first = next(
+        (node for node in mains[0].body if not isinstance(node, (ast.Import, ast.ImportFrom))),
+        None,
+    )
+    if not isinstance(first, ast.Assign):
+        raise DebugWitnessError("debugger entrypoint breakpoint is unavailable")
+    line = first.lineno
     deadline = clock() + timeout_seconds
     try:
         while True:

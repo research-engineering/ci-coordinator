@@ -180,6 +180,73 @@ def test_breakpoint_and_continue_require_correlated_fragmented_dap_exchange(tmp_
     assert not any(request["command"] == "evaluate" for request in transport.requests)
 
 
+@pytest.mark.parametrize(
+    ("prefix", "expected_line"),
+    (
+        ("", 2),
+        ("    import sys\n", 3),
+        ("    from package import (\n        application,\n    )\n", 5),
+        ("    import sys\n    from package import application\n", 4),
+    ),
+)
+def test_breakpoint_preserves_first_assignment_after_deferred_imports(
+    tmp_path: Path, prefix: str, expected_line: int
+) -> None:
+    source = _source(tmp_path)
+    source.write_text(f"def main():\n{prefix}    marker = 1\n    return marker\n", encoding="utf-8")
+    transport = ScriptedSocket()
+
+    result = verify_backend_debugger(tmp_path, port=54321, connect=lambda *_: transport)
+
+    assert result.breakpoint_line == transport.line == expected_line
+    assert result.source_sha256 == hashlib.sha256(source.read_bytes()).hexdigest()
+    assert transport.closed
+    assert [request["command"] for request in transport.requests][-2:] == ["continue", "disconnect"]
+
+
+@pytest.mark.parametrize(
+    "text",
+    (
+        "marker = 1\n",
+        "def main():\n    marker = 1\ndef main():\n    marker = 2\n",
+        "def main():\n    import sys\n",
+        "def main():\n    import sys\n    return 0\n",
+        "def main():\n    import sys\n    prepare()\n    marker = 1\n",
+        "def main():\n    import sys\n    if True:\n        marker = 1\n",
+    ),
+)
+def test_unavailable_assignment_breakpoint_fails_before_connect(tmp_path: Path, text: str) -> None:
+    source = _source(tmp_path)
+    source.write_text(text, encoding="utf-8")
+
+    def forbidden(address: tuple[str, int], timeout: float) -> ScriptedSocket:
+        pytest.fail("invalid entrypoint reached the debugger connection")
+
+    with pytest.raises(DebugWitnessError, match=r"^debugger entrypoint breakpoint is unavailable$"):
+        verify_backend_debugger(tmp_path, port=54321, connect=forbidden)
+
+
+def test_actual_runtime_entrypoint_retains_the_interpreter_admission_breakpoint() -> None:
+    root = Path(__file__).resolve().parents[2]
+    source = root / "backend/src/ci_coordinator/runtime/__main__.py"
+    source_bytes = source.read_bytes()
+    expected = [
+        number
+        for number, line in enumerate(source_bytes.splitlines(), start=1)
+        if line == b"    python_rejection = admit_python_runtime()"
+    ]
+    assert len(expected) == 1
+    transport = ScriptedSocket()
+
+    result = verify_backend_debugger(root, port=54321, connect=lambda *_: transport)
+
+    assert result.breakpoint_line == transport.line == expected[0]
+    assert result.source_sha256 == hashlib.sha256(source_bytes).hexdigest()
+    assert transport.closed
+    assert [request["command"] for request in transport.requests][-2:] == ["continue", "disconnect"]
+    assert source.read_bytes() == source_bytes
+
+
 @pytest.mark.parametrize("wrong_source,missing_stop", [(True, False), (False, True)])
 def test_successful_attach_alone_never_proves_breakpoint_continue(
     tmp_path: Path, wrong_source: bool, missing_stop: bool
