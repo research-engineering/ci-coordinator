@@ -187,6 +187,8 @@ def _string(value: object, field_name: str, *, maximum_bytes: int = 256) -> str:
 
 def _confidence(value: object) -> float:
     if type(value) is int:
+        if not 0 <= value <= 1:
+            raise ValueError("agent_advice_confidence_invalid")
         numeric = float(value)
     elif type(value) is float:
         numeric = value

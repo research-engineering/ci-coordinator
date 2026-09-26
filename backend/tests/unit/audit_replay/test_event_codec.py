@@ -46,11 +46,15 @@ class UnboundedKeyMapping(Mapping[str, object]):
         raise AssertionError("mapping values must not be read")
 
 
-def test_mapping_shape_caps_key_iteration_before_value_reads() -> None:
+@pytest.mark.parametrize("input_mapping", (False, True), ids=("record", "input"))
+def test_mapping_shape_caps_key_iteration_before_value_reads(input_mapping: bool) -> None:
     mapping = UnboundedKeyMapping()
 
     with pytest.raises(AuditEventError, match="contains unknown key key-0"):
-        audit_event_from_mapping(mapping)
+        if input_mapping:
+            audit_event_input_from_mapping(mapping)
+        else:
+            audit_event_from_mapping(mapping)
 
     assert mapping.next_calls == 17
     assert mapping.value_reads == 0
@@ -105,6 +109,142 @@ def test_audit_event_input_mapping_requires_exact_input_or_record_shape() -> Non
         audit_event_input_from_mapping({**input_mapping, "unauthenticated": True})
     with pytest.raises(AuditEventError, match="invalid Unicode scalar values"):
         audit_event_input_from_mapping({**input_mapping, "actor": "invalid-\ud800"})
+
+
+@pytest.mark.parametrize("scope_key", ("installationId", "repositoryId"))
+@pytest.mark.parametrize("scope_value", (1, None, "invalid"))
+def test_half_scoped_input_has_a_typed_shape_failure_before_any_value_read(
+    scope_key: str, scope_value: object
+) -> None:
+    raw = _literal_input()
+    raw[scope_key] = scope_value
+    mapping = _ReadCountingMapping(raw)
+
+    with pytest.raises(AuditEventError) as failure:
+        audit_event_input_from_mapping(mapping)
+
+    assert str(failure.value) == "audit event input has an incomplete repository scope"
+    assert failure.value.audit_event_id is None
+    assert mapping.reads == []
+    assert mapping.iterations == len(raw)
+
+
+@pytest.mark.parametrize(
+    ("removed", "added", "message"),
+    (
+        ("actor", {"installationId": 1}, "audit event input is missing actor"),
+        ("actor", {"repositoryId": 2}, "audit event input is missing actor"),
+        ("actor", {}, "audit event input is missing actor"),
+        (None, {"unexpected": True}, "audit event input contains unknown key unexpected"),
+        (
+            None,
+            {"schemaVersion": "ci-audit-event/v1"},
+            "audit event input is missing installationId",
+        ),
+    ),
+)
+def test_input_shape_repair_preserves_existing_diagnostic_precedence(
+    removed: str | None, added: dict[str, object], message: str
+) -> None:
+    raw = _literal_input()
+    if removed is not None:
+        del raw[removed]
+    raw.update(added)
+    mapping = _ReadCountingMapping(raw)
+
+    with pytest.raises(AuditEventError) as failure:
+        audit_event_input_from_mapping(mapping)
+
+    assert str(failure.value) == message
+    assert failure.value.audit_event_id is None
+    assert mapping.reads == []
+
+
+@pytest.mark.parametrize("scoped", (False, True))
+def test_valid_input_and_record_shapes_preserve_snapshot_values_and_hashes(scoped: bool) -> None:
+    raw = _literal_input()
+    if scoped:
+        raw.update(installationId=1, repositoryId=2)
+    mapping = _ReadCountingMapping(dict(reversed(tuple(raw.items()))))
+    admitted = audit_event_input_from_mapping(mapping)
+    assert len(mapping.reads) == len(raw)
+    assert set(mapping.reads) == set(raw)
+    assert mapping.reads == (
+        [
+            "idempotencyKey",
+            "installationId",
+            "repositoryId",
+            "subjectType",
+            "subjectId",
+            "eventType",
+            "createdAt",
+            "actor",
+            "payload",
+        ]
+        if scoped
+        else list(_literal_input())
+    )
+    assert admitted.installation_id == (1 if scoped else None)
+    assert admitted.repository_id == (2 if scoped else None)
+    assert admitted.payload == {"value": [1, "snapshot"]}
+    record = build_audit_event(admitted, None)
+    record_mapping = audit_event_to_mapping(record)
+    read_record = _ReadCountingMapping(dict(reversed(tuple(record_mapping.items()))))
+
+    assert audit_event_from_mapping(read_record) == record
+    assert len(read_record.reads) == len(record_mapping)
+    assert set(read_record.reads) == set(record_mapping)
+    assert read_record.reads[0] == "auditEventId"
+    projected = audit_event_input_from_mapping(record_mapping)
+    assert projected == admitted
+    assert build_audit_event(projected, None) == record
+    assert verify_audit_chain([record_mapping]).valid is True
+    assert record_mapping == audit_event_to_mapping(audit_event_from_mapping(record_mapping))
+
+
+def test_record_shape_failure_keeps_its_existing_missing_key_and_diagnostic_id() -> None:
+    record = audit_replay_oracle()["validChain"]["events"][0]
+    raw = {key: value for key, value in record.items() if key != "actor"}
+    mapping = _ReadCountingMapping(raw)
+
+    with pytest.raises(AuditEventError) as failure:
+        audit_event_from_mapping(mapping)
+
+    assert str(failure.value) == "audit event record is missing installationId"
+    assert failure.value.audit_event_id == record["auditEventId"]
+    assert mapping.reads == ["auditEventId"]
+    assert audit_event_to_mapping(audit_event_from_mapping(record)) == record
+
+
+def _literal_input() -> dict[str, object]:
+    return {
+        "idempotencyKey": "scope-totality",
+        "subjectType": "dynamic-ci-plan",
+        "subjectId": "scope-test",
+        "eventType": "scope.checked",
+        "createdAt": "2026-09-26T00:00:00.000Z",
+        "actor": "test",
+        "payload": {"value": [1, "snapshot"]},
+    }
+
+
+class _ReadCountingMapping(Mapping[str, object]):
+    def __init__(self, values: dict[str, object]) -> None:
+        self._data = values
+        self.reads: list[str] = []
+        self.iterations = 0
+
+    def __iter__(self) -> Iterator[str]:
+        for key in self._data:
+            self.iterations += 1
+            yield key
+
+    def __len__(self) -> int:
+        raise AssertionError("shape admission must not query caller-owned length")
+
+    def __getitem__(self, key: str) -> object:
+        self.reads.append(key)
+        return self._data[key]
 
 
 def test_verify_audit_chain_rejects_schema_and_unknown_field_drift() -> None:

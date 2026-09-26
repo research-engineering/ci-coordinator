@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from dataclasses import replace
+from io import StringIO
 
 import pytest
+from ruamel.yaml import YAML
 
 import ci_coordinator.config_control._compiler as compiler_module
 import ci_coordinator.config_control._schema_validation as schema_validation_module
@@ -25,6 +27,7 @@ from ci_coordinator.config_control._dynamic_ci_compatibility import (
 from ci_coordinator.config_control._resources import ContractResource, contract_document
 from ci_coordinator.config_control.contracts import (
     PolicyDiagnostic,
+    PolicySourceFormat,
     RepositoryScope,
     ValidatedEpochDraft,
 )
@@ -65,6 +68,162 @@ def test_compiler_maps_null_and_disabled_dynamic_policy_to_null() -> None:
 
     assert _compile_document(null_document)["dynamicCi"] is None
     assert _compile_document(disabled_document)["dynamicCi"] is None
+
+
+@pytest.mark.parametrize("source_format", ("json", "yaml-1.2"))
+@pytest.mark.parametrize(
+    ("field", "token", "integer"),
+    (
+        ("maxShards", "8.0", 8),
+        ("maxShards", "8e0", 8),
+        ("maxParallel", "4.0", 4),
+        ("maxParallel", "4e0", 4),
+        ("maxItemsPerShard", "1000.0", 1000),
+        ("maxItemsPerShard", "1e3", 1000),
+    ),
+)
+def test_public_admission_normalizes_each_integral_sharding_number(
+    source_format: PolicySourceFormat, field: str, token: str, integer: int
+) -> None:
+    control_source = _sharding_source(field, str(integer), source_format)
+    source = _sharding_source(field, token, source_format)
+    control = admit_policy_document(control_source, source_format)
+    admitted = admit_policy_document(source, source_format)
+
+    assert isinstance(control, ValidatedEpochDraft)
+    assert isinstance(admitted, ValidatedEpochDraft)
+    assert admitted.source_bytes == source != control.source_bytes
+    assert admitted.source_hash != control.source_hash
+    assert admitted.epoch_id != control.epoch_id
+    assert admitted == replace(
+        control,
+        source_bytes=source,
+        source_hash=admitted.source_hash,
+        epoch_id=admitted.epoch_id,
+    )
+    projection = project_dynamic_ci_planning(admitted)
+    control_projection = project_dynamic_ci_planning(control)
+    assert projection is not None and control_projection is not None
+    assert projection.policy_hash == control_projection.policy_hash
+    assert projection.validation_catalog == control_projection.validation_catalog
+    sharding = projection.validation_catalog.execution_profiles[0].sharding_policy
+    assert (sharding.max_shards, sharding.max_parallel, sharding.max_items_per_shard) == (
+        8,
+        4,
+        1000,
+    )
+    assert all(
+        type(value) is int
+        for value in (sharding.max_shards, sharding.max_parallel, sharding.max_items_per_shard)
+    )
+
+
+@pytest.mark.parametrize("source_format", ("json", "yaml-1.2"))
+@pytest.mark.parametrize("field", ("maxShards", "maxParallel", "maxItemsPerShard"))
+@pytest.mark.parametrize(
+    ("token", "keyword"),
+    (("true", "type"), ('"8"', "type"), ("8.5", "type"), ("0", "minimum")),
+)
+def test_public_sharding_admission_preserves_structural_diagnostics(
+    source_format: PolicySourceFormat, field: str, token: str, keyword: str
+) -> None:
+    result = admit_policy_document(_sharding_source(field, token, source_format), source_format)
+
+    assert result == (
+        PolicyDiagnostic(
+            code="structure.invalid",
+            phase="structure",
+            rule_id="schema:" + keyword,
+            instance_pointer="/repository/dynamicCi/executionProfiles/0/shardingPolicy/" + field,
+            parameters={
+                "schemaKeyword": keyword,
+                "schemaPointer": "/$defs/shardingPolicy/properties/" + field + "/" + keyword,
+            },
+        ),
+    )
+
+
+@pytest.mark.parametrize("source_format", ("json", "yaml-1.2"))
+@pytest.mark.parametrize(
+    ("field", "token"),
+    (("maxShards", "257.0"), ("maxParallel", "257e0"), ("maxItemsPerShard", "10001.0")),
+)
+def test_public_sharding_admission_does_not_widen_numeric_bounds(
+    source_format: PolicySourceFormat, field: str, token: str
+) -> None:
+    result = admit_policy_document(_sharding_source(field, token, source_format), source_format)
+
+    assert result == (
+        PolicyDiagnostic(
+            code="structure.invalid",
+            phase="structure",
+            rule_id="schema:maximum",
+            instance_pointer="/repository/dynamicCi/executionProfiles/0/shardingPolicy/" + field,
+            parameters={
+                "schemaKeyword": "maximum",
+                "schemaPointer": "/$defs/shardingPolicy/properties/" + field + "/maximum",
+            },
+        ),
+    )
+
+
+@pytest.mark.parametrize("source_format", ("json", "yaml-1.2"))
+def test_integral_sharding_values_still_require_bounded_parallelism(
+    source_format: PolicySourceFormat,
+) -> None:
+    result = admit_policy_document(
+        _sharding_source("maxParallel", "9.0", source_format), source_format
+    )
+
+    assert result == (
+        PolicyDiagnostic(
+            code="semantics.invalid",
+            phase="semantics",
+            rule_id="profile.parallelism-bounded",
+            instance_pointer="/repository/dynamicCi/executionProfiles/0/shardingPolicy/maxParallel",
+            parameters={},
+        ),
+    )
+
+
+@pytest.mark.parametrize("source_format", ("json", "yaml-1.2"))
+def test_disabled_dynamic_policy_remains_observe_only_with_integral_sharding_values(
+    source_format: PolicySourceFormat,
+) -> None:
+    source = _sharding_source("maxShards", "8.0", source_format, planning_enabled=False)
+    control_source = _sharding_source("maxShards", "8", source_format, planning_enabled=False)
+    control = admit_policy_document(control_source, source_format)
+    admitted = admit_policy_document(source, source_format)
+
+    assert isinstance(control, ValidatedEpochDraft)
+    assert isinstance(admitted, ValidatedEpochDraft)
+    assert admitted.normalized_document_bytes == control.normalized_document_bytes
+    assert admitted.compiled_policy_bytes == control.compiled_policy_bytes
+    assert json.loads(admitted.compiled_policy_bytes)["dynamicCi"] is None
+    assert project_dynamic_ci_planning(admitted) is None
+
+
+def _sharding_source(
+    field: str, token: str, source_format: PolicySourceFormat, *, planning_enabled: bool = True
+) -> bytes:
+    document = _normalized_policy_document()
+    _dynamic(document)["planningEnabled"] = planning_enabled
+    profile = _object(_array(_dynamic(document)["executionProfiles"])[0])
+    original = _object(profile["shardingPolicy"])[field]
+    if source_format == "json":
+        text = json.dumps(document)
+        prefix = json.dumps(field) + ": "
+    else:
+        stream = StringIO()
+        yaml = YAML(typ="safe", pure=True)
+        yaml.default_flow_style = False
+        yaml.dump(document, stream)
+        text = stream.getvalue()
+        prefix = field + ": "
+        assert "\n" in text and not text.startswith("{")
+    old = prefix + str(original)
+    assert text.count(old) == 1
+    return text.replace(old, prefix + token, 1).encode("utf-8")
 
 
 def test_compiler_reports_schema_and_bounded_output_failures_exactly() -> None:

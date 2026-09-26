@@ -9,6 +9,7 @@ from planning_core._support import make_input_value, make_policy_value
 from ci_coordinator.agent_risk_advice import (
     MAX_AGENT_ADVICE_OUTPUT_BYTES,
     AdmittedAdvice,
+    AdviceAuditMetadata,
     AdviceEvaluationEvidence,
     AdviceExecutionEnvelope,
     RejectedAdvice,
@@ -188,6 +189,117 @@ def test_advice_output_is_strict_json_and_bounded_before_parsing() -> None:
     assert result.audit.reasons == ("agent_advice_invalid_json",)
     with pytest.raises(ValueError, match="byte bound"):
         _envelope_bytes(input.input_hash, b"x" * (MAX_AGENT_ADVICE_OUTPUT_BYTES + 1))
+
+
+@pytest.mark.parametrize("enabled", (True, False))
+@pytest.mark.parametrize(
+    ("token", "reason"),
+    (
+        (b"1" + b"0" * 309, "agent_advice_confidence_invalid"),
+        (b"-1" + b"0" * 309, "agent_advice_confidence_invalid"),
+        (b"2", "agent_advice_confidence_invalid"),
+        (b"-1", "agent_advice_confidence_invalid"),
+        (b"1.5", "agent_advice_confidence_invalid"),
+        (b"true", "agent_advice_confidence_invalid"),
+        (b'"1"', "agent_advice_confidence_invalid"),
+        (b"1e309", "agent_advice_invalid_json"),
+        (b"NaN", "agent_advice_invalid_json"),
+    ),
+    ids=(
+        "huge-int",
+        "negative-huge-int",
+        "above",
+        "below",
+        "fraction",
+        "bool",
+        "text",
+        "exp",
+        "nan",
+    ),
+)
+def test_literal_confidence_rejection_preserves_exact_audit_provenance(
+    enabled: bool, token: bytes, reason: str
+) -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = _advice_policy()
+    policy = replace(policy, agent_advice=replace(policy.agent_advice, enabled=enabled))
+    raw = _confidence_output(token)
+    assert len(raw) < MAX_AGENT_ADVICE_OUTPUT_BYTES
+    envelope = _envelope_bytes(input.input_hash, raw)
+
+    result = admit_advice(envelope, input=input, policy=policy)
+
+    assert result == RejectedAdvice(
+        AdviceAuditMetadata(
+            advice_hash=hashlib.sha256(raw).hexdigest(),
+            advice_id=None,
+            input_hash=input.input_hash,
+            model_id="model",
+            prompt_hash=_PROMPT_HASH,
+            evaluation_id=envelope.evaluation.evaluator_id,
+            evaluation_policy_hash=_EVALUATION_POLICY_HASH,
+            evaluation_passed=True,
+            parse_valid=False,
+            accepted=False,
+            reasons=(reason,),
+        )
+    )
+
+
+@pytest.mark.parametrize("token", (b"0", b"1", b"0.0", b"1.0", b"0.5", b"-0.0"))
+def test_literal_confidence_keeps_the_admitted_numeric_domain(token: bytes) -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = _advice_policy()
+    policy = replace(policy, agent_advice=replace(policy.agent_advice, min_confidence=0))
+    raw = _confidence_output(token)
+
+    result = admit_advice(_envelope_bytes(input.input_hash, raw), input=input, policy=policy)
+
+    assert isinstance(result, AdmittedAdvice)
+    assert result.advice.confidence == float(token)
+    assert type(result.advice.confidence) is float
+    assert result.audit.parse_valid is True
+    assert result.audit.accepted is True
+    assert result.audit.reasons == ()
+    assert result.audit.advice_hash == hashlib.sha256(raw).hexdigest()
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "reason"),
+    (
+        (b'"adviceId":"confidence-totality",', b"", "agent_advice_missing_fields:adviceId"),
+        (
+            b'{"schemaVersion"',
+            b'{"unexpected":true,"schemaVersion"',
+            "agent_advice_unknown_fields:unexpected",
+        ),
+        (b'"agent-risk-advice/v2"', b'"other"', "agent_advice_schema_unsupported"),
+    ),
+)
+def test_confidence_overflow_cannot_reorder_earlier_parse_failures(
+    old: bytes, new: bytes, reason: str
+) -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    raw = _confidence_output(b"1" + b"0" * 309)
+    assert raw.count(old) == 1
+
+    result = admit_advice(
+        _envelope_bytes(input.input_hash, raw.replace(old, new, 1)),
+        input=input,
+        policy=_advice_policy(),
+    )
+
+    assert isinstance(result, RejectedAdvice)
+    assert result.audit.reasons == (reason,)
+    assert result.audit.parse_valid is False
+
+
+def _confidence_output(token: bytes) -> bytes:
+    return (
+        b'{"schemaVersion":"agent-risk-advice/v2","adviceId":"confidence-totality",'
+        b'"confidence":' + token + b',"addObligations":[],"increaseDepth":[],"riskFindings":[],'
+        b'"fallbackRecommendation":null,"rationale":"bounded test"}'
+    )
 
 
 def _advice_policy() -> PlanningPolicy:

@@ -108,6 +108,14 @@ unchanged and records canonical reason codes. A post-admission authority or
 coverage violation produces FullCI and records the advice as rejected. Advice
 absence also leaves the deterministic plan unchanged.
 
+A decoded exact integer confidence outside `[0, 1]` is rejected before conversion
+to a host float, including a decimal integer that fits the output-byte limit
+but exceeds the finite-float range. The result retains
+`agent_advice_confidence_invalid` and the exact envelope provenance; it does not
+escape as a numeric conversion error. Earlier JSON, shape, and schema failures
+retain their precedence. Public verification must preserve the independently
+admitted plan, including its omission proofs and fallback state, on this refusal.
+
 ## 8. Implementation And Proof
 
 ```text

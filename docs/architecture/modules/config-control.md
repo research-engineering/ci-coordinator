@@ -163,6 +163,15 @@ classification is applied to that projected value. Safe integer tokens remain
 exact. Distinct numeric source spellings remain distinct in `sourceHash` even
 when they project to the same normalized number.
 
+This integer domain also applies to all three dynamic-CI sharding counters
+through producer feasibility and compilation. Integral decimal or exponent
+spellings produce the same normalized and compiled bytes, catalog and policy
+hashes as their integer spelling; exact source bytes, `sourceHash`, and the
+source-bound `epochId` remain distinct. Non-integral, boolean, textual, and
+out-of-bound values retain their existing typed diagnostics. The worker preserves
+the pure admission result; HTTP validation retains its existing success, error,
+and authentication contracts.
+
 Depth, node, and forbidden graph features are enforced while consuming tokens
 or events, before constructing the full host object. JSON receives a
 string-aware preflight before `json.loads`; YAML receives an event preflight
