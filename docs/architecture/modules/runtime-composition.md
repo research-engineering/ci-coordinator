@@ -172,6 +172,37 @@ restart. Its enforcing path additionally consumes a real signed receipt,
 registers the exact authority and scope rows before serving, and proves that a
 tampered receipt cannot allocate the database or provider clients.
 
+### Dedicated Server Diagnostics
+
+Before serving, the executable installs one bounded server-record adapter on
+the dedicated `uvicorn` logger, with `uvicorn.error` propagating only to that
+parent. It then passes `log_config=None` so Uvicorn cannot reinstall its default
+raw formatter. Access logging stays disabled; root and unrelated logger owners
+are untouched. Foreign handlers or a conflicting server logger configuration
+are rejected rather than silently replaced. This is a fresh dedicated-process
+profile, not an integration contract for an arbitrary embedding host.
+
+The Uvicorn 0.53 template catalog maps exact native-severity/template pairs to
+finite reasons. It never formats arguments or copies message text, extras,
+source paths, `exc_text`, `stack_info`, exception notes or locals. With genuine
+`exc_info`, only exception class is retained. Already-formatted Starlette
+failed-lifespan messages, unknown strings and non-string messages instead emit
+`unclassified_server_event` at the original supported level. They are not
+silently dropped or labelled as success. Malformed projection inputs produce
+a fixed ERROR diagnostic-contract event. Server-generated correlation metadata
+does not claim the HTTP request's correlation identity.
+
+This projection preserves HTTP error handling before/after response start,
+lifespan failure messages' control semantics, startup refusal, shutdown, drain,
+cancellation and readiness/metric decisions. It does not turn every shutdown
+failure into a new nonzero process exit. Sink failure remains non-authoritative
+under the [observability failure contract](observability.md#8-failure-behavior),
+with no raw fallback. Real pinned h11 and Starlette lifespan witnesses through
+the installer/entrypoint are required in native CI, including message-only and
+failing-handler paths. TestClient or formatter-only tests do not qualify that
+boundary. Rich stack coordinates and process-wide logging secrecy are not
+claimed.
+
 ## 5. Container Artifact Contract
 
 The supported deployment artifact is the digest-addressed OCI image built by

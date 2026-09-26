@@ -110,8 +110,10 @@ def test_executable_uses_one_hardened_bounded_server_profile(
 ) -> None:
     app = object()
     calls: list[tuple[object, dict[str, object]]] = []
+    order: list[str] = []
 
     def run(candidate: object, **options: object) -> None:
+        order.append("run")
         calls.append((candidate, options))
 
     projection = SimpleNamespace(
@@ -130,8 +132,12 @@ def test_executable_uses_one_hardened_bounded_server_profile(
         lambda _: SimpleNamespace(app=app, settings=projection),
     )
     monkeypatch.setitem(sys.modules, "uvicorn", SimpleNamespace(run=run))
+    monkeypatch.setattr(
+        runtime_main, "configure_runtime_server_logging", lambda: order.append("logging")
+    )
 
     assert runtime_main.main() == 0
+    assert order == ["logging", "run"]
 
     assert calls == [
         (
@@ -140,6 +146,7 @@ def test_executable_uses_one_hardened_bounded_server_profile(
                 "host": "127.0.0.1",
                 "port": 8080,
                 "access_log": False,
+                "log_config": None,
                 "proxy_headers": False,
                 "forwarded_allow_ips": "",
                 "limit_concurrency": runtime_main.UVICORN_MAX_CONCURRENT_REQUESTS,

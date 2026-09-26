@@ -155,6 +155,12 @@ jobs:
             "${root}/image.json" > "${root}/size.json"
           rm "${root}/image.tar.gz"
       - name: Qualify read-only runtime and PostgreSQL TLS
+        env:
+          SHUTDOWN_LOG_QUERY: >-
+            any(.[]; type == "object" and .event == "server_log" and
+              .level == "INFO" and .reason == "shutdown_complete") and
+            all(.[]; type == "object" and
+              (.event != "server_log" or .reason != "shutdown_failed"))
         run: |
           set -euo pipefail
           root="${RUNNER_TEMP}/qualification"
@@ -227,7 +233,9 @@ jobs:
           docker inspect runtime-candidate --format '{{json .State}}' \
             | jq '{ExitCode,OOMKilled,Error,StartedAt,FinishedAt}' > "${root}/shutdown.json"
           docker logs runtime-candidate > "${root}/shutdown.log" 2>&1
-          grep -F 'Application shutdown complete.' "${root}/shutdown.log"
+          test -s "${root}/shutdown.log"
+          test "$(wc -c < "${root}/shutdown.log")" -le 1048576
+          jq -e -s "${SHUTDOWN_LOG_QUERY}" "${root}/shutdown.log" > /dev/null
           jq -e '(.ExitCode == 0 or .ExitCode == 143) and .OOMKilled == false and .Error == ""' \
             "${root}/shutdown.json" > /dev/null
       - name: Compare bounded runtime workloads with exact baseline source

@@ -222,6 +222,8 @@ def test_observation_composes_background_membership_and_independent_bounds(
     assert type(resources.background._services[1]) is HistoryCollectionWorker
     primary = resources.background._primary
     assert type(primary) is PeriodicReconciliationService
+    assert primary._diagnostics is history_collection._diagnostics
+    assert type(primary._diagnostics) is RuntimeDiagnosticObserver
     assert worker_factory.call_args.kwargs["idle_seconds"] == primary._interval_seconds
     assert worker_factory.call_args.kwargs["drain_seconds"] == primary._drain_timeout_seconds
     assert worker_factory.call_args.kwargs["metrics"] is observed["metrics"]

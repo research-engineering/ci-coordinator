@@ -6,9 +6,10 @@ from collections.abc import Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from io import StringIO
 from threading import Barrier
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pytest
+from _pytest.logging import LogCaptureHandler, catching_logs
 from prometheus_support import prometheus_samples
 
 from ci_coordinator.observability import (
@@ -22,6 +23,7 @@ from ci_coordinator.observability import (
     health,
     redacted_log_event,
 )
+from ci_coordinator.observability import logging as event_logging
 from ci_coordinator.observability.runtime_metrics import (
     CI_ECONOMICS_COLLECTION_METRIC_OUTCOMES,
     CiEconomicsCollectionItemMetricOutcome,
@@ -505,5 +507,192 @@ def test_runtime_diagnostics_exclude_exception_messages_and_arguments() -> None:
     assert record["event"] == "unexpected_failure"
     assert record["stage"] == "candidate_context"
     assert record["exceptionType"] == "RuntimeError"
+    assert record["level"] == "ERROR"
     assert record["correlationId"] == "d" * 32
     assert "provider response contains a secret" not in output.getvalue()
+
+
+@pytest.mark.parametrize("severity,level", [("INFO", 20), ("WARNING", 30), ("ERROR", 40)])
+def test_native_and_json_severity_agree_without_event_field_authority(
+    severity: Literal["INFO", "WARNING", "ERROR"], level: int
+) -> None:
+    records: list[logging.LogRecord] = []
+
+    class Capture(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            records.append(record)
+
+    logger = logging.Logger("severity-witness", level=logging.INFO)
+    logger.addHandler(Capture())
+    structured = StructuredEventLogger(logger)
+    structured.emit({"event": "sample", "level": "forged"}, severity=severity)
+    structured.emit({"event": "ordinary"})
+    RuntimeDiagnosticObserver(structured).unexpected_failure(
+        "reconciliation_loop", KeyError("private")
+    )
+    assert [record.levelno for record in records] == [level, 20, 40]
+    assert [json.loads(record.getMessage())["level"] for record in records] == [
+        severity,
+        "INFO",
+        "ERROR",
+    ]
+    assert json.loads(records[2].getMessage())["stage"] == "reconciliation_loop"
+
+
+@pytest.mark.parametrize("severity", ["DEBUG", "private-level", 1, None, []])
+def test_invalid_severity_becomes_fixed_instrumentation_failure(severity: object) -> None:
+    output = StringIO()
+    logger = logging.Logger("invalid-level")
+    logger.addHandler(logging.StreamHandler(output))
+    structured = StructuredEventLogger(logger)
+    structured.emit({"event": "discarded"}, severity=cast(Any, severity))
+    assert structured.failure_count == 1
+    row = json.loads(output.getvalue())
+    assert (row["event"], row["level"]) == ("structured_log_failure", "ERROR")
+    assert "private-level" not in output.getvalue()
+
+
+@pytest.mark.parametrize("fault", ["once", "always", "flush", "formatter"])
+def test_owned_handler_failure_is_contained_without_raw_stderr(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], fault: str
+) -> None:
+    class Stream(StringIO):
+        writes = 0
+        flushes = 0
+
+        def write(self, text: str) -> int:
+            self.writes += 1
+            if fault == "always" or (fault == "once" and self.writes == 1):
+                raise OSError("private sink diagnostic")
+            return super().write(text)
+
+        def flush(self) -> None:
+            self.flushes += 1
+            if fault == "flush":
+                raise OSError("private flush diagnostic")
+
+    class BrokenFormatter(logging.Formatter):
+        def format(self, record: logging.LogRecord) -> str:
+            raise ValueError("private formatter diagnostic")
+
+    logger = logging.Logger("isolated-runtime-events")
+    original_get_logger = logging.getLogger
+    monkeypatch.setattr(
+        logging,
+        "getLogger",
+        lambda name=None: logger if name == "ci_coordinator.events" else original_get_logger(name),
+    )
+    structured = event_logging.default_structured_event_logger()
+    handler = cast(logging.StreamHandler[Any], logger.handlers[0])
+    stream = Stream()
+    handler.setStream(stream)
+    if fault == "formatter":
+        handler.setFormatter(BrokenFormatter())
+    structured.emit({"event": "ordinary"})
+    assert structured.failure_count == 1
+    assert stream.writes == (0 if fault == "formatter" else 2)
+    assert capsys.readouterr().err == ""
+    rows = [json.loads(line) for line in stream.getvalue().splitlines()]
+    assert [row["event"] for row in rows] == (
+        ["structured_log_failure"]
+        if fault == "once"
+        else ["ordinary", "structured_log_failure"]
+        if fault == "flush"
+        else []
+    )
+
+
+def test_fallback_metadata_failure_does_not_escape(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BrokenClock:
+        @staticmethod
+        def now(_zone: object) -> object:
+            raise ValueError("private clock diagnostic")
+
+    monkeypatch.setattr(event_logging, "datetime", BrokenClock)
+    structured = StructuredEventLogger(logging.Logger("broken-clock"))
+    structured.emit({"event": "ordinary"})
+    assert structured.failure_count == 1
+
+
+@pytest.mark.parametrize("foreign_state", ["handler", "filter", "disabled", "level", "propagation"])
+def test_default_logger_refuses_foreign_configuration(
+    monkeypatch: pytest.MonkeyPatch, foreign_state: str
+) -> None:
+    logger = logging.Logger("foreign-events")
+    if foreign_state == "handler":
+        logger.addHandler(logging.NullHandler())
+    elif foreign_state == "filter":
+        logger.addFilter(logging.Filter())
+    elif foreign_state == "disabled":
+        logger.disabled = True
+    elif foreign_state == "level":
+        logger.setLevel(logging.ERROR)
+    else:
+        logger.propagate = False
+    before = (
+        list(logger.handlers),
+        list(logger.filters),
+        logger.disabled,
+        logger.level,
+        logger.propagate,
+    )
+    original_get_logger = logging.getLogger
+    monkeypatch.setattr(
+        logging,
+        "getLogger",
+        lambda name=None: logger if name == "ci_coordinator.events" else original_get_logger(name),
+    )
+    with pytest.raises(RuntimeError, match="dedicated runtime logger"):
+        event_logging.default_structured_event_logger()
+    assert (
+        logger.handlers,
+        logger.filters,
+        logger.disabled,
+        logger.level,
+        logger.propagate,
+    ) == before
+
+
+def test_dedicated_test_logger_isolated_from_real_pytest_capture(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    isolated = logging.getLogger("ci_coordinator.events")
+    assert logging.Logger.manager.loggerDict.get(isolated.name) is not isolated
+    first = event_logging.default_structured_event_logger()
+    owned_handlers = tuple(isolated.handlers)
+    assert len(owned_handlers) == 1
+    registered = logging.Logger("dedicated-logger-capture-probe")
+    get_logger = logging.getLogger
+
+    def probe_logger(name: str | None = None) -> logging.Logger:
+        return registered if name == isolated.name else get_logger(name)
+
+    monkeypatch.setitem(logging.Logger.manager.loggerDict, registered.name, registered)
+    with monkeypatch.context() as patch:
+        patch.setattr(logging, "getLogger", probe_logger)
+        event_logging.default_structured_event_logger()
+    probe_handlers = tuple(registered.handlers)
+    assert len(probe_handlers) == 1
+    assert registered.propagate is False
+    capture = LogCaptureHandler()
+
+    with catching_logs(capture, logging.INFO):
+        assert capture in registered.handlers
+        assert capture not in isolated.handlers
+        second = event_logging.default_structured_event_logger()
+        assert tuple(isolated.handlers) == owned_handlers
+        first.emit({"event": "first"})
+        second.emit({"event": "second"})
+        assert capture.records == []
+        with monkeypatch.context() as patch:
+            patch.setattr(logging, "getLogger", probe_logger)
+            with pytest.raises(RuntimeError, match="dedicated runtime logger"):
+                event_logging.default_structured_event_logger()
+        assert capture in registered.handlers
+
+    assert tuple(registered.handlers) == probe_handlers
+    assert tuple(isolated.handlers) == owned_handlers
+    assert [json.loads(line)["event"] for line in capsys.readouterr().err.splitlines()] == [
+        "first",
+        "second",
+    ]

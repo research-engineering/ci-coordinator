@@ -288,11 +288,16 @@ def container_diagnostic(output: str) -> dict[str, object]:
 
 
 def startup_diagnostic(output: str, *, allowed_fields: frozenset[str]) -> dict[str, object]:
-    markers = sorted({label for text, label in _MARKERS.items() if text in output})
+    markers = {label for text, label in _MARKERS.items() if text in output}
     rejections = []
     for line in output.splitlines()[:4096]:
         start = line.find("{")
         value = _object(line[start:], maximum=4096) if start >= 0 else None
+        if value is not None and value.get("event") == "server_log":
+            if value.get("level") == "INFO" and value.get("reason") == "startup_complete":
+                markers.add("startup-complete")
+            elif value.get("level") == "ERROR" and value.get("reason") == "startup_failed":
+                markers.add("startup-failed")
         if value is None or type(value.get("code")) is not str or value["code"] not in _REJECTIONS:
             continue
         field = value.get("field")
@@ -304,7 +309,7 @@ def startup_diagnostic(output: str, *, allowed_fields: frozenset[str]) -> dict[s
         )
         if len(rejections) == 16:
             break
-    return {"markers": markers, "rejections": rejections}
+    return {"markers": sorted(markers), "rejections": rejections}
 
 
 def _object(output: str, *, maximum: int) -> Mapping[str, object] | None:

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import asyncio
 
-from ci_coordinator.observability import BackgroundHealth, BackgroundHealthState, RuntimeMetrics
+from ci_coordinator.observability import (
+    BackgroundHealth,
+    BackgroundHealthState,
+    RuntimeDiagnosticObserver,
+    RuntimeMetrics,
+)
 from ci_coordinator.reconciliation import ReconciliationScheduler, RoundCompletion
 from ci_coordinator.reconciliation.scheduler import TickResult
 
@@ -24,6 +29,7 @@ class PeriodicReconciliationService:
         startup_timeout_seconds: float,
         drain_timeout_seconds: float,
         metrics: RuntimeMetrics | None = None,
+        diagnostics: RuntimeDiagnosticObserver | None = None,
     ) -> None:
         for value, name in (
             (interval_seconds, "reconciliation interval"),
@@ -37,6 +43,7 @@ class PeriodicReconciliationService:
         self._startup_timeout_seconds = float(startup_timeout_seconds)
         self._drain_timeout_seconds = float(drain_timeout_seconds)
         self._metrics = metrics
+        self._diagnostics = diagnostics
         self._stop_signal = asyncio.Event()
         self._loop_task: asyncio.Task[None] | None = None
         self._terminal_failure = False
@@ -114,8 +121,10 @@ class PeriodicReconciliationService:
             self._terminal_failure = not self._stop_signal.is_set()
             self._startup_complete.set()
             raise
-        except Exception:
+        except Exception as error:
             self._terminal_failure = True
             self._round_healthy = False
+            if self._diagnostics is not None:
+                self._diagnostics.unexpected_failure("reconciliation_loop", error)
         finally:
             self._startup_complete.set()

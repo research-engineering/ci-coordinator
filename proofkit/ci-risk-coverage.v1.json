@@ -3029,7 +3029,7 @@
     "scripts/ci_business_witness/__main__.py": "39233d77025a38f7b44ee712fc26b6e9aa799e17d6b7839ef4ec7c919755ef8e",
     "scripts/ci_business_witness/attached_logs.py": "42ae6599986a7ef49236d034120ec970b342c92bc135fa8fec0b9d09e19aae35",
     "scripts/ci_business_witness/consumers.py": "601b02f78f0725d3e3b016da78c7c263765708191c7af4122ac950237d1e6d9b",
-    "scripts/ci_business_witness/diagnostics.py": "aca65a9f8a31ecf5d175c054c5d2fa470ffc65fedabcf5f0aa9b38545eec52ff",
+    "scripts/ci_business_witness/diagnostics.py": "7170bf29727d4af516abf5b41544f2a2c415137988f59683788ea9f8b6722a68",
     "scripts/ci_business_witness/fixture.py": "64cab0f5ea7a3c53001e8c3d4f869c223c7306ed71291869329788c29b5e4ef1",
     "scripts/ci_business_witness/lifecycle.py": "26565a0ffe8f29b94d802f338017d8281e3f76ffb686dd34900cd15017fd9dd0",
     "scripts/ci_business_witness/oracle.py": "3cf70f37fe69726c51bb28432271d4f030407249c1f196b55e1beafd82fe66f6",

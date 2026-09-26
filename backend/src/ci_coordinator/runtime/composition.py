@@ -529,6 +529,7 @@ def _compose_connected_dependencies(
                 startup_timeout_seconds=settings.reconciliation_startup_timeout_seconds,
                 drain_timeout_seconds=shutdown.background_drain_seconds,
                 metrics=runtime_metrics,
+                diagnostics=diagnostics,
             ),
             additional=(
                 HistoryCollectionWorker(

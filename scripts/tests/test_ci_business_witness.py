@@ -633,6 +633,53 @@ def test_startup_diagnostic_emits_only_known_markers_rejections_and_setting_name
 
 
 @pytest.mark.parametrize(
+    ("level", "reason", "marker"),
+    [
+        ("INFO", "startup_complete", "startup-complete"),
+        ("ERROR", "startup_failed", "startup-failed"),
+    ],
+)
+def test_startup_diagnostic_admits_exact_structured_server_markers(
+    level: str, reason: str, marker: str
+) -> None:
+    value = {
+        "event": "server_log",
+        "level": level,
+        "reason": reason,
+        "private": "not-retained",
+    }
+    output = "backend | " + json.dumps(value)
+    assert startup_diagnostic(output, allowed_fields=frozenset()) == {
+        "markers": [marker],
+        "rejections": [],
+    }
+    for key, replacement in (
+        ("event", "not-server"),
+        ("level", "WARNING"),
+        ("reason", "startup_waiting"),
+    ):
+        changed = {**value, key: replacement}
+        assert startup_diagnostic(json.dumps(changed), allowed_fields=frozenset()) == {
+            "markers": [],
+            "rejections": [],
+        }
+
+
+def test_startup_diagnostic_retains_rejection_beside_structured_marker() -> None:
+    value = {
+        "event": "server_log",
+        "level": "ERROR",
+        "reason": "startup_failed",
+        "code": "runtime_dependencies_unavailable",
+        "field": "not-admitted",
+    }
+    assert startup_diagnostic(json.dumps(value), allowed_fields=frozenset()) == {
+        "markers": ["startup-failed"],
+        "rejections": [{"code": "runtime_dependencies_unavailable", "field": None}],
+    }
+
+
+@pytest.mark.parametrize(
     "patch",
     [
         {"failure": "minted-oidc-value"},
