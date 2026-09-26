@@ -37,7 +37,7 @@ from ci_coordinator.verification_core import (
     verify,
 )
 from ci_coordinator.verification_core import model as verified_model
-from ci_coordinator.verification_core.model import make_verified_plan
+from ci_coordinator.verification_core.model import VerificationEvidence, make_verified_plan
 
 
 def test_agent_advice_can_only_strengthen_obligation_and_witness_coverage() -> None:
@@ -87,6 +87,59 @@ def test_stale_deterministic_plan_forces_full_validation() -> None:
         "standard",
         "full",
     ]
+
+
+@pytest.mark.parametrize("sign", (b"", b"-"), ids=("positive", "negative"))
+def test_huge_literal_confidence_retains_the_independently_admitted_plan(sign: bytes) -> None:
+    input = make_input_value(DiffFileChangeInput(path="docs/guide.md", status="modified"))
+    policy = replace(
+        make_policy_value(),
+        agent_advice=AgentAdvicePolicy(True, ("model",), (_PROMPT_HASH,), 0.8, True),
+    )
+    candidate = _candidate(plan(input, policy))
+    baseline = verify(input, policy, candidate)
+    assert admit_deterministic_plan(input, policy, candidate) is None
+    assert baseline.fallback.triggered is False
+    assert baseline.omitted_obligations
+    raw = (
+        b'{"schemaVersion":"agent-risk-advice/v2","adviceId":"confidence-totality",'
+        b'"confidence":'
+        + sign
+        + b"1"
+        + b"0" * 309
+        + b',"addObligations":[],"increaseDepth":[],"riskFindings":[],'
+        b'"fallbackRecommendation":null,"rationale":"bounded test"}'
+    )
+    envelope = _envelope_bytes(input.input_hash, raw)
+
+    verified = verify(input, policy, candidate, envelope)
+
+    assert verified.source_plan == baseline.source_plan == candidate
+    assert verified.selected_obligations == baseline.selected_obligations
+    assert verified.selected_witnesses == baseline.selected_witnesses
+    assert verified.omitted_obligations == baseline.omitted_obligations
+    assert verified.deterministic_evidence == baseline.deterministic_evidence
+    assert verified.fallback == baseline.fallback
+    assert verified.agent_advice is not None
+    assert verified.agent_advice.accepted is False
+    assert verified.agent_advice.parse_valid is False
+    assert verified.agent_advice.reasons == ("agent_advice_confidence_invalid",)
+    assert verified.agent_advice.advice_hash == hashlib.sha256(raw).hexdigest()
+    assert verified.verification_evidence == (
+        *baseline.verification_evidence,
+        VerificationEvidence("agent_advice_rejected", "agent_advice_confidence_invalid"),
+    )
+
+    stale_input = make_input_value(
+        DiffFileChangeInput(path="src/service/component.py", status="modified")
+    )
+    stale = _candidate(plan(stale_input, policy))
+    assert admit_deterministic_plan(stale_input, policy, stale) is None
+    assert admit_deterministic_plan(input, policy, stale) == "deterministic_plan_mismatch"
+    rejected = verify(input, policy, stale, envelope)
+    assert rejected.fallback.triggered is True
+    assert rejected.fallback.reason == "deterministic_plan_mismatch"
+    assert rejected.agent_advice is None
 
 
 @pytest.mark.parametrize(
@@ -591,7 +644,10 @@ _PROMPT_HASH = "e" * 64
 
 
 def _envelope(input_hash: str, output: object) -> AdviceExecutionEnvelope:
-    raw_output = canonical_json(output)
+    return _envelope_bytes(input_hash, canonical_json(output))
+
+
+def _envelope_bytes(input_hash: str, raw_output: bytes) -> AdviceExecutionEnvelope:
     return AdviceExecutionEnvelope(
         raw_output=raw_output,
         input_hash=input_hash,

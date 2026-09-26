@@ -314,11 +314,16 @@ def _snapshot_mapping_shape(
         preferred_shape = (
             expected_shapes[-1] if seen - _AUDIT_EVENT_INPUT_KEYS else expected_shapes[0]
         )
-        missing_key = next(key for key in preferred_shape if key not in seen)
+        missing_key = next((key for key in preferred_shape if key not in seen), None)
+        message = (
+            f"{label} is missing {missing_key}"
+            if missing_key is not None
+            else "audit event input has an incomplete repository scope"
+        )
         _raise_mapping_shape_error(
             data,
             keys,
-            f"{label} is missing {missing_key}",
+            message,
             diagnostic_key,
         )
 

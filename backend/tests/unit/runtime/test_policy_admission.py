@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from anyio import BrokenWorkerProcess, CapacityLimiter, to_process
 from config_control._document_admission_support import valid_policy_source
+from config_epoch_support import CONFIG_SOURCE
 
 from ci_coordinator.app.config_admission import PolicyAdmissionUnavailable
 from ci_coordinator.config_control import ValidatedEpochDraft, admit_policy_document
@@ -40,6 +42,42 @@ def test_process_admission_preserves_the_pure_result_across_the_worker_boundary(
 
     assert result == expected
     assert isinstance(result, ValidatedEpochDraft) is (source != b"{}")
+
+
+@pytest.mark.parametrize("token", (b"8.0", b"8e0"))
+def test_real_worker_preserves_integral_sharding_values_and_source_identity(token: bytes) -> None:
+    control_source = _dynamic_source(b"8")
+    source = _dynamic_source(token)
+    control = admit_policy_document(control_source, "json")
+    assert isinstance(control, ValidatedEpochDraft)
+
+    result = asyncio.run(ProcessPolicyAdmission()(source, "json"))
+
+    assert isinstance(result, ValidatedEpochDraft)
+    assert result.source_bytes == source != control.source_bytes
+    assert result.source_hash != control.source_hash
+    assert result.epoch_id != control.epoch_id
+    assert result == replace(
+        control, source_bytes=source, source_hash=result.source_hash, epoch_id=result.epoch_id
+    )
+    assert result == admit_policy_document(source, "json")
+
+
+def _dynamic_source(token: bytes) -> bytes:
+    dynamic = (
+        b'{"planningEnabled":true,"policyVersion":"totality-v1","riskClasses":[], '
+        b'"dependencyGraph":{"source":"configured","globalRiskPaths":[]},'
+        b'"obligations":[{"obligationId":"quality","responsibility":{"paths":["src/**"]},'
+        b'"requiredWitnessIds":["quality"],"defaultDepth":"standard","fullDepth":"full",'
+        b'"omitAllowed":true}],"witnesses":[{"witnessId":"quality","executionProfileId":"linux",'
+        b'"supportedDepths":["standard","full"]}],"executionProfiles":[{"profileId":"linux",'
+        b'"runnerProfileId":"linux","permissionProfileId":"read","credentialProfileId":"none",'
+        b'"fixtureProfileId":"none","capacityClassId":"hosted","shardingPolicy":{'
+        b'"maxShards":' + token + b',"maxParallel":1,"maxItemsPerShard":100,'
+        b'"setupSecondsPerShard":1}}]}'
+    )
+    assert CONFIG_SOURCE.count(b'"dynamicCi":null') == 1
+    return CONFIG_SOURCE.replace(b'"dynamicCi":null', b'"dynamicCi":' + dynamic, 1)
 
 
 def test_process_admission_uses_exact_cancellable_worker_inputs(

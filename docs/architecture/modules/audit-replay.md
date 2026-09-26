@@ -232,6 +232,14 @@ Mapping admission snapshots the key sequence, rejects duplicate keys, and reads
 each required value at most once. Replay snapshots and validates the exact
 filter plus payload-disclosure options before any asynchronous store access and
 applies one detached control state to the whole report.
+
+Mapping-input shape admission requires both repository scope keys or neither.
+An otherwise complete input containing exactly one scope key raises
+`AuditEventError` before caller-owned value reads, not `StopIteration` from
+missing-key diagnosis. This refusal changes neither the precedence and messages
+of already diagnosed unknown, duplicate, or missing fields nor record diagnostic
+identity. Valid input and record snapshots retain their canonical bytes and hashes.
+
 Any producer that persists decision state before appending its audit event must
 admit and detach the complete audit input before the first store mutation.
 Resource exhaustion therefore cannot leave a planning context without its

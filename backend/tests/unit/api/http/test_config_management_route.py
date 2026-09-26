@@ -5,6 +5,7 @@ from hashlib import sha256
 from types import SimpleNamespace
 from typing import cast
 
+import pytest
 from config_epoch_support import CONFIG_SOURCE, admitted_config_epoch
 from control_plane_http_support import (
     ACTOR,
@@ -35,7 +36,9 @@ from ci_coordinator.app import (
 from ci_coordinator.app.config_admission import (
     ConfigAdmissionAccepted,
     ConfigAdmissionResult,
+    ConfigAdmissionService,
     ConfigAdmissionUnavailable,
+    ConfigAdmissionUseCase,
 )
 from ci_coordinator.app.config_queries import (
     ConfigQueryUnavailable,
@@ -45,6 +48,7 @@ from ci_coordinator.app.config_queries import (
     ConfigStatusResult,
 )
 from ci_coordinator.config_control import (
+    PolicyAdmissionResult,
     PolicyDiagnostic,
     PolicySourceFormat,
     RepositoryScope,
@@ -63,6 +67,7 @@ from ci_coordinator.control_plane_identity import (
     RoleAdmission,
 )
 from ci_coordinator.operator_controls.auth import RepositoryAccessUnavailable
+from ci_coordinator.runtime.policy_admission import ProcessPolicyAdmission
 
 
 class _Authenticator:
@@ -87,6 +92,103 @@ class _RecordingRoleAdmission:
     ) -> RoleAdmission:
         self.required_roles.append(required_roles)
         return StaticRoleAdmission().admit(principal, required_roles)
+
+
+class _ScopeAuthorizer:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, RepositoryScope]] = []
+
+    async def allows_scope(self, *, actor: str, scope: RepositoryScope) -> bool:
+        self.calls.append((actor, scope))
+        return actor == ACTOR and scope == RepositoryScope(1, 2)
+
+
+def test_validation_route_uses_real_process_admission_without_lexical_hash_aliasing() -> None:
+    control_source = _dynamic_validation_source(b"8")
+    source = _dynamic_validation_source(b"8.0")
+    control = admitted_config_epoch(source=control_source)
+    authorizer = _ScopeAuthorizer()
+    process = ProcessPolicyAdmission()
+    calls: list[tuple[bytes, PolicySourceFormat]] = []
+
+    async def admit(raw_source: bytes, source_format: PolicySourceFormat) -> PolicyAdmissionResult:
+        calls.append((raw_source, source_format))
+        return await process(raw_source, source_format)
+
+    service = ConfigAdmissionService(authorizer=authorizer, policy_admission=admit)
+    use_case = _UseCase(
+        ConfigRegistrationOutcome("unavailable"), ConfigActivationOutcome("unavailable")
+    )
+    with _client("operator", use_case, admission=service) as client:
+        response = client.post(
+            "/api/v1/config/validations",
+            json={
+                "schemaVersion": "ci-config-epoch-validation/v1",
+                "sourceFormat": "json",
+                "source": source.decode("utf-8"),
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    result = response.json()
+    assert result["ok"] is True
+    assert result["documentHash"] == control.document_hash
+    assert result["epochHash"] == control.epoch_hash
+    assert result["sourceHash"] != control.source_hash
+    assert result["epochId"] != control.epoch_id
+    expected = admitted_config_epoch(source=source)
+    assert result["sourceHash"] == expected.source_hash
+    assert result["epochId"] == expected.epoch_id
+    assert calls == [(source, "json")]
+    assert authorizer.calls == [(ACTOR, RepositoryScope(1, 2))]
+    assert use_case.register_commands == []
+    assert use_case.activate_commands == []
+    assert use_case.rollback_commands == []
+
+
+def test_validation_auth_rejection_never_reaches_process_admission() -> None:
+    authorizer = _ScopeAuthorizer()
+
+    async def forbidden(
+        raw_source: bytes, source_format: PolicySourceFormat
+    ) -> PolicyAdmissionResult:
+        pytest.fail("unauthenticated validation reached policy admission")
+
+    service = ConfigAdmissionService(authorizer=authorizer, policy_admission=forbidden)
+    use_case = _UseCase(
+        ConfigRegistrationOutcome("unavailable"), ConfigActivationOutcome("unavailable")
+    )
+    with _client(None, use_case, admission=service) as client:
+        response = client.post(
+            "/api/v1/config/validations",
+            json={
+                "schemaVersion": "ci-config-epoch-validation/v1",
+                "sourceFormat": "json",
+                "source": _dynamic_validation_source(b"8.0").decode("utf-8"),
+            },
+        )
+
+    assert response.status_code == 401
+    assert response.headers["cache-control"] == "no-store"
+    assert authorizer.calls == []
+
+
+def _dynamic_validation_source(token: bytes) -> bytes:
+    dynamic = (
+        b'{"planningEnabled":true,"policyVersion":"totality-v1","riskClasses":[], '
+        b'"dependencyGraph":{"source":"configured","globalRiskPaths":[]},'
+        b'"obligations":[{"obligationId":"quality","responsibility":{"paths":["src/**"]},'
+        b'"requiredWitnessIds":["quality"],"defaultDepth":"standard","fullDepth":"full",'
+        b'"omitAllowed":true}],"witnesses":[{"witnessId":"quality","executionProfileId":"linux",'
+        b'"supportedDepths":["standard","full"]}],"executionProfiles":[{"profileId":"linux",'
+        b'"runnerProfileId":"linux","permissionProfileId":"read","credentialProfileId":"none",'
+        b'"fixtureProfileId":"none","capacityClassId":"hosted","shardingPolicy":{'
+        b'"maxShards":' + token + b',"maxParallel":1,"maxItemsPerShard":100,'
+        b'"setupSecondsPerShard":1}}]}'
+    )
+    assert CONFIG_SOURCE.count(b'"dynamicCi":null') == 1
+    return CONFIG_SOURCE.replace(b'"dynamicCi":null', b'"dynamicCi":' + dynamic, 1)
 
 
 class _UseCase:
@@ -864,7 +966,7 @@ def _client(
     use_case: _UseCase,
     *,
     authenticator: _Authenticator | None = None,
-    admission: _Admission | None = None,
+    admission: ConfigAdmissionUseCase | None = None,
     queries: _Queries | None = None,
     role_admission: StaticRoleAdmission | _RecordingRoleAdmission | None = None,
 ) -> TestClient:

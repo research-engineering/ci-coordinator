@@ -218,9 +218,11 @@ def _string(value: object) -> str:
 
 
 def _integer(value: object) -> int:
-    if type(value) is not int:
-        raise RuntimeError("normalized dynamic CI integer invariant failed")
-    return value
+    if type(value) is int:
+        return value
+    if type(value) is float and value.is_integer():
+        return int(value)
+    raise RuntimeError("normalized dynamic CI integer invariant failed")
 
 
 def _number(value: object) -> float:
