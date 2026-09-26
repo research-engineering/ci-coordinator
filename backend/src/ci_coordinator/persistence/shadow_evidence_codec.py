@@ -291,7 +291,7 @@ def _observation_from_mapping(value: object) -> FullCiObservation:
 
 
 def _timestamp(value: datetime) -> str:
-    if type(value) is not datetime or value.tzinfo is None:
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
         raise ShadowEvidenceCodecError("shadow evidence timestamp must be timezone-aware")
     return value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 

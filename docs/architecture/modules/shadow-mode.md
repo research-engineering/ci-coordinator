@@ -12,9 +12,10 @@ changing required validation behavior.
 ## 2. Public API
 
 ```text
-record_candidate(plan, actual_execution) -> ShadowCandidate
+record_and_compare(candidate, observation, *, profile_id, observed_at, recorder)
+  -> ShadowComparison
 compare_full_ci(candidate, observation) -> ShadowComparison
-classify_unsafe_omission(comparison) -> UnsafeOmissionFinding | SafeObservation
+classify_unsafe_omission(comparison) -> UnsafeOmissionFinding | SafeObservation | None
 ```
 
 ## 3. Required Shadow Record
@@ -86,6 +87,13 @@ required safe count, spans the required duration, and its newest safe record is
 not older than the maximum age. Evidence from another profile never contributes
 to the count. This makes a zero-traffic window and a post-hoc threshold change
 insufficient by construction.
+
+Record construction, durable encoding and evaluation require an exact datetime
+with both a timezone and a defined UTC offset. A timezone object alone does not
+establish awareness. Invalid time is rejected before recording or evaluating
+even an empty evidence set. Equivalent fixed-offset instants preserve evidence
+identity, decisions and the existing microsecond UTC encoding; observation time
+does not become a new semantic-key component.
 
 The runtime receives the lowercase SHA-256 `profile_id` of that precommitted
 profile as immutable process wiring before observations begin. It stores the id

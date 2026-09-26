@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import FrozenInstanceError, fields, replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 
 import pytest
 
@@ -32,6 +32,107 @@ from ci_coordinator.shadow_mode import (
 )
 
 NOW = datetime(2026, 7, 14, 12, 0, tzinfo=UTC)
+
+
+class _DatetimeSubclass(datetime):
+    pass
+
+
+class _UnknownOffset(tzinfo):
+    def utcoffset(self, dt: datetime | None) -> None:
+        return None
+
+    def dst(self, dt: datetime | None) -> None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> None:
+        return None
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    (
+        datetime(2026, 7, 14, 12),
+        datetime(2026, 7, 14, 12, tzinfo=_UnknownOffset()),
+        _DatetimeSubclass(2026, 7, 14, 12, tzinfo=UTC),
+    ),
+    ids=("naive", "offset-none", "aware-subclass"),
+)
+def test_shadow_record_rejects_non_exact_or_unaware_time_before_recording(
+    observed_at: datetime,
+) -> None:
+    candidate = shadow_candidate()
+    recorder = RecordingRecorder()
+
+    with pytest.raises(ValueError, match=r"^shadow evidence timestamp must be timezone-aware$"):
+        asyncio.run(
+            record_and_compare(
+                candidate,
+                matching_observation(candidate),
+                profile_id="profile-1",
+                observed_at=observed_at,
+                recorder=recorder,
+            )
+        )
+
+    assert recorder.records == []
+
+
+@pytest.mark.parametrize(
+    "now",
+    (
+        datetime(2026, 7, 14, 12),
+        datetime(2026, 7, 14, 12, tzinfo=_UnknownOffset()),
+        _DatetimeSubclass(2026, 7, 14, 12, tzinfo=UTC),
+    ),
+    ids=("naive", "offset-none", "aware-subclass"),
+)
+@pytest.mark.parametrize("has_evidence", (False, True), ids=("empty", "safe"))
+def test_rollout_evaluation_rejects_non_exact_or_unaware_time(
+    now: datetime, has_evidence: bool
+) -> None:
+    profile = RolloutEvidenceProfile((SurfaceEvidenceRequirement("backend-tests", 1, 1, 60),))
+    records = (
+        (evidence(shadow_candidate(), NOW - timedelta(seconds=10), profile_id=profile.profile_id),)
+        if has_evidence
+        else ()
+    )
+
+    with pytest.raises(
+        ValueError, match=r"^rollout evidence evaluation time must be timezone-aware$"
+    ):
+        evaluate_rollout_evidence(profile, records, now=now)
+
+
+def test_rollout_evidence_preserves_equivalent_fixed_offset_instants() -> None:
+    profile = RolloutEvidenceProfile((SurfaceEvidenceRequirement("backend-tests", 2, 60, 300),))
+    records = (
+        evidence(shadow_candidate(), NOW - timedelta(seconds=70), profile_id=profile.profile_id),
+        evidence(
+            shadow_candidate(event="delivery-2"),
+            NOW - timedelta(seconds=10),
+            profile_id=profile.profile_id,
+        ),
+    )
+    offset_records = (
+        replace(
+            records[0], observed_at=records[0].observed_at.astimezone(timezone(timedelta(hours=2)))
+        ),
+        replace(
+            records[1], observed_at=records[1].observed_at.astimezone(timezone(timedelta(hours=-5)))
+        ),
+    )
+
+    expected = evaluate_rollout_evidence(profile, records, now=NOW)
+    actual = evaluate_rollout_evidence(
+        profile, offset_records, now=datetime(2026, 7, 14, 14, tzinfo=timezone(timedelta(hours=2)))
+    )
+
+    assert actual == expected
+    assert actual.satisfied
+    assert actual.surfaces[0].safe_comparison_count == 2
+    assert actual.surfaces[0].observed_duration_seconds == 60
+    assert tuple(record.key for record in offset_records) == tuple(record.key for record in records)
 
 
 def test_safe_replay_is_positive_evidence_without_enforcement_block() -> None:

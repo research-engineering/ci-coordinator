@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 from hashlib import sha256
 from importlib.resources import files
 from typing import cast
@@ -66,6 +66,70 @@ _NATIVE_SIGNAL = ProviderSignal.declared_native(
     job_id="full-check-gate",
     job_name="Full Check",
 )
+
+
+class _DatetimeSubclass(datetime):
+    pass
+
+
+class _UnknownOffset(tzinfo):
+    def utcoffset(self, dt: datetime | None) -> None:
+        return None
+
+    def dst(self, dt: datetime | None) -> None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> None:
+        return None
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    (
+        datetime(2026, 7, 14, 12),
+        datetime(2026, 7, 14, 12, tzinfo=_UnknownOffset()),
+        _DatetimeSubclass(2026, 7, 14, 12, tzinfo=UTC),
+    ),
+    ids=("naive", "offset-none", "aware-subclass"),
+)
+def test_shadow_codec_rejects_non_exact_or_unaware_time_after_constructor_bypass(
+    observed_at: datetime,
+) -> None:
+    record = _shadow_record("plan-a", _NOW)
+    object.__setattr__(record, "observed_at", observed_at)
+    profile = load_bundled_shadow_reconciliation_state_profile()
+
+    with pytest.raises(
+        ShadowEvidenceCodecError, match=r"^shadow evidence timestamp must be timezone-aware$"
+    ):
+        encode_shadow_evidence_row(record, profile)
+
+
+@pytest.mark.parametrize(
+    "observed_at",
+    (
+        datetime(2026, 7, 14, 14, 0, 0, 123456, tzinfo=timezone(timedelta(hours=2))),
+        datetime(2026, 7, 14, 7, 0, 0, 123456, tzinfo=timezone(timedelta(hours=-5))),
+    ),
+    ids=("positive-offset", "negative-offset"),
+)
+def test_shadow_codec_preserves_equivalent_instants_and_microsecond_bytes(
+    observed_at: datetime,
+) -> None:
+    profile = load_bundled_shadow_reconciliation_state_profile()
+    utc_record = _shadow_record("plan-a", datetime(2026, 7, 14, 12, 0, 0, 123456, tzinfo=UTC))
+    offset_record = _shadow_record("plan-a", observed_at)
+
+    utc_row = encode_shadow_evidence_row(utc_record, profile)
+    offset_row = encode_shadow_evidence_row(offset_record, profile)
+
+    assert offset_record.key == utc_record.key
+    assert offset_record.has_same_semantics_as(utc_record)
+    assert offset_row == utc_row
+    assert b'"observedAt":"2026-07-14T12:00:00.123456Z"' in cast(
+        bytes, offset_row["record_canonical_json"]
+    )
+    assert decode_shadow_evidence_row(offset_row, profile) == utc_record
 
 
 def test_profile_is_digest_pinned_and_rejects_unknown_fields() -> None:

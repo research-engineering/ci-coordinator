@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Final, Literal, Protocol
 
 from ci_coordinator.app.config_admission import (
@@ -244,7 +245,7 @@ class ConfigManagementService:
             return ConfigRegistrationOutcome("forbidden")
         if not isinstance(admitted, ConfigAdmissionAccepted):
             raise RuntimeError("config admission result algebra is incomplete")
-        occurred_at = self._clock.now().isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        occurred_at = _clock_timestamp(self._clock.now())
         prepared = prepare_config_epoch_registration(
             ConfigEpochRegistrationCommand(
                 draft=admitted.draft,
@@ -296,7 +297,7 @@ class ConfigManagementService:
         if not isinstance(authorization, RepositoryActivationGranted):
             raise RuntimeError("repository activation authorization algebra is incomplete")
         authority = authorization.authority
-        occurred_at = self._clock.now().isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        occurred_at = _clock_timestamp(self._clock.now())
         prepared = prepare_config_epoch_activation(
             ConfigEpochActivationCommand(
                 scope=command.scope,
@@ -376,7 +377,7 @@ class ConfigManagementService:
         if not isinstance(admission, RollbackAllowed):
             raise RuntimeError("rollback admission algebra is incomplete")
 
-        occurred_at = self._clock.now().isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        occurred_at = _clock_timestamp(self._clock.now())
         prepared = prepare_config_epoch_activation(
             ConfigEpochActivationCommand(
                 scope=command.scope,
@@ -421,3 +422,9 @@ class ConfigManagementService:
         if self._runtime_metrics is not None:
             self._runtime_metrics.config_activation(outcome.state)
         return outcome
+
+
+def _clock_timestamp(value: datetime) -> str:
+    if value.tzinfo is not None and value.utcoffset() is not None:
+        value = value.astimezone(UTC)
+    return value.isoformat(timespec="milliseconds").replace("+00:00", "Z")
