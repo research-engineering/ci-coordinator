@@ -3,9 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from ruamel.yaml import YAML
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _assert_runtime_qualification_events(events: dict[str, Any]) -> None:
+    assert set(events) == {"workflow_dispatch", "push", "pull_request"}
+    assert events["push"] == {"branches": ["master"]}, "runtime qualification events changed"
+    assert events["pull_request"] == {}, "runtime qualification events changed"
 
 
 def test_runtime_qualification_is_current_ref_scoped_and_read_only() -> None:
@@ -13,10 +20,7 @@ def test_runtime_qualification_is_current_ref_scoped_and_read_only() -> None:
         (ROOT / ".github/workflows/runtime-image-qualification.yml").read_text()
     )
     events = workflow["on"]
-    assert set(events) == {"workflow_dispatch", "push", "pull_request"}
-    assert events["push"]["branches"] == ["master"]
-    assert set(events["push"]["paths"]) == set(events["pull_request"]["paths"])
-    assert {"Dockerfile", "docker/runtime/**", "backend/uv.lock"} <= set(events["push"]["paths"])
+    _assert_runtime_qualification_events(events)
     assert workflow["permissions"] == {"contents": "read"}
     steps = workflow["jobs"]["qualify"]["steps"]
     checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout@"))
@@ -38,6 +42,19 @@ def test_runtime_qualification_is_current_ref_scoped_and_read_only() -> None:
     assert "050b7ef3947ad69b5d1e7762308a75a57503ee4e" not in scripts
     assert "python3 - <<" not in scripts
     assert "python3 -I -B docker/runtime/check_layer_reuse.py" in scripts
+
+
+@pytest.mark.parametrize("event", ["push", "pull_request"])
+@pytest.mark.parametrize("filter_name", ["paths", "paths-ignore"])
+def test_runtime_qualification_rejects_path_filters(event: str, filter_name: str) -> None:
+    workflow: dict[str, Any] = YAML(typ="safe").load(
+        (ROOT / ".github/workflows/runtime-image-qualification.yml").read_text()
+    )
+    events = workflow["on"]
+    _assert_runtime_qualification_events(events)
+    events[event][filter_name] = ["backend/alembic/**"]
+    with pytest.raises(AssertionError, match=r"^runtime qualification events changed(?:\n|$)"):
+        _assert_runtime_qualification_events(events)
 
 
 def test_exploratory_base_comparison_has_no_obsolete_branch_trigger() -> None:

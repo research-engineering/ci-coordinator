@@ -9,19 +9,7 @@ on:
         type: string
   push:
     branches: [master]
-    paths:
-      - Dockerfile
-      - docker/runtime/**
-      - .github/workflows/runtime-image-qualification.yml
-      - backend/pyproject.toml
-      - backend/uv.lock
-  pull_request:
-    paths:
-      - Dockerfile
-      - docker/runtime/**
-      - .github/workflows/runtime-image-qualification.yml
-      - backend/pyproject.toml
-      - backend/uv.lock
+  pull_request: {}
 
 permissions:
   contents: read
