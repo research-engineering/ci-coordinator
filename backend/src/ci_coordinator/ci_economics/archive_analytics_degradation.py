@@ -1,7 +1,6 @@
 from ci_coordinator.ci_economics.archive_analytics_forecast import usable_duration_day
 from ci_coordinator.ci_economics.archive_analytics_models import (
     AnalyticsQuery,
-    CohortEvidence,
     DailyBucket,
     DegradationEvent,
     DegradationResult,
@@ -15,15 +14,19 @@ BASELINE_DAYS = 7
 def assess_degradation(
     query: AnalyticsQuery,
     buckets: tuple[DailyBucket, ...],
-    cohort: CohortEvidence,
     mapping: PurposeMapping | None,
 ) -> DegradationResult:
     if query.workflow_id is None or query.job_name is None:
         return DegradationResult(status="unavailable", reason="incompatible_cohort")
-    baseline = buckets[:BASELINE_DAYS]
-    if len(buckets) <= BASELINE_DAYS or not all(
-        usable_duration_day(bucket, query.minimum_daily_samples) for bucket in baseline
-    ):
+    baseline: list[DailyBucket] = []
+    baseline_end = 0
+    for index, bucket in enumerate(buckets):
+        if usable_duration_day(bucket, query.minimum_daily_samples):
+            baseline.append(bucket)
+            if len(baseline) == BASELINE_DAYS:
+                baseline_end = index + 1
+                break
+    if len(baseline) < BASELINE_DAYS or baseline_end == len(buckets):
         return DegradationResult(status="unavailable", reason="insufficient_samples")
     samples = sum(bucket.selected.duration_samples for bucket in baseline)
     baseline_total = sum(bucket.selected.runner_ms for bucket in baseline)
@@ -32,7 +35,7 @@ def assess_degradation(
     high_streak = low_streak = 0
     events: list[DegradationEvent] = []
     last_usable = True
-    for bucket in buckets[BASELINE_DAYS:]:
+    for bucket in buckets[baseline_end:]:
         last_usable = usable_duration_day(bucket, query.minimum_daily_samples)
         if not last_usable:
             high_streak = low_streak = 0
@@ -88,7 +91,7 @@ def assess_degradation(
         {
             "status": status,
             "reason": "observed_duration_only" if last_usable else "insufficient_samples",
-            "baseline_until": buckets[BASELINE_DAYS].day,
+            "baseline_until": buckets[baseline_end].day,
             "baseline_mean_ms": mean,
             "baseline_samples": samples,
             "events": tuple(events),

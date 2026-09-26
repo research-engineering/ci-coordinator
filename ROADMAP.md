@@ -119,6 +119,7 @@ the complete audit parents:
 | [#37](https://github.com/research-engineering/ci-coordinator/pull/37) | Finite platform-workflow admission, exact activation labels and observed zero baselines for alerts; no future-platform, pre-scrape recovery or worker-health claim. |
 | [#38](https://github.com/research-engineering/ci-coordinator/pull/38) | Workspace reads cannot discard captured commands or replace confirmed revision floors; callback/error admission and ruleset-only governance labels retain their explicit boundaries. |
 | [#39](https://github.com/research-engineering/ci-coordinator/pull/39) | Future exact-subject force evidence is unavailable knowledge before selected issuance; ordinary override reads, immutable replay and the existing FullCI path remain unchanged. |
+| [#40](https://github.com/research-engineering/ci-coordinator/pull/40) | Explicit fresh review and selected-receipt activation use coordinated v2 requests while preserving completed legacy replay; pending-only fenced migration, captured result revisions and bounded outcome metrics retain their separate authorities. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -128,12 +129,12 @@ Live provider enrollment, authentication and deployment recovery remain separate
 mocked APIs are not their evidence. Artifact publication, artifact qualification
 and production omission authority are still distinct.
 
-The next prepared audit batch provides explicit review renewal after the qualified UI
-boundary, preserving historical replay while rejecting new legacy requests.
+The next prepared audit batch selects the first seven complete analytics baseline
+days without discarding subsequent unknown days or changing forecast admission.
 Phase-exact managed installation and transitive process ownership retain their
 independent lifecycle proof, including the isolated consumer-lab process path.
-The analytics batch selects the first seven complete baseline days without
-discarding subsequent unknown days; credential narrowing is in implementation.
+Credential narrowing has a source-reviewed candidate; actual-base integration
+and native qualification remain required.
 All these prepared changes still require their exact-source native qualification.
 Workflow CPU
 isolation, readiness freshness and plan-failure telemetry retain their own
