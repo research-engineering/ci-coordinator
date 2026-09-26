@@ -172,6 +172,25 @@ are diagnostic coordinates, not authorization evidence.
 | Unknown route or method              | Project to `unmatched` or `OTHER`; never use caller text as a label.                                                              |
 | Process restarts                     | Counters restart; deployment-owned Prometheus handles resets through `rate`/`increase`.                                           |
 
+Ordinary structured events default to native and JSON `INFO`. The emitter's
+trusted severity parameter admits only `INFO`, `WARNING`, and `ERROR`; caller
+fields cannot override it. `unexpected_failure` uses native and JSON `ERROR`,
+retaining only exception class, a closed stage and fixed reason plus service,
+build, time and correlation metadata. Messages, arguments, causes, notes,
+tracebacks, source lines, locals and frame coordinates remain excluded.
+`reconciliation_loop` distinguishes an unexpected terminal periodic-loop
+exception from an ordinary failed `reconciliation_round`.
+
+The dedicated runtime's stream handler reports formatting/write/flush failure
+back to the structured boundary without stdlib's raw `handleError` output.
+The boundary increments its existing private failure counter and attempts at
+most one fixed ERROR fallback. Fallback failure is contained without recursion
+or raw printing; failure to construct safe metadata is also contained. This is
+loss-tolerant telemetry, not delivery acknowledgement or a new alert/SLO.
+A completed record is bounded canonical JSON; an interrupted stream write can
+leave partial safe bytes and does not prove an atomic or durable record.
+Foreign handlers on the dedicated event logger are not silently adopted.
+
 Application boundaries that deliberately convert dependency or projection
 exceptions into FullCI must propagate cancellation and emit one bounded
 planning-unavailability observation. Exception type, message, repository, and

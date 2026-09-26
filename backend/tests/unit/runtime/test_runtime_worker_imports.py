@@ -69,6 +69,7 @@ def _assert_real_main_and_worker(receipt: dict[str, object], subject: Path) -> N
         "host": "127.0.0.1",
         "port": 8080,
         "access_log": False,
+        "log_config": None,
         "proxy_headers": False,
         "forwarded_allow_ips": "",
         "limit_concurrency": 128,

@@ -7,6 +7,7 @@ import sys
 from typing import Final
 
 from ci_coordinator.runtime.environment import load_runtime_settings_from_environment
+from ci_coordinator.runtime.event_logging import configure_runtime_server_logging
 from ci_coordinator.runtime.shutdown_budget import partition_shutdown_budget
 from ci_coordinator.runtime_settings import RuntimeSettingsRejection, admit_python_runtime
 
@@ -42,11 +43,13 @@ def main() -> int:
     import uvicorn
 
     shutdown = partition_shutdown_budget(application.settings.shutdown_timeout_seconds)
+    configure_runtime_server_logging()
     uvicorn.run(
         application.app,
         host=application.settings.bind_host,
         port=application.settings.bind_port,
         access_log=False,
+        log_config=None,
         proxy_headers=False,
         forwarded_allow_ips="",
         limit_concurrency=UVICORN_MAX_CONCURRENT_REQUESTS,

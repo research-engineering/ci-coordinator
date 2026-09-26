@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from collections.abc import Callable
+from io import StringIO
 
 import pytest
 from prometheus_support import prometheus_samples
 
-from ci_coordinator.observability import BackgroundHealthState, RuntimeMetrics
+from ci_coordinator.observability import (
+    BackgroundHealthState,
+    RuntimeDiagnosticObserver,
+    RuntimeMetrics,
+    StructuredEventLogger,
+)
 from ci_coordinator.reconciliation import ReconciliationScheduler
 from ci_coordinator.runtime.reconciliation_service import (
     InitialReconciliationError,
@@ -48,6 +56,7 @@ def _service(
     startup_timeout_seconds: float = 1,
     drain_timeout_seconds: float = 1,
     metrics: RuntimeMetrics | None = None,
+    diagnostics: RuntimeDiagnosticObserver | None = None,
 ) -> PeriodicReconciliationService:
     return PeriodicReconciliationService(
         ReconciliationScheduler(round_runner),
@@ -55,6 +64,7 @@ def _service(
         startup_timeout_seconds=startup_timeout_seconds,
         drain_timeout_seconds=drain_timeout_seconds,
         metrics=metrics,
+        diagnostics=diagnostics,
     )
 
 
@@ -243,3 +253,108 @@ def test_terminal_scheduler_failure_is_redacted() -> None:
     assert state is BackgroundHealthState.TERMINAL_FAILURE
     assert rendered == "terminal failure redacted"
     assert safe_to_close is True
+
+
+@pytest.mark.parametrize("initial", [False, True])
+@pytest.mark.parametrize("broken_sink", [False, True])
+def test_outer_loop_cause_does_not_change_terminal_startup_or_stop(
+    monkeypatch: pytest.MonkeyPatch, initial: bool, broken_sink: bool
+) -> None:
+    output = StringIO()
+
+    class Sink(logging.StreamHandler[StringIO]):
+        def emit(self, record: logging.LogRecord) -> None:
+            if broken_sink:
+                raise OSError("private sink failure")
+            super().emit(record)
+
+    logger = logging.Logger("periodic-diagnostic")
+    logger.addHandler(Sink(output))
+    structured = StructuredEventLogger(logger)
+
+    async def scenario() -> None:
+        service = _service(
+            _ScriptedRound([None]),
+            interval_seconds=0.001,
+            diagnostics=RuntimeDiagnosticObserver(structured),
+        )
+        tick = service._scheduler.tick
+        calls = 0
+
+        async def failing_tick() -> object:
+            nonlocal calls
+            calls += 1
+            if initial or calls > 1:
+                raise KeyError("private scheduler cause")
+            return await tick()
+
+        monkeypatch.setattr(service._scheduler, "tick", failing_tick)
+        if initial:
+            with pytest.raises(InitialReconciliationError, match="initial reconciliation failed"):
+                await service.start()
+        else:
+            await service.start()
+            await _wait_until(
+                lambda: service.background_health().state is BackgroundHealthState.TERMINAL_FAILURE
+            )
+        assert service.background_health().state is BackgroundHealthState.TERMINAL_FAILURE
+        assert service._startup_complete.is_set()
+        assert await service.stop() is True
+
+    asyncio.run(scenario())
+    if broken_sink:
+        assert structured.failure_count == 1
+        assert output.getvalue() == ""
+    else:
+        row = json.loads(output.getvalue())
+        assert (row["stage"], row["exceptionType"], row["level"]) == (
+            "reconciliation_loop",
+            "KeyError",
+            "ERROR",
+        )
+        assert "private" not in output.getvalue()
+
+
+def test_round_failure_does_not_become_a_terminal_loop_diagnostic() -> None:
+    output = StringIO()
+    logger = logging.Logger("round-not-loop")
+    logger.addHandler(logging.StreamHandler(output))
+
+    async def scenario() -> None:
+        service = _service(
+            _ScriptedRound([RuntimeError("private round failure")]),
+            diagnostics=RuntimeDiagnosticObserver(StructuredEventLogger(logger)),
+        )
+        with pytest.raises(InitialReconciliationError):
+            await service.start()
+        assert service.background_health().state is BackgroundHealthState.STOPPED
+        assert await service.stop() is True
+
+    asyncio.run(scenario())
+    assert output.getvalue() == ""
+
+
+@pytest.mark.parametrize("stopping", [False, True])
+def test_loop_cancellation_keeps_original_health_without_exception_event(stopping: bool) -> None:
+    output = StringIO()
+    logger = logging.Logger("loop-cancellation")
+    logger.addHandler(logging.StreamHandler(output))
+
+    async def scenario() -> None:
+        service = _service(
+            _ScriptedRound([None]),
+            diagnostics=RuntimeDiagnosticObserver(StructuredEventLogger(logger)),
+        )
+        await service.start()
+        if stopping:
+            service._stop_signal.set()
+        assert service._loop_task is not None
+        service._loop_task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await service._loop_task
+        assert service.background_health().state is (
+            BackgroundHealthState.STOPPED if stopping else BackgroundHealthState.TERMINAL_FAILURE
+        )
+
+    asyncio.run(scenario())
+    assert output.getvalue() == ""

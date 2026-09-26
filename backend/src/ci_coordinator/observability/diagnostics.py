@@ -26,6 +26,7 @@ type RuntimeDiagnosticStage = Literal[
     "planning_override",
     "production_authorization",
     "production_preauthorization",
+    "reconciliation_loop",
     "reconciliation_registration",
     "reconciliation_round",
     "readiness_database",
@@ -54,6 +55,7 @@ _STAGES: Final = frozenset(
         "planning_override",
         "production_authorization",
         "production_preauthorization",
+        "reconciliation_loop",
         "reconciliation_registration",
         "reconciliation_round",
         "readiness_database",
@@ -87,4 +89,5 @@ class RuntimeDiagnosticObserver:
                 "stage": admitted_stage,
             },
             correlation_id=correlation_id,
+            severity="ERROR",
         )

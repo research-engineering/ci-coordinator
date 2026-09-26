@@ -11,9 +11,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from threading import Lock
-from typing import Final, cast
+from typing import Final, Literal, TextIO, cast
 
 type LogValue = str | int | float | bool | tuple["LogValue", ...] | dict[str, "LogValue"] | None
+type LogSeverity = Literal["INFO", "WARNING", "ERROR"]
+
+_LEVELS: Final = {"INFO": logging.INFO, "WARNING": logging.WARNING, "ERROR": logging.ERROR}
 
 _LOGGER_NAME: Final = "ci_coordinator.events"
 _SERVICE_NAME: Final = "ci-coordinator"
@@ -136,15 +139,19 @@ class StructuredEventLogger:
         event: Mapping[str, object],
         *,
         correlation_id: str | None = None,
+        severity: LogSeverity = "INFO",
     ) -> None:
         """Emit one event; malformed telemetry can never affect its caller."""
-        admitted_correlation_id = _admit_correlation_id(correlation_id)
+        admitted_correlation_id: str | None = None
         try:
+            admitted_correlation_id = _admit_correlation_id(correlation_id)
+            if type(severity) is not str or severity not in _LEVELS:
+                raise ValueError("structured log severity is not admitted")
             redacted, warnings = _sanitize_event(event)
             record: dict[str, LogValue] = {
                 **redacted,
                 "correlationId": admitted_correlation_id,
-                "level": "INFO",
+                "level": severity,
                 "observedAt": datetime.now(UTC).isoformat(),
                 "service": _SERVICE_NAME,
                 "sourceCommit": self._source_commit,
@@ -153,38 +160,60 @@ class StructuredEventLogger:
             if warnings:
                 record["logSanitization"] = warnings
             encoded = _encode_bounded_record(record)
-            self._logger.info(encoded.decode("ascii"))
+            self._logger.log(_LEVELS[severity], encoded.decode("ascii"))
         except Exception:
             self._record_failure()
-            self._emit_fallback(admitted_correlation_id)
+            if admitted_correlation_id is not None:
+                self._emit_fallback(admitted_correlation_id)
 
     def _record_failure(self) -> None:
         with self._failure_lock:
             self._failure_count += 1
 
     def _emit_fallback(self, correlation_id: str) -> None:
-        record = {
-            "correlationId": correlation_id,
-            "event": "structured_log_failure",
-            "level": "ERROR",
-            "observedAt": datetime.now(UTC).isoformat(),
-            "reason": "instrumentation_failure",
-            "service": _SERVICE_NAME,
-            "sourceCommit": self._source_commit,
-            "releaseIdentity": self._release_identity,
-        }
         try:
+            record = {
+                "correlationId": correlation_id,
+                "event": "structured_log_failure",
+                "level": "ERROR",
+                "observedAt": datetime.now(UTC).isoformat(),
+                "reason": "instrumentation_failure",
+                "service": _SERVICE_NAME,
+                "sourceCommit": self._source_commit,
+                "releaseIdentity": self._release_identity,
+            }
             self._logger.error(_encode_record(record).decode("ascii"))
         except Exception:
             return
+
+
+class _ContainedStreamHandler(logging.StreamHandler[TextIO]):
+    def handleError(self, record: logging.LogRecord) -> None:
+        # Let the structured boundary observe sink failure without stdlib's raw stderr fallback.
+        raise RuntimeError("structured log sink failed") from None
 
 
 def default_structured_event_logger(
     *, source_commit: str | None = None, release_identity: str | None = None
 ) -> StructuredEventLogger:
     logger = logging.getLogger(_LOGGER_NAME)
+    if logger.filters or logger.disabled:
+        raise RuntimeError("structured logging requires the dedicated runtime logger")
+    if logger.handlers:
+        handler = logger.handlers[0]
+        if (
+            len(logger.handlers) != 1
+            or type(handler) is not _ContainedStreamHandler
+            or handler.filters
+            or handler.level != logging.NOTSET
+            or logger.level != logging.INFO
+            or logger.propagate
+        ):
+            raise RuntimeError("structured logging requires the dedicated runtime logger")
+    elif logger.level != logging.NOTSET or not logger.propagate:
+        raise RuntimeError("structured logging requires the dedicated runtime logger")
     if not logger.handlers:
-        handler = logging.StreamHandler()
+        handler = _ContainedStreamHandler()
         handler.setFormatter(logging.Formatter("%(message)s"))
         logger.addHandler(handler)
     logger.setLevel(logging.INFO)
