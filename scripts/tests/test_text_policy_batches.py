@@ -696,7 +696,7 @@ def test_native_whole_and_forced_batches_have_independent_literal_counts(tmp_pat
     "bad,diagnostic",
     [
         (b"\xff\n", "not valid UTF-8"),
-        (b"caf\xc3\xa9\n", "non-ASCII"),
+        (b"\x63\x61\x66\xc3\xa9\n", "non-ASCII"),
         (b"no newline", "missing final newline"),
         (b"space \n", "trailing whitespace"),
     ],
