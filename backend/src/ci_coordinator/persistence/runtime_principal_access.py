@@ -846,6 +846,26 @@ def _migration_metadata_access_is_exact(
     )
     observed = {row[0]: (row[1], row[2]) for row in cursor.fetchall()}
     expected = {privilege: (privilege == "SELECT", False) for privilege in RUNTIME_TABLE_PRIVILEGES}
+    if observed != expected:
+        return False
+    cursor.execute(
+        "SELECT privilege.name, "
+        "pg_catalog.has_any_column_privilege(%s, pg_catalog.to_regclass(%s), privilege.name), "
+        "pg_catalog.has_any_column_privilege(%s, pg_catalog.to_regclass(%s), "
+        "privilege.name || ' WITH GRANT OPTION') "
+        "FROM pg_catalog.unnest(%s::text[]) AS privilege(name) ORDER BY privilege.name",
+        (
+            runtime_role,
+            migration_head_relation,
+            runtime_role,
+            migration_head_relation,
+            list(RUNTIME_COLUMN_PRIVILEGES),
+        ),
+    )
+    observed = {row[0]: (row[1], row[2]) for row in cursor.fetchall()}
+    expected = {
+        privilege: (privilege == "SELECT", False) for privilege in RUNTIME_COLUMN_PRIVILEGES
+    }
     return observed == expected
 
 

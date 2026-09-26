@@ -130,6 +130,15 @@ this summary is not a second privilege policy. Changing the actual grant
 contract requires its descriptor identity, schema transition, profile update
 and witness; correcting this projection grants no database privileges.
 
+The metadata SELECT-only policy includes effective column privileges: INSERT,
+UPDATE, REFERENCES, and every column grant option, including SELECT delegation,
+must be absent. Redundant ordinary column SELECT is allowed. Both runtime
+principal admission and the database-access checker collect these facts in
+addition to table privileges. Independently, the shared PUBLIC attestor rejects
+any explicit PUBLIC ACL on a live application column, even when the runtime
+role's effective privileges remain unchanged; this applies to runtime admission
+and resulting-migration attestation.
+
 ## 5. Admission Order And Non-Claims
 
 The principal fact is collected after the shared compatibility fence and
