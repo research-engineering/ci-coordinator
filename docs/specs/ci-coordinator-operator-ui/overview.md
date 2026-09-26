@@ -41,6 +41,54 @@ requirements.v1.json
 The feature design explains the chosen experience but does not create
 additional normative requirements.
 
+## Read And Command Lifetimes
+
+The following projects `REQ-CI-UI-001`, `REQ-CI-UI-010`, `REQ-CI-UI-016`,
+`REQ-CI-UI-021` and `REQ-CI-UI-024`; their requirement records remain canonical.
+Repository/session authority `E`, a read owner's replacement revision `R`, and
+the captured command `Q` have separate lifetimes. Changing `E` retires foreign
+reads, callbacks and commands. Replacing a read rejects its older responses
+without replacing a pending or uncertain `Q`; explicit retry preserves its
+operation ID and reviewed payload under still-valid authority. Same-scope
+navigation does not submit commands. Discovery identity contains its actual
+request coordinates, not the workbench display limit or scope object identity.
+
+Confirmed rollback and activation invalidate the shared workbench snapshot and
+the independent enabled Configuration status read. Only an admitted response
+from the current command owner can contribute an active-pointer lower bound;
+activation additionally requires the response epoch to equal the captured
+command target. Invalid responses remain uncertain and contribute no bound.
+The maximum confirmed revision is retained: a missing or older active pointer,
+or another epoch at that revision, cannot satisfy the next read. Contradictory
+confirmed identities at one revision fail closed. A later admitted revision
+may be shown. Registration invalidates reads without inventing an active pointer.
+
+A recorded or duplicate activation is a historical receipt, displayed separately
+from the observed current configuration. An unproved baseline is not admitted
+absence. New verification uses a current admitted baseline; uncertain retry
+keeps the original `Q`. Explicit refresh and fresh verification do not renew
+expired manifest approval or guarantee activation. Backend receipt, expiry,
+permission and concurrency admission remain authoritative; no polling or
+automatic mutation replay follows from a receipt.
+
+Archive list, selected jobs and detail share read invalidation. Manual refresh,
+confirmed retention and relevant inactive/return read replacement retire
+unsubmitted previews and stale cursors/responses, without remounting the pending
+or uncertain command owner. A confirmed retention receipt is separate from
+current reads; only its admitted non-null data revision can raise their lower
+bound. A refused result with no preview is not deletion; detail deletion does
+not erase statistics.
+An uncertain retry retains the exact selection, digest and operation identity.
+
+Under `REQ-CI-UI-002`, development callback forwarding follows the separate
+[identity owner](../../architecture/modules/control-plane-identity-and-repository-attestation.md#8-http-projection)
+query contracts, not a shared permissive callback rule. Under `REQ-CI-UI-014`
+and `REQ-CI-UI-024`, local timeout/bound RangeError classification is network
+failure, while malformed, cross-scope or oversized response evidence is invalid
+response. Reusing classification does not change caller-specific abort
+precedence or lifecycle cancellation handling; cancellation must not publish
+stale state, start a download or escape as an unhandled rejection.
+
 ## Browser Support Contract
 
 Blocking browser witnesses cover Playwright Chromium in three admitted

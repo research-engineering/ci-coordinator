@@ -164,6 +164,50 @@ describe("control-plane identity, repository attestation, and activation clients
     });
   });
 
+  test.each([false, true])(
+    "binds the activation receipt target, duplicate=%s",
+    async (duplicate) => {
+      const proposal = workflowDiscoveryFixture().proposal;
+      expect(proposal.admittedEpochId).toBe("4".repeat(64));
+      expect(activationCommand.targetEpochId).toBe(proposal.admittedEpochId);
+      const receipt = configActivationFixture({
+        duplicate,
+        epochId: activationCommand.targetEpochId,
+      });
+      const fetch = vi
+        .fn()
+        .mockResolvedValueOnce(Response.json(receipt))
+        .mockResolvedValueOnce(Response.json({ ...receipt, epochId: "b".repeat(64) }));
+      vi.stubGlobal("fetch", fetch);
+      await expect(activateConfig(activationCommand, csrfToken)).resolves.toEqual({
+        kind: "complete",
+        activation: receipt,
+      });
+      await expect(activateConfig(activationCommand, csrfToken)).resolves.toEqual({
+        kind: "invalid-response",
+      });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  test("binds the reply to the target captured before awaiting transport", async () => {
+    const reply = Promise.withResolvers<Response>();
+    let request: Request | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((value: Request) => {
+        request = value;
+        return reply.promise;
+      }),
+    );
+    const command = { ...activationCommand };
+    const response = activateConfig(command, csrfToken);
+    command.targetEpochId = "b".repeat(64);
+    reply.resolve(Response.json(configActivationFixture({ epochId: command.targetEpochId })));
+    await expect(response).resolves.toEqual({ kind: "invalid-response" });
+    await expect(request?.json()).resolves.toMatchObject({ targetEpochId: "4".repeat(64) });
+  });
+
   test.each([
     [413, "invalid_config"],
     [401, "unauthenticated"],
@@ -699,7 +743,12 @@ describe("development proxy authority", () => {
     ["POST", "/api/v1/auth/keycloak/logout", true],
     ["GET", "/api/v1/auth/keycloak/logout", false],
     ["POST", "/api/v1/auth/keycloak/backchannel-logout", true],
-    ["GET", `/api/v1/auth/keycloak/callback?code=provider&state=${"s".repeat(43)}`, true],
+    [
+      "GET",
+      `/api/v1/auth/keycloak/callback?code=provider&state=${"s".repeat(43)}&iss=https%3A%2F%2Fidentity.example`,
+      true,
+    ],
+    ["GET", `/api/v1/auth/keycloak/callback?code=provider&state=${"s".repeat(43)}`, false],
     ["GET", "/api/v1/auth/keycloak/callback?code=provider", false],
     ["GET", "/api/v1/auth/keycloak/callback?code=a&code=b&state=c", false],
     ["POST", "/api/v1/repository-attestations/github/start", true],

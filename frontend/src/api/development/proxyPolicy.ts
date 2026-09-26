@@ -58,12 +58,10 @@ export function proxyRequestIsAdmitted(
   ) {
     return method === "POST" && url.search === "";
   }
-  if (
-    url.pathname === AUTH_LOGIN_CALLBACK_PATH ||
-    url.pathname === REPOSITORY_ATTESTATION_CALLBACK_PATH
-  ) {
-    return method === "GET" && callbackQueryIsAdmitted(url);
-  }
+  if (url.pathname === AUTH_LOGIN_CALLBACK_PATH)
+    return method === "GET" && keycloakCallbackQueryIsAdmitted(url);
+  if (url.pathname === REPOSITORY_ATTESTATION_CALLBACK_PATH)
+    return method === "GET" && githubCallbackQueryIsAdmitted(url);
   const baseline = GOVERNANCE_BASELINE_PATH.exec(url.pathname);
   if (baseline) {
     return (
@@ -138,7 +136,7 @@ function pageQueryIsAdmitted(url: URL, defaultSize: number): boolean {
   );
 }
 
-function callbackQueryIsAdmitted(url: URL): boolean {
+function githubCallbackQueryIsAdmitted(url: URL): boolean {
   if (
     url.searchParams.getAll("code").length !== 1 ||
     url.searchParams.getAll("state").length !== 1 ||
@@ -152,8 +150,42 @@ function callbackQueryIsAdmitted(url: URL): boolean {
     code !== null &&
     code.length > 0 &&
     code.length <= 512 &&
+    !/[\u0080-\uffff]/.test(code) &&
     state !== null &&
+    state.length === 43 &&
     /^[A-Za-z0-9_-]{43}$/.test(state)
+  );
+}
+
+function keycloakCallbackQueryIsAdmitted(url: URL): boolean {
+  const query = url.searchParams;
+  if (
+    ["code", "state", "iss"].some((key) => query.getAll(key).length !== 1) ||
+    query.getAll("session_state").length > 1 ||
+    [...query.keys()].some((key) => !["code", "state", "iss", "session_state"].includes(key))
+  )
+    return false;
+  const state = query.get("state");
+  const sessionState = query.get("session_state");
+  return (
+    boundedCallbackText(query.get("code"), 1024) &&
+    boundedCallbackText(query.get("iss"), 2048) &&
+    state !== null &&
+    state.length === 43 &&
+    /^[A-Za-z0-9_-]{43}$/.test(state) &&
+    (sessionState === null ||
+      (sessionState.length >= 1 &&
+        sessionState.length <= 512 &&
+        !/[^\x21-\x7e]/.test(sessionState)))
+  );
+}
+
+function boundedCallbackText(value: string | null, maximum: number): boolean {
+  return (
+    value !== null &&
+    value.length > 0 &&
+    value.length <= maximum * 2 &&
+    [...value].length <= maximum
   );
 }
 

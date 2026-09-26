@@ -410,15 +410,40 @@ test("a rendering crash recovers through explicit same-URL refresh", async ({ pa
 });
 
 test("verifies repository authority before configuration activation", async ({ page }) => {
+  let activated = false;
   await page.unroute("**/api/v1/auth/session");
   await page.route("**/api/v1/auth/session", async (route) => {
     await route.fulfill({ json: controlPlaneSessionFixture() });
   });
   await routeReadyPortfolio(page, true);
+  await page.route("**/api/v1/workbench/repositories/1/1?limit=10", (route) =>
+    route.fulfill({
+      json: workbenchFixture({
+        configEpochs: activated
+          ? [
+              {
+                active: true,
+                activeRevision: 1,
+                epochId: "4".repeat(64),
+                sourceFormat: "json",
+                sourceHash: "a".repeat(64),
+                documentHash: "b".repeat(64),
+                epochHash: "c".repeat(64),
+                documentSchemaId: "ci-repository-policy/v1",
+                documentProfileId: "ci-policy-document/v1",
+                semanticProfileId: "ci-repository-policy-semantics/v1",
+                compiledSchemaId: "ci-compiled-repository-policy/v1",
+              },
+            ]
+          : [],
+      }),
+    }),
+  );
   await page.route("**/api/v1/repository-attestations/github/start", async (route) => {
     await route.fulfill({ json: { error: "already_reviewed", ok: false }, status: 409 });
   });
   await page.route("**/api/v1/config/activations", async (route) => {
+    activated = true;
     await route.fulfill({ json: configActivationFixture() });
   });
 
@@ -432,7 +457,8 @@ test("verifies repository authority before configuration activation", async ({ p
   await page.getByRole("button", { name: "Activate proposal" }).click();
 
   await expect(page.getByText("Configuration activated")).toBeVisible();
-  await expect(page.getByText("Revision 1 is now authoritative")).toBeVisible();
+  await expect(page.getByText("Activation recorded at revision 1")).toBeVisible();
+  await expect(page.getByText(/Current observed revision 1/)).toBeVisible();
   await expectNoViewportOverflow(page);
 });
 

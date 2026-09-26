@@ -12,10 +12,12 @@ import type {
   ArchiveAttemptDetail,
   ArchiveRecord,
 } from "../../api/ciEconomics/archiveRecordSchema";
+import type { RetentionResult } from "../../api/ciEconomics/archiveRetentionSchema";
 import type { HistoryStatus } from "../../api/ciEconomics/historyStatusSchema";
 import { sameScope } from "../../api/ciEconomics/sourceSchema";
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
 import type { WorkbenchScope } from "../../api/workbench/client";
+import { IdentityDisclosure } from "../../components/IdentityDisclosure";
 import { ScrollableRegion } from "../../components/ScrollableRegion";
 import { formatDateTime } from "../../domain/format";
 import { ArchiveGapRepair, type GapRepairSelection } from "./ArchiveGapRepair";
@@ -98,9 +100,41 @@ function ArchiveSelection({
   const [query, setQuery] = useState(initial);
   const [invalid, setInvalid] = useState(false);
   const [selected, setSelected] = useState<ArchiveRecord | null>(null);
-  const [retentionPage, setRetentionPage] = useState<ArchiveRead | null>(null);
+  const [retentionPage, setRetentionPage] = useState<{
+    readonly page: ArchiveRead;
+    readonly revision: number;
+  } | null>(null);
+  const [retentionReceipt, setRetentionReceipt] = useState<{
+    readonly result: RetentionResult;
+    readonly workflowRunId: number;
+    readonly runAttempt: number;
+  }>();
+  const [minimumDataRevision, setMinimumDataRevision] = useState<number>();
   const [gapRepair, setGapRepair] = useState<GapRepairSelection | null>(null);
-  const [gapRefresh, setGapRefresh] = useState(0);
+  const [evidence, setEvidence] = useState({ active, revision: 0 });
+  const refreshEvidence = useCallback(
+    () => setEvidence((value) => ({ ...value, revision: value.revision + 1 })),
+    [],
+  );
+  // Inactivity removes read subtrees, but must not retire the captured command.
+  if (evidence.active !== active) setEvidence({ active, revision: evidence.revision + 1 });
+  const evidenceRevision = evidence.revision;
+  function retentionResolved(result: RetentionResult) {
+    const attempt = retentionPage?.page.records[0]?.header.attempt;
+    if (!attempt) return;
+    setRetentionReceipt({
+      result,
+      workflowRunId: attempt.workflowRunId,
+      runAttempt: attempt.runAttempt,
+    });
+    if (result.dataRevision !== null) {
+      const confirmed = result.dataRevision;
+      setMinimumDataRevision((previous) => Math.max(previous ?? 0, confirmed));
+    }
+    setRetentionPage(null);
+    refreshEvidence();
+    onChanged();
+  }
   return (
     <>
       {active && selected !== null ? (
@@ -116,9 +150,12 @@ function ArchiveSelection({
           <ArchiveAttempt
             query={query}
             record={selected}
-            onRetention={setRetentionPage}
+            onRetention={(page) => setRetentionPage({ page, revision: evidenceRevision })}
             retentionOpen={retentionPage !== null}
             inspection={inspection}
+            refreshEpoch={evidenceRevision}
+            minimumDataRevision={minimumDataRevision}
+            onRefresh={refreshEvidence}
           />
         </>
       ) : active ? (
@@ -163,9 +200,12 @@ function ArchiveSelection({
           ) : null}
           {invalid ? <p role="alert">Choose a valid date interval and workflow ID.</p> : null}
           <ArchivePage
-            key={`${JSON.stringify(query)}:${gapRefresh}`}
+            key={JSON.stringify(query)}
             query={query}
             inspection={inspection}
+            refreshEpoch={evidenceRevision}
+            minimumDataRevision={minimumDataRevision}
+            onRefresh={refreshEvidence}
           >
             {(page) =>
               query.kind === "gaps" ? (
@@ -252,13 +292,31 @@ function ArchiveSelection({
           </ArchivePage>
         </>
       ) : null}
+      {retentionReceipt ? (
+        <section aria-label="Retention operation receipt" role="status">
+          <p>
+            {retentionReceipt.result.preview === null
+              ? "The reviewed archive changed. No new change was admitted; refresh and review again."
+              : "Retention change confirmed. Permanent statistics are preserved."}
+          </p>
+          <p>
+            Recorded operation for run #{retentionReceipt.workflowRunId}, attempt{" "}
+            {retentionReceipt.runAttempt}.
+            {retentionReceipt.result.dataRevision !== null
+              ? ` Recorded data revision ${retentionReceipt.result.dataRevision}.`
+              : ""}
+          </p>
+          <IdentityDisclosure value={retentionReceipt.result.operationId} />
+        </section>
+      ) : null}
       {retentionPage !== null ? (
         <ArchiveRetention
-          page={retentionPage}
+          page={retentionPage.page}
           defaultRevision={status.defaults.revision}
           session={session}
-          onChanged={onChanged}
+          onChanged={retentionResolved}
           onClose={() => setRetentionPage(null)}
+          stale={retentionPage.revision !== evidenceRevision}
         />
       ) : null}
       {gapRepair !== null ? (
@@ -266,7 +324,7 @@ function ArchiveSelection({
           selection={gapRepair}
           session={session}
           onChanged={() => {
-            setGapRefresh((value) => value + 1);
+            refreshEvidence();
             onChanged();
           }}
           onClose={() => setGapRepair(null)}
@@ -280,16 +338,33 @@ function ArchivePage({
   query,
   children,
   inspection,
+  refreshEpoch = 0,
+  minimumDataRevision,
+  onRefresh,
 }: {
   readonly query: ArchiveQuery;
   readonly children: (page: ArchiveRead) => React.ReactNode;
   readonly inspection?: ArchiveInspection | undefined;
+  readonly refreshEpoch?: number;
+  readonly minimumDataRevision?: number | undefined;
+  readonly onRefresh?: (() => void) | undefined;
 }) {
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [pageNumber, setPageNumber] = useState(1);
+  const [position, setPosition] = useState<{
+    readonly epoch: number;
+    readonly cursor: string | null;
+    readonly page: number;
+  }>({ epoch: refreshEpoch, cursor: null, page: 1 });
+  const cursor = position.epoch === refreshEpoch ? position.cursor : null;
+  const pageNumber = position.epoch === refreshEpoch ? position.page : 1;
   const read = useCallback(
     async (signal: AbortSignal) => {
       const result = await fetchArchivePage(query, cursor, signal);
+      if (
+        result.kind === "ready" &&
+        minimumDataRevision !== undefined &&
+        result.value.dataRevision < minimumDataRevision
+      )
+        return { kind: "invalid-response" as const };
       if (
         inspection &&
         result.kind === "ready" &&
@@ -302,13 +377,13 @@ function ArchivePage({
         };
       return result;
     },
-    [query, cursor, inspection],
+    [query, cursor, inspection, minimumDataRevision],
   );
-  const { state, refresh } = useEconomicsRead(read);
+  const { state, refresh } = useEconomicsRead(read, refreshEpoch);
   function restart() {
-    setCursor(null);
-    setPageNumber(1);
-    refresh();
+    setPosition({ epoch: refreshEpoch, cursor: null, page: 1 });
+    if (onRefresh) onRefresh();
+    else refresh();
   }
   return (
     <>
@@ -324,8 +399,7 @@ function ArchivePage({
               page={pageNumber}
               next={page.nextCursor}
               onNext={(next) => {
-                setCursor(next);
-                setPageNumber((value) => value + 1);
+                setPosition({ epoch: refreshEpoch, cursor: next, page: pageNumber + 1 });
               }}
               onFirst={restart}
             />
@@ -342,12 +416,18 @@ function ArchiveAttempt({
   onRetention,
   retentionOpen,
   inspection,
+  refreshEpoch,
+  minimumDataRevision,
+  onRefresh,
 }: {
   readonly query: ArchiveQuery;
   readonly record: ArchiveRecord;
   readonly onRetention: (page: ArchiveRead) => void;
   readonly retentionOpen: boolean;
   readonly inspection: ArchiveInspection | undefined;
+  readonly refreshEpoch: number;
+  readonly minimumDataRevision: number | undefined;
+  readonly onRefresh: () => void;
 }) {
   const attempt = record.header.attempt;
   const [jobsQuery] = useState(() =>
@@ -374,7 +454,13 @@ function ArchiveAttempt({
         Workflow version: <code>{record.header.workflowBlobSha ?? "Unknown"}</code>. Current
         availability in GitHub has not been checked.
       </p>
-      <ArchivePage query={jobsQuery} inspection={inspection}>
+      <ArchivePage
+        query={jobsQuery}
+        inspection={inspection}
+        refreshEpoch={refreshEpoch}
+        minimumDataRevision={minimumDataRevision}
+        onRefresh={onRefresh}
+      >
         {(page) => (
           <>
             <ScrollableRegion className="archive-table-scroll" label="Retained job table">
@@ -428,7 +514,14 @@ function ArchiveAttempt({
           </>
         )}
       </ArchivePage>
-      <ArchiveDetail query={query} record={record} inspection={inspection} />
+      <ArchiveDetail
+        query={query}
+        record={record}
+        inspection={inspection}
+        refreshEpoch={refreshEpoch}
+        minimumDataRevision={minimumDataRevision}
+        onRefresh={onRefresh}
+      />
     </section>
   );
 }
@@ -437,10 +530,16 @@ function ArchiveDetail({
   query,
   record,
   inspection,
+  refreshEpoch,
+  minimumDataRevision,
+  onRefresh,
 }: {
   readonly query: ArchiveQuery;
   readonly record: ArchiveRecord;
   readonly inspection: ArchiveInspection | undefined;
+  readonly refreshEpoch: number;
+  readonly minimumDataRevision: number | undefined;
+  readonly onRefresh: () => void;
 }) {
   const [detailQuery] = useState(() =>
     archiveDetailQuerySchema.parse({
@@ -461,6 +560,12 @@ function ArchiveDetail({
     async (signal: AbortSignal) => {
       const result = await fetchArchiveDetail(detailQuery, signal);
       if (
+        result.kind === "ready" &&
+        minimumDataRevision !== undefined &&
+        result.value.dataRevision < minimumDataRevision
+      )
+        return { kind: "invalid-response" as const };
+      if (
         inspection &&
         result.kind === "ready" &&
         (result.value.dataRevision !== inspection.dataRevision ||
@@ -472,13 +577,13 @@ function ArchiveDetail({
         };
       return result;
     },
-    [detailQuery, inspection],
+    [detailQuery, inspection, minimumDataRevision],
   );
-  const { state, refresh } = useEconomicsRead(read);
+  const { state } = useEconomicsRead(read, refreshEpoch);
   return (
     <section className="archive-detail" aria-label="Numbered step details">
       <h4>Numbered step details</h4>
-      <EconomicsRead state={state} onRetry={refresh}>
+      <EconomicsRead state={state} onRetry={onRefresh}>
         {(page) => <ArchiveDetailContent page={page.detailPayload} retention={page.detail} />}
       </EconomicsRead>
     </section>

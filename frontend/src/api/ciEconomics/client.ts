@@ -1,6 +1,6 @@
-import { ZodError } from "zod";
 import type { operations } from "../generated";
-import { boundedFetch, combinedSignal, ResponseLimitError } from "../shared/boundedFetch";
+import { boundedFetch, combinedSignal } from "../shared/boundedFetch";
+import { caughtFailure } from "../shared/responseFailure";
 import {
   attemptSummaryCursor,
   CI_ECONOMICS_PAGE_SIZE,
@@ -173,22 +173,6 @@ async function failure(response: Response, allowNotFound: boolean): Promise<CiEc
   } catch {
     return { kind: "invalid-response" };
   }
-}
-
-function caughtFailure(
-  error: unknown,
-  signal: AbortSignal | undefined,
-): CiEconomicsListFailure | never {
-  if (
-    error instanceof ZodError ||
-    error instanceof SyntaxError ||
-    error instanceof ResponseLimitError ||
-    error instanceof RangeError
-  ) {
-    return { kind: "invalid-response" };
-  }
-  if (signal?.aborted) throw error;
-  return { kind: "network-failure" };
 }
 
 function scopeIsAdmitted(scope: CiEconomicsRepositoryScope): boolean {

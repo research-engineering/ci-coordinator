@@ -40,6 +40,7 @@ export async function activateConfig(
   if (!activationCommandIsAdmitted(command) || !/^[A-Za-z0-9_-]{43}$/.test(csrfToken)) {
     return { kind: "invalid-response" };
   }
+  const targetEpochId = command.targetEpochId;
   try {
     const response = await boundedFetch(
       new Request(new URL("/api/v1/config/activations", globalThis.location.origin), {
@@ -50,7 +51,7 @@ export async function activateConfig(
           proposalManifestId: command.proposalManifestId,
           repositoryId: command.scope.repositoryId,
           schemaVersion: "ci-config-epoch-activation/v1",
-          targetEpochId: command.targetEpochId,
+          targetEpochId,
         }),
         credentials: "same-origin",
         headers: {
@@ -63,7 +64,10 @@ export async function activateConfig(
       }),
     );
     if (response.status === 200) {
-      return { kind: "complete", activation: configActivationSchema.parse(await response.json()) };
+      const activation = configActivationSchema.parse(await response.json());
+      return activation.epochId === targetEpochId
+        ? { kind: "complete", activation }
+        : { kind: "invalid-response" };
     }
     return await activationFailure(response);
   } catch (error) {

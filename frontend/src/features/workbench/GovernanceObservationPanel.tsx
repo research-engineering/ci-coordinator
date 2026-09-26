@@ -120,7 +120,8 @@ function GovernanceResult({
         </div>
       </div>
       <dl className="governance-summary">
-        <SummaryItem label="Effective rules" value={String(observation.rules.length)} />
+        <SummaryItem label="Active ruleset rules" value={String(observation.rules.length)} />
+        <SummaryItem label="Classic branch protection" value="Not observed" />
         <SummaryItem label="GitHub API" value={observation.apiVersion} />
         <SummaryItem label="Observed" value={formatDateTime(observation.observedAt)} />
         <SummaryItem label="State digest" value={observation.stateDigest} code />
@@ -146,13 +147,13 @@ function GovernanceResult({
       {observation.rules.length === 0 ? (
         <GovernanceMessage
           icon={Search}
-          title="No active rules reported"
-          description="No active rules were reported during this best-effort traversal."
+          title="No active ruleset rules reported"
+          description="Branch protection remains unverified."
         />
       ) : (
         <section aria-labelledby="effective-rules-title">
           <h3 id="effective-rules-title" className="governance-rules-heading">
-            Effective rules
+            Ruleset rules
           </h3>
           <GovernanceRuleEvidence rules={observation.rules} />
         </section>

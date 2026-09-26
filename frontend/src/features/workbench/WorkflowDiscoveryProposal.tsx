@@ -16,6 +16,12 @@ interface WorkflowDiscoveryProposalProps {
   readonly scope: WorkbenchScope;
   readonly session: ControlPlaneSession | undefined;
   readonly expectedActive: ExpectedActiveEpoch | null | undefined;
+  readonly authorityRevision: number;
+  readonly snapshotReadRevision: number;
+  readonly snapshotLoading: boolean;
+  readonly onConfirmed: (active?: ExpectedActiveEpoch) => void;
+  readonly onRefreshSnapshot: () => void;
+  readonly onLockedChange: (locked: boolean) => void;
 }
 
 const DIAGNOSTIC_COLUMNS: readonly DataColumn<Diagnostic>[] = [
@@ -30,6 +36,12 @@ export function WorkflowDiscoveryProposal({
   scope,
   session,
   expectedActive,
+  authorityRevision,
+  snapshotReadRevision,
+  snapshotLoading,
+  onConfirmed,
+  onRefreshSnapshot,
+  onLockedChange,
 }: WorkflowDiscoveryProposalProps) {
   const { proposal } = report;
   const reviewable = proposal.state === "reviewable";
@@ -61,6 +73,12 @@ export function WorkflowDiscoveryProposal({
         proposal={proposal}
         scope={scope}
         session={session}
+        authorityRevision={authorityRevision}
+        snapshotReadRevision={snapshotReadRevision}
+        snapshotLoading={snapshotLoading}
+        onConfirmed={onConfirmed}
+        onRefreshSnapshot={onRefreshSnapshot}
+        onLockedChange={onLockedChange}
       />
       <dl className="proposal-metadata">
         <div>

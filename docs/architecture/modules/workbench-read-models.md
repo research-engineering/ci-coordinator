@@ -127,6 +127,13 @@ mutation, but does not substitute for the separate capability and scope proofs.
 An empty section means no matching retained fact in the snapshot. It does not
 mean that the provider has no corresponding external state.
 
+The active config pointer is an observation in this snapshot, not a command
+receipt or a promise that it remains current. A browser-confirmed command may
+set a lower bound for a subsequent read; it cannot replace that read with the
+receipt or synthesize snapshot rows. Browser read and command lifetimes belong
+to the [operator UI contract](../../specs/ci-coordinator-operator-ui/overview.md#read-and-command-lifetimes),
+without changing this module's read-only transaction or scope authority.
+
 ## 7. Failure Contract
 
 ```text

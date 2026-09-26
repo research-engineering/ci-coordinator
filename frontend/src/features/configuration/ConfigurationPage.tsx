@@ -1,6 +1,7 @@
 import { ArrowRight, RefreshCw } from "lucide-react";
 import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useState } from "react";
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
+import type { ExpectedActiveEpoch } from "../../api/repositoryAttestation/client";
 import type { WorkbenchScope } from "../../api/workbench/client";
 import { consoleHref } from "../workbench/navigation";
 import { ConfigurationNotice } from "./ConfigurationNotice";
@@ -14,12 +15,20 @@ export function ConfigurationPage({
   authorityRevision,
   active,
   onWorkflows,
+  onConfirmed,
+  sharedReadRevision = 0,
+  confirmedMinimum,
+  minimumConflict = false,
 }: {
   readonly scope: WorkbenchScope;
   readonly session: ControlPlaneSession | undefined;
   readonly authorityRevision: number;
   readonly active: boolean;
   readonly onWorkflows: ((event: MouseEvent<HTMLAnchorElement>) => void) | undefined;
+  readonly onConfirmed?: ((active?: ExpectedActiveEpoch) => void) | undefined;
+  readonly sharedReadRevision?: number;
+  readonly confirmedMinimum?: ExpectedActiveEpoch | undefined;
+  readonly minimumConflict?: boolean;
 }) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -54,6 +63,10 @@ export function ConfigurationPage({
       session={session}
       active={active}
       onWorkflows={onWorkflows}
+      onConfirmed={onConfirmed}
+      sharedReadRevision={sharedReadRevision}
+      confirmedMinimum={confirmedMinimum}
+      minimumConflict={minimumConflict}
     />
   );
 }
@@ -63,11 +76,19 @@ function AuthorizedConfiguration({
   session,
   active,
   onWorkflows,
+  onConfirmed,
+  sharedReadRevision,
+  confirmedMinimum,
+  minimumConflict,
 }: {
   readonly scope: WorkbenchScope;
   readonly session: ControlPlaneSession;
   readonly active: boolean;
   readonly onWorkflows: ((event: MouseEvent<HTMLAnchorElement>) => void) | undefined;
+  readonly onConfirmed: ((active?: ExpectedActiveEpoch) => void) | undefined;
+  readonly sharedReadRevision: number;
+  readonly confirmedMinimum: ExpectedActiveEpoch | undefined;
+  readonly minimumConflict: boolean;
 }) {
   const repository = useMemo(
     () => ({ installationId: scope.installationId, repositoryId: scope.repositoryId }),
@@ -80,7 +101,7 @@ function AuthorizedConfiguration({
     document.addEventListener("visibilitychange", update);
     return () => document.removeEventListener("visibilitychange", update);
   }, []);
-  const command = useConfigurationCommand(session);
+  const command = useConfigurationCommand(session, onConfirmed);
   function tabKey(event: KeyboardEvent<HTMLButtonElement>) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -96,13 +117,25 @@ function AuthorizedConfiguration({
     document.getElementById(`configuration-tab-${next}`)?.focus();
   }
   const state = command.state;
-  const minimumActive = useMemo(
+  const localMinimum = useMemo(
     () =>
       state.kind === "complete" && state.command.kind === "rollback" && "revision" in state.value
         ? { epochId: state.value.epochId, revision: state.value.revision }
         : undefined,
     [state],
   );
+  const minimumActive =
+    confirmedMinimum && (!localMinimum || confirmedMinimum.revision > localMinimum.revision)
+      ? confirmedMinimum
+      : localMinimum;
+  const conflictingMinimum =
+    minimumConflict ||
+    Boolean(
+      localMinimum &&
+        confirmedMinimum &&
+        localMinimum.revision === confirmedMinimum.revision &&
+        localMinimum.epochId !== confirmedMinimum.epochId,
+    );
   return (
     <div className="configuration-workspace">
       <div role="tablist" aria-label="Configuration views" className="configuration-tabs">
@@ -205,6 +238,8 @@ function AuthorizedConfiguration({
           scope={repository}
           minimumActive={minimumActive}
           readRevision={command.readRevision}
+          sharedReadRevision={sharedReadRevision}
+          minimumConflict={conflictingMinimum}
           active={active && visible && tab === "epochs" && !command.locked}
           canRollback={session.roles.includes("activate")}
           onRollback={(value) => void command.submit(value)}

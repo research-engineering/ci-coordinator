@@ -15,6 +15,8 @@ export function RetainedEpochs({
   readRevision,
   canRollback,
   onRollback,
+  sharedReadRevision = 0,
+  minimumConflict = false,
 }: {
   readonly scope: ConfigScope;
   readonly active: boolean;
@@ -22,8 +24,17 @@ export function RetainedEpochs({
   readonly readRevision: number;
   readonly canRollback: boolean;
   readonly onRollback: (command: RollbackCommand) => void;
+  readonly sharedReadRevision?: number;
+  readonly minimumConflict?: boolean;
 }) {
-  const query = useConfigurationStatus(scope, active, minimumActive, readRevision);
+  const query = useConfigurationStatus(
+    scope,
+    active,
+    minimumActive,
+    readRevision,
+    sharedReadRevision,
+    minimumConflict,
+  );
   return (
     <section aria-label="Retained configuration epochs">
       <div className="configuration-toolbar">

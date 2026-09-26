@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { type MouseEvent, type ReactNode, useEffect, useState } from "react";
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
 import type { ExpectedActiveEpoch } from "../../api/repositoryAttestation/client";
@@ -45,6 +46,16 @@ export function RepositoryWorkspace({
 
   return (
     <>
+      <button
+        type="button"
+        className="icon-button"
+        title="Refresh repository snapshot"
+        aria-label="Refresh repository snapshot"
+        disabled={query.state.kind === "loading"}
+        onClick={query.refresh}
+      >
+        <RefreshCw aria-hidden="true" />
+      </button>
       {view === "overview" || view === "audit" ? (
         query.state.kind === "loading" ? (
           <LoadingState label="Loading snapshot" />
@@ -85,6 +96,10 @@ export function RepositoryWorkspace({
           session={session}
           active={view === "configuration"}
           onWorkflows={onWorkflows}
+          onConfirmed={query.invalidate}
+          sharedReadRevision={query.readRevision}
+          confirmedMinimum={query.minimumActive}
+          minimumConflict={query.minimumConflict}
         />
       </RetainedTask>
       <RetainedTask active={view === "economics"}>
@@ -107,9 +122,14 @@ export function RepositoryWorkspace({
       </RetainedTask>
       <RetainedTask active={view === "workflows"}>
         <WorkflowDiscoveryPanel
+          authorityRevision={authorityRevision}
           expectedActive={snapshot ? activeEpoch(snapshot) : undefined}
           scope={scope}
           session={session}
+          onConfirmed={query.invalidate}
+          onRefreshSnapshot={query.refresh}
+          snapshotLoading={query.state.kind === "loading"}
+          snapshotReadRevision={query.readRevision}
         />
       </RetainedTask>
     </>
