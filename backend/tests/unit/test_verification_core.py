@@ -130,7 +130,12 @@ def test_huge_literal_confidence_retains_the_independently_admitted_plan(sign: b
         VerificationEvidence("agent_advice_rejected", "agent_advice_confidence_invalid"),
     )
 
-    stale = replace(candidate, input_hash="f" * 64)
+    stale_input = make_input_value(
+        DiffFileChangeInput(path="src/service/component.py", status="modified")
+    )
+    stale = _candidate(plan(stale_input, policy))
+    assert admit_deterministic_plan(stale_input, policy, stale) is None
+    assert admit_deterministic_plan(input, policy, stale) == "deterministic_plan_mismatch"
     rejected = verify(input, policy, stale, envelope)
     assert rejected.fallback.triggered is True
     assert rejected.fallback.reason == "deterministic_plan_mismatch"
