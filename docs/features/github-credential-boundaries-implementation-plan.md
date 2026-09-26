@@ -50,7 +50,7 @@ All rows require positive controls and counterexamples; authoring is not passing
 | Sharing is neither too broad nor fragmented | `integrations/test_github_app_transport_auth.py`: distinct I/R/P remain separate; equal grants reuse; equal O grants across R share one refresh without sharing request results |
 | Denial cannot broaden authority | Same auth owner: preloaded other grants and denied scoped mint yield failure without token substitution or a broader mint |
 | Lifecycle and bounds survive rekeying | Auth and `integrations/test_github_app_transport_lifecycle.py`: mixed-key global refresh/cache limits, deadline while waiting, clock resampling, waiter cancellation, callback cleanup and close/drain |
-| Organization population survives transport | `integrations/test_github_runner_capacity.py`: real factory mint and full controlled organization membership retain the existing visibility, population and eligibility result |
+| Organization population survives transport | `integrations/test_github_runner_capacity.py`: real factory mint, repository/group deduplication and disjoint controlled group membership retain the existing visibility, population and eligibility result; cross-group ambiguity remains unknown after the complete provider trace |
 | Historical audience bytes remain exact | `target_artifacts/test_measurement_report_upload.py`: producer and receiver agree with an independent literal v1 vector |
 | Recipe recipients are explicit | `scripts/tests/test_operational_documentation.py`: parse the actual example and environment source; assert the approved audience/endpoint relationship and existing permission scope |
 

@@ -557,7 +557,7 @@ def _request() -> PlanRequest:
     )
 
 
-@pytest.mark.parametrize("failure", [None, "org-denied", "members-incomplete"])
+@pytest.mark.parametrize("failure", [None, "org-denied", "members-incomplete", "members-ambiguous"])
 def test_real_factory_preserves_complete_org_population_without_repository_scoping(
     failure: str | None,
 ) -> None:
@@ -587,7 +587,7 @@ def test_real_factory_preserves_complete_org_population_without_repository_scopi
         headers = {"x-github-api-version-selected": GITHUB_API_VERSION}
         body_value: object
         if path == "/repos/example/target/actions/runners":
-            body_value = _runner_page(1, _runner(1, "dev"))
+            body_value = _runner_page(2, _runner(1, "dev"), _runner(2, "dev"))
         elif path == "/orgs/example/actions/runner-groups":
             assert request.url.params["visible_to_repository"] == "target"
             body_value = _group_page(
@@ -604,7 +604,11 @@ def test_real_factory_preserves_complete_org_population_without_repository_scopi
                     '?page=2&per_page=100>; rel="next"'
                 )
         elif path == "/orgs/example/actions/runner-groups/20/runners":
-            body_value = _runner_page(2, _runner(2, "dev"), _runner(4, "dev"))
+            body_value = (
+                _runner_page(2, _runner(2, "dev"), _runner(4, "dev"))
+                if failure == "members-ambiguous"
+                else _runner_page(1, _runner(4, "dev"))
+            )
         else:
             raise AssertionError(f"unexpected runner request: {path}")
         return httpx.Response(
@@ -637,5 +641,9 @@ def test_real_factory_preserves_complete_org_population_without_repository_scopi
         ("/orgs/example/actions/runner-groups/20/runners", "page=1&per_page=100"),
     ]
     assert observed == (
-        complete[:1] if failure == "org-denied" else complete[:3] if failure else complete
+        complete[:1]
+        if failure == "org-denied"
+        else complete[:3]
+        if failure == "members-incomplete"
+        else complete
     )
