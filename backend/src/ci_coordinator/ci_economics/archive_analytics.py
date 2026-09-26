@@ -18,7 +18,5 @@ def summarize_archive(snapshot: AnalyticsSnapshot) -> AnalyticsReport:
         cohort=snapshot.cohort,
         buckets=snapshot.buckets,
         forecast=forecast_occupancy(snapshot.query, snapshot.buckets, snapshot.cohort),
-        degradation=assess_degradation(
-            snapshot.query, snapshot.buckets, snapshot.cohort, snapshot.mapping
-        ),
+        degradation=assess_degradation(snapshot.query, snapshot.buckets, snapshot.mapping),
     )
