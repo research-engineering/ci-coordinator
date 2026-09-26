@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Literal
 
 type GitHubHttpMethod = Literal["GET", "POST", "PATCH", "PUT", "DELETE"]
@@ -115,10 +116,17 @@ class GitHubResponse:
     body: bytes
     pagination: GitHubPaginationEvidence
     rate_limit: GitHubRateLimitEvidence | None = None
+    received_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if not 100 <= self.status <= 599:
             raise ValueError("GitHub response status must be an HTTP status code")
+        if self.received_at is not None and (
+            type(self.received_at) is not datetime
+            or self.received_at.tzinfo is None
+            or self.received_at.utcoffset() is None
+        ):
+            raise ValueError("GitHub response receipt time must be an aware datetime")
 
 
 @dataclass(frozen=True, slots=True)

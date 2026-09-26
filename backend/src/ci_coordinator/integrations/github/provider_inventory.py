@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ci_coordinator.integrations.github._client import GitHubProtocolClient
+from ci_coordinator.integrations.github._rate_limits import retry_after_seconds
 from ci_coordinator.integrations.github._routes import GitHubPage, path_value
 from ci_coordinator.integrations.github.app_client import AppIdentityClient
 from ci_coordinator.integrations.github.app_transport import GitHubAppTransportFactory
@@ -177,7 +178,7 @@ def _unavailable(outcome: GitHubUnavailable) -> ProviderInventoryUnavailable:
     if failure.kind == "rate_limited":
         return ProviderInventoryUnavailable(
             "rate_limited",
-            _retry_after_seconds(failure.rate_limit.retry_after if failure.rate_limit else None),
+            retry_after_seconds(failure),
         )
     if failure.kind == "not_found":
         return ProviderInventoryUnavailable("not_found")
@@ -187,10 +188,3 @@ def _unavailable(outcome: GitHubUnavailable) -> ProviderInventoryUnavailable:
     }:
         return ProviderInventoryUnavailable("provider_binding_mismatch")
     return ProviderInventoryUnavailable("unavailable")
-
-
-def _retry_after_seconds(value: str | None) -> int | None:
-    if value is None or not value.isascii() or not value.isdecimal() or len(value) > 4:
-        return None
-    result = int(value)
-    return result if result <= 3_600 else None

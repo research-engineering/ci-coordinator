@@ -72,8 +72,37 @@ provider limit rather than inventing an unavailable `total_files` field.
 
 For HTTP `403`, rate-limit evidence takes precedence over `GitHubForbidden`:
 GitHub documents both primary exhaustion (`remaining = 0`) and secondary-limit
-backoff (`retry-after`) on `403` or `429`. A `403` without either evidence
-remains an authorization failure.
+backoff (`retry-after`) on `403` or `429`. Without those headers, a bounded
+strict JSON error object can identify a secondary limit: its message must equal
+`You have exceeded a secondary rate limit` (optionally followed by a period)
+or begin with that complete sentence and a space. The object is limited to
+4,096 bytes, kernel depth limit two (root depth zero) and 16 value nodes;
+only `message`, optional textual
+`documentation_url` and optional string status `403` are admitted. Message and
+documentation text each have a 1,024-byte bound and exclude ASCII control characters.
+Other shapes remain forbidden; a URL alone is not evidence. Provider text is
+never copied into a public failure. This is a bounded recognizer, not an
+exhaustive provider-message grammar.
+
+A genuinely absent selected-version header on HTTP `500`, `502`, `503` or `504`
+retains the existing non-success/timeout classification and raw response.
+A present empty/duplicate header is not absence. Explicit version mismatch and
+all `2xx` responses retain provenance enforcement; other statuses retain their
+existing precedence. This exception cannot produce successful evidence.
+
+Provider inventory and governance observation share one retry-seconds projection.
+It preserves explicit `Retry-After` and may additionally derive a primary-reset
+delay only for `remaining = 0` with admitted epoch seconds and a trusted aware
+receipt instant. The transport samples its existing injected `Clock` after the
+bounded exchange for `403`/`429`; legacy responses without that optional instant
+cannot supply reset-derived timing. The provider `Date` header is not time
+authority. Conversion rounds up and combines applicable hints without shortening
+either. Missing, malformed, duplicate or unrepresentable timing remains unknown;
+delays over the existing 3,600-second API bound are not clamped. A positive
+remaining count does not make its reset an applicable secondary-limit delay.
+The value is a bounded wait hint, not proof that every provider constraint is
+known or that availability returns at that instant. No default wait, automatic
+retry, cooldown, quota reservation or retry-budget change follows from it.
 
 ## 5. Proof Obligations
 
