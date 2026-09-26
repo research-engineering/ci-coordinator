@@ -126,6 +126,27 @@ def test_unavailable_or_invalid_lookup_fails_closed() -> None:
         assert resolution.dynamic_ci_disabled is True
 
 
+def test_future_force_is_unavailable_knowledge_not_an_active_record() -> None:
+    future = _override(
+        "force_full_ci",
+        subject_id="run-7",
+        operation_id="future-force",
+        applied_at=NOW + timedelta(minutes=1),
+        expires_at=NOW + timedelta(minutes=2),
+    )
+    assert not future.applies_at(NOW)
+    resolution = asyncio.run(
+        resolve_active_overrides(
+            _Reader(ActiveOverrideRecords(force_full_ci=future)),
+            scope=SCOPE,
+            subject_id="run-7",
+            now=NOW,
+        )
+    )
+    assert resolution == OverrideResolution(lookup_available=False)
+    assert resolution.force_full_ci is True
+
+
 def test_query_rejects_ambiguous_values_before_reader_access() -> None:
     reader = _Reader(ActiveOverrideRecords())
 

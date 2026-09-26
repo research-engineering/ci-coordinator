@@ -117,6 +117,7 @@ the complete audit parents:
 | [#35](https://github.com/research-engineering/ci-coordinator/pull/35) | Aware configuration audit times and defined-offset shadow admission; immutable historical replay is preserved. |
 | [#36](https://github.com/research-engineering/ci-coordinator/pull/36) | Complete bounded text-policy inputs and active-environment executable admission; the existing file exclusions and pinned CLI policy are preserved. |
 | [#37](https://github.com/research-engineering/ci-coordinator/pull/37) | Finite platform-workflow admission, exact activation labels and observed zero baselines for alerts; no future-platform, pre-scrape recovery or worker-health claim. |
+| [#38](https://github.com/research-engineering/ci-coordinator/pull/38) | Workspace reads cannot discard captured commands or replace confirmed revision floors; callback/error admission and ruleset-only governance labels retain their explicit boundaries. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -126,13 +127,16 @@ Live provider enrollment, authentication and deployment recovery remain separate
 mocked APIs are not their evidence. Artifact publication, artifact qualification
 and production omission authority are still distinct.
 
-The next prepared audit batch separates UI reads from command authority and
-clarifies the observed governance population. Its local-tooling preparation
-ancestor is not a product prerequisite; phase-exact managed installation and
-transitive process ownership retain their independent lifecycle proof. Explicit
-review renewal builds on the UI boundary, preserving historical replay while
-rejecting new legacy requests. Override-clock uncertainty is independently
-prepared and still requires native qualification. Workflow CPU
+The next prepared audit batch rejects future exact-subject force evidence as
+unavailable before selected issuance, preserving ordinary override reads and
+the existing FullCI path. Explicit review renewal follows the qualified UI
+boundary, preserving historical replay while rejecting new legacy requests.
+Phase-exact managed installation and transitive process ownership retain their
+independent lifecycle proof, including the isolated consumer-lab process path.
+The analytics batch selects the first seven complete baseline days without
+discarding subsequent unknown days; credential narrowing remains in design.
+All these prepared changes still require their exact-source native qualification.
+Workflow CPU
 isolation, readiness freshness and plan-failure telemetry retain their own
 lifecycle and outcome contracts. No prepared scope is qualified merely
 by this ordering or by the preceding PRs; all remain routed through CI-054 and

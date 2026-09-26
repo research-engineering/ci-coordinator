@@ -123,7 +123,7 @@
     {
       "requirementId": "REQ-CI-CORE-006",
       "ownerId": "ci-coordinator.core",
-      "invariant": "Shadow mode must compare planned omissions against full validation outcomes and block limited dynamic omission expansion until candidate unsafe omissions are zero for the enabled surface and rollback, alerting, replay, and operator override are proven.",
+      "invariant": "Shadow mode must compare planned omissions against full validation outcomes and block limited dynamic omission expansion until candidate unsafe omissions are zero for the enabled surface and rollback, alerting, replay, and operator override are proven. An unexpired retained force-FullCI record for the exact installation, repository and subject whose application time is later than the reader instant makes override knowledge unavailable, not absent or active. Planning preserves FullCI and selected persistence rejects that uncertainty under the existing repository-scope lock and post-lock database-clock check. Due-only, expired, foreign-scope and null-subject lookup behavior, selected-row decoding, immutable timestamps and exact operation replay remain unchanged; expiry does not introduce a scheduled start.",
       "claimLevel": "blocking",
       "riskClass": "critical",
       "proofBindingRefs": ["proofkit/requirement-bindings.json"],

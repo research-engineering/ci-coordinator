@@ -219,12 +219,14 @@ class PostgresOperatorOverrideRepository:
         scope: RepositoryScope,
         subject_id: str | None,
         now: datetime,
-    ) -> ActiveOverrideRecords:
+    ) -> OverrideLookupResult:
         self._ensure_active()
         _require_resolution_query(scope, subject_id, now)
         try:
             await self._admit_state()
             force = await self._load_active_force(scope, subject_id, now)
+            if isinstance(force, OverrideLookupUnavailable):
+                return force
             control = await self._load_latest_omission_control(scope, now)
             disable = None
             if control is not None:
@@ -287,7 +289,7 @@ class PostgresOperatorOverrideRepository:
         scope: RepositoryScope,
         subject_id: str | None,
         now: datetime,
-    ) -> ActiveOverride | None:
+    ) -> ActiveOverride | OverrideLookupUnavailable | None:
         if subject_id is None:
             return None
         row = await self._connection.execute(
@@ -297,7 +299,6 @@ class PostgresOperatorOverrideRepository:
                 operator_overrides.c.repository_id == scope.repository_id,
                 operator_overrides.c.kind == "force_full_ci",
                 operator_overrides.c.target_subject_id == subject_id,
-                operator_overrides.c.applied_at <= now,
                 operator_overrides.c.expires_at > now,
             )
             .order_by(
@@ -310,6 +311,8 @@ class PostgresOperatorOverrideRepository:
         if mapping is None:
             return None
         override = decode_operator_override_row(dict(mapping)).override
+        if override.applied_at > now:
+            return OverrideLookupUnavailable()
         if not override.applies_at(now):
             raise PersistenceInvariantViolation("stored force-FullCI override is not active")
         return override

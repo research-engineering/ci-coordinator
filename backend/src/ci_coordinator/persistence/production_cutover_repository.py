@@ -17,6 +17,7 @@ from ci_coordinator.operator_controls.override import (
     OverrideAuditEvent,
     OverrideCommand,
 )
+from ci_coordinator.operator_controls.resolution import OverrideLookupUnavailable
 from ci_coordinator.operator_controls.use_cases import OverrideApplied, OverrideDuplicate
 from ci_coordinator.persistence.audit_repository import _PostgresAuditEventRepository
 from ci_coordinator.persistence.config_epoch_repository import _PostgresConfigEpochRepository
@@ -216,6 +217,8 @@ class PostgresProductionCutoverRepository:
             return ProductionCutoverRejected("override_conflict")
         at = await production_database_now(self._connection)
         active = await self._overrides.resolve_active(scope=command.scope, subject_id=None, now=at)
+        if isinstance(active, OverrideLookupUnavailable):
+            return ProductionCutoverRejected("override_conflict")
         disable = active.disable_dynamic
         if disable is None:
             disable = await self._override(command, "disable_omission", None, at)
@@ -269,6 +272,8 @@ class PostgresProductionCutoverRepository:
         ):
             return ProductionCutoverRejected("config_changed")
         active = await self._overrides.resolve_active(scope=command.scope, subject_id=None, now=at)
+        if isinstance(active, OverrideLookupUnavailable):
+            return ProductionCutoverRejected("override_conflict")
         if (
             active.disable_dynamic is None
             or active.disable_dynamic.override_id != state.latch_override_id
