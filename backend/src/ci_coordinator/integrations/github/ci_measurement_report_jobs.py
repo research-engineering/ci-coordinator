@@ -51,7 +51,9 @@ class GitHubMeasurementReportJobs:
             raise ValueError("report job page exceeds its bound")
         attempt = report.attempt
         client = ActionsClient(
-            self._transport_factory.for_installation(attempt.scope.installation_id),
+            self._transport_factory.for_installation(
+                attempt.scope.installation_id, repository_id=attempt.scope.repository_id
+            ),
             api_version=self._api_version,
         )
         resolved = await load_economics_repository(

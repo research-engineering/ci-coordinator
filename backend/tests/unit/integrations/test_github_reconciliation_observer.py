@@ -80,9 +80,11 @@ class _Transport:
 class _Factory:
     transport: _Transport
     installations: list[int] = field(default_factory=list)
+    bindings: list[tuple[int, int | None]] = field(default_factory=list)
 
-    def for_installation(self, installation_id: int) -> _Transport:
+    def for_installation(self, installation_id: int, *, repository_id: int | None) -> _Transport:
         self.installations.append(installation_id)
+        self.bindings.append((installation_id, repository_id))
         return self.transport
 
 
@@ -99,6 +101,7 @@ def test_exact_subject_binding_produces_only_exact_contract_observations() -> No
 
     assert not isinstance(observations, ProviderSignalAmbiguity)
     assert factory.installations == [SUBJECT.installation_id]
+    assert factory.bindings == [(101, 202)]
     assert [request.path for request in transport.requests] == [
         f"/repositories/{REPOSITORY_ID}",
         JOBS_PATH,
@@ -140,6 +143,7 @@ def test_attempt_entrypoint_retains_exact_provider_binding_without_reconciliatio
     assert [job.job_id for job in observed] == [1]
     assert observed[0].head_sha == attempt.head_sha
     assert factory.installations == [101]
+    assert factory.bindings == [(101, 202)]
     assert [request.path for request in transport.requests] == [
         f"/repositories/{REPOSITORY_ID}",
         JOBS_PATH,
@@ -163,6 +167,7 @@ def test_legacy_subject_reader_keeps_its_existing_sha_domain(length: int) -> Non
 
     assert asyncio.run(_observer(factory).load_attempt(subject)) == ()
     assert factory.installations == [SUBJECT.installation_id]
+    assert factory.bindings == [(101, 202)]
     assert [request.path for request in transport.requests] == [
         f"/repositories/{REPOSITORY_ID}",
         JOBS_PATH,

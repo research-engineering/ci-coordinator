@@ -83,9 +83,12 @@ REGISTRY_CONTENT = json.dumps(
 
 def test_reader_binds_numeric_repository_to_one_commit_tree_blob_chain() -> None:
     requests: list[str] = []
+    grants: list[object] = []
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request.url.path)
+        if request.url.path.endswith("/access_tokens"):
+            grants.append(json.loads(request.content))
         return _discovery_response(request)
 
     factory = _factory(_private_key(), httpx.MockTransport(handler))
@@ -96,9 +99,14 @@ def test_reader_binds_numeric_repository_to_one_commit_tree_blob_chain() -> None
     assert result.repository.scope == RepositoryScope(77, 501)
     assert result.sources[0].content == CONTENT
     assert result.failures == ()
+    assert grants == [
+        {"repository_ids": [501], "permissions": {"metadata": "read"}},
+        {"repository_ids": [501], "permissions": {"contents": "read"}},
+    ]
     assert requests == [
         "/app/installations/77/access_tokens",
         "/repositories/501",
+        "/app/installations/77/access_tokens",
         "/repos/example/repo/git/ref/heads/master",
         f"/repos/example/repo/git/commits/{COMMIT_SHA}",
         f"/repos/example/repo/git/trees/{ROOT_TREE_SHA}",

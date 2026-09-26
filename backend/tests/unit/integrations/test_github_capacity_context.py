@@ -50,9 +50,13 @@ class _Factory:
     def __init__(self, transport: GitHubTransport) -> None:
         self._transport = transport
         self.installation_ids: list[int] = []
+        self.bindings: list[tuple[int, int | None]] = []
 
-    def for_installation(self, installation_id: int) -> GitHubTransport:
+    def for_installation(
+        self, installation_id: int, *, repository_id: int | None
+    ) -> GitHubTransport:
         self.installation_ids.append(installation_id)
+        self.bindings.append((installation_id, repository_id))
         return self._transport
 
 
@@ -143,6 +147,7 @@ def test_native_target_uses_only_the_exact_git_object_snapshot() -> None:
     assert result is not None
     assert result.capacity_manifest is None
     assert factory.installation_ids == [100]
+    assert factory.bindings == [(100, 200)]
     assert [request.operation for request in transport.requests] == [
         "workflow_discovery.get_commit",
         "workflow_discovery.get_tree",

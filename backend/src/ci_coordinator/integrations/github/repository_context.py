@@ -142,7 +142,9 @@ class GitHubRepositoryContextProvider:
         self, epoch: RepositoryEpoch, policy: PolicySnapshot, *, use_prepared: bool = True
     ) -> GitHubRepositoryContext:
         try:
-            transport = self._transport_factory.for_installation(epoch.installation_id)
+            transport = self._transport_factory.for_installation(
+                epoch.installation_id, repository_id=epoch.repository_id
+            )
             repository = await self._resolve_repository(
                 ActionsClient(transport, api_version=self._api_version),
                 epoch,

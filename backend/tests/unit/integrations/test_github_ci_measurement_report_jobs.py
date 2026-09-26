@@ -52,6 +52,7 @@ def test_exact_attempt_membership_needs_one_page_not_job_completion(page: int) -
     assert (result.provider_job_id, result.check_run_id) == (404, 405)
     assert len(result.evidence_digest) == 64
     assert provider.installations == [SCOPE.installation_id]
+    assert provider.bindings == [(101, 202)]
     assert [request.path for request in provider.requests] == ["/repositories/202", PATH + "/jobs"]
     assert [(pair.name, pair.value) for pair in provider.requests[1].query] == [
         ("page", str(page)),

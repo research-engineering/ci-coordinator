@@ -75,7 +75,9 @@ class GitHubCiEconomicsSources:
         if any(positive_safe_integer(value) is None for value in (workflow_run_id, run_attempt)):
             raise ValueError("source resolution requires positive safe run and attempt IDs")
         client = ActionsClient(
-            self._transport_factory.for_installation(scope.installation_id),
+            self._transport_factory.for_installation(
+                scope.installation_id, repository_id=scope.repository_id
+            ),
             api_version=self._api_version,
         )
         repository = await load_economics_repository(client, scope, api_version=self._api_version)
@@ -164,7 +166,9 @@ class GitHubCiEconomicsSources:
         if type(page_number) is not int or not 1 <= page_number <= MAX_DISCOVERY_PAGES:
             raise ValueError("discovery page number exceeds its bound")
         client = ActionsClient(
-            self._transport_factory.for_installation(scope.installation_id),
+            self._transport_factory.for_installation(
+                scope.installation_id, repository_id=scope.repository_id
+            ),
             api_version=self._api_version,
         )
         repository = await load_economics_repository(client, scope, api_version=self._api_version)

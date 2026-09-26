@@ -47,6 +47,7 @@ def test_exact_source_needs_no_reconciliation_and_includes_failed_run() -> None:
     assert source.run_created_at == datetime(2026, 9, 7, 12, tzinfo=UTC)
     assert source.provider_api_version == GITHUB_API_VERSION
     assert provider.installations == [SCOPE.installation_id]
+    assert provider.bindings == [(101, 202)]
     assert [request.path for request in provider.requests] == [
         "/repositories/202",
         PATH,

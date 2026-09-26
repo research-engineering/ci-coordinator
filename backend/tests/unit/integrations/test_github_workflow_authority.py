@@ -35,9 +35,12 @@ CONTENT = b"name: CI\non: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n"
 def test_reader_binds_exact_provider_revision_to_recomputed_git_objects() -> None:
     fixture = _fixture()
     requests: list[str] = []
+    grants: list[object] = []
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request.url.path)
+        if request.url.path.endswith("/access_tokens"):
+            grants.append(json.loads(request.content))
         return _provider_response(request, fixture)
 
     result = asyncio.run(_read(_factory(_private_key(), httpx.MockTransport(handler))))
@@ -45,9 +48,14 @@ def test_reader_binds_exact_provider_revision_to_recomputed_git_objects() -> Non
     assert isinstance(result, WorkflowAuthorityEvidence)
     assert result == fixture
     assert result.manifest.entries[0].path == ".github/workflows/ci.yml"
+    assert grants == [
+        {"repository_ids": [22], "permissions": {"metadata": "read"}},
+        {"repository_ids": [22], "permissions": {"contents": "read"}},
+    ]
     assert requests == [
         "/app/installations/11/access_tokens",
         "/repositories/22",
+        "/app/installations/11/access_tokens",
         f"/repos/example/consumer/git/commits/{REVISION}",
         f"/repos/example/consumer/git/trees/{fixture.source_binding.root_tree_id}",
         f"/repos/example/consumer/git/trees/{fixture.source_binding.github_tree_id}",

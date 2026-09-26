@@ -30,6 +30,7 @@ async def read(
     provider = Provider([response(repository()), page])
     result = await GitHubCiObservationWorkflows(provider).workflow_page(SCOPE, page_number=number)
     assert provider.installations == [SCOPE.installation_id]
+    assert provider.bindings == [(101, 202)]
     assert len(provider.requests) == 2 and not provider.responses
     request = provider.requests[1]
     assert request.method == "GET" and request.path == PATH

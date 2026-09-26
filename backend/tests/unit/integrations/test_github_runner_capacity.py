@@ -4,6 +4,7 @@ import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
+import httpx2 as httpx
 import pytest
 
 from ci_coordinator.integrations.github.app_transport_profile import GITHUB_API_VERSION
@@ -21,6 +22,8 @@ from ci_coordinator.integrations.github.transport import GitHubTransport
 from ci_coordinator.kernel import FixedClock
 from ci_coordinator.plan_issuance import PlanRequest
 from ci_coordinator.runner_capacity import CapacityClassSelector
+
+from ._github_app_transport_support import _factory, _private_key, _token_response
 
 NOW = datetime(2026, 9, 5, tzinfo=UTC)
 
@@ -42,8 +45,10 @@ class _Factory:
     def __init__(self, transport: GitHubTransport) -> None:
         self._transport = transport
 
-    def for_installation(self, installation_id: int) -> GitHubTransport:
-        del installation_id
+    def for_installation(
+        self, installation_id: int, *, repository_id: int | None
+    ) -> GitHubTransport:
+        assert (installation_id, repository_id) == (100, 200)
         return self._transport
 
 
@@ -51,8 +56,10 @@ class _FailingFactory:
     def __init__(self, error: Exception) -> None:
         self._error = error
 
-    def for_installation(self, installation_id: int) -> GitHubTransport:
-        del installation_id
+    def for_installation(
+        self, installation_id: int, *, repository_id: int | None
+    ) -> GitHubTransport:
+        assert (installation_id, repository_id) == (100, 200)
         raise self._error
 
 
@@ -547,4 +554,88 @@ def _request() -> PlanRequest:
         1,
         42,
         execution_sha="c" * 40,
+    )
+
+
+@pytest.mark.parametrize("failure", [None, "org-denied", "members-incomplete"])
+def test_real_factory_preserves_complete_org_population_without_repository_scoping(
+    failure: str | None,
+) -> None:
+    grants: list[object] = []
+    observed: list[tuple[str, str]] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path.endswith("/access_tokens"):
+            assert path == "/app/installations/100/access_tokens"
+            body = json.loads(request.content)
+            grants.append(body)
+            if len(grants) == 1:
+                assert body == {"repository_ids": [200], "permissions": {"administration": "read"}}
+                return _token_response(token="repository-runners")
+            assert body == {"permissions": {"organization_self_hosted_runners": "read"}}
+            return (
+                httpx.Response(403)
+                if failure == "org-denied"
+                else _token_response(token="organization-runners")
+            )
+        observed.append((path, str(request.url.query, "ascii")))
+        expected_token = (
+            "organization-runners" if path.startswith("/orgs/") else "repository-runners"
+        )
+        assert request.headers["authorization"] == f"Bearer {expected_token}"
+        headers = {"x-github-api-version-selected": GITHUB_API_VERSION}
+        body_value: object
+        if path == "/repos/example/target/actions/runners":
+            body_value = _runner_page(1, _runner(1, "dev"))
+        elif path == "/orgs/example/actions/runner-groups":
+            assert request.url.params["visible_to_repository"] == "target"
+            body_value = _group_page(
+                2,
+                _group(10, "Dev", restricted=False),
+                {**_group(20, "Shared", restricted=False), "inherited": True},
+            )
+        elif path == "/orgs/example/actions/runner-groups/10/runners":
+            page = request.url.params["page"]
+            body_value = _runner_page(2, _runner(2 if page == "1" else 3, "dev"))
+            if page == "1" and failure != "members-incomplete":
+                headers["link"] = (
+                    "<https://api.github.com/orgs/example/actions/runner-groups/10/runners"
+                    '?page=2&per_page=100>; rel="next"'
+                )
+        elif path == "/orgs/example/actions/runner-groups/20/runners":
+            body_value = _runner_page(2, _runner(2, "dev"), _runner(4, "dev"))
+        else:
+            raise AssertionError(f"unexpected runner request: {path}")
+        return httpx.Response(
+            200, headers=headers, stream=httpx.ByteStream(json.dumps(body_value).encode())
+        )
+
+    async def scenario() -> None:
+        factory = _factory(_private_key(), httpx.MockTransport(handler))
+        try:
+            result = await GitHubRunnerSnapshotProvider(factory, clock=FixedClock(NOW)).capture(
+                _request(), (CapacityClassSelector("dev", ("dev",), None),)
+            )
+            if failure is None:
+                assert result is not None and result.free_slots_for("dev") == 4
+            else:
+                assert result is None
+        finally:
+            await factory.aclose()
+
+    asyncio.run(scenario())
+    assert grants == [
+        {"repository_ids": [200], "permissions": {"administration": "read"}},
+        {"permissions": {"organization_self_hosted_runners": "read"}},
+    ]
+    complete = [
+        ("/repos/example/target/actions/runners", "page=1&per_page=100"),
+        ("/orgs/example/actions/runner-groups", "visible_to_repository=target&page=1&per_page=100"),
+        ("/orgs/example/actions/runner-groups/10/runners", "page=1&per_page=100"),
+        ("/orgs/example/actions/runner-groups/10/runners", "page=2&per_page=100"),
+        ("/orgs/example/actions/runner-groups/20/runners", "page=1&per_page=100"),
+    ]
+    assert observed == (
+        complete[:1] if failure == "org-denied" else complete[:3] if failure else complete
     )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -58,9 +59,17 @@ def test_factory_rejects_unsafe_installation_id_before_any_provider_request() ->
     factory = _factory(_private_key(), httpx.MockTransport(_api_response_handler))
     try:
         with pytest.raises(ValueError, match="safe integer"):
-            factory.for_installation(GITHUB_MAXIMUM_INSTALLATION_ID + 1)
+            factory.for_installation(GITHUB_MAXIMUM_INSTALLATION_ID + 1, repository_id=11)
     finally:
         asyncio.run(factory.aclose())
+
+
+def test_factory_requires_an_explicit_keyword_repository_scope() -> None:
+    parameter = inspect.signature(
+        app_transport_module.GitHubAppTransportFactory.for_installation
+    ).parameters["repository_id"]
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameter.default is inspect.Parameter.empty
 
 
 @pytest.mark.parametrize(
@@ -433,7 +442,7 @@ def test_provider_rate_limit_metadata_is_bounded_before_integer_conversion() -> 
 
         factory = _factory(_private_key(), httpx.MockTransport(handler))
         try:
-            result = await factory.for_installation(77).send(_request())
+            result = await factory.for_installation(77, repository_id=11).send(_request())
         finally:
             await factory.aclose()
         assert isinstance(result, GitHubResponse)
@@ -740,7 +749,7 @@ def test_installation_transport_rejects_capability_expansion_before_credential_i
 
         factory = _factory(_private_key(), httpx.MockTransport(handler))
         try:
-            result = await factory.for_installation(77).send(candidate)
+            result = await factory.for_installation(77, repository_id=11).send(candidate)
         finally:
             await factory.aclose()
         assert isinstance(result, GitHubTransportFailure)
@@ -1059,3 +1068,283 @@ def test_composition_constants_match_the_machine_owned_transport_profile() -> No
         "maximumCachedInstallations": GITHUB_MAXIMUM_CACHED_INSTALLATIONS,
         "maximumConcurrentRefreshes": GITHUB_MAXIMUM_CONCURRENT_REFRESHES,
     }
+
+
+_PAGE = (GitHubQueryParameter("page", "1"), GitHubQueryParameter("per_page", "100"))
+_VISIBLE_PAGE = (GitHubQueryParameter("visible_to_repository", "ci"), *_PAGE)
+
+
+@pytest.mark.parametrize(
+    ("operation", "path", "query", "repository_id", "permission", "token_repository_id"),
+    [
+        ("repositories.get_by_id", "/repositories/11", (), 11, "metadata", 11),
+        ("governance_observation.get_repository", "/repositories/11", (), 11, "metadata", 11),
+        ("workflow_authority.get_repository", "/repositories/11", (), 11, "metadata", 11),
+        ("workflow_discovery.get_repository", "/repositories/11", (), 11, "metadata", 11),
+        (
+            "provider_inventory.list_repositories",
+            "/installation/repositories",
+            _PAGE,
+            None,
+            "metadata",
+            None,
+        ),
+        ("actions.get_workflow_run", "/repos/example/ci/actions/runs/7", (), 11, "actions", 11),
+        (
+            "actions.get_workflow_run_attempt",
+            "/repos/example/ci/actions/runs/7/attempts/2",
+            (),
+            11,
+            "actions",
+            11,
+        ),
+        (
+            "actions.list_repository_workflow_runs",
+            "/repos/example/ci/actions/runs",
+            (GitHubQueryParameter("created", "2026-09-01T00:00:00Z..2026-09-02T00:00:00Z"), *_PAGE),
+            11,
+            "actions",
+            11,
+        ),
+        (
+            "actions.list_workflow_run_attempt_jobs",
+            "/repos/example/ci/actions/runs/7/attempts/2/jobs",
+            _PAGE,
+            11,
+            "actions",
+            11,
+        ),
+        (
+            "actions.list_workflow_runs",
+            "/repos/example/ci/actions/workflows/ci.yml/runs",
+            _PAGE,
+            11,
+            "actions",
+            11,
+        ),
+        (
+            "checks.list_check_runs",
+            "/repos/example/ci/commits/main/check-runs",
+            _PAGE,
+            11,
+            "checks",
+            11,
+        ),
+        ("diff.get_pull_request", "/repos/example/ci/pulls/7", (), 11, "pull_requests", 11),
+        (
+            "diff.list_pull_request_files",
+            "/repos/example/ci/pulls/7/files",
+            _PAGE,
+            11,
+            "pull_requests",
+            11,
+        ),
+        ("diff.compare", "/repos/example/ci/compare/main...feature", (), 11, "contents", 11),
+        (
+            "workflow_catalog.list_workflows",
+            "/repos/example/ci/actions/workflows",
+            _PAGE,
+            11,
+            "actions",
+            11,
+        ),
+        (
+            "workflow_catalog.get_workflow",
+            "/repos/example/ci/actions/workflows/ci.yml",
+            (),
+            11,
+            "actions",
+            11,
+        ),
+        (
+            "workflow_catalog.get_content",
+            "/repos/example/ci/contents/file",
+            (GitHubQueryParameter("ref", "main"),),
+            11,
+            "contents",
+            11,
+        ),
+        (
+            "workflow_discovery.get_reference",
+            "/repos/example/ci/git/ref/heads/main",
+            (),
+            11,
+            "contents",
+            11,
+        ),
+        (
+            "workflow_discovery.get_commit",
+            "/repos/example/ci/git/commits/abc",
+            (),
+            11,
+            "contents",
+            11,
+        ),
+        ("workflow_discovery.get_tree", "/repos/example/ci/git/trees/abc", (), 11, "contents", 11),
+        (
+            "workflow_discovery.get_recursive_tree",
+            "/repos/example/ci/git/trees/abc",
+            (GitHubQueryParameter("recursive", "1"),),
+            11,
+            "contents",
+            11,
+        ),
+        ("workflow_discovery.get_blob", "/repos/example/ci/git/blobs/abc", (), 11, "contents", 11),
+        (
+            "workflow_authority.get_commit",
+            "/repos/example/ci/git/commits/abc",
+            (),
+            11,
+            "contents",
+            11,
+        ),
+        ("workflow_authority.get_tree", "/repos/example/ci/git/trees/abc", (), 11, "contents", 11),
+        ("workflow_authority.get_blob", "/repos/example/ci/git/blobs/abc", (), 11, "contents", 11),
+        (
+            "governance_observation.list_effective_branch_rules",
+            "/repos/example/ci/rules/branches/main",
+            _PAGE,
+            11,
+            "metadata",
+            11,
+        ),
+        (
+            "reviewer_attestation.get_permission",
+            "/repos/example/ci/collaborators/reviewer/permission",
+            (),
+            11,
+            "metadata",
+            11,
+        ),
+        (
+            "runner.list_self_hosted_runners",
+            "/repos/example/ci/actions/runners",
+            _PAGE,
+            11,
+            "administration",
+            11,
+        ),
+        (
+            "runner.list_visible_self_hosted_runner_groups",
+            "/orgs/example/actions/runner-groups",
+            _VISIBLE_PAGE,
+            11,
+            "organization_self_hosted_runners",
+            None,
+        ),
+        (
+            "runner.list_group_self_hosted_runners",
+            "/orgs/example/actions/runner-groups/7/runners",
+            _PAGE,
+            11,
+            "organization_self_hosted_runners",
+            None,
+        ),
+    ],
+)
+def test_every_installation_operation_mints_only_its_literal_grant(
+    operation: str,
+    path: str,
+    query: tuple[GitHubQueryParameter, ...],
+    repository_id: int | None,
+    permission: str,
+    token_repository_id: int | None,
+) -> None:
+    candidate = GitHubRequest(operation, "GET", path, GITHUB_API_VERSION, query=query)
+    expected: dict[str, object] = {"permissions": {permission: "read"}}
+    if token_repository_id is not None:
+        expected["repository_ids"] = [token_repository_id]
+    observed: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        observed.append(request)
+        if request.url.path == "/app/installations/77/access_tokens":
+            assert request.method == "POST"
+            assert request.headers["content-type"] == "application/json"
+            assert json.loads(request.content) == expected
+            return _token_response()
+        return _api_response()
+
+    async def scenario() -> None:
+        factory = _factory(_private_key(), httpx.MockTransport(handler))
+        try:
+            result = await factory.for_installation(77, repository_id=repository_id).send(candidate)
+            assert isinstance(result, GitHubResponse)
+        finally:
+            await factory.aclose()
+
+    asyncio.run(scenario())
+    assert [request.url.path for request in observed] == [
+        "/app/installations/77/access_tokens",
+        path,
+    ]
+    assert observed[1].method == "GET"
+    assert list(observed[1].url.params.multi_items()) == [(item.name, item.value) for item in query]
+
+
+@pytest.mark.parametrize(
+    ("candidate", "repository_id"),
+    [
+        (_request(), None),
+        (_request(path="/repositories/12"), 11),
+        (
+            GitHubRequest(
+                "provider_inventory.list_repositories",
+                "GET",
+                "/installation/repositories",
+                GITHUB_API_VERSION,
+                query=_PAGE,
+            ),
+            11,
+        ),
+        (
+            GitHubRequest(
+                "runner.list_visible_self_hosted_runner_groups",
+                "GET",
+                "/orgs/example/actions/runner-groups",
+                GITHUB_API_VERSION,
+                query=_VISIBLE_PAGE,
+            ),
+            None,
+        ),
+        (
+            GitHubRequest(
+                "runner.list_group_self_hosted_runners",
+                "GET",
+                "/orgs/example/actions/runner-groups/7/runners",
+                GITHUB_API_VERSION,
+                query=_PAGE,
+            ),
+            None,
+        ),
+    ],
+)
+def test_scope_population_mismatch_stops_before_any_credential(
+    candidate: GitHubRequest, repository_id: int | None
+) -> None:
+    observed: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        observed.append(request)
+        return _token_response()
+
+    async def scenario() -> None:
+        factory = _factory(_private_key(), httpx.MockTransport(handler))
+        try:
+            result = await factory.for_installation(77, repository_id=repository_id).send(candidate)
+            assert isinstance(result, GitHubTransportFailure)
+        finally:
+            await factory.aclose()
+
+    asyncio.run(scenario())
+    assert not observed
+
+
+@pytest.mark.parametrize("repository_id", [False, True, 0, -1, 9_007_199_254_740_992])
+def test_factory_rejects_noncanonical_repository_identity(repository_id: int) -> None:
+    factory = _factory(_private_key(), httpx.MockTransport(_api_response_handler))
+    try:
+        with pytest.raises(ValueError, match="repository id"):
+            factory.for_installation(77, repository_id=repository_id)
+    finally:
+        asyncio.run(factory.aclose())

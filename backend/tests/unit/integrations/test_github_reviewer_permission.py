@@ -23,6 +23,10 @@ def test_recheck_uses_installation_authority_and_preserves_exact_reviewer_identi
     async def handler(request: httpx.Request) -> httpx.Response:
         paths.append(request.url.path)
         if request.url.path.endswith("/access_tokens"):
+            assert json.loads(request.content) == {
+                "repository_ids": [2],
+                "permissions": {"metadata": "read"},
+            }
             return _token_response()
         if request.url.path == "/repositories/2":
             return _response({"id": 2, "name": "repo", "owner": {"login": "example"}})

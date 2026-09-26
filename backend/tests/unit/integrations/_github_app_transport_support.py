@@ -64,7 +64,7 @@ def _request(
     )
 
 
-def _token_response() -> httpx.Response:
+def _token_response(*, token: str = INSTALLATION_TOKEN) -> httpx.Response:
     return httpx.Response(
         201,
         headers={
@@ -74,7 +74,7 @@ def _token_response() -> httpx.Response:
         stream=httpx.ByteStream(
             json.dumps(
                 {
-                    "token": INSTALLATION_TOKEN,
+                    "token": token,
                     "expires_at": (NOW + timedelta(hours=1)).isoformat(),
                 }
             ).encode()
@@ -125,7 +125,7 @@ async def _run_failure_case(
 
     factory = _factory(_private_key(), httpx.MockTransport(counting_handler))
     try:
-        result = await factory.for_installation(77).send(request)
+        result = await factory.for_installation(77, repository_id=11).send(request)
     finally:
         await factory.aclose()
     assert isinstance(result, GitHubTransportFailure)
@@ -152,7 +152,7 @@ async def _run_credential_failure_case(
 
     factory = _factory(_private_key(), httpx.MockTransport(handler))
     try:
-        result = await factory.for_installation(77).send(_request())
+        result = await factory.for_installation(77, repository_id=11).send(_request())
     finally:
         await factory.aclose()
     assert isinstance(result, GitHubTransportFailure)

@@ -2213,7 +2213,7 @@
           "requirementId": "REQ-CI-RUNTIME-005",
           "witnessPath": "backend/tests/unit/integrations/test_github_self_ci_inventory.py",
           "assertion": "test_provider_inventory_failure_forces_full_selection_before_omission",
-          "sourceSha256": "ef8564afbecc989738fcb187b032eb7e537fb14c3c5ae5d3ba6db8e45ef4bf16",
+          "sourceSha256": "e7e140b0ea2533e188b43350840d47c580bf9f3698b2b4c7de667247d33bd4d4",
           "commandIds": [
             "python.test"
           ],

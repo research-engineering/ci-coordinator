@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from ci_coordinator.ci_economics.discovery import DISCOVERY_PAGE_SIZE, MAX_DISCOVERY_PAGES
 from ci_coordinator.integrations.github._routes import parse_workflow_run_created_query
 from ci_coordinator.integrations.github.app_transport_profile import (
@@ -15,6 +17,78 @@ from ci_coordinator.integrations.github.request_admission import (
     parse_canonical_page_query,
     parse_canonical_positive_integer,
 )
+
+type InstallationPermission = Literal[
+    "metadata",
+    "actions",
+    "checks",
+    "contents",
+    "pull_requests",
+    "administration",
+    "organization_self_hosted_runners",
+]
+
+
+def installation_request_permission(
+    request: GitHubRequest, *, repository_id: int | None
+) -> InstallationPermission | None:
+    """Project an admitted request and independent caller scope to one read permission."""
+    if not installation_request_is_admitted(request):
+        return None
+    if request.operation == "provider_inventory.list_repositories":
+        return "metadata" if repository_id is None else None
+    if type(repository_id) is not int or not 1 <= repository_id <= GITHUB_MAXIMUM_INSTALLATION_ID:
+        return None
+    if (
+        request.path.startswith("/repositories/")
+        and request.path != f"/repositories/{repository_id}"
+    ):
+        return None
+    match request.operation:
+        case (
+            "repositories.get_by_id"
+            | "governance_observation.get_repository"
+            | "workflow_authority.get_repository"
+            | "workflow_discovery.get_repository"
+            | "governance_observation.list_effective_branch_rules"
+            | "reviewer_attestation.get_permission"
+        ):
+            return "metadata"
+        case (
+            "actions.get_workflow_run"
+            | "actions.get_workflow_run_attempt"
+            | "actions.list_repository_workflow_runs"
+            | "actions.list_workflow_run_attempt_jobs"
+            | "actions.list_workflow_runs"
+            | "workflow_catalog.list_workflows"
+            | "workflow_catalog.get_workflow"
+        ):
+            return "actions"
+        case "checks.list_check_runs":
+            return "checks"
+        case "diff.get_pull_request" | "diff.list_pull_request_files":
+            return "pull_requests"
+        case (
+            "diff.compare"
+            | "workflow_catalog.get_content"
+            | "workflow_discovery.get_reference"
+            | "workflow_discovery.get_commit"
+            | "workflow_discovery.get_tree"
+            | "workflow_discovery.get_recursive_tree"
+            | "workflow_discovery.get_blob"
+            | "workflow_authority.get_commit"
+            | "workflow_authority.get_tree"
+            | "workflow_authority.get_blob"
+        ):
+            return "contents"
+        case "runner.list_self_hosted_runners":
+            return "administration"
+        case (
+            "runner.list_visible_self_hosted_runner_groups"
+            | "runner.list_group_self_hosted_runners"
+        ):
+            return "organization_self_hosted_runners"
+    return None
 
 
 def installation_request_is_admitted(request: GitHubRequest) -> bool:

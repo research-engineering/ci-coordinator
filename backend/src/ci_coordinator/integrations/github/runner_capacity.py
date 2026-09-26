@@ -156,7 +156,9 @@ class GitHubRunnerSnapshotProvider:
     ) -> RunnerSnapshot | None:
         repository = GitHubRepository(request.owner, request.repository)
         client = RunnerClient(
-            self._transport_factory.for_installation(request.installation_id),
+            self._transport_factory.for_installation(
+                request.installation_id, repository_id=request.repository_id
+            ),
             api_version=GITHUB_API_VERSION,
         )
         budget = _ReadBudget(self._limits)

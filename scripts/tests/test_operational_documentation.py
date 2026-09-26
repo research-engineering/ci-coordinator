@@ -187,6 +187,36 @@ def _assert_transport(requests: list[dict[str, object]], header: str) -> None:
         )
 
 
+def test_requester_and_measurement_examples_share_an_explicit_trusted_pair() -> None:
+    plan_url = "https://coordinator.example.test/api/v1/dynamic-ci/plan"
+    prefix = "# CI_COORDINATOR_OIDC_AUDIENCE="
+    examples = [
+        line.removeprefix(prefix)
+        for line in (ROOT / ".env.example").read_text().splitlines()
+        if line.startswith(prefix)
+    ]
+    assert examples == [plan_url]
+    guide = (ROOT / "docs/how-to/measure-and-compare-ci.md").read_text()
+    blocks = [
+        token.content
+        for token in MarkdownIt("commonmark").parse(guide)
+        if token.type == "fence" and token.info == "dotenv"
+    ]
+    assert len(blocks) == 1
+    assignments = dict(word.split("=", 1) for word in shlex.split(blocks[0], comments=True))
+    assert assignments == {
+        "CI_COORDINATOR_OIDC_AUDIENCE": plan_url,
+        "CI_COORDINATOR_PLAN_URL": plan_url,
+        "COORDINATOR_PLAN_AUDIENCE": plan_url,
+        "COORDINATOR_URL": "https://coordinator.example.test",
+    }
+    commands = _blocks("measure-and-compare-ci.md", "3. Measure A Command")
+    [reporter] = [command for command in commands if ".ci-coordinator/measure.py" in command]
+    argv = shlex.split(reporter)
+    assert argv[argv.index("--endpoint") + 1] == "$COORDINATOR_URL"
+    assert argv[argv.index("--audience") + 1] == "$COORDINATOR_PLAN_AUDIENCE"
+
+
 def test_local_guide_mise_floor_matches_manifest() -> None:
     manifest = tomllib.loads((ROOT / "mise.toml").read_text())
     guide = (ROOT / "docs/how-to/evaluate-locally.md").read_text()

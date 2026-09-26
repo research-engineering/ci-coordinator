@@ -134,7 +134,7 @@ class GitHubProviderInventory:
     ) -> RepositoryReadResult:
         github_page = GitHubPage(page, per_page)
         outcome = await RepositoryInventoryClient(
-            self._transport_factory.for_installation(installation_id),
+            self._transport_factory.for_installation(installation_id, repository_id=None),
             api_version=self._api_version,
         ).list_repositories(github_page)
         if isinstance(outcome, GitHubUnavailable):

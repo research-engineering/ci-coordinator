@@ -21,7 +21,7 @@ Actions metadata. An operator needs a short-lived Keycloak workload token with
 their current session, exact public origin and CSRF token. Never give the
 operator token to an untrusted CI job.
 
-The producing job needs `id-token: write`, `actions: read`, and an allowed
+The trusted producing job needs `id-token: write`, `actions: read`, and an allowed
 Actions workflow identity under the service's existing OIDC configuration.
 The report audience is derived from the configured plan audience; it is not
 interchangeable with a plan token. Initial support is GitHub.com, not GHES.
@@ -116,16 +116,56 @@ control artifacts remain unchanged.
 
 ## 3. Measure A Command
 
-Wrap the actual check command, preserving its original arguments. For example,
-the workflow can supply these environment values through its normal secret
-and configuration mechanisms:
+Use the optional reporter only when the measured command, its dependencies,
+workflow revision and runner environment are trusted. A reviewed workflow does
+not make an untrusted PR checkout, test hook, plugin or downloaded executable
+trusted. The command inherits the job's GitHub API and OIDC mint credentials;
+do not expose unrelated privileged credentials to this job.
+
+Untrusted-code CI should keep its ordinary checks without this optional reporter
+or its reporting credential grant. Removing a few environment variables does
+not isolate hostile same-job code. A separate uploader has a different signed
+job/check-run identity and cannot impersonate the measured job under this
+protocol. Neither the reporter's digest nor an authenticated report attests
+counter truth or runner cleanliness.
+
+Approve the recipient origin and plan audience together in deployment-owned
+configuration before enabling reporting. For example, configure these values
+at their indicated boundaries, replacing the reserved hostname with the exact
+reviewed deployment:
+
+```dotenv
+# Service configuration
+CI_COORDINATOR_OIDC_AUDIENCE=https://coordinator.example.test/api/v1/dynamic-ci/plan
+# Repository setting used by the bundled requester
+CI_COORDINATOR_PLAN_URL=https://coordinator.example.test/api/v1/dynamic-ci/plan
+# Trusted producing job values
+COORDINATOR_PLAN_AUDIENCE=https://coordinator.example.test/api/v1/dynamic-ci/plan
+COORDINATOR_URL=https://coordinator.example.test
+```
+
+Protect both members of this pair and the workflow supplying them. Do not obtain
+them from PR content, artifacts, job outputs or measured-command output.
+The bundled requester uses its canonical plan URL as the plan audience; this is
+not the browser public origin. Other clients may retain an abstract audience
+with an independently approved recipient. HTTPS syntax alone does not establish
+recipient ownership. The report audience remains
+`urn:ci-coordinator:measurement-report:v1:<sha256(planAudience UTF-8)>`; do not
+change that formula or send a plan token to the reporting endpoint.
+
+Limit these permissions to the trusted producing job, not the entire workflow.
+Keep `contents: read` only when that job needs checkout:
 
 ```yaml
-permissions:
-  contents: read
-  actions: read
-  id-token: write
+jobs:
+  measured:
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
 ```
+
+Wrap the actual trusted check command, preserving its original arguments:
 
 ```sh
 python .ci-coordinator/measure.py \
@@ -142,6 +182,14 @@ python .ci-coordinator/measure.py \
 Set `CI_REPORT_GITHUB_TOKEN` from the job's `github.token`. The runner supplies
 the OIDC request URL/token and standard GitHub job environment. Do not print
 these credentials or put them in command arguments.
+
+The owned reporter sends the mint bearer only to its admitted GitHub OIDC
+endpoint, the GitHub API token only to `api.github.com`, and the report JWT only
+to the approved `COORDINATOR_URL` origin at `/api/v2/economics/reports`.
+It does not follow redirects or use ambient proxies. A hostile recipient can
+still misuse a report bearer sent to it; the audience hash does not validate
+that recipient. Code holding the mint credential may request other audiences,
+but downstream cloud access also requires an accepting provider trust policy.
 
 The three digests must describe reviewed, secret-free manifests of protected
 workload inputs, runner class and cache conditions. Merely assigning identical
