@@ -36,6 +36,15 @@ WorkflowCatalogClient
 - adapters preserve response provenance required for audit.
 - adapters enforce API version configuration at the edge.
 
+Workflow catalogue completeness, duplicate identities and resource bounds cover
+every provider row before source projection. The exact platform paths
+`dynamic/dependabot/update-graph` and `dynamic/github-code-scanning/codeql` count
+toward that population but grant no source or execution authority. Only admitted
+`.github/workflows` source files enter the default-branch inventory and
+exact-revision content checks. Unknown paths or malformed rows reject the
+catalogue; neither a `dynamic/` prefix nor a display-only workflow model admits
+another platform kind.
+
 ## 4. Failure Behavior
 
 ```text

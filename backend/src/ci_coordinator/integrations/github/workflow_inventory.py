@@ -47,6 +47,9 @@ from ci_coordinator.workflow_authority import WorkflowAuthorityRepository
 WORKFLOW_INVENTORY_PAGE_SIZE: Final = 100
 _MAX_NEXT_PAGE_URL_BYTES: Final = 2_048
 _MAX_WORKFLOW_CONTENT_RESPONSE_BYTES: Final = 524_288
+_PLATFORM_WORKFLOW_PATHS: Final = frozenset(
+    {"dynamic/dependabot/update-graph", "dynamic/github-code-scanning/codeql"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,9 +68,15 @@ DEFAULT_WORKFLOW_INVENTORY_LIMITS: Final = WorkflowInventoryLimits()
 
 
 @dataclass(frozen=True, slots=True)
+class _PlatformWorkflow:
+    workflow_id: int
+    path: str
+
+
+@dataclass(frozen=True, slots=True)
 class _WorkflowPage:
     total_count: int
-    workflows: tuple[DefaultBranchWorkflow, ...]
+    workflows: tuple[DefaultBranchWorkflow | _PlatformWorkflow, ...]
 
 
 class GitHubWorkflowInventoryLoader:
@@ -155,7 +164,7 @@ class GitHubWorkflowInventoryLoader:
         pages_observed = 0
         response_bytes = 0
         expected_total: int | None = None
-        workflows_by_path: dict[str, DefaultBranchWorkflow] = {}
+        workflows_by_path: dict[str, DefaultBranchWorkflow | _PlatformWorkflow] = {}
         workflow_ids: set[int] = set()
 
         while True:
@@ -217,8 +226,11 @@ class GitHubWorkflowInventoryLoader:
                 ):
                     return None
                 return tuple(
-                    workflows_by_path[path]
-                    for path in sorted(workflows_by_path, key=utf16_sort_key)
+                    workflow
+                    for workflow in sorted(
+                        workflows_by_path.values(), key=lambda item: utf16_sort_key(item.path)
+                    )
+                    if isinstance(workflow, DefaultBranchWorkflow)
                 )
 
             if pages_observed >= self._limits.max_pages or len(workflows_by_path) >= expected_total:
@@ -278,7 +290,7 @@ def _decode_workflow_page(body: bytes) -> _WorkflowPage | None:
         or len(raw_workflows) > WORKFLOW_INVENTORY_PAGE_SIZE
     ):
         return None
-    workflows: list[DefaultBranchWorkflow] = []
+    workflows: list[DefaultBranchWorkflow | _PlatformWorkflow] = []
     for raw_workflow in raw_workflows:
         value = object_or_none(raw_workflow)
         if value is None:
@@ -294,6 +306,9 @@ def _decode_workflow_page(body: bytes) -> _WorkflowPage | None:
             or len(state.encode("utf-8")) > 64
         ):
             return None
+        if path in _PLATFORM_WORKFLOW_PATHS:
+            workflows.append(_PlatformWorkflow(workflow_id, path))
+            continue
         try:
             workflows.append(DefaultBranchWorkflow(workflow_id, path, state == "active"))
         except (TypeError, ValueError):

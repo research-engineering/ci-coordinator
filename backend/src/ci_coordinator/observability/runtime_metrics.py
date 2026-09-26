@@ -90,6 +90,21 @@ _PLAN_RESULTS: Final = (
     "issued",
     "unauthenticated",
 )
+_CONFIG_ACTIVATION_RESULTS: Final = frozenset(
+    {
+        "applied",
+        "attestation_invalid",
+        "coverage_reducing",
+        "coverage_unproven",
+        "duplicate",
+        "forbidden",
+        "operation_conflict",
+        "other",
+        "revision_conflict",
+        "target_unavailable",
+        "unavailable",
+    }
+)
 _FALLBACK_REASONS: Final = frozenset(
     {
         "deterministic_plan_mismatch",
@@ -563,20 +578,7 @@ class RuntimeMetrics:
         self._safe_increment(self._invalid_oidc, _oidc_reason(reason))
 
     def config_activation(self, result: str) -> None:
-        category = _member(
-            result,
-            {
-                "applied",
-                "coverage_reducing",
-                "coverage_unproven",
-                "duplicate",
-                "forbidden",
-                "operation_conflict",
-                "revision_conflict",
-                "target_unavailable",
-                "unavailable",
-            },
-        )
+        category = result if result in _CONFIG_ACTIVATION_RESULTS else "other"
         self._safe_increment(self._config_activations, category)
         if category == "revision_conflict":
             self._safe_increment(self._config_cas_conflicts)
@@ -628,6 +630,14 @@ class RuntimeMetrics:
             if self._http_route_templates is not None and self._http_route_templates != templates:
                 raise ValueError("HTTP route templates are already bound to another catalog")
             self._http_route_templates = templates
+            if "/webhooks/github" in templates:
+                self._safe_initialize(
+                    self._http_requests, "POST", "/webhooks/github", "5xx", surface="http"
+                )
+            if "/api/v1/dynamic-ci/plan" in templates:
+                self._safe_initialize(
+                    self._http_duration, "POST", "/api/v1/dynamic-ci/plan", "2xx", surface="http"
+                )
 
     def http_request(
         self,
@@ -833,21 +843,8 @@ class RuntimeMetrics:
         _initialize(self._verifier_rejections, (*sorted(_FALLBACK_REASONS), "other"))
         _initialize(self._signed_envelopes, ("created", "duplicate"))
         _initialize(self._invalid_oidc, (*sorted(_OIDC_REASONS), "other"))
-        _initialize(
-            self._config_activations,
-            (
-                "applied",
-                "coverage_reducing",
-                "coverage_unproven",
-                "duplicate",
-                "forbidden",
-                "operation_conflict",
-                "other",
-                "revision_conflict",
-                "target_unavailable",
-                "unavailable",
-            ),
-        )
+        for result in sorted(_CONFIG_ACTIVATION_RESULTS):
+            self._safe_initialize(self._config_activations, result)
         _initialize(
             self._shadow_comparisons,
             ("other", "replay_mismatch", "safe", "unknown", "unsafe"),
@@ -867,6 +864,30 @@ class RuntimeMetrics:
         for stage in _PLANNING_STAGES:
             for reason in _PLANNING_REASONS:
                 self._planning_unavailable.labels(stage, reason)
+
+        for lane in sorted(_HISTORY_LANES):
+            for outcome in ("store_unavailable", "unexpected_error"):
+                self._safe_initialize(self._ci_history_items, lane, outcome)
+            for outcome in (
+                "access_unavailable",
+                "timed_out",
+                "provider_unavailable",
+                "provider_binding_mismatch",
+                "provider_malformed",
+                "provider_incomplete",
+                "provider_unstable",
+            ):
+                self._safe_initialize(self._ci_history_provider_results, lane, outcome)
+        for outcome in ("store_unavailable", "unexpected_error", "timed_out"):
+            self._safe_initialize(self._ci_history_delivery_outcomes, outcome)
+
+    def _safe_initialize(
+        self, metric: Counter | Histogram, *labels: str, surface: str = "counter"
+    ) -> None:
+        try:
+            metric.labels(*labels)
+        except Exception:
+            self._record_instrumentation_failure(surface)
 
     def _safe_increment(self, counter: Counter, *labels: str) -> None:
         try:

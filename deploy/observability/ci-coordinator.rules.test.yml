@@ -211,6 +211,22 @@ tests:
         alertname: CIWebhookDeliveryUnavailable
         exp_alerts: []
 
+  - name: a lazy webhook counter has no ordinary sample baseline for its first failure
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_requests_total{job="ci-coordinator",method="POST",route="/webhooks/github",status_class="5xx"}'
+        values: '_ 1+0x15'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: CIWebhookDeliveryUnavailable
+        exp_alerts: []
+
   - name: healthy replicas do not fire telemetry alerts
     interval: 1m
     input_series:
@@ -872,6 +888,56 @@ tests:
         alertname: CIPlanLatencyFastBurn
         exp_alerts: *latency_alert
 
+  - name: a zero baseline admits the first twenty slow successful plans
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '0 0+0x39'
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="+Inf"}'
+        values: '0 20+0x39'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0 20+0x39'
+      - series: 'ci_coordinator_http_request_duration_seconds_sum{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '0 240+0x39'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+      - eval_time: 6m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: *latency_alert
+      - eval_time: 21m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
+  - name: a lazy plan histogram has no ordinary sample baseline for its first twenty successes
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="10.0"}'
+        values: '_ 0+0x39'
+      - series: 'ci_coordinator_http_request_duration_seconds_bucket{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx",le="+Inf"}'
+        values: '_ 20+0x39'
+      - series: 'ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '_ 20+0x39'
+      - series: 'ci_coordinator_http_request_duration_seconds_sum{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}'
+        values: '_ 240+0x39'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+      - eval_time: 21m
+        alertname: CIPlanLatencyFastBurn
+        exp_alerts: []
+
   - name: short latency burn alone is insufficient
     interval: 1m
     input_series:
@@ -1121,6 +1187,19 @@ tests:
         alertname: CIHistoryCollectionFailuresObserved
         exp_alerts: []
 
+  - name: lazy history items have no ordinary sample baseline for the first three failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_items_total{job="ci-coordinator",lane="backfill",outcome="store_unavailable"}'
+        values: '_ 3+0x39'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+      - eval_time: 29m
+        alertname: CIHistoryCollectionFailuresObserved
+        exp_alerts: []
+
   - name: history_items two isolated failures remain below the warning threshold
     interval: 1m
     input_series:
@@ -1312,6 +1391,19 @@ tests:
         alertname: CIHistoryProviderFailuresObserved
         exp_alerts: []
 
+  - name: lazy history provider results have no ordinary sample baseline for the first three failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_provider_results_total{job="ci-coordinator",lane="backfill",outcome="access_unavailable"}'
+        values: '_ 3+0x39'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+      - eval_time: 29m
+        alertname: CIHistoryProviderFailuresObserved
+        exp_alerts: []
+
   - name: history_provider two isolated failures remain below the warning threshold
     interval: 1m
     input_series:
@@ -1433,6 +1525,19 @@ tests:
         alertname: CIHistoryDeliveryFailuresObserved
         exp_alerts: *history_delivery_alert
       - eval_time: 31m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+
+  - name: lazy history delivery outcomes have no ordinary sample baseline for the first three failures
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_ci_history_delivery_outcomes_total{job="ci-coordinator",outcome="store_unavailable"}'
+        values: '_ 3+0x39'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: CIHistoryDeliveryFailuresObserved
+        exp_alerts: []
+      - eval_time: 29m
         alertname: CIHistoryDeliveryFailuresObserved
         exp_alerts: []
 
