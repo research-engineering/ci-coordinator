@@ -9,6 +9,7 @@ from threading import Barrier
 from typing import Any, Literal, cast
 
 import pytest
+from _pytest.logging import LogCaptureHandler, catching_logs
 from prometheus_support import prometheus_samples
 
 from ci_coordinator.observability import (
@@ -650,3 +651,48 @@ def test_default_logger_refuses_foreign_configuration(
         logger.level,
         logger.propagate,
     ) == before
+
+
+def test_dedicated_test_logger_isolated_from_real_pytest_capture(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    isolated = logging.getLogger("ci_coordinator.events")
+    assert logging.Logger.manager.loggerDict.get(isolated.name) is not isolated
+    first = event_logging.default_structured_event_logger()
+    owned_handlers = tuple(isolated.handlers)
+    assert len(owned_handlers) == 1
+    registered = logging.Logger("dedicated-logger-capture-probe")
+    get_logger = logging.getLogger
+
+    def probe_logger(name: str | None = None) -> logging.Logger:
+        return registered if name == isolated.name else get_logger(name)
+
+    monkeypatch.setitem(logging.Logger.manager.loggerDict, registered.name, registered)
+    with monkeypatch.context() as patch:
+        patch.setattr(logging, "getLogger", probe_logger)
+        event_logging.default_structured_event_logger()
+    probe_handlers = tuple(registered.handlers)
+    assert len(probe_handlers) == 1
+    assert registered.propagate is False
+    capture = LogCaptureHandler()
+
+    with catching_logs(capture, logging.INFO):
+        assert capture in registered.handlers
+        assert capture not in isolated.handlers
+        second = event_logging.default_structured_event_logger()
+        assert tuple(isolated.handlers) == owned_handlers
+        first.emit({"event": "first"})
+        second.emit({"event": "second"})
+        assert capture.records == []
+        with monkeypatch.context() as patch:
+            patch.setattr(logging, "getLogger", probe_logger)
+            with pytest.raises(RuntimeError, match="dedicated runtime logger"):
+                event_logging.default_structured_event_logger()
+        assert capture in registered.handlers
+
+    assert tuple(registered.handlers) == probe_handlers
+    assert tuple(isolated.handlers) == owned_handlers
+    assert [json.loads(line)["event"] for line in capsys.readouterr().err.splitlines()] == [
+        "first",
+        "second",
+    ]
