@@ -43,13 +43,15 @@ ProviderWorkflowInventory.admits_local_reusable_workflow_closure(...) -> bool
 ProviderWorkflowInventory.admits_control_plane(...) -> bool
 ```
 
-Workflow capability YAML admission limits both composition passes to depth 64,
-counting the root as depth one, before recursively composing deeper nodes. The
-post-composition graph walk retains its independent node, depth, scalar, tag and
-alias checks. Resource exceptions (`RecursionError`, `MemoryError`) yield absent
-capability on a best-effort basis; this is not an RSS limit or guaranteed recovery
-from process memory exhaustion. Existing byte bounds and scalar resolution remain
-unchanged.
+Workflow capability YAML admission uses one pure safe composition, limited to
+depth 64 with the root at depth one, followed by the existing node, depth, scalar,
+tag and alias checks before object construction. A workflow-local safe-constructor
+hook preserves lexical facts before mapping construction can mutate nodes; the
+library constructs control values under the same effective document resolver
+before disposing the parser. Scalar resolution, accepted language, hashes and
+byte bounds remain unchanged. Resource exceptions (`RecursionError`, `MemoryError`)
+yield absent capability on a best-effort basis; this is not an RSS limit, CPU
+isolation or guaranteed recovery from process memory exhaustion.
 
 Static runner selectors accept a label scalar or nonempty label sequence, also
 inside the mapping form with optional `group`. A group and all labels are
