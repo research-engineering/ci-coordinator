@@ -47,7 +47,9 @@ class GitHubCurrentProductionSourcesReader:
             return None
         inventory = await GitHubWorkflowInventoryLoader(
             WorkflowCatalogClient(
-                self._factory.for_installation(scope.installation_id),
+                self._factory.for_installation(
+                    scope.installation_id, repository_id=scope.repository_id
+                ),
                 api_version=GITHUB_API_VERSION,
             )
         ).load(lookup.repository, revision_sha=revisions[0], required_paths=lookup.provider_paths)

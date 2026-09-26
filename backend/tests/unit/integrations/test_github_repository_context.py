@@ -48,9 +48,11 @@ class _Transport:
 class _Factory:
     transport: _Transport
     installation_ids: list[int] = field(default_factory=list)
+    bindings: list[tuple[int, int | None]] = field(default_factory=list)
 
-    def for_installation(self, installation_id: int) -> _Transport:
+    def for_installation(self, installation_id: int, *, repository_id: int | None) -> _Transport:
         self.installation_ids.append(installation_id)
+        self.bindings.append((installation_id, repository_id))
         return self.transport
 
 
@@ -67,6 +69,7 @@ def test_happy_path_binds_contents_reads_to_exact_base_and_head() -> None:
     assert result.planning_input.full_ci_invalidating is False
     assert result.dependency_graph.fresh is True
     assert factory.installation_ids == [101]
+    assert factory.bindings == [(101, 202)]
     assert transport.requests[0].operation == "repositories.get_by_id"
     assert transport.requests[0].path == "/repositories/202"
     assert all(

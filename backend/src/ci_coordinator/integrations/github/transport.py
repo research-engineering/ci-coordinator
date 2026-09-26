@@ -14,4 +14,6 @@ class GitHubTransport(Protocol):
 class InstallationTransportFactory(Protocol):
     """Create an installation-bound transport without exposing credentials."""
 
-    def for_installation(self, installation_id: int) -> GitHubTransport: ...
+    def for_installation(
+        self, installation_id: int, *, repository_id: int | None
+    ) -> GitHubTransport: ...

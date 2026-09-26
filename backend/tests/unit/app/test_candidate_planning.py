@@ -21,8 +21,8 @@ NOW = datetime(2026, 7, 15, tzinfo=UTC)
 
 
 class _UnavailableTransportFactory:
-    def for_installation(self, installation_id: int) -> Never:
-        del installation_id
+    def for_installation(self, installation_id: int, *, repository_id: int | None) -> Never:
+        assert type(installation_id) is int and type(repository_id) is int
         raise RuntimeError("provider unavailable")
 
 

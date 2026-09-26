@@ -57,6 +57,10 @@ def test_composite_current_sources_require_every_owner_and_exact_request_coordin
         if unavailable == "governance":
             inventory.load.assert_not_awaited()
         else:
+            factory.for_installation.assert_called_once_with(
+                lookup.repository.scope.installation_id,
+                repository_id=lookup.repository.scope.repository_id,
+            )
             catalog_factory.assert_called_once_with(
                 factory.for_installation.return_value, api_version=GITHUB_API_VERSION
             )

@@ -265,8 +265,8 @@ class _Transport:
 class _Factory:
     transport: _Transport
 
-    def for_installation(self, installation_id: int) -> _Transport:
-        assert installation_id == 101
+    def for_installation(self, installation_id: int, *, repository_id: int | None) -> _Transport:
+        assert (installation_id, repository_id) == (101, 202)
         return self.transport
 
 

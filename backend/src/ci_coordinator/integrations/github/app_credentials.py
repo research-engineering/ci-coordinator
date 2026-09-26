@@ -1,8 +1,9 @@
-"""GitHub App JWT issuance and per-installation token cache semantics."""
+"""GitHub App JWT issuance and exact-grant installation token cache semantics."""
 
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -23,10 +24,18 @@ from ci_coordinator.integrations.github.app_transport_profile import (
     GITHUB_MAXIMUM_CACHED_INSTALLATIONS,
     GITHUB_MAXIMUM_CONCURRENT_REFRESHES,
 )
+from ci_coordinator.integrations.github.installation_request_admission import InstallationPermission
 from ci_coordinator.kernel import Clock, StrictJsonError, load_strict_json
 
 _APP_JWT_ALGORITHM = "RS256"
 _APP_JWT_REGISTRY = JWSRegistry(algorithms=[_APP_JWT_ALGORITHM], strict_check_header=True)
+
+
+@dataclass(frozen=True, slots=True)
+class _InstallationGrant:
+    installation_id: int
+    repository_id: int | None
+    permission: InstallationPermission
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,11 +77,11 @@ class _GitHubAppCredentialProvider:
         self._private_key_pem = private_key_pem
         self._clock = clock
         self._http_client = http_client
-        self._cache: dict[int, _InstallationToken] = {}
+        self._cache: dict[_InstallationGrant, _InstallationToken] = {}
         self._refresh_tasks: dict[
-            int, asyncio.Task[_InstallationToken | _CredentialUnavailable]
+            _InstallationGrant, asyncio.Task[_InstallationToken | _CredentialUnavailable]
         ] = {}
-        self._refresh_waiters: dict[int, int] = {}
+        self._refresh_waiters: dict[_InstallationGrant, int] = {}
         self._refresh_slots = asyncio.BoundedSemaphore(GITHUB_MAXIMUM_CONCURRENT_REFRESHES)
 
     def get_app(self) -> _AppToken | _CredentialUnavailable:
@@ -83,66 +92,66 @@ class _GitHubAppCredentialProvider:
         )
         return _AppToken(app_jwt) if app_jwt is not None else _CredentialUnavailable("jwt_invalid")
 
-    async def get(self, installation_id: int) -> _InstallationToken | _CredentialUnavailable:
+    async def get(self, grant: _InstallationGrant) -> _InstallationToken | _CredentialUnavailable:
         now = _utc_now(self._clock)
         self._discard_expired(now)
-        cached = self._cache.get(installation_id)
+        cached = self._cache.get(grant)
         if cached is not None and _token_is_fresh(cached, now):
             return cached
-        refresh = self._live_refresh(installation_id)
+        refresh = self._live_refresh(grant)
         if refresh is None:
             await self._refresh_slots.acquire()
             slot_owned = True
             try:
                 now = _utc_now(self._clock)
                 self._discard_expired(now)
-                cached = self._cache.get(installation_id)
+                cached = self._cache.get(grant)
                 if cached is not None and _token_is_fresh(cached, now):
                     return cached
-                refresh = self._live_refresh(installation_id)
+                refresh = self._live_refresh(grant)
                 if refresh is None:
-                    refresh = asyncio.create_task(self._refresh(installation_id, now))
-                    self._refresh_tasks[installation_id] = refresh
+                    refresh = asyncio.create_task(self._refresh(grant, now))
+                    self._refresh_tasks[grant] = refresh
                     slot_owned = False
-                    refresh.add_done_callback(self._refresh_done_callback(installation_id))
+                    refresh.add_done_callback(self._refresh_done_callback(grant))
             finally:
                 if slot_owned:
                     self._refresh_slots.release()
-        return await self._await_refresh(installation_id, refresh)
+        return await self._await_refresh(grant, refresh)
 
     def _live_refresh(
         self,
-        installation_id: int,
+        grant: _InstallationGrant,
     ) -> asyncio.Task[_InstallationToken | _CredentialUnavailable] | None:
-        refresh = self._refresh_tasks.get(installation_id)
+        refresh = self._refresh_tasks.get(grant)
         if refresh is None or refresh.done() or refresh.cancelling():
             return None
         return refresh
 
     async def _await_refresh(
         self,
-        installation_id: int,
+        grant: _InstallationGrant,
         refresh: asyncio.Task[_InstallationToken | _CredentialUnavailable],
     ) -> _InstallationToken | _CredentialUnavailable:
-        self._refresh_waiters[installation_id] = self._refresh_waiters.get(installation_id, 0) + 1
+        self._refresh_waiters[grant] = self._refresh_waiters.get(grant, 0) + 1
         try:
             # A caller owns only its wait.  The refresh belongs to all waiters.
             return await asyncio.shield(refresh)
         finally:
-            remaining = self._refresh_waiters[installation_id] - 1
+            remaining = self._refresh_waiters[grant] - 1
             if remaining > 0:
-                self._refresh_waiters[installation_id] = remaining
+                self._refresh_waiters[grant] = remaining
             else:
-                del self._refresh_waiters[installation_id]
-                if self._refresh_tasks.get(installation_id) is refresh and not refresh.done():
+                del self._refresh_waiters[grant]
+                if self._refresh_tasks.get(grant) is refresh and not refresh.done():
                     refresh.cancel()
 
     async def _refresh(
         self,
-        installation_id: int,
+        grant: _InstallationGrant,
         now: datetime,
     ) -> _InstallationToken | _CredentialUnavailable:
-        refreshed = await self._request(installation_id, now)
+        refreshed = await self._request(grant, now)
         if isinstance(refreshed, _InstallationToken):
             now = _utc_now(self._clock)
             if _token_is_fresh(refreshed, now):
@@ -152,54 +161,58 @@ class _GitHubAppCredentialProvider:
                         min(self._cache, key=lambda key: self._cache[key].expires_at),
                         None,
                     )
-                self._cache[installation_id] = refreshed
+                self._cache[grant] = refreshed
             else:
                 return _CredentialUnavailable("token_near_expiry")
         return refreshed
 
     def _finish_refresh(
         self,
-        installation_id: int,
+        grant: _InstallationGrant,
         completed: asyncio.Future[_InstallationToken | _CredentialUnavailable],
     ) -> None:
-        if self._refresh_tasks.get(installation_id) is completed:
-            del self._refresh_tasks[installation_id]
+        if self._refresh_tasks.get(grant) is completed:
+            del self._refresh_tasks[grant]
         self._refresh_slots.release()
 
     def _refresh_done_callback(
         self,
-        installation_id: int,
+        grant: _InstallationGrant,
     ) -> Callable[[asyncio.Future[_InstallationToken | _CredentialUnavailable]], None]:
         def callback(
             completed: asyncio.Future[_InstallationToken | _CredentialUnavailable],
         ) -> None:
-            self._finish_refresh(installation_id, completed)
+            self._finish_refresh(grant, completed)
 
         return callback
 
     def _discard_expired(self, now: datetime) -> None:
-        for installation_id, credential in tuple(self._cache.items()):
+        for grant, credential in tuple(self._cache.items()):
             if not _token_is_fresh(credential, now):
-                del self._cache[installation_id]
+                del self._cache[grant]
 
     async def _request(
         self,
-        installation_id: int,
+        grant: _InstallationGrant,
         now: datetime,
     ) -> _InstallationToken | _CredentialUnavailable:
         app_jwt = _issue_app_jwt(self._app_id, self._private_key_pem, now)
         if app_jwt is None:
             return _CredentialUnavailable("jwt_invalid")
+        body: dict[str, object] = {"permissions": {grant.permission: "read"}}
+        if grant.repository_id is not None:
+            body["repository_ids"] = [grant.repository_id]
         exchange = await self._http_client.exchange(
             method="POST",
-            path=f"/app/installations/{installation_id}/access_tokens",
+            path=f"/app/installations/{grant.installation_id}/access_tokens",
             headers=(
                 ("Accept", GITHUB_API_ACCEPT),
+                ("Content-Type", "application/json"),
                 ("Authorization", f"Bearer {app_jwt}"),
                 ("User-Agent", GITHUB_API_USER_AGENT),
                 ("X-GitHub-Api-Version", GITHUB_API_VERSION),
             ),
-            body=None,
+            body=json.dumps(body, separators=(",", ":")).encode("utf-8"),
         )
         if isinstance(exchange, _HttpFailure):
             return _CredentialUnavailable(f"token_{exchange.kind}")

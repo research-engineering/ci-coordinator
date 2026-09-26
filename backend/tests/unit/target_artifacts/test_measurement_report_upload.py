@@ -275,3 +275,28 @@ def test_bad_coordinator_endpoint_is_rejected_before_credentials(
     with pytest.raises(ValueError):
         producer._upload({**_input(), "endpoint": endpoint}, _environment())
     assert not network.calls
+
+
+@pytest.mark.parametrize(
+    ("audience", "digest"),
+    [
+        ("abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+        (
+            "https://coordinator.example.test/api/v1/dynamic-ci/plan",
+            "8b9330d0f77c9a9d1b64d1e650b413232220d69bf491a815d5e7c431f3b1bc4b",
+        ),
+    ],
+)
+def test_producer_and_receiver_keep_independent_literal_v1_audience_vectors(
+    audience: str, digest: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = "urn:ci-coordinator:measurement-report:v1:" + digest
+    network = Network()
+    monkeypatch.setattr(producer, "_request", network.request)
+    receipt = producer._upload({**_input(), "audience": audience}, _environment())
+    assert measurement_report_audience(audience) == expected
+    assert parse_qs(urlsplit(network.calls[0][0]).query)["audience"] == [expected]
+    assert receipt["reportId"] == REPORT.report_id
+    assert receipt["reportDigest"] == REPORT.report_digest
+    assert network.calls[-1][0] == "https://coordinator.example/api/v2/economics/reports"
+    assert network.calls[-1][1] == network.token

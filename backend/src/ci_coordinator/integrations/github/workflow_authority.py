@@ -97,7 +97,9 @@ class GitHubWorkflowAuthorityReader:
         if not is_github_object_id(revision):
             return WorkflowAuthorityUnavailable("invalid_revision")
         client = WorkflowAuthorityClient(
-            self._transport_factory.for_installation(scope.installation_id),
+            self._transport_factory.for_installation(
+                scope.installation_id, repository_id=scope.repository_id
+            ),
             api_version=self._api_version,
         )
         try:

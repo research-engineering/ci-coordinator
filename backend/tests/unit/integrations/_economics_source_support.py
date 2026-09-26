@@ -23,9 +23,11 @@ class Provider:
     responses: list[GitHubTransportResult | BaseException]
     requests: list[GitHubRequest] = field(default_factory=list)
     installations: list[int] = field(default_factory=list)
+    bindings: list[tuple[int, int | None]] = field(default_factory=list)
 
-    def for_installation(self, installation_id: int) -> Provider:
+    def for_installation(self, installation_id: int, *, repository_id: int | None) -> Provider:
         self.installations.append(installation_id)
+        self.bindings.append((installation_id, repository_id))
         return self
 
     async def send(self, request: GitHubRequest) -> GitHubTransportResult:

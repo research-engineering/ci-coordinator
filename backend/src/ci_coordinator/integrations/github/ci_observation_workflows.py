@@ -41,7 +41,9 @@ class GitHubCiObservationWorkflows:
         if type(scope) is not RepositoryScope:
             raise TypeError("workflow catalogue requires an exact scope")
         require_workflow_page(page_number)
-        transport = self._transport_factory.for_installation(scope.installation_id)
+        transport = self._transport_factory.for_installation(
+            scope.installation_id, repository_id=scope.repository_id
+        )
         repository = await load_economics_repository(
             ActionsClient(transport, api_version=GITHUB_API_VERSION),
             scope,

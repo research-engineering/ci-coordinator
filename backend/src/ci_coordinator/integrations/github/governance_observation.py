@@ -63,7 +63,9 @@ class GitHubGovernanceObservationReader:
 
     async def read(self, *, scope: RepositoryScope) -> GovernanceReadResult:
         client = GovernanceObservationClient(
-            self._transport_factory.for_installation(scope.installation_id),
+            self._transport_factory.for_installation(
+                scope.installation_id, repository_id=scope.repository_id
+            ),
             api_version=self._api_version,
         )
         repository = await self._repository(client, scope.repository_id)

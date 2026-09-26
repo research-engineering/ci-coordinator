@@ -2,7 +2,10 @@
 
 Status: as-built module specification
 
-Last updated: 2026-09-05
+Last updated: 2026-09-26
+
+Credential-boundary design: [selected design](../../features/github-credential-boundaries.md)
+and [implementation plan](../../features/github-credential-boundaries-implementation-plan.md).
 
 ## 1. Owned Invariant
 
@@ -124,6 +127,10 @@ retry, cooldown, quota reservation or retry-budget change follows from it.
 | Runner snapshot is not reservation.                                    | Adapter marks runner as reserved.                                                                                                                                                  |
 | App and installation credential planes remain distinct.                | An installation token reaches `/app/installations/{id}` or an app JWT reaches `/installation/repositories`.                                                                        |
 | Installation-token capability is closed.                               | An unknown operation, method, path shape, dot segment, query order/value, or request body reaches credential acquisition or provider I/O, including after HTTP path normalization. |
+| Installation grants follow independent caller scope and finite purpose. | A repository operation mints without its singleton repository id, a numeric path disagrees with that id, or caller `None` mints anything except inventory metadata. |
+| Credential sharing uses the full actual grant.                         | Different installation, repository or permission keys share a repository token, refresh, waiter cleanup or eviction identity. |
+| Organization population is not narrowed by a repository credential.    | Organization group membership uses an R-selected token, drops a foreign-repository runner before eligibility projection, or reuses results across R contexts. |
+| Grant cardinality retains global resource bounds.                      | Multiple grants of one installation bypass the 1,024-entry cache or 64-refresh/64-exchange limits; denied mint retries with broader authority. |
 | Reviewer, app-JWT, and installation credential planes remain distinct. | A reviewer token reaches an app-only route, or an app/installation credential reaches reviewer identity resolution.                                                                |
 | Reviewer-token capability is exact and ephemeral.                      | A mutation, unknown operation, body, wrong repository id, or retained reviewer token reaches provider I/O or durable state.                                                        |
 | Exact repository relation is conjunctive.                              | Reviewer access without the matching App installation and activation-time permission recheck becomes activation authority.                                                         |
@@ -148,6 +155,7 @@ ci_coordinator/integrations/github/app_transport_profile.py
 ci_coordinator/integrations/github/app_http.py
 ci_coordinator/integrations/github/app_credentials.py
 ci_coordinator/integrations/github/app_transport.py
+ci_coordinator/integrations/github/transport.py
 ci_coordinator/integrations/github/installation_request_admission.py
 ci_coordinator/integrations/github/request_admission.py
 ci_coordinator/integrations/github/_response_decoding.py
@@ -184,6 +192,12 @@ body, unstable total, or bound violation returns unknown capacity.
 - typed failure mapping tests.
 - pagination, truncation, runner eligibility, and runner-group denial tests.
 - check source app identity tests.
+- independent literal request/grant vectors for all 30 installation operations,
+  plus rejection before credentials for malformed shape or incompatible scope.
+- all 16 production factory-call relations retain their independently known
+  repository id; fake factories record the required keyword rather than hide it.
+- real factory with controlled wire responses for full-key sharing, concurrent
+  refreshes, cancellation, mixed-grant cache bounds and organization population.
 
 ## 8. GitHub App Runtime Transport
 
@@ -193,7 +207,7 @@ success algebra. It owns application JWT construction, installation-token
 acquisition and cache safety, bounded HTTP exchange, and resource closure.
 
 ```text
-GitHubAppTransportFactory.for_installation(installation_id)
+GitHubAppTransportFactory.for_installation(installation_id, *, repository_id)
   -> GitHubTransport
 GitHubAppTransportFactory.for_app()
   -> exact installation-identity GitHubTransport
@@ -203,20 +217,29 @@ GitHubAppTransportFactory.aclose()
 ```
 
 The factory is the sole owner of its HTTP client, credential cache, and
-per-installation single-flight locks. A returned transport is a lightweight
-installation binding; it does not own a second client or a second cache.
+per-grant single-flight refreshes. A returned transport is a lightweight
+installation/repository-context binding; it owns no second client or cache.
+The `repository_id: int | None` keyword is required, with no broad legacy
+default. Both installation and non-null repository ids are exact positive safe
+integers. Callers supply R from an independently admitted scope, request, epoch
+or retained attempt, never infer authority from a supplied request URL. Only
+installation inventory accepts caller R = `None`; organization-runner callers
+still supply their independent R for visibility, filtering and result identity.
 Runtime composition may supply one admitted canonical credential-free outbound
 proxy URL. The factory passes it explicitly to its sole HTTP client while
 retaining `trust_env=False`; no ambient proxy or bypass variable can alter the
 route. An injected test transport and the live proxy are mutually exclusive.
 
-The app-authenticated binding admits exactly two bodyless, query-free reads
-with their exact protocol operation identities: `GET
-/app/installations/{installation_id}` and `GET
-/repos/{owner}/{repository}/installation`. Every other request fails before JWT
-construction or provider I/O.
-The installation binding mints and caches only the token for its own positive
-safe installation identity. Before credential acquisition, it admits only the
+The unchanged app-authenticated binding admits three bodyless reads with exact
+operation identities: `app_identity.get_installation` at
+`/app/installations/{installation_id}` and
+`app_identity.get_repository_installation` at
+`/repos/{owner}/{repository}/installation` are query-free;
+`app_identity.list_installations` at `/app/installations` retains its exact
+bounded page query. All use GET. Every other request fails before JWT
+construction or provider I/O; these are not installation-token operations.
+The installation binding mints and caches only a finite grant of its own
+installation identity and admitted purpose. Before credential acquisition, it admits only the
 closed set of read operations consumed by the repository, Actions, checks,
 diff, runner, workflow-catalog, workflow-discovery, and provider-inventory
 clients. Each operation is bound to `GET`, an exact canonical path shape, an
@@ -225,6 +248,9 @@ or a mismatched request fails without reading credentials or performing
 provider I/O. Canonical path admission is performed before URL construction;
 raw or decoded dot segments, non-canonical encoding, oversized paths, and path
 shapes that an HTTP client could normalize into another endpoint are rejected.
+Numeric `/repositories/{id}` reads additionally require `id = R`. Repository
+names and organization names remain protocol routing operands, not a source of
+repository authority or an arbitrary caller-selected permission set.
 
 The reviewer-token binding is a separate, callback-scoped capability. A
 proposal-bound GitHub OAuth exchange requires PKCE S256, an exact redirect URI,
@@ -243,18 +269,19 @@ only and does not merge reviewer-token, installation-token, or app-JWT
 authority.
 
 ```text
-AuthenticatedSend(I, R) iff
+AdmittedInstallationSend(I, R, q) implies
   PositiveInstallation(I)
-  and RequestVersion(R) = AdmittedApiVersion
-  and Credential(I) is unexpired beyond refresh skew
-  and I is a positive safe installation identity
-  and RequestPath(R) remains within the fixed origin
-  and RequestHeaders(R) cannot override authorization or transport framing
-  and HTTPSRequestIsBoundedAndNonRedirecting(R)
+  and ClosedShape(q) and ScopeCompatible(R, q)
+  and P = FiniteReadPermission(q.operation)
+  and K = ActualGrant(I, R, P)
+  and RequestVersion(q) = AdmittedApiVersion
+  and Credential(K) is unexpired beyond refresh skew
+  and RequestPath(q) remains within the fixed origin
+  and RequestHeaders(q) cannot override authorization or transport framing
+  and HTTPSRequestIsBoundedAndNonRedirecting(q)
 
-not AuthenticatedSend(I, R)
-=> GitHubTransportFailure
-=> GitHubProtocolClient cannot produce GitHubSuccess
+failed request admission => no credential acquisition or provider I/O
+failed credential acquisition => GitHubTransportFailure, never a broader grant
 ```
 
 The application JWT has `alg = RS256`, `iat = now - 60 seconds`, bounded
@@ -268,13 +295,23 @@ The versioned machine profile
 the endpoint, API version, header values, JWT bounds, cache skew, and byte or
 time limits. It also bounds installation identities, cache cardinality,
 simultaneous refreshes, and all HTTP exchanges admitted by one shared transport
-factory. The concurrency permit covers credential refresh and ordinary API
+factory. The cache contains at most 1,024 total full-grant entries, not 1,024
+entries per installation or purpose. The retained profile field
+`maximumCachedInstallations` supplies that entry ceiling: distinct installations
+are consequently bounded too, but residency for 1,024 installations is not
+promised. At most 64 refreshes and 64 HTTP exchanges are active across all keys
+of one factory. The concurrency permit covers credential refresh and ordinary API
 calls, while its wait remains inside the same absolute exchange deadline. Each
 logical send has one absolute deadline across credential-cache lookup,
 refresh-slot admission, token acquisition, HTTP exchange, and all response
 chunks; per-operation HTTP timeouts do not substitute for that bound. The
 values are runtime composition behavior, not repository policy and not a
-dynamic user configuration.
+dynamic user configuration. The logical send bound remains 10 seconds and
+refresh skew remains 300 seconds. The cache, refresh-task map, waiter counts,
+completion callbacks and eviction all use K, including identity-sensitive
+cleanup. A cancelled waiter does not cancel a shared refresh while another
+waiter remains; the last waiter may cancel it. Clock resampling after admission
+and refresh, expiry eviction, and accepted-send drain before close are retained.
 
 The HTTP client requests `Accept-Encoding: identity`. Before response-body
 iteration, the transport rejects any `Content-Encoding`, repeated or
@@ -288,6 +325,64 @@ the application-owned network read path without overstating what can be proved
 about an injected transport. The bound also does not claim that the underlying
 network stack cannot allocate one transport chunk before yielding it; that
 chunk size remains an HTTP-client and network-transport fact.
+
+### Closed Installation Grants
+
+Every row retains its existing exact GET/path/query/empty-body grammar; this
+table selects credentials, not new endpoints. P below always means `P: read`.
+The 30 operation identities are closed, including admitted low-level operations
+without a current production caller.
+
+| Operation | P | Actual grant K |
+| --- | --- | --- |
+| `repositories.get_by_id` | `metadata` | `(I,R,P)` |
+| `governance_observation.get_repository` | `metadata` | `(I,R,P)` |
+| `workflow_authority.get_repository` | `metadata` | `(I,R,P)` |
+| `workflow_discovery.get_repository` | `metadata` | `(I,R,P)` |
+| `governance_observation.list_effective_branch_rules` | `metadata` | `(I,R,P)` |
+| `reviewer_attestation.get_permission` | `metadata` | `(I,R,P)` |
+| `provider_inventory.list_repositories` | `metadata` | `(I,None,P)` |
+| `actions.get_workflow_run` | `actions` | `(I,R,P)` |
+| `actions.get_workflow_run_attempt` | `actions` | `(I,R,P)` |
+| `actions.list_repository_workflow_runs` | `actions` | `(I,R,P)` |
+| `actions.list_workflow_run_attempt_jobs` | `actions` | `(I,R,P)` |
+| `actions.list_workflow_runs` | `actions` | `(I,R,P)` |
+| `workflow_catalog.list_workflows` | `actions` | `(I,R,P)` |
+| `workflow_catalog.get_workflow` | `actions` | `(I,R,P)` |
+| `checks.list_check_runs` | `checks` | `(I,R,P)` |
+| `diff.get_pull_request` | `pull_requests` | `(I,R,P)` |
+| `diff.list_pull_request_files` | `pull_requests` | `(I,R,P)` |
+| `diff.compare` | `contents` | `(I,R,P)` |
+| `workflow_catalog.get_content` | `contents` | `(I,R,P)` |
+| `workflow_discovery.get_reference` | `contents` | `(I,R,P)` |
+| `workflow_discovery.get_commit` | `contents` | `(I,R,P)` |
+| `workflow_discovery.get_tree` | `contents` | `(I,R,P)` |
+| `workflow_discovery.get_recursive_tree` | `contents` | `(I,R,P)` |
+| `workflow_discovery.get_blob` | `contents` | `(I,R,P)` |
+| `workflow_authority.get_commit` | `contents` | `(I,R,P)` |
+| `workflow_authority.get_tree` | `contents` | `(I,R,P)` |
+| `workflow_authority.get_blob` | `contents` | `(I,R,P)` |
+| `runner.list_self_hosted_runners` | `administration` | `(I,R,P)` |
+| `runner.list_visible_self_hosted_runner_groups` | `organization_self_hosted_runners` | `(I,None,P)` |
+| `runner.list_group_self_hosted_runners` | `organization_self_hosted_runners` | `(I,None,P)` |
+
+Repository grants send exactly `permissions: {P: read}` and
+`repository_ids: [R]`. Inventory sends only `permissions: {metadata: read}`,
+omitting both repository selector fields to retain the installation population.
+This explicit nonempty metadata request is not a claim that the inventory
+endpoint requires additional permission.
+
+The two organization rows send only
+`permissions: {organization_self_hosted_runners: read}`, also omitting both
+repository selectors. This is a declared organization purpose, never a fallback
+after a rejected repository grant. Its K intentionally has no R: equal actual
+organization grants may share credentials across R contexts, but request
+visibility queries, complete group membership, eligibility filtering and result
+provenance remain independently repository-bound. Such a token is not
+R-scoped and may carry provider-implicit metadata access across installation
+repositories. No combination of R and organization permission is assumed to
+preserve the same population. No mint denial authorizes a union, unscoped
+repository token, alternate credential or retry with broader permissions.
 
 ### 8.1 Failure And Cancellation Algebra
 
@@ -316,3 +411,9 @@ The transport-factory-local concurrency cap does not prove provider-wide
 concurrency, primary-rate, secondary-rate, or CPU budgets because additional
 factories, replicas, and integrations may share the same provider accounting
 scope and some point costs are undisclosed.
+Explicit request narrowing does not prove the effective live grant or numeric
+repository metadata endpoint compatibility. Those require separately admitted
+provider qualification; failure cannot widen authority. O-only implicit
+metadata breadth is accepted for the declared organization purpose, not denied
+by this contract. More cold mints or cache misses may occur; the unchanged
+resource ceiling is not a latency-neutrality or throughput claim.

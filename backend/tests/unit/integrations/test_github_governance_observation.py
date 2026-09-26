@@ -31,6 +31,11 @@ def test_reader_binds_terminal_traversal_to_stable_numeric_repository_identity()
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request.url.path)
+        if request.url.path.endswith("/access_tokens"):
+            assert json.loads(request.content) == {
+                "repository_ids": [501],
+                "permissions": {"metadata": "read"},
+            }
         return _provider_response(request, rules=(rule,))
 
     result = asyncio.run(_read(_factory(_private_key(), httpx.MockTransport(handler))))

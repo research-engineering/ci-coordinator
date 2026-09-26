@@ -65,7 +65,9 @@ class GitHubReviewerPermissionReaderAdapter:
         ):
             raise GitHubReviewerRejected("GitHub reviewer identity is invalid")
         client = _ReviewerPermissionClient(
-            self._transport_factory.for_installation(scope.installation_id),
+            self._transport_factory.for_installation(
+                scope.installation_id, repository_id=scope.repository_id
+            ),
             api_version=GITHUB_API_VERSION,
         )
         repository = await _resolve_repository(client, scope.repository_id)

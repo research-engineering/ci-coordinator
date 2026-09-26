@@ -10,12 +10,16 @@ from cryptography.hazmat.primitives import serialization
 
 from ci_coordinator.integrations.github import (
     GitHubAppTransportFactory,
+    GitHubQueryParameter,
+    GitHubRequest,
     GitHubResponse,
     GitHubTransportFailure,
 )
+from ci_coordinator.integrations.github import app_credentials as credential_module
 from ci_coordinator.integrations.github.app_lifecycle import _SharedClientLifecycle
 from ci_coordinator.integrations.github.app_transport_profile import (
     GITHUB_API_VERSION,
+    GITHUB_MAXIMUM_CACHED_INSTALLATIONS,
 )
 from ci_coordinator.kernel import FixedClock
 
@@ -45,7 +49,7 @@ def test_factory_drains_an_accepted_send_before_closing_the_shared_client() -> N
             return _api_response()
 
         factory = _factory(_private_key(), httpx.MockTransport(handler))
-        bound_transport = factory.for_installation(77)
+        bound_transport = factory.for_installation(77, repository_id=11)
         send = asyncio.create_task(bound_transport.send(_request()))
         await refresh_started.wait()
         close = asyncio.create_task(factory.aclose())
@@ -186,7 +190,7 @@ def test_factory_rejects_near_expiry_token_using_time_after_provider_exchange() 
             transport=httpx.MockTransport(handler),
         )
         try:
-            result = await factory.for_installation(77).send(_request())
+            result = await factory.for_installation(77, repository_id=11).send(_request())
         finally:
             await factory.aclose()
         assert isinstance(result, GitHubTransportFailure)
@@ -206,7 +210,9 @@ def test_factory_bounds_failed_refresh_registry_and_does_not_render_secrets() ->
         )
         try:
             for installation_id in range(1, 129):
-                result = await factory.for_installation(installation_id).send(_request())
+                result = await factory.for_installation(installation_id, repository_id=11).send(
+                    _request()
+                )
                 assert isinstance(result, GitHubTransportFailure)
                 assert private_key not in repr(result)
                 assert private_key not in str(result)
@@ -219,3 +225,94 @@ def test_factory_bounds_failed_refresh_registry_and_does_not_render_secrets() ->
 
     factory = asyncio.run(scenario())
     assert "PRIVATE-KEY-CANARY" not in repr(factory)
+
+
+def test_cache_ceiling_counts_all_grants_not_installations(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert GITHUB_MAXIMUM_CACHED_INSTALLATIONS == 1_024
+
+    def app_jwt(_app_id: str, _private_key: str, _now: datetime) -> str:
+        return "synthetic-app-token"
+
+    monkeypatch.setattr(credential_module, "_issue_app_jwt", app_jwt)
+
+    async def scenario() -> None:
+        mints = 0
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal mints
+            if request.url.path.endswith("/access_tokens"):
+                mints += 1
+                return _token_response(token=f"scoped-{mints}")
+            return _api_response()
+
+        factory = _factory(_private_key(), httpx.MockTransport(handler))
+        page = (GitHubQueryParameter("page", "1"), GitHubQueryParameter("per_page", "100"))
+        try:
+            for repository_id in range(1, 1_024):
+                result = await factory.for_installation(77, repository_id=repository_id).send(
+                    _request(path=f"/repositories/{repository_id}")
+                )
+                assert isinstance(result, GitHubResponse)
+            assert mints == 1_023 and len(factory._credentials._cache) == 1_023
+            extra = (
+                (
+                    77,
+                    None,
+                    GitHubRequest(
+                        "provider_inventory.list_repositories",
+                        "GET",
+                        "/installation/repositories",
+                        GITHUB_API_VERSION,
+                        query=page,
+                    ),
+                ),
+                (
+                    77,
+                    11,
+                    GitHubRequest(
+                        "runner.list_group_self_hosted_runners",
+                        "GET",
+                        "/orgs/example/actions/runner-groups/7/runners",
+                        GITHUB_API_VERSION,
+                        query=page,
+                    ),
+                ),
+                (
+                    77,
+                    11,
+                    GitHubRequest(
+                        "actions.get_workflow_run",
+                        "GET",
+                        "/repos/example/ci/actions/runs/7",
+                        GITHUB_API_VERSION,
+                    ),
+                ),
+                (88, 11, _request()),
+            )
+            for installation_id, bound_repository_id, request in extra:
+                result = await factory.for_installation(
+                    installation_id, repository_id=bound_repository_id
+                ).send(request)
+                assert isinstance(result, GitHubResponse)
+                assert len(factory._credentials._cache) == 1_024
+            assert mints == 1_027
+            assert isinstance(
+                await factory.for_installation(77, repository_id=1_023).send(
+                    _request(path="/repositories/1023")
+                ),
+                GitHubResponse,
+            )
+            assert mints == 1_027
+            assert isinstance(
+                await factory.for_installation(77, repository_id=1).send(
+                    _request(path="/repositories/1")
+                ),
+                GitHubResponse,
+            )
+            assert mints == 1_028 and len(factory._credentials._cache) == 1_024
+            assert not factory._credentials._refresh_tasks
+            assert not factory._credentials._refresh_waiters
+        finally:
+            await factory.aclose()
+
+    asyncio.run(scenario())

@@ -15,6 +15,7 @@ from ci_coordinator.integrations.github.app_credentials import (
     _AppToken,
     _CredentialUnavailable,
     _GitHubAppCredentialProvider,
+    _InstallationGrant,
     _InstallationToken,
     _validate_github_app_identity,
 )
@@ -39,7 +40,7 @@ from ci_coordinator.integrations.github.contracts import (
     GitHubTransportResult,
 )
 from ci_coordinator.integrations.github.installation_request_admission import (
-    installation_request_is_admitted,
+    installation_request_permission,
 )
 from ci_coordinator.integrations.github.request_admission import (
     bounded_ascii_path_is_admitted,
@@ -124,16 +125,23 @@ class GitHubAppTransportFactory:
         self._lifecycle = _SharedClientLifecycle()
         self._unavailable_observer = unavailable_observer
 
-    def for_installation(self, installation_id: int) -> GitHubAppInstallationTransport:
-        """Bind a GitHub protocol transport to one admitted installation identity."""
+    def for_installation(
+        self, installation_id: int, *, repository_id: int | None
+    ) -> GitHubAppInstallationTransport:
+        """Bind an independent repository context or explicit installation inventory."""
         if (
             type(installation_id) is not int
             or not 1 <= installation_id <= GITHUB_MAXIMUM_INSTALLATION_ID
         ):
             raise ValueError("GitHub installation id must be a positive safe integer")
+        if repository_id is not None and (
+            type(repository_id) is not int
+            or not 1 <= repository_id <= GITHUB_MAXIMUM_INSTALLATION_ID
+        ):
+            raise ValueError("GitHub repository id must be a positive safe integer")
         if not self._lifecycle.is_open:
             raise RuntimeError("GitHub App transport factory is closed")
-        return GitHubAppInstallationTransport(self, installation_id)
+        return GitHubAppInstallationTransport(self, installation_id, repository_id=repository_id)
 
     def for_app(self) -> GitHubAppIdentityTransport:
         """Bind a transport to authenticated-app endpoints without installation authority."""
@@ -155,13 +163,20 @@ class GitHubAppTransportFactory:
     async def _send_installation(
         self,
         installation_id: int,
+        repository_id: int | None,
         request: GitHubRequest,
     ) -> GitHubTransportResult:
-        if not installation_request_is_admitted(request):
+        permission = installation_request_permission(request, repository_id=repository_id)
+        if permission is None:
             return _unavailable("GitHub App installation request is not admitted")
+        grant = _InstallationGrant(
+            installation_id,
+            None if permission == "organization_self_hosted_runners" else repository_id,
+            permission,
+        )
 
         async def load_credential() -> _Credential:
-            return await self._credentials.get(installation_id)
+            return await self._credentials.get(grant)
 
         return await self._send(request, load_credential)
 
@@ -264,12 +279,21 @@ class GitHubAppTransportFactory:
 class GitHubAppInstallationTransport:
     """One lightweight installation binding over a shared factory lifecycle."""
 
-    def __init__(self, factory: GitHubAppTransportFactory, installation_id: int) -> None:
+    def __init__(
+        self,
+        factory: GitHubAppTransportFactory,
+        installation_id: int,
+        *,
+        repository_id: int | None,
+    ) -> None:
         self._factory = factory
         self._installation_id = installation_id
+        self._repository_id = repository_id
 
     async def send(self, request: GitHubRequest) -> GitHubTransportResult:
-        result = await self._factory._send_installation(self._installation_id, request)
+        result = await self._factory._send_installation(
+            self._installation_id, self._repository_id, request
+        )
         self._factory._observe_result(request, result)
         return result
 

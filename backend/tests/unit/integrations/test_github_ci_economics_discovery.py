@@ -79,6 +79,7 @@ def _discover(
         )
     )
     assert provider.installations == [SCOPE.installation_id]
+    assert provider.bindings == [(101, 202)]
     assert provider.requests[-1].query == (
         GitHubQueryParameter("created", CREATED),
         GitHubQueryParameter("page", str(page_number)),

@@ -55,6 +55,7 @@ def test_repository_page_uses_exact_installation_token_and_validates_next_link()
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
         if request.url.path.endswith("/access_tokens"):
+            assert json.loads(request.content) == {"permissions": {"metadata": "read"}}
             return _token_response()
         return _response(
             _repository_page_body(total_count=2),

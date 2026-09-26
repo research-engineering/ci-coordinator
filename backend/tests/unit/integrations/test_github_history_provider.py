@@ -551,6 +551,7 @@ def test_attempt_collection_is_bounded_and_distinguishes_complete_empty_and_part
     assert result.population == ("partial" if count > 2_000 else "complete")
     assert result.provider_job_total == count and len(result.jobs) == min(count, 2_000)
     assert provider.installations == [SCOPE.installation_id]
+    assert provider.bindings == [(101, 202)]
     assert [request.path for request in provider.requests] == [
         "/repositories/202",
         PATH,

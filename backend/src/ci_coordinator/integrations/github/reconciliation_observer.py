@@ -120,7 +120,9 @@ class GitHubActionsReconciliationObserver:
         """Load one complete bounded provider view for an exact run attempt."""
         if type(subject) is not ReconciliationSubject:
             raise TypeError("reconciliation observer requires an exact subject")
-        transport = self._transport_factory.for_installation(subject.installation_id)
+        transport = self._transport_factory.for_installation(
+            subject.installation_id, repository_id=subject.repository_id
+        )
         client = ActionsClient(transport, api_version=self._api_version)
         repository, consumed_bytes = await self._resolve_repository(client, subject.repository_id)
         return await self._load_jobs(client, subject, repository, consumed_bytes)
@@ -128,7 +130,9 @@ class GitHubActionsReconciliationObserver:
     async def load_attempt_identity(self, attempt: AttemptIdentity) -> tuple[ProviderJob, ...]:
         if type(attempt) is not AttemptIdentity:
             raise TypeError("GitHub attempt reader requires an exact attempt identity")
-        transport = self._transport_factory.for_installation(attempt.scope.installation_id)
+        transport = self._transport_factory.for_installation(
+            attempt.scope.installation_id, repository_id=attempt.scope.repository_id
+        )
         client = ActionsClient(transport, api_version=self._api_version)
         repository, consumed_bytes = await self._resolve_repository(
             client, attempt.scope.repository_id

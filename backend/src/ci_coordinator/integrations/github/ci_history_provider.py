@@ -84,7 +84,9 @@ class GitHubHistoryProvider:
             raise TypeError("history provider requires an exact attempt cursor")
         run_created_at = utc_time(run_created_at)
         client = ActionsClient(
-            self._transport_factory.for_installation(cursor.scope.installation_id),
+            self._transport_factory.for_installation(
+                cursor.scope.installation_id, repository_id=cursor.scope.repository_id
+            ),
             api_version=self._api_version,
         )
         repository = await load_economics_repository(

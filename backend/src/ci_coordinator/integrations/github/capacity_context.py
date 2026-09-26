@@ -46,7 +46,9 @@ class GitHubCapacityInputsProvider:
         if not is_github_object_id(execution_authority_sha):
             return None
         try:
-            transport = self._transport_factory.for_installation(request.installation_id)
+            transport = self._transport_factory.for_installation(
+                request.installation_id, repository_id=request.repository_id
+            )
             git_client = WorkflowDiscoveryClient(
                 transport,
                 api_version=GITHUB_API_VERSION,
