@@ -116,10 +116,7 @@ class ConfigEpochRegistrationBody(RequestModel):
         return _validate_operation_id(value)
 
 
-class ConfigEpochActivationBody(RequestModel):
-    schema_version: Literal["ci-config-epoch-activation/v1"] = Field(
-        validation_alias="schemaVersion"
-    )
+class _ConfigEpochActivationFields(RequestModel):
     installation_id: int = Field(
         validation_alias="installationId",
         ge=1,
@@ -158,6 +155,29 @@ class ConfigEpochActivationBody(RequestModel):
     @field_validator("operation_id")
     @classmethod
     def operation_id_fits_the_persistence_contract(cls, value: str) -> str:
+        return _validate_operation_id(value)
+
+
+class ConfigEpochActivationBody(_ConfigEpochActivationFields):
+    schema_version: Literal["ci-config-epoch-activation/v1"] = Field(
+        validation_alias="schemaVersion"
+    )
+
+
+class ExplicitConfigEpochActivationBody(_ConfigEpochActivationFields):
+    schema_version: Literal["ci-config-epoch-activation/v2"] = Field(
+        validation_alias="schemaVersion"
+    )
+    review_operation_id: str = Field(
+        validation_alias="reviewOperationId",
+        min_length=1,
+        max_length=MAX_CONFIG_OPERATION_ID_UTF8_BYTES,
+        json_schema_extra={"x-max-utf8-bytes": MAX_CONFIG_OPERATION_ID_UTF8_BYTES},
+    )
+
+    @field_validator("review_operation_id")
+    @classmethod
+    def review_id_fits_the_persistence_contract(cls, value: str) -> str:
         return _validate_operation_id(value)
 
 
@@ -289,6 +309,7 @@ class ConfigControlErrorBody(ResponseModel):
         "revision_conflict",
         "target_unavailable",
         "attestation_invalid",
+        "legacy_new_operation_unsupported",
         "coverage_reducing",
         "coverage_unproven",
         "overloaded",

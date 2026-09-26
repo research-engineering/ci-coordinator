@@ -89,11 +89,10 @@ def main() -> int:
         return 0
 
     if command == "exec" and args[2:] == ["alembic", "heads"]:
-        head = (
-            "20991231_9999 (head)"
-            if scenario == "migration_head_failure"
-            else ("20260915_0015 (head)")
-        )
+        head = {
+            "migration_head_failure": "20991231_9999 (head)",
+            "stale_migration_head": "20260915_0015 (head)",
+        }.get(scenario, "20260926_0017 (head)")
         sys.stdout.write(f"{head}\n")
         return 0
 

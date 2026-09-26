@@ -36,6 +36,7 @@ export const configControlErrorSchema: z.ZodType<ConfigControlError> = z.strictO
     "coverage_unproven",
     "forbidden",
     "invalid_config",
+    "legacy_new_operation_unsupported",
     "overloaded",
     "revision_conflict",
     "target_unavailable",

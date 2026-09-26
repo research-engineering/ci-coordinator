@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from dataclasses import replace
+from io import StringIO
+from typing import Literal
 
 import pytest
 from sqlalchemy import text
 
 from ci_coordinator.audit_replay import AuditEventInput, prepare_audit_event
+from ci_coordinator.audit_replay.replay import AllAuditReplayFilter
 from ci_coordinator.config_control import (
     PolicySourceFormat,
     RepositoryScope,
@@ -31,6 +36,7 @@ from ci_coordinator.persistence.config_epoch_schema_attestation import (
     config_epoch_lifecycle_schema_matches_contract,
 )
 from ci_coordinator.persistence.connection import create_postgres_engine
+from ci_coordinator.replay_cli import ReplayCommand, execute_replay
 
 from ._audit_replay_support import load_test_audit_records
 from ._config_epoch_support import config_epoch_draft
@@ -231,8 +237,10 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize("version", [1, 2])
 def test_pair_owned_activation_event_cannot_use_the_generic_ledger_port(
     runtime_postgres_database_url: str,
+    version: Literal[1, 2],
 ) -> None:
     async def scenario() -> None:
         draft = _draft("json")
@@ -240,12 +248,91 @@ def test_pair_owned_activation_event_cannot_use_the_generic_ledger_port(
         try:
             async with PostgresUnitOfWork(engine) as unit_of_work:
                 prepared = prepare_config_epoch_activation(
-                    _command(draft.scope, draft.epoch_id, None, "generic-port")
+                    replace(
+                        _command(draft.scope, draft.epoch_id, None, "generic-port"),
+                        activation_version=version,
+                        review_operation_id=None if version == 1 else "review-1",
+                    )
                 )
                 with pytest.raises(PersistenceInvariantViolation, match="pair-owned"):
                     await unit_of_work.audit_events.append(prepared._take_audit_event())
                 with pytest.raises(RuntimeError, match="not active"):
                     await unit_of_work.commit()
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_activation_payload_generations_replay_exactly_and_export_through_generic_cli(
+    runtime_postgres_database_url: str,
+) -> None:
+    async def scenario() -> None:
+        draft = _draft("json")
+        old = _command(draft.scope, draft.epoch_id, None, "legacy")
+        current = replace(
+            _command(draft.scope, draft.epoch_id, 1, "current"),
+            activation_version=2,
+            review_operation_id="chosen-review",
+        )
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        try:
+            async with PostgresConfigEpochUnitOfWork(engine) as transaction:
+                await transaction.config_epochs.register(draft)
+                for value in (old, current):
+                    assert isinstance(
+                        await transaction.config_epochs.activate(
+                            prepare_config_epoch_activation(value)
+                        ),
+                        ConfigEpochActivationApplied,
+                    )
+                await transaction.commit()
+            async with PostgresConfigEpochUnitOfWork(engine) as transaction:
+                for value in (old, current):
+                    replay = ConfigEpochReplayCommand.from_activation(value)
+                    assert isinstance(
+                        await transaction.config_epochs.resolve_operation(replay),
+                        ConfigEpochActivationDuplicate,
+                    )
+                    cross = replace(
+                        replay,
+                        activation_version=2 if replay.activation_version == 1 else 1,
+                        review_operation_id="chosen-review"
+                        if replay.activation_version == 1
+                        else None,
+                    )
+                    assert isinstance(
+                        await transaction.config_epochs.resolve_operation(cross),
+                        ConfigEpochActivationOperationConflict,
+                    )
+                changed = replace(
+                    ConfigEpochReplayCommand.from_activation(current),
+                    review_operation_id="other-review",
+                )
+                assert isinstance(
+                    await transaction.config_epochs.resolve_operation(changed),
+                    ConfigEpochActivationOperationConflict,
+                )
+            output = StringIO()
+            assert (
+                await execute_replay(
+                    ReplayCommand(
+                        database_dsn=runtime_postgres_database_url,
+                        replay_filter=AllAuditReplayFilter(),
+                        include_payload=True,
+                    ),
+                    stdout=output,
+                )
+                == 0
+            )
+            exported = json.loads(output.getvalue())
+            assert exported["status"] == "valid"
+            first, second = exported["events"]
+            assert first["eventType"] == second["eventType"] == "config-epoch-activation/v1"
+            assert first["payload"]["schemaVersion"] == "config-epoch-activation-audit/v1"
+            assert "reviewOperationId" not in first["payload"]
+            assert second["payload"]["schemaVersion"] == "config-epoch-activation-audit/v2"
+            assert second["payload"]["reviewOperationId"] == "chosen-review"
         finally:
             await engine.dispose()
 

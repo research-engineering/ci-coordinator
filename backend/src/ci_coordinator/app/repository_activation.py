@@ -52,16 +52,24 @@ class RepositoryActivationAuthorityService:
         scope: RepositoryScope,
         target_epoch_id: str,
         proposal_manifest_id: str,
+        review_operation_id: str,
     ) -> RepositoryActivationAuthorization:
         try:
             review = await self._store.load_activation_candidate(
                 scope=scope,
                 target_epoch_id=target_epoch_id,
                 proposal_manifest_id=proposal_manifest_id,
+                review_operation_id=review_operation_id,
             )
         except ProposalReviewStoreUnavailable:
             return RepositoryActivationUnavailable()
-        if review is None:
+        if (
+            review is None
+            or review.command.scope != scope
+            or review.command.operation_id != review_operation_id
+            or review.target_epoch_id != target_epoch_id
+            or review.command.expected_manifest_id != proposal_manifest_id
+        ):
             return RepositoryActivationRejected()
         retained = review.attestation
         if retained.transaction.binding.authority_profile_digest != self._authority_profile_digest:

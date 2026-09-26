@@ -56,10 +56,10 @@ from ci_coordinator.persistence.schema import (
 )
 from ci_coordinator.persistence.schema_capabilities import (
     AUDIT_LEDGER,
-    CONFIG_EPOCH_LIFECYCLE,
+    CONFIG_EPOCH_LIFECYCLE_V2,
     CONTROL_PLANE_IDENTITY_STATE,
     DATABASE_COMPATIBILITY_PROTOCOL,
-    PROPOSAL_REVIEW_REGISTRATION,
+    PROPOSAL_REVIEW_REGISTRATION_V2,
 )
 from ci_coordinator.proposal_review import RepositoryAttestationRegistered
 
@@ -78,13 +78,13 @@ from .test_proposal_review_registration import (
 
 pytestmark = pytest.mark.persistence
 
-_OLD_REQUIREMENTS = tuple(
+_WITHOUT_IDENTITY_REQUIREMENTS = tuple(
     sorted(
         (
             DATABASE_COMPATIBILITY_PROTOCOL.declaration(),
             AUDIT_LEDGER.declaration(),
-            CONFIG_EPOCH_LIFECYCLE.declaration(),
-            PROPOSAL_REVIEW_REGISTRATION.declaration(),
+            CONFIG_EPOCH_LIFECYCLE_V2.declaration(),
+            PROPOSAL_REVIEW_REGISTRATION_V2.declaration(),
         )
     )
 )
@@ -172,7 +172,7 @@ def test_identity_is_an_independent_pre_exposure_obligation(
                         connection, profile, CompatibilityFenceMode.PARTICIPANT
                     )
                     current = await admit_schema_dependent_operation(
-                        connection, profile, _OLD_REQUIREMENTS
+                        connection, profile, _WITHOUT_IDENTITY_REQUIREMENTS
                     )
                     identity = CONTROL_PLANE_IDENTITY_STATE.declaration()
                     assert (identity in current.declaration.capabilities) is (damage == "facts")
@@ -233,7 +233,7 @@ async def _damage_identity(engine: AsyncEngine, damage: Literal["declaration", "
             identity = CONTROL_PLANE_IDENTITY_STATE.declaration()
             retained = tuple(item for item in current.capabilities if item != identity)
             assert set(current.capabilities) - set(retained) == {identity}
-            assert capabilities_cover(_OLD_REQUIREMENTS, retained)
+            assert capabilities_cover(_WITHOUT_IDENTITY_REQUIREMENTS, retained)
             successor = build_declaration(
                 profile,
                 generation=current.generation + 1,

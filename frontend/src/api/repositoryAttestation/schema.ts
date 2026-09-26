@@ -28,6 +28,7 @@ export const repositoryAttestationErrorSchema: z.ZodType<RepositoryAttestationEr
       "epoch_conflict",
       "forbidden",
       "invalid_callback",
+      "legacy_new_operation_unsupported",
       "operation_conflict",
       "overloaded",
       "rate_limited",

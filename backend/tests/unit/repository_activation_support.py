@@ -77,6 +77,7 @@ jobs:
 def review_record(
     completed: WorkflowDiscoveryCompleted | None = None,
     *,
+    actor: str = ACTOR,
     manifest_id: str | None = None,
     provider_revision: str | None = None,
     proposal_digest: str | None = None,
@@ -92,7 +93,7 @@ def review_record(
         operation_id="review-1",
         expected_manifest_id=manifest_id or proposal.manifest_id,
         expected_active=None,
-        actor=ACTOR,
+        actor=actor,
     )
     retained_revision = provider_revision or discovered.report.revision
     retained_proposal_digest = proposal_digest or proposal.proposal_digest
@@ -135,7 +136,7 @@ def attestation_for(
             b"3" * 32,
             ReviewerStepUpBinding(
                 session_handle_digest=b"4" * 32,
-                initiating_actor=ACTOR,
+                initiating_actor=command.actor,
                 scope=command.scope,
                 operation_id=command.operation_id,
                 proposal_manifest_id=command.expected_manifest_id,

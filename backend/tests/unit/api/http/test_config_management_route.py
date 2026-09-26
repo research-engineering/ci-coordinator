@@ -313,7 +313,8 @@ def test_config_mutations_are_authenticated_stable_control_plane_routes() -> Non
     activated = client.post(
         "/api/v1/config/activations",
         json={
-            "schemaVersion": "ci-config-epoch-activation/v1",
+            "schemaVersion": "ci-config-epoch-activation/v2",
+            "reviewOperationId": "review-1",
             "installationId": 1,
             "repositoryId": 2,
             "targetEpochId": "a" * 64,
@@ -361,6 +362,8 @@ def test_config_mutations_are_authenticated_stable_control_plane_routes() -> Non
     assert use_case.register_commands[0].source == b"{}"
     assert use_case.register_commands[0].operation_id == "register-1"
     assert use_case.activate_commands[0].actor == ACTOR
+    assert use_case.activate_commands[0].activation_version == 2
+    assert use_case.activate_commands[0].review_operation_id == "review-1"
     assert use_case.rollback_commands == [
         RollbackConfigEpoch(
             actor=ACTOR,
@@ -418,6 +421,74 @@ def test_rollback_preserves_duplicate_and_conflict_outcomes() -> None:
         409,
         {"ok": False, "error": "conflict", "diagnostics": []},
     )
+
+
+def test_legacy_activation_wire_preserves_the_replay_only_generation() -> None:
+    use_case = _UseCase(
+        ConfigRegistrationOutcome("unavailable"),
+        ConfigActivationOutcome("duplicate", epoch_id="a" * 64, revision=1),
+    )
+    response = _client("operator", use_case).post(
+        "/api/v1/config/activations",
+        json={
+            "schemaVersion": "ci-config-epoch-activation/v1",
+            "installationId": 1,
+            "repositoryId": 2,
+            "targetEpochId": "a" * 64,
+            "proposalManifestId": "proposal:" + "b" * 32,
+            "expectedRevision": None,
+            "operationId": "retained-legacy",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["duplicate"] is True
+    assert use_case.activate_commands[0].activation_version == 1
+    assert use_case.activate_commands[0].review_operation_id is None
+
+
+def test_current_activation_wire_requires_an_exact_review_selector() -> None:
+    use_case = _UseCase(
+        ConfigRegistrationOutcome("unavailable"),
+        ConfigActivationOutcome("legacy_new_operation_unsupported"),
+    )
+    client = _client("operator", use_case)
+    body = {
+        "schemaVersion": "ci-config-epoch-activation/v2",
+        "installationId": 1,
+        "repositoryId": 2,
+        "targetEpochId": "a" * 64,
+        "proposalManifestId": "proposal:" + "b" * 32,
+        "expectedRevision": None,
+        "operationId": "activation-current",
+        "reviewOperationId": "review-selected",
+    }
+    response = client.post("/api/v1/config/activations", json=body)
+    assert response.status_code == 409
+    assert response.json() == {
+        "ok": False,
+        "error": "legacy_new_operation_unsupported",
+        "diagnostics": [],
+    }
+    assert response.headers["cache-control"] == "no-store"
+    assert len(use_case.activate_commands) == 1
+    assert use_case.activate_commands[0].activation_version == 2
+    assert use_case.activate_commands[0].review_operation_id == "review-selected"
+    for field, value in (
+        ("reviewOperationId", None),
+        ("reviewOperationId", ""),
+        ("reviewOperationId", "nul\0id"),
+        ("reviewOperationId", "x" * 257),
+        ("schemaVersion", None),
+        ("schemaVersion", "unknown"),
+        ("schemaVersion", "ci-config-epoch-activation/v1"),
+    ):
+        assert (
+            client.post("/api/v1/config/activations", json={**body, field: value}).status_code
+            == 422
+        )
+    missing = {key: value for key, value in body.items() if key != "reviewOperationId"}
+    assert client.post("/api/v1/config/activations", json=missing).status_code == 422
+    assert len(use_case.activate_commands) == 1
 
 
 def test_activation_rejects_non_exact_or_unpersistable_request_facts() -> None:
@@ -798,7 +869,8 @@ def test_config_lifecycle_routes_enforce_the_profile_role_partition() -> None:
         client.post(
             "/api/v1/config/activations",
             json={
-                "schemaVersion": "ci-config-epoch-activation/v1",
+                "schemaVersion": "ci-config-epoch-activation/v2",
+                "reviewOperationId": "review-role-witness",
                 "installationId": 1,
                 "repositoryId": 2,
                 "targetEpochId": draft.epoch_id,
@@ -947,7 +1019,8 @@ def test_unknown_activation_outcome_is_not_misclassified_as_unavailable() -> Non
     response = _client("operator", use_case).post(
         "/api/v1/config/activations",
         json={
-            "schemaVersion": "ci-config-epoch-activation/v1",
+            "schemaVersion": "ci-config-epoch-activation/v2",
+            "reviewOperationId": "review-1",
             "installationId": 1,
             "repositoryId": 2,
             "targetEpochId": "a" * 64,

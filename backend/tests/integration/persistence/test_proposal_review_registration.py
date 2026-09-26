@@ -22,6 +22,8 @@ from ci_coordinator.config_epochs import (
     ActiveConfigEpoch,
     ConfigEpochActivationApplied,
     ConfigEpochActivationCommand,
+    ConfigEpochActivationDuplicate,
+    ConfigEpochActivationOperationConflict,
     prepare_config_epoch_activation,
 )
 from ci_coordinator.control_plane_identity import (
@@ -43,7 +45,7 @@ from ci_coordinator.persistence.audit_repository import _PostgresAuditEventRepos
 from ci_coordinator.persistence.connection import create_postgres_engine
 from ci_coordinator.persistence.errors import DatabaseCapabilityUnavailable, StoreUnavailable
 from ci_coordinator.persistence.proposal_review_schema_attestation import (
-    proposal_review_registration_schema_matches_contract,
+    proposal_review_renewal_schema_matches_contract,
 )
 from ci_coordinator.persistence.proposal_review_unit_of_work import (
     PostgresProposalReviewUnitOfWork,
@@ -90,9 +92,11 @@ _PROFILE_DIGEST = "e" * 64
 _SESSION_DIGEST = b"s" * 32
 
 
-def test_registration_replay_and_manifest_deduplication_are_atomic(
+@pytest.mark.parametrize("renewal_actor", [_ACTOR, _OTHER_ACTOR])
+def test_registration_replay_and_independent_review_renewal_are_atomic(
     postgres_database_url: str,
     runtime_postgres_database_url: str,
+    renewal_actor: str,
 ) -> None:
     async def scenario() -> None:
         target = _draft("target")
@@ -120,6 +124,7 @@ def test_registration_replay_and_manifest_deduplication_are_atomic(
                 command=replace(
                     review.command,
                     operation_id="review-another-operation",
+                    actor=renewal_actor,
                 ),
             )
             duplicate_attestation = await _register_attestation(
@@ -146,9 +151,33 @@ def test_registration_replay_and_manifest_deduplication_are_atomic(
                 < replay.record.attestation.reviewer.observed_at
             )
             assert isinstance(conflict, ProposalReviewOperationConflict)
-            assert isinstance(duplicate_manifest, ProposalReviewDuplicate)
-            assert duplicate_manifest.record == result.record
-            assert await _counts(admin_engine) == (1, 1, 1)
+            assert isinstance(duplicate_manifest, ProposalReviewCreated)
+            assert not duplicate_manifest.epoch_created
+            assert duplicate_manifest.record.command.operation_id == "review-another-operation"
+            assert duplicate_manifest.record.command.actor == renewal_actor
+            assert result.record.command.actor == _ACTOR
+            assert duplicate_manifest.record.audit_event_id != result.record.audit_event_id
+            assert await _counts(admin_engine) == (2, 2, 1)
+            async with PostgresProposalReviewUnitOfWork(runtime_engine) as transaction:
+                for receipt in (result.record, duplicate_manifest.record):
+                    assert (
+                        await transaction.proposal_reviews.load_activation_candidate(
+                            scope=SCOPE,
+                            target_epoch_id=target.epoch_id,
+                            proposal_manifest_id=review.command.expected_manifest_id,
+                            review_operation_id=receipt.command.operation_id,
+                        )
+                        == receipt
+                    )
+                assert (
+                    await transaction.proposal_reviews.load_activation_candidate(
+                        scope=SCOPE,
+                        target_epoch_id=target.epoch_id,
+                        proposal_manifest_id=review.command.expected_manifest_id,
+                        review_operation_id="missing-operation",
+                    )
+                    is None
+                )
         finally:
             await admin_engine.dispose()
             await runtime_engine.dispose()
@@ -156,7 +185,7 @@ def test_registration_replay_and_manifest_deduplication_are_atomic(
     asyncio.run(scenario())
 
 
-def test_concurrent_manifest_acceptance_has_one_created_effect_and_one_duplicate(
+def test_concurrent_manifest_acceptance_retains_both_independent_proofs(
     postgres_database_url: str,
     runtime_postgres_database_url: str,
 ) -> None:
@@ -199,19 +228,114 @@ def test_concurrent_manifest_acceptance_has_one_created_effect_and_one_duplicate
                 accept(first, first_attestation, first_engine),
                 accept(second, second_attestation, second_engine),
             )
-            created = next(
-                result for result in results if isinstance(result, ProposalReviewCreated)
+            assert all(isinstance(result, ProposalReviewCreated) for result in results)
+            assert len({result.record.audit_event_id for result in results}) == 2
+            assert (
+                sum(
+                    result.epoch_created
+                    for result in results
+                    if isinstance(result, ProposalReviewCreated)
+                )
+                == 1
             )
-            duplicate = next(
-                result for result in results if isinstance(result, ProposalReviewDuplicate)
-            )
-            assert duplicate.record == created.record
-            assert created.record.command.actor == _ACTOR
-            assert await _counts(admin_engine) == (1, 1, 1)
+            assert {result.record.command.actor for result in results} == {_ACTOR}
+            assert await _counts(admin_engine) == (2, 2, 1)
         finally:
             await admin_engine.dispose()
             await second_engine.dispose()
             await first_engine.dispose()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("selected_index", [0, 1])
+def test_explicit_selected_receipt_activates_and_replay_precedes_authority_recheck(
+    postgres_database_url: str,
+    runtime_postgres_database_url: str,
+    selected_index: int,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def scenario() -> None:
+        target = _draft("selected-receipt")
+        base = _review(target=target)
+        runtime = create_postgres_engine(runtime_postgres_database_url)
+        admin = create_postgres_engine(postgres_database_url)
+        receipts: list[ProposalReviewRecord] = []
+        try:
+            for operation in ("review-first", "review-second"):
+                draft = replace(base, command=replace(base.command, operation_id=operation))
+                evidence = await _register_attestation(runtime, draft)
+                async with PostgresProposalReviewUnitOfWork(runtime) as transaction:
+                    result = await transaction.proposal_reviews.accept(
+                        _prepare(
+                            draft, attestation=evidence, occurred_at="2026-09-26T10:00:00.000Z"
+                        )
+                    )
+                    assert isinstance(result, ProposalReviewCreated)
+                    receipts.append(result.record)
+                    await transaction.commit()
+            selected = receipts[selected_index]
+            other = receipts[1 - selected_index]
+            async with PostgresProposalReviewUnitOfWork(runtime) as transaction:
+                now = await transaction.proposal_reviews.current_time()
+                authority = RepositoryActivationAuthority(
+                    selected, selected.attestation.reviewer.evidence, now
+                )
+                value = replace(
+                    _activation(target.epoch_id, None, "activate-selected"),
+                    activation_version=2,
+                    review_operation_id=selected.command.operation_id,
+                    proposal_manifest_id=selected.command.expected_manifest_id,
+                    authority_evidence_hash=authority.evidence_hash,
+                    authority_observed_at=now.isoformat(timespec="milliseconds").replace(
+                        "+00:00", "Z"
+                    ),
+                )
+                wrong = replace(value, review_operation_id=other.command.operation_id)
+                rejected = await transaction.proposal_reviews.activate_config(
+                    prepare_config_epoch_activation(wrong), authority
+                )
+                assert isinstance(rejected, RepositoryActivationAuthorityConflict)
+                assert await transaction.proposal_reviews.load_active(SCOPE) is None
+                applied = await transaction.proposal_reviews.activate_config(
+                    prepare_config_epoch_activation(value), authority
+                )
+                assert isinstance(applied, ConfigEpochActivationApplied)
+                await transaction.commit()
+
+            async def no_fresh_authority(*_args: object) -> bool:
+                raise AssertionError("retained operation reached fresh authority")
+
+            with monkeypatch.context() as patch:
+                patch.setattr(
+                    proposal_review_repository._PostgresProposalReviewRepository,
+                    "_activation_authority_is_current",
+                    no_fresh_authority,
+                )
+                async with PostgresProposalReviewUnitOfWork(runtime) as transaction:
+                    duplicate = await transaction.proposal_reviews.activate_config(
+                        prepare_config_epoch_activation(value), authority
+                    )
+                    assert isinstance(duplicate, ConfigEpochActivationDuplicate)
+                    assert duplicate.record == applied.record
+                    for changed in (
+                        wrong,
+                        replace(value, activation_version=1, review_operation_id=None),
+                    ):
+                        conflict = await transaction.proposal_reviews.activate_config(
+                            prepare_config_epoch_activation(changed), authority
+                        )
+                        assert isinstance(conflict, ConfigEpochActivationOperationConflict)
+                    for retained in receipts:
+                        replay = await transaction.proposal_reviews.resolve_operation(
+                            retained.command
+                        )
+                        assert isinstance(replay, ProposalReviewDuplicate)
+                        assert replay.record == retained
+            assert await _counts(admin) == (2, 3, 1)
+        finally:
+            await admin.dispose()
+            await runtime.dispose()
 
     asyncio.run(scenario())
 
@@ -280,21 +404,21 @@ def test_schema_attestation_rejects_a_disabled_immutability_trigger(
         engine = create_postgres_engine(postgres_database_url)
         try:
             async with engine.begin() as connection:
-                assert await proposal_review_registration_schema_matches_contract(connection)
+                assert await proposal_review_renewal_schema_matches_contract(connection)
                 await connection.execute(
                     text(
                         "ALTER TABLE ci_coordinator.workflow_proposal_reviews "
                         "DISABLE TRIGGER tr_workflow_proposal_reviews_immutable"
                     )
                 )
-                assert not await proposal_review_registration_schema_matches_contract(connection)
+                assert not await proposal_review_renewal_schema_matches_contract(connection)
                 await connection.execute(
                     text(
                         "ALTER TABLE ci_coordinator.workflow_proposal_reviews "
                         "ENABLE TRIGGER tr_workflow_proposal_reviews_immutable"
                     )
                 )
-                assert await proposal_review_registration_schema_matches_contract(connection)
+                assert await proposal_review_renewal_schema_matches_contract(connection)
         finally:
             await engine.dispose()
 
@@ -549,6 +673,8 @@ def test_activation_receipt_cannot_authorize_a_changed_baseline(
                     actor=_ACTOR,
                     occurred_at="2026-09-02T10:00:01.000Z",
                     proposal_manifest_id=review.command.expected_manifest_id,
+                    activation_version=2,
+                    review_operation_id=review.command.operation_id,
                     authority_evidence_hash=authority.evidence_hash,
                     authority_observed_at=(
                         observed_at.isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -900,15 +1026,33 @@ def _attestation(
 async def _register_attestation(
     engine: AsyncEngine,
     draft: ProposalReviewDraft,
+    *,
+    unit_of_work_type: type[PostgresProposalReviewUnitOfWork] = PostgresProposalReviewUnitOfWork,
 ) -> RepositoryAttestationEvidence:
-    await _ensure_control_plane_session(engine)
-    async with PostgresProposalReviewUnitOfWork(engine) as transaction:
+    await _ensure_control_plane_session(engine, actor=draft.command.actor)
+    async with unit_of_work_type(engine) as transaction:
         observed_at = await transaction.proposal_reviews.current_time()
         attestation = _attestation(
             draft,
             issued_at=observed_at - timedelta(seconds=1),
             observed_at=observed_at,
         )
+        if draft.command.actor == _OTHER_ACTOR:
+            attestation = replace(
+                attestation,
+                transaction=replace(
+                    attestation.transaction,
+                    binding=replace(
+                        attestation.transaction.binding,
+                        session_handle_digest=b"t" * 32,
+                    ),
+                ),
+                reviewer=GitHubReviewerPrincipal(
+                    evidence=GitHubReviewerEvidence(43, "other-reviewer", "admin"),
+                    observed_at=attestation.reviewer.observed_at,
+                    expires_at=attestation.reviewer.expires_at,
+                ),
+            )
         registration = await transaction.proposal_reviews.register_attestation(
             attestation.transaction
         )
@@ -917,19 +1061,22 @@ async def _register_attestation(
     return attestation
 
 
-async def _ensure_control_plane_session(engine: AsyncEngine) -> None:
+async def _ensure_control_plane_session(engine: AsyncEngine, *, actor: str = _ACTOR) -> None:
+    if actor not in {_ACTOR, _OTHER_ACTOR}:
+        raise ValueError("test session actor is not admitted")
+    digest = _SESSION_DIGEST if actor == _ACTOR else b"t" * 32
     store = PostgresControlPlaneSessionStore(engine)
-    if await store.load(_SESSION_DIGEST) is not None:
+    if await store.load(digest) is not None:
         return
     now = await store.current_time()
     await store.replace(
         previous_handle_digest=None,
         record=ControlPlaneSessionRecord(
-            handle_digest=_SESSION_DIGEST,
+            handle_digest=digest,
             issuer=_ISSUER,
-            subject=_SUBJECT,
+            subject=_SUBJECT if actor == _ACTOR else "other-reviewer",
             keycloak_session_id="proposal-review-session",
-            actor_id=_ACTOR,
+            actor_id=actor,
             roles=frozenset(("configure",)),
             authority_profile_digest=_PROFILE_DIGEST,
             issued_at=now - timedelta(seconds=1),

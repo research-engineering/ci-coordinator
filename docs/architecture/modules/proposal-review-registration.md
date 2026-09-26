@@ -23,6 +23,12 @@ and the bounded HTTP mutation boundary are owned by
 [Control-Plane Identity And Repository Attestation](control-plane-identity-and-repository-attestation.md),
 which composes this application capability without widening its authority.
 
+The admitted renewal change is described by
+[explicit review renewal](../../features/explicit-review-renewal.md) and its
+[implementation plan](../../features/explicit-review-renewal-implementation-plan.md).
+It replaces manifest-level review deduplication with immutable per-operation
+proofs; configuration content deduplication remains unchanged.
+
 ## 2. Safety Theorem
 
 Let:
@@ -34,7 +40,6 @@ Let:
 - `P` mean a new current-default-head discovery reproduces the exact expected
   proposal manifest;
 - `D` mean the semantic diff is deterministic and within its resource bounds;
-- `M` mean scope `S` already retains an acceptance for that exact manifest;
 - `B1` mean the active pointer still equals the observed baseline under the
   repository-scope transaction lock; and
 - `T` mean one compatibility-admitted PostgreSQL transaction registers the
@@ -43,13 +48,12 @@ Let:
 
 ```text
 SuccessfulOutcome(S, U) iff
-  A and (O or (B0 and P and D and (M or (B1 and T))))
+  A and (O or (B0 and P and D and B1 and T))
 
-Created(S, U) iff A and B0 and P and D and not M and B1 and T
+Created(S, U) iff A and B0 and P and D and not O and B1 and T
 
 not A or not B0 or not P or not D => no attempted durable effect
 O => return retained acceptance before proposal or workflow provider work
-M => return the previously retained manifest acceptance without another write
 commit(T) => Epoch and Review and Audit
 abort(T) => not Epoch and not Review and not Audit
 unknown(commit(T)) => reconcile by exact operation retry
@@ -60,10 +64,10 @@ cross repository authority. Without `B0` and `B1`, an await can approve against 
 baseline. Without `P`, a moved default head can retain stale workflow facts.
 Without `D`, review evidence can be ambiguous or resource-unbounded. Without
 `T`, an epoch, approval, or audit event can survive alone. Therefore no
-creation conjunct is redundant. `O` is command idempotence. `M` is effect
-idempotence: another authorized command cannot create a second affirmative
-review for content already accepted in the same scope, and its duplicate result
-returns the original actor and baseline rather than relabeling that review.
+creation conjunct is redundant. `O` is command idempotence. Another currently
+authorized human can obtain an independent fresh proof for the same content
+with a new operation. No operation rewrites or inherits the original actor or
+baseline. Only config_epochs deduplicates immutable content.
 
 ## 3. Ownership
 
@@ -211,7 +215,7 @@ The repository executes this order inside one unit of work:
 ```text
 compatibility shared fence
   -> repository-scope advisory transaction lock
-  -> resolve operation and prior manifest acceptance
+  -> resolve exact operation
   -> re-read active pointer
   -> register exact re-admitted epoch
   -> append pair-owned acceptance audit event
@@ -220,8 +224,8 @@ compatibility shared fence
 ```
 
 The scope lock composes with config activation and prevents a baseline change
-during the local transaction. The operation primary key rejects reuse; the
-scope-and-manifest unique key prevents duplicate affirmative review. Foreign
+during the local transaction. The operation primary key rejects reuse;
+independent operations may retain the same manifest. Foreign
 keys bind baseline and target epochs and the audit event. Update and delete are
 rejected by a database trigger.
 
@@ -251,6 +255,17 @@ of unintended access. The operation's shared-fence admission proves the
 current session has the exact admitted runtime grants. Thus a declared schema
 capability does not become application authority before deployment-owned ACL
 provisioning.
+
+### 8.2 Coordinated Renewal Cutover
+
+Current review requests require ci-repository-attestation-start/v2. Legacy
+requests may replay completed operations but cannot create new ones. Under the
+exclusive compatibility fence, the forward transition invalidates only pending
+verification challenges; users must explicitly restart interrupted verification.
+Completed reviews, sessions, epochs and audit are unchanged. New config/proposal
+capabilities fence old writers, including pending mint and final consume.
+Activation must select one exact reviewOperationId, never an implicit latest
+or manifest-only match. Failed migration admission rolls back the cutoff.
 
 ## 9. Authorization Boundary
 

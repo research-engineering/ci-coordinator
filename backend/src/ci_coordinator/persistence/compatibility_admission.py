@@ -57,6 +57,7 @@ from ci_coordinator.persistence.production_cutover_schema_attestation import (
 )
 from ci_coordinator.persistence.proposal_review_schema_attestation import (
     proposal_review_registration_schema_matches_contract,
+    proposal_review_renewal_schema_matches_contract,
 )
 from ci_coordinator.persistence.repository_attestation_schema_attestation import (
     repository_attestation_schema_matches_contract,
@@ -120,10 +121,9 @@ async def admit_schema_dependent_operation(
             and not await compatibility_protocol_schema_matches_contract(connection)
         ):
             raise DatabaseCapabilityUnavailable("database compatibility schema facts do not match")
-        if (
-            "config-epoch-lifecycle/v1" in capability_ids
-            and not await config_epoch_lifecycle_schema_matches_contract(connection)
-        ):
+        if bool(
+            {"config-epoch-lifecycle/v1", "config-epoch-lifecycle/v2"} & capability_ids
+        ) and not await config_epoch_lifecycle_schema_matches_contract(connection):
             raise DatabaseCapabilityUnavailable("config epoch lifecycle schema facts do not match")
         if (
             "config-epoch-registration-operations/v1" in capability_ids
@@ -192,9 +192,13 @@ async def admit_schema_dependent_operation(
                 "proposal review registration schema facts do not match"
             )
         if (
-            "proposal-review-registration/v1" in capability_ids
-            and not await repository_attestation_schema_matches_contract(connection)
+            "proposal-review-registration/v2" in capability_ids
+            and not await proposal_review_renewal_schema_matches_contract(connection)
         ):
+            raise DatabaseCapabilityUnavailable("proposal review renewal schema facts do not match")
+        if bool(
+            {"proposal-review-registration/v1", "proposal-review-registration/v2"} & capability_ids
+        ) and not await repository_attestation_schema_matches_contract(connection):
             raise DatabaseCapabilityUnavailable(
                 "repository attestation transaction schema facts do not match"
             )

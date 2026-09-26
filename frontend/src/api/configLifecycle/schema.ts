@@ -111,6 +111,7 @@ export const errorSchema: z.ZodType<ConfigError> = z.strictObject({
     "revision_conflict",
     "target_unavailable",
     "attestation_invalid",
+    "legacy_new_operation_unsupported",
     "coverage_reducing",
     "coverage_unproven",
     "overloaded",

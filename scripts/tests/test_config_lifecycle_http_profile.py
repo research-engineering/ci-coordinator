@@ -16,6 +16,18 @@ from scripts.frontend_contract import rendered_contract
 from scripts.tests.profile_mutation_support import MutationPath, profile_leaves
 from scripts.tests.profile_mutation_support import replace_profile_value as _replace
 
+_ACTIVATION_REQUEST = (
+    "paths",
+    "/api/v1/config/activations",
+    "post",
+    "requestBody",
+    "content",
+    "application/json",
+    "schema",
+)
+_LEGACY_ACTIVATION = {"$ref": "#/components/schemas/ConfigEpochActivationBody"}
+_CURRENT_ACTIVATION = {"$ref": "#/components/schemas/ExplicitConfigEpochActivationBody"}
+
 
 def test_repository_profile_is_exact_and_matches_openapi() -> None:
     profile = load_config_lifecycle_http_profile()
@@ -28,7 +40,108 @@ def test_repository_profile_is_exact_and_matches_openapi() -> None:
     assert profile.maximum_operation_id_bytes == 256
     assert profile.maximum_rollback_reason_bytes == 512
     assert len(profile.operations) == 6
+    assert profile.operations[2].request_schema == "ci-config-epoch-activation/v2"
     assert_config_lifecycle_openapi(document, profile)
+
+
+def test_activation_union_preserves_both_versions_independent_of_order() -> None:
+    document = cast(dict[str, object], json.loads(rendered_contract()))
+    _replace(document, _ACTIVATION_REQUEST, {"anyOf": [_CURRENT_ACTIVATION, _LEGACY_ACTIVATION]})
+
+    assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        _LEGACY_ACTIVATION,
+        _CURRENT_ACTIVATION,
+        {"anyOf": [_LEGACY_ACTIVATION]},
+        {"anyOf": [_CURRENT_ACTIVATION, _CURRENT_ACTIVATION]},
+        {"anyOf": [_LEGACY_ACTIVATION, _CURRENT_ACTIVATION, {}]},
+        {"anyOf": [_LEGACY_ACTIVATION, {}]},
+        {"anyOf": [_LEGACY_ACTIVATION, _CURRENT_ACTIVATION], "nullable": True},
+    ],
+)
+def test_activation_projection_rejects_widened_or_incomplete_union(schema: object) -> None:
+    document = cast(dict[str, object], json.loads(rendered_contract()))
+    _replace(document, _ACTIVATION_REQUEST, schema)
+
+    with pytest.raises(ValueError, match="activation request"):
+        assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "path", "replacement"),
+    [
+        ("ConfigEpochActivationBody", ("additionalProperties",), True),
+        ("ConfigEpochActivationBody", ("properties", "reviewOperationId"), {"type": "string"}),
+        (
+            "ConfigEpochActivationBody",
+            ("properties", "schemaVersion", "const"),
+            "ci-config-epoch-activation/v2",
+        ),
+        (
+            "ExplicitConfigEpochActivationBody",
+            ("properties", "schemaVersion", "const"),
+            "ci-config-epoch-activation/v3",
+        ),
+        ("ExplicitConfigEpochActivationBody", ("additionalProperties",), True),
+        (
+            "ExplicitConfigEpochActivationBody",
+            ("properties", "reviewOperationId", "type"),
+            ["string", "null"],
+        ),
+        ("ExplicitConfigEpochActivationBody", ("properties", "reviewOperationId", "minLength"), 0),
+        (
+            "ExplicitConfigEpochActivationBody",
+            ("properties", "reviewOperationId", "maxLength"),
+            257,
+        ),
+        (
+            "ExplicitConfigEpochActivationBody",
+            ("properties", "reviewOperationId", "x-max-utf8-bytes"),
+            257,
+        ),
+    ],
+)
+def test_activation_projection_rejects_version_or_selector_drift(
+    schema_name: str, path: MutationPath, replacement: object
+) -> None:
+    document = cast(dict[str, object], json.loads(rendered_contract()))
+    _replace(document, ("components", "schemas", schema_name, *path), replacement)
+
+    with pytest.raises(ValueError, match="activation request"):
+        assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "field"),
+    [
+        ("ConfigEpochActivationBody", "schemaVersion"),
+        ("ExplicitConfigEpochActivationBody", "schemaVersion"),
+        ("ExplicitConfigEpochActivationBody", "reviewOperationId"),
+    ],
+)
+def test_activation_projection_requires_version_and_current_selector(
+    schema_name: str, field: str
+) -> None:
+    document = cast(dict[str, object], json.loads(rendered_contract()))
+    schemas = cast(
+        dict[str, dict[str, object]], cast(dict[str, object], document["components"])["schemas"]
+    )
+    cast(list[str], schemas[schema_name]["required"]).remove(field)
+
+    with pytest.raises(ValueError, match="activation request"):
+        assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
+
+
+def test_activation_projection_requires_request_body() -> None:
+    document = cast(dict[str, object], json.loads(rendered_contract()))
+    _replace(document, (*_ACTIVATION_REQUEST[:4], "required"), False)
+
+    with pytest.raises(ValueError, match="activation request"):
+        assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
 
 
 def test_profile_rejects_every_single_leaf_mutation(tmp_path: Path) -> None:
@@ -138,6 +251,18 @@ def test_profile_rejects_duplicate_json_keys(tmp_path: Path) -> None:
                 "components",
                 "schemas",
                 "ConfigEpochActivationBody",
+                "properties",
+                "operationId",
+                "x-max-utf8-bytes",
+            ),
+            257,
+            "operation identity bound differs",
+        ),
+        (
+            (
+                "components",
+                "schemas",
+                "ExplicitConfigEpochActivationBody",
                 "properties",
                 "operationId",
                 "x-max-utf8-bytes",

@@ -100,6 +100,7 @@ class TransactionalProposalReviewStore:
         scope: RepositoryScope,
         target_epoch_id: str,
         proposal_manifest_id: str,
+        review_operation_id: str,
     ) -> ProposalReviewRecord | None:
         try:
             async with self._unit_of_work() as transaction:
@@ -107,6 +108,7 @@ class TransactionalProposalReviewStore:
                     scope=scope,
                     target_epoch_id=target_epoch_id,
                     proposal_manifest_id=proposal_manifest_id,
+                    review_operation_id=review_operation_id,
                 )
         except PersistenceError as error:
             raise ProposalReviewStoreUnavailable("proposal review store is unavailable") from error

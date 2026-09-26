@@ -79,7 +79,7 @@ class ExpectedActiveRequest(RequestModel):
     revision: int = Field(ge=1, le=MAX_SAFE_JSON_INTEGER)
 
 
-class RepositoryAttestationStartRequest(RequestModel):
+class LegacyRepositoryAttestationStartRequest(RequestModel):
     installation_id: int = Field(
         validation_alias="installationId",
         ge=1,
@@ -107,6 +107,12 @@ class RepositoryAttestationStartRequest(RequestModel):
         return value
 
 
+class RepositoryAttestationStartRequest(LegacyRepositoryAttestationStartRequest):
+    schema_version: Literal["ci-repository-attestation-start/v2"] = Field(
+        validation_alias="schemaVersion"
+    )
+
+
 class RepositoryAttestationStartResponse(ResponseModel):
     ok: Literal[True]
     authorization_url: str
@@ -114,6 +120,7 @@ class RepositoryAttestationStartResponse(ResponseModel):
 
 type RepositoryAttestationErrorCode = Literal[
     "already_reviewed",
+    "legacy_new_operation_unsupported",
     "baseline_conflict",
     "blocked",
     "diff_limit",
@@ -158,7 +165,7 @@ def build_repository_attestation_router(
     )
     async def start_github_repository_attestation(
         request: Request,
-        body: RepositoryAttestationStartRequest,
+        body: RepositoryAttestationStartRequest | LegacyRepositoryAttestationStartRequest,
         _session: Annotated[str | None, Security(CONTROL_PLANE_SESSION)] = None,
     ) -> Response:
         admission = await authenticate_and_admit_roles(
@@ -189,6 +196,7 @@ def build_repository_attestation_router(
         )
         outcome = await dependencies.service.start(
             principal=principal,
+            legacy_replay_only=type(body) is LegacyRepositoryAttestationStartRequest,
             command=ProposalReviewCommand(
                 scope=scope,
                 operation_id=body.operation_id,
@@ -221,6 +229,7 @@ def build_repository_attestation_router(
             return _error(status.HTTP_403_FORBIDDEN, "forbidden")
         if outcome.state in {
             "already_reviewed",
+            "legacy_new_operation_unsupported",
             "baseline_conflict",
             "blocked",
             "operation_conflict",
@@ -309,6 +318,12 @@ def _review_response(outcome: ProposalReviewOutcome) -> Response:
                 "repositoryAttestation": "reviewed",
                 "proposalManifestId": command.expected_manifest_id,
                 "reviewOperationId": command.operation_id,
+                "reviewBaseEpochId": (
+                    "" if command.expected_active is None else command.expected_active.epoch_id
+                ),
+                "reviewBaseRevision": (
+                    "" if command.expected_active is None else str(command.expected_active.revision)
+                ),
             }
         )
         response = RedirectResponse(

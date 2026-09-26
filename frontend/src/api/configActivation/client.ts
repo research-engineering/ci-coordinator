@@ -17,6 +17,7 @@ export interface ConfigActivationCommand {
   readonly expectedRevision: number | null;
   readonly operationId: string;
   readonly proposalManifestId: string;
+  readonly reviewOperationId: string;
   readonly targetEpochId: string;
 }
 
@@ -41,6 +42,7 @@ export async function activateConfig(
     return { kind: "invalid-response" };
   }
   const targetEpochId = command.targetEpochId;
+  const resultRevision = (command.expectedRevision ?? 0) + 1;
   try {
     const response = await boundedFetch(
       new Request(new URL("/api/v1/config/activations", globalThis.location.origin), {
@@ -49,8 +51,9 @@ export async function activateConfig(
           installationId: command.scope.installationId,
           operationId: command.operationId,
           proposalManifestId: command.proposalManifestId,
+          reviewOperationId: command.reviewOperationId,
           repositoryId: command.scope.repositoryId,
-          schemaVersion: "ci-config-epoch-activation/v1",
+          schemaVersion: "ci-config-epoch-activation/v2",
           targetEpochId,
         }),
         credentials: "same-origin",
@@ -65,7 +68,7 @@ export async function activateConfig(
     );
     if (response.status === 200) {
       const activation = configActivationSchema.parse(await response.json());
-      return activation.epochId === targetEpochId
+      return activation.epochId === targetEpochId && activation.revision === resultRevision
         ? { kind: "complete", activation }
         : { kind: "invalid-response" };
     }
@@ -89,6 +92,7 @@ async function activationFailure(response: Response): Promise<ConfigActivationRe
     coverage_unproven: 409,
     forbidden: 403,
     invalid_config: 413,
+    legacy_new_operation_unsupported: 409,
     overloaded: 503,
     revision_conflict: 409,
     target_unavailable: 404,
@@ -107,6 +111,7 @@ function activationCommandIsAdmitted(command: ConfigActivationCommand): boolean 
     (command.expectedRevision === null ||
       (Number.isSafeInteger(command.expectedRevision) && command.expectedRevision > 0)) &&
     operationIdIsAdmitted(command.operationId) &&
+    operationIdIsAdmitted(command.reviewOperationId) &&
     /^proposal:[0-9a-f]{32}$/.test(command.proposalManifestId) &&
     /^[0-9a-f]{64}$/.test(command.targetEpochId)
   );

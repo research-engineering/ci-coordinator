@@ -42,6 +42,9 @@ _EXPECTED_INVARIANTS = (
     "scope-admission-precedes-row-projection",
     "validation-has-no-durable-or-provider-effect",
     "registration-replay-compares-all-client-owned-facts",
+    "current-activation-v2-requires-an-explicit-review-operation-id",
+    "legacy-activation-v1-without-selector-is-exact-retained-replay-only",
+    "unknown-legacy-activation-operations-reject-without-new-writes",
     "status-cardinality-is-page-bounded",
     "export-revalidates-and-emits-exact-retained-bytes",
     "success-projections-do-not-widen-runtime-value-domains",
@@ -106,7 +109,7 @@ _EXPECTED_OPERATIONS = (
         "/api/v1/config/activations",
         ("activate",),
         "postgresql-audit-provider-evidence",
-        "ci-config-epoch-activation/v1",
+        "ci-config-epoch-activation/v2",
         "ci-config-epoch-activation-result/v1",
     ),
     ConfigLifecycleHttpOperation(
@@ -286,9 +289,79 @@ def _assert_request_schema(
     body = as_object(request_body, "OpenAPI request body")
     content = as_object(body.get("content"), "OpenAPI request content")
     media = as_object(content.get("application/json"), "OpenAPI JSON request content")
+    if expected.semantic_operation_id == "activate-configuration":
+        if body.get("required") is not True:
+            raise ValueError("config activation request body must be required")
+        _assert_activation_request(document, as_object(media.get("schema"), "activation request"))
+        return
     schema = _resolve_schema(document, media.get("schema"))
     if _schema_version(schema) != expected.request_schema:
         raise ValueError("config lifecycle request schema differs from its profile")
+
+
+def _assert_activation_request(document: JsonObject, schema: JsonObject) -> None:
+    # These two transport shapes do not themselves prove retained-operation replay admission.
+    alternatives = schema.get("anyOf")
+    if (
+        set(schema) - {"anyOf", "title"}
+        or not isinstance(alternatives, list)
+        or len(alternatives) != 2
+    ):
+        raise ValueError("config activation request must contain exactly the V1/V2 union")
+    expected_versions = {
+        "#/components/schemas/ConfigEpochActivationBody": "ci-config-epoch-activation/v1",
+        "#/components/schemas/ExplicitConfigEpochActivationBody": "ci-config-epoch-activation/v2",
+    }
+    observed: set[str] = set()
+    for raw in alternatives:
+        reference = as_object(raw, "activation request branch")
+        name = reference.get("$ref")
+        if (
+            set(reference) != {"$ref"}
+            or not isinstance(name, str)
+            or name not in expected_versions
+            or name in observed
+        ):
+            raise ValueError("config activation request alternatives differ from V1/V2")
+        observed.add(name)
+        branch = _resolve_schema(document, reference)
+        properties = as_object(branch.get("properties"), "activation request properties")
+        fields = {
+            "schemaVersion",
+            "installationId",
+            "repositoryId",
+            "targetEpochId",
+            "proposalManifestId",
+            "expectedRevision",
+            "operationId",
+        }
+        current = expected_versions[name] == "ci-config-epoch-activation/v2"
+        if current:
+            fields.add("reviewOperationId")
+        required = _string_tuple(branch.get("required"), "activation request required fields")
+        if (
+            set(branch) - {"type", "properties", "required", "additionalProperties", "title"}
+            or branch.get("type") != "object"
+            or branch.get("additionalProperties") is not False
+            or set(properties) != fields
+            or set(required) != fields - {"expectedRevision"}
+            or len(required) != len(set(required))
+            or _schema_version(branch) != expected_versions[name]
+        ):
+            raise ValueError("config activation request fields or version differ")
+        version = as_object(properties["schemaVersion"], "activation request version")
+        if set(version) - {"type", "const", "title"} or version.get("type") != "string":
+            raise ValueError("config activation request version must be a literal string")
+        if current:
+            selector = as_object(properties["reviewOperationId"], "activation request selector")
+            if (
+                set(selector) - {"type", "minLength", "maxLength", "x-max-utf8-bytes", "title"}
+                or selector.get("type") != "string"
+                or selector.get("minLength") != 1
+                or selector.get("maxLength") != MAX_CONFIG_OPERATION_ID_UTF8_BYTES
+                or selector.get("x-max-utf8-bytes") != MAX_CONFIG_OPERATION_ID_UTF8_BYTES
+            ):
+                raise ValueError("config activation request selector bound differs")
 
 
 def _assert_success_schema(
@@ -324,6 +397,7 @@ def _assert_openapi_bounds(
 ) -> None:
     for schema_name in (
         "ConfigEpochActivationBody",
+        "ExplicitConfigEpochActivationBody",
         "ConfigEpochRegistrationBody",
         "ConfigEpochRollbackBody",
     ):

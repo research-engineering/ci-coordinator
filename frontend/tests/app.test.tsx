@@ -706,7 +706,8 @@ test("does not treat a forged repository callback query as retained authority", 
     {},
     "",
     "/workbench?installationId=1&repositoryId=1&repositoryAttestation=reviewed&proposalManifestId=proposal:c0169591134297170c6402e83fc6b67f&reviewOperationId=" +
-      operationId,
+      operationId +
+      "&reviewBaseEpochId=&reviewBaseRevision=",
   );
   try {
     renderApp(async (request) => {
@@ -741,7 +742,8 @@ test("replays the exact callback operation before exposing retained authority", 
     {},
     "",
     "/workbench?installationId=1&repositoryId=1&repositoryAttestation=reviewed&proposalManifestId=proposal:c0169591134297170c6402e83fc6b67f&reviewOperationId=" +
-      operationId,
+      operationId +
+      "&reviewBaseEpochId=&reviewBaseRevision=",
   );
   try {
     renderApp(async (request) => {

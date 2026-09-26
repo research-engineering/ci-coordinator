@@ -1534,7 +1534,7 @@ export interface components {
              * Error
              * @enum {string}
              */
-            readonly error: "unauthenticated" | "forbidden" | "invalid_config" | "conflict" | "revision_conflict" | "target_unavailable" | "attestation_invalid" | "coverage_reducing" | "coverage_unproven" | "overloaded" | "unavailable";
+            readonly error: "unauthenticated" | "forbidden" | "invalid_config" | "conflict" | "revision_conflict" | "target_unavailable" | "attestation_invalid" | "legacy_new_operation_unsupported" | "coverage_reducing" | "coverage_unproven" | "overloaded" | "unavailable";
             /**
              * Ok
              * @constant
@@ -2137,6 +2137,28 @@ export interface components {
             readonly stateDigest: string;
             /** Version */
             readonly version: number;
+        };
+        /** ExplicitConfigEpochActivationBody */
+        readonly ExplicitConfigEpochActivationBody: {
+            /** Expectedrevision */
+            readonly expectedRevision?: number | null;
+            /** Installationid */
+            readonly installationId: number;
+            /** Operationid */
+            readonly operationId: string;
+            /** Proposalmanifestid */
+            readonly proposalManifestId: string;
+            /** Repositoryid */
+            readonly repositoryId: number;
+            /** Reviewoperationid */
+            readonly reviewOperationId: string;
+            /**
+             * Schemaversion
+             * @constant
+             */
+            readonly schemaVersion: "ci-config-epoch-activation/v2";
+            /** Targetepochid */
+            readonly targetEpochId: string;
         };
         /** FactResponse */
         readonly FactResponse: {
@@ -3089,6 +3111,18 @@ export interface components {
         readonly JsonTuple_PurposeEntry__MaxLen_max_length_64_: readonly components["schemas"]["PurposeEntry"][];
         /** @description Bounded JSON value admitted by the browser runtime schema; represented as unknown in generated TypeScript to avoid recursive indexed-type emission. */
         readonly JsonValue: unknown;
+        /** LegacyRepositoryAttestationStartRequest */
+        readonly LegacyRepositoryAttestationStartRequest: {
+            readonly expectedActive: components["schemas"]["ExpectedActiveRequest"] | null;
+            /** Expectedmanifestid */
+            readonly expectedManifestId: string;
+            /** Installationid */
+            readonly installationId: number;
+            /** Operationid */
+            readonly operationId: string;
+            /** Repositoryid */
+            readonly repositoryId: number;
+        };
         readonly LowercaseSha256Hex: string;
         /** MatrixDimensionResponse */
         readonly MatrixDimensionResponse: {
@@ -3791,7 +3825,7 @@ export interface components {
             readonly runnerClassDigest: components["schemas"]["_Digest"];
         };
         /** @enum {string} */
-        readonly RepositoryAttestationErrorCode: "already_reviewed" | "baseline_conflict" | "blocked" | "diff_limit" | "epoch_conflict" | "forbidden" | "invalid_callback" | "operation_conflict" | "overloaded" | "rate_limited" | "replayed" | "stale" | "unauthenticated" | "unavailable";
+        readonly RepositoryAttestationErrorCode: "already_reviewed" | "legacy_new_operation_unsupported" | "baseline_conflict" | "blocked" | "diff_limit" | "epoch_conflict" | "forbidden" | "invalid_callback" | "operation_conflict" | "overloaded" | "rate_limited" | "replayed" | "stale" | "unauthenticated" | "unavailable";
         /** RepositoryAttestationErrorResponse */
         readonly RepositoryAttestationErrorResponse: {
             readonly error: components["schemas"]["RepositoryAttestationErrorCode"];
@@ -3812,6 +3846,11 @@ export interface components {
             readonly operationId: string;
             /** Repositoryid */
             readonly repositoryId: number;
+            /**
+             * Schemaversion
+             * @constant
+             */
+            readonly schemaVersion: "ci-repository-attestation-start/v2";
         };
         /** RepositoryAttestationStartResponse */
         readonly RepositoryAttestationStartResponse: {
@@ -4874,7 +4913,7 @@ export interface operations {
         };
         readonly requestBody: {
             readonly content: {
-                readonly "application/json": components["schemas"]["ConfigEpochActivationBody"];
+                readonly "application/json": components["schemas"]["ConfigEpochActivationBody"] | components["schemas"]["ExplicitConfigEpochActivationBody"];
             };
         };
         readonly responses: {
@@ -5701,7 +5740,7 @@ export interface operations {
         };
         readonly requestBody: {
             readonly content: {
-                readonly "application/json": components["schemas"]["RepositoryAttestationStartRequest"];
+                readonly "application/json": components["schemas"]["RepositoryAttestationStartRequest"] | components["schemas"]["LegacyRepositoryAttestationStartRequest"];
             };
         };
         readonly responses: {

@@ -534,7 +534,9 @@ class _PostgresConfigEpochRepository:
         ):
             return False
         event = await self._load_audit_event(record.audit_event_id)
-        if event.actor != replay.actor:
+        if verify_audit_event_integrity(event) is not None:
+            raise PersistenceInvariantViolation("config activation audit event fails integrity")
+        if event.actor != replay.actor or event.input_hash != record.audit_input_hash:
             return False
         retained_active_epoch_id: str | None = None
         retained_coverage_relation = None
@@ -545,6 +547,20 @@ class _PostgresConfigEpochRepository:
         if type(payload) is not dict:
             return False
         if replay.mutation_kind == "activation":
+            expected_schema = (
+                "config-epoch-activation-audit/v1"
+                if replay.activation_version == 1
+                else "config-epoch-activation-audit/v2"
+            )
+            if (
+                event.event_type != "config-epoch-activation/v1"
+                or payload.get("schemaVersion") != expected_schema
+                or (
+                    replay.activation_version == 2
+                    and payload.get("reviewOperationId") != replay.review_operation_id
+                )
+            ):
+                return False
             proposal_manifest_id = payload.get("proposalManifestId")
             authority_evidence_hash = payload.get("authorityEvidenceHash")
             authority_observed_at = payload.get("authorityObservedAt")
@@ -559,6 +575,11 @@ class _PostgresConfigEpochRepository:
             retained_authority_evidence_hash = authority_evidence_hash
             retained_authority_observed_at = authority_observed_at
         else:
+            if (
+                event.event_type != "config-epoch-rollback/v1"
+                or payload.get("schemaVersion") != "config-epoch-rollback-audit/v1"
+            ):
+                return False
             active_epoch_id = payload.get("activeEpochId")
             retained_coverage_relation = _coverage_relation(payload.get("coverageRelation"))
             if type(active_epoch_id) is not str or retained_coverage_relation is None:
@@ -580,6 +601,8 @@ class _PostgresConfigEpochRepository:
                     expected_active_epoch_id=retained_active_epoch_id,
                     coverage_relation=retained_coverage_relation,
                     reason=replay.reason,
+                    activation_version=replay.activation_version,
+                    review_operation_id=replay.review_operation_id,
                 )
             )
         except (TypeError, ValueError):

@@ -20,6 +20,7 @@ POLICY_GUIDE = "manage-repository-policy.md"
 EPOCH = "a" * 64
 PREVIOUS_EPOCH = "b" * 64
 MANIFEST = "proposal:" + "c" * 32
+REVIEW_OPERATION = 'review-witness-"selected"-001'
 SYNTHETIC_VALUES = (
     "documentation-workload-witness-not-a-real-credential",
     "documentation-metrics-witness-not-a-real-credential",
@@ -117,6 +118,7 @@ def environment(tmp_path: Path) -> dict[str, str]:
         "INSTALLATION_ID": "101",
         "REPOSITORY_ID": "202",
         "PROPOSAL_MANIFEST_ID": MANIFEST,
+        "REVIEW_OPERATION_ID": REVIEW_OPERATION,
         "epoch_id": EPOCH,
         "reviewed_epoch_id": EPOCH,
         "expected_revision": "null",
@@ -217,11 +219,12 @@ def test_matching_epoch_preserves_exact_activation_request(
     assert request["method"] == "POST"
     assert request["url"] == "https://coordinator.example.invalid/api/v1/config/activations"
     assert request["body"] == {
-        "schemaVersion": "ci-config-epoch-activation/v1",
+        "schemaVersion": "ci-config-epoch-activation/v2",
         "installationId": 101,
         "repositoryId": 202,
         "targetEpochId": EPOCH,
         "proposalManifestId": MANIFEST,
+        "reviewOperationId": REVIEW_OPERATION,
         "expectedRevision": json.loads(revision),
         "operationId": "activation-witness-001",
     }
@@ -229,6 +232,23 @@ def test_matching_epoch_preserves_exact_activation_request(
     [directory] = list(tmp_path.glob("ci-policy.*"))
     _assert_private(directory)
     assert json.loads((directory / "activation.response.json").read_text()) == {"revision": 42}
+
+
+@pytest.mark.parametrize("selector", [None, ""])
+@pytest.mark.parametrize("errexit", [False, True])
+def test_missing_review_selector_sends_nothing_and_parent_continues(
+    tmp_path: Path, environment: dict[str, str], selector: str | None, errexit: bool
+) -> None:
+    if selector is None:
+        del environment["REVIEW_OPERATION_ID"]
+    else:
+        environment["REVIEW_OPERATION_ID"] = selector
+    result = _run(tmp_path, environment, _activation_script(errexit=errexit))
+    assert "parent-continued:unset" in result.stdout
+    assert _requests(environment) == []
+    [directory] = list(tmp_path.glob("ci-policy.*"))
+    _assert_private(directory)
+    assert not (directory / "activation.response.json").exists()
 
 
 def test_body_construction_failure_cannot_reach_http(
@@ -247,10 +267,13 @@ def test_failed_or_malformed_receipt_is_retained_without_revision_or_retry(
     environment.update(HTTP_EXIT=exit_code, MALFORMED_RESPONSE=malformed)
     result = _run(tmp_path, environment, _activation_script(errexit=True))
     assert "parent-continued:unset" in result.stdout
-    assert len(_requests(environment)) == 1
+    [request] = _requests(environment)
     [directory] = list(tmp_path.glob("ci-policy.*"))
     _assert_private(directory)
-    assert (directory / "activation.request.json").is_file()
+    body = json.loads((directory / "activation.request.json").read_text())
+    assert body == request["body"]
+    assert body["schemaVersion"] == "ci-config-epoch-activation/v2"
+    assert body["reviewOperationId"] == REVIEW_OPERATION
     assert (directory / "activation.response.json").read_text()
 
 
@@ -263,6 +286,7 @@ def test_policy_guide_all_requests_use_private_files_and_unique_workspaces(
         shlex.quote(environment["CONTROL_PLANE_HEADER_FILE"]),
     ).replace("replace-with-target-epoch-from-the-same-reviewed-proposal", EPOCH)
     script = script.replace("replace-with-retained-64-character-epoch-id", PREVIOUS_EPOCH)
+    script = script.replace("replace-with-operation-id-from-the-selected-review", REVIEW_OPERATION)
     for _ in range(2):
         _run(tmp_path, environment, "set -e\n" + script)
     directories = list(tmp_path.glob("ci-policy.*"))
@@ -289,6 +313,16 @@ def test_policy_guide_all_requests_use_private_files_and_unique_workspaces(
         "sourceFormat": "yaml-1.2",
         "source": "schemaVersion: fixture-only\n",
         "operationId": "register-policy-001",
+    }
+    assert first[2]["body"] == {
+        "schemaVersion": "ci-config-epoch-activation/v2",
+        "installationId": 100,
+        "repositoryId": 200,
+        "targetEpochId": EPOCH,
+        "proposalManifestId": "proposal:replace-with-32-lowercase-hex-characters",
+        "reviewOperationId": REVIEW_OPERATION,
+        "expectedRevision": None,
+        "operationId": "activate-policy-001",
     }
     assert first[3]["body"] == {
         "schemaVersion": "ci-config-epoch-rollback/v1",

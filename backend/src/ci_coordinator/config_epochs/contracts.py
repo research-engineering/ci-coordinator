@@ -17,6 +17,7 @@ MAX_CONFIG_OPERATION_ID_UTF8_BYTES: Final = 256
 MAX_ROLLBACK_REASON_UTF8_BYTES: Final = 512
 _ACTIVATION_EVENT_TYPE: Final = "config-epoch-activation/v1"
 _ACTIVATION_AUDIT_SCHEMA: Final = "config-epoch-activation-audit/v1"
+_EXPLICIT_ACTIVATION_AUDIT_SCHEMA: Final = "config-epoch-activation-audit/v2"
 _ROLLBACK_EVENT_TYPE: Final = "config-epoch-rollback/v1"
 _ROLLBACK_AUDIT_SCHEMA: Final = "config-epoch-rollback-audit/v1"
 _PAIR_OWNED_EVENT_TYPES: Final = frozenset({_ACTIVATION_EVENT_TYPE, _ROLLBACK_EVENT_TYPE})
@@ -65,6 +66,8 @@ class ConfigEpochActivationCommand:
     expected_active_epoch_id: str | None = None
     coverage_relation: ProvenCoverageRelation | None = None
     reason: str | None = None
+    activation_version: Literal[1, 2] = 1
+    review_operation_id: str | None = None
 
     def __post_init__(self) -> None:
         _require_scope(self.scope)
@@ -78,6 +81,9 @@ class ConfigEpochActivationCommand:
         )
         _require_nonempty_scalar_text(self.actor, "actor")
         _require_nonempty_scalar_text(self.occurred_at, "occurred_at")
+        _require_activation_selection(
+            self.mutation_kind, self.activation_version, self.review_operation_id
+        )
         if self.mutation_kind == "activation":
             _require_proposal_manifest_id(self.proposal_manifest_id)
             _require_epoch_id(self.authority_evidence_hash)
@@ -126,6 +132,8 @@ class ConfigEpochReplayCommand:
     proposal_manifest_id: str | None = None
     mutation_kind: ConfigEpochMutationKind = "activation"
     reason: str | None = None
+    activation_version: Literal[1, 2] = 1
+    review_operation_id: str | None = None
 
     def __post_init__(self) -> None:
         _require_scope(self.scope)
@@ -138,6 +146,9 @@ class ConfigEpochReplayCommand:
             maximum_utf8_bytes=MAX_CONFIG_OPERATION_ID_UTF8_BYTES,
         )
         _require_nonempty_scalar_text(self.actor, "actor")
+        _require_activation_selection(
+            self.mutation_kind, self.activation_version, self.review_operation_id
+        )
         if self.mutation_kind == "activation":
             _require_proposal_manifest_id(self.proposal_manifest_id)
             if self.reason is not None:
@@ -164,6 +175,8 @@ class ConfigEpochReplayCommand:
             proposal_manifest_id=command.proposal_manifest_id,
             mutation_kind=command.mutation_kind,
             reason=command.reason,
+            activation_version=command.activation_version,
+            review_operation_id=command.review_operation_id,
         )
 
 
@@ -372,18 +385,25 @@ def _audit_projection(
     command: ConfigEpochActivationCommand,
 ) -> tuple[str, str, JsonValue]:
     if command.mutation_kind == "activation":
+        payload: dict[str, JsonValue] = {
+            "schemaVersion": (
+                _ACTIVATION_AUDIT_SCHEMA
+                if command.activation_version == 1
+                else _EXPLICIT_ACTIVATION_AUDIT_SCHEMA
+            ),
+            "operationId": command.operation_id,
+            "expectedRevision": command.expected_revision,
+            "targetEpochId": command.target_epoch_id,
+            "proposalManifestId": command.proposal_manifest_id,
+            "authorityEvidenceHash": command.authority_evidence_hash,
+            "authorityObservedAt": command.authority_observed_at,
+        }
+        if command.activation_version == 2:
+            payload["reviewOperationId"] = command.review_operation_id
         return (
             "config-epoch-activation",
             _ACTIVATION_EVENT_TYPE,
-            {
-                "schemaVersion": _ACTIVATION_AUDIT_SCHEMA,
-                "operationId": command.operation_id,
-                "expectedRevision": command.expected_revision,
-                "targetEpochId": command.target_epoch_id,
-                "proposalManifestId": command.proposal_manifest_id,
-                "authorityEvidenceHash": command.authority_evidence_hash,
-                "authorityObservedAt": command.authority_observed_at,
-            },
+            payload,
         )
     expected_active_epoch_id = cast(str, command.expected_active_epoch_id)
     coverage_relation = cast(ProvenCoverageRelation, command.coverage_relation)
@@ -401,6 +421,26 @@ def _audit_projection(
             "reason": reason,
         },
     )
+
+
+def _require_activation_selection(
+    mutation_kind: ConfigEpochMutationKind,
+    version: object,
+    review_operation_id: object,
+) -> None:
+    if type(version) is not int or version not in (1, 2):
+        raise ValueError("activation version is not admitted")
+    if version == 1:
+        if review_operation_id is not None:
+            raise ValueError("legacy activation cannot carry a review selector")
+    elif mutation_kind != "activation":
+        raise ValueError("rollback cannot carry an activation version")
+    else:
+        _require_bounded_text(
+            review_operation_id,
+            "review_operation_id",
+            maximum_utf8_bytes=MAX_CONFIG_OPERATION_ID_UTF8_BYTES,
+        )
 
 
 def _audit_subject_id(scope: RepositoryScope) -> str:

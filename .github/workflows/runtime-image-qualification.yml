@@ -226,7 +226,7 @@ jobs:
           timeout 20 docker exec \
             -e "CI_COORDINATOR_MIGRATION_DATABASE_DSN=${dsn/postgresql:/postgresql+psycopg:}" \
             runtime-candidate alembic current > "${root}/migration.txt"
-          grep -Fx '20260915_0015 (head)' "${root}/migration.txt"
+          grep -Fx '20260926_0017 (head)' "${root}/migration.txt"
           container_id="$(docker inspect runtime-candidate --format '{{.Id}}')"
           timeout 5 docker kill --signal TERM "${container_id}"
           timeout 15 docker wait "${container_id}"

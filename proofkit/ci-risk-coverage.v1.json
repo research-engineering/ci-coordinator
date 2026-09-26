@@ -378,7 +378,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "be069c69aa2c099e0ac5e60494c804db6d0c6f69eb2dc3fe76a877e0befc6a90"
+          "sourceSha256": "cb62c80cd74b6f8c10ac680ab71f2126f02a2baf9a3c21132d430ad552c08c82"
         },
         {
           "requirementId": "REQ-CI-UI-004",
@@ -423,7 +423,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "af5d08db481944190d20238194b98edc3d996d800e061c64c094c9f452864fec"
+          "sourceSha256": "d60a2e5784fb9ab9c705c2ccc44bbe9aa1b7193b3713d661dfad4a6b8cefd9b3"
         }
       ]
     },
@@ -2542,7 +2542,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "b4c28d70f584db7cebdf9af01b21f069214866609216b90d781267cbb83589d9"
+          "sourceSha256": "d158062a883ec1ce62e3e297169a9079a8ee6a38a4de258982b6585d45a4549c"
         }
       ]
     },

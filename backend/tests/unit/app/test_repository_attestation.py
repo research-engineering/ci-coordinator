@@ -7,7 +7,7 @@ from typing import cast
 
 import pytest
 from control_plane_http_support import NOW, human_principal
-from repository_activation_support import REVIEWER, SCOPE, completed_discovery
+from repository_activation_support import REVIEWER, SCOPE, completed_discovery, review_record
 
 from ci_coordinator.app.repository_attestation import (
     RepositoryAttestationService,
@@ -28,6 +28,7 @@ from ci_coordinator.proposal_review import (
     ProposalReviewAttestationConflict,
     ProposalReviewCommand,
     ProposalReviewCreated,
+    ProposalReviewDuplicate,
     ProposalReviewRecord,
     ProposalReviewResolution,
     ProposalReviewStore,
@@ -152,6 +153,49 @@ class _Store:
             audit_input_hash=prepared.audit_input_hash,
         )
         return ProposalReviewCreated(record, epoch_created=True)
+
+
+def test_unknown_legacy_start_stops_before_baseline_provider_clock_or_pending() -> None:
+    completed = completed_discovery()
+    store = _Store()
+    provider = _Provider()
+    discovery = _Discovery(completed)
+    command = _command(completed)
+    outcome = asyncio.run(
+        _service(store, provider, discovery).start(
+            principal=_PRINCIPAL, command=command, legacy_replay_only=True
+        )
+    )
+    assert outcome.state == "legacy_new_operation_unsupported"
+    assert store.calls == [("resolve", command)]
+    assert discovery.calls == []
+    assert store.pending is None
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_retained_start_replays_before_clock_provider_and_pending(legacy: bool) -> None:
+    completed = completed_discovery()
+    record = review_record(completed, actor=_PRINCIPAL.actor_id)
+    assert record.command.actor == _PRINCIPAL.actor_id
+    assert record.attestation.transaction.binding.initiating_actor == record.command.actor
+    store = _Store(
+        resolution=ProposalReviewDuplicate(record), now=record.attestation.reviewer.expires_at
+    )
+    provider = _Provider()
+    discovery = _Discovery(completed)
+    outcome = asyncio.run(
+        _service(store, provider, discovery).start(
+            principal=_PRINCIPAL,
+            command=record.command,
+            legacy_replay_only=legacy,
+        )
+    )
+    assert outcome.state == "already_reviewed"
+    assert store.calls == [("resolve", record.command)]
+    assert discovery.calls == []
+    assert store.pending is None
+    assert provider.authorization_calls == []
+    assert provider.exchange_calls == []
 
 
 def test_start_binds_every_authority_coordinate_before_registration() -> None:

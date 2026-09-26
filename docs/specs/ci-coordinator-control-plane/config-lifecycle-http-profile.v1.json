@@ -38,7 +38,7 @@
       "path": "/api/v1/config/activations",
       "requiredRoles": ["activate"],
       "effect": "postgresql-audit-provider-evidence",
-      "requestSchema": "ci-config-epoch-activation/v1",
+      "requestSchema": "ci-config-epoch-activation/v2",
       "successSchema": "ci-config-epoch-activation-result/v1"
     },
     {
@@ -78,6 +78,9 @@
     "scope-admission-precedes-row-projection",
     "validation-has-no-durable-or-provider-effect",
     "registration-replay-compares-all-client-owned-facts",
+    "current-activation-v2-requires-an-explicit-review-operation-id",
+    "legacy-activation-v1-without-selector-is-exact-retained-replay-only",
+    "unknown-legacy-activation-operations-reject-without-new-writes",
     "status-cardinality-is-page-bounded",
     "export-revalidates-and-emits-exact-retained-bytes",
     "success-projections-do-not-widen-runtime-value-domains"

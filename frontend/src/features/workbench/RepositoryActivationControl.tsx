@@ -14,10 +14,10 @@ import type {
   ExpectedActiveEpoch,
   RepositoryAttestationFailure,
 } from "../../api/repositoryAttestation/client";
-import { operationIdIsAdmitted } from "../../api/shared/operationId";
 import type { WorkbenchScope } from "../../api/workbench/client";
 import type { WorkflowDiscoveryReport } from "../../api/workflowDiscovery/schema";
 import { StatusBadge } from "../../components/StatusBadge";
+import { reviewHint } from "./navigation";
 import { useConfigActivation } from "./useConfigActivation";
 import { useRepositoryAttestation } from "./useRepositoryAttestation";
 
@@ -140,6 +140,7 @@ function AdmittedRepositoryActivationControl({
     expiresAt: session.expiresAt,
     allowed: canActivate,
     newCommandAllowed: canAttemptActivation,
+    reviewOperationId: attestation.reviewOperationId,
     onConfirmed: (receipt) => onConfirmed({ epochId: receipt.epochId, revision: receipt.revision }),
     onConflict: () => {
       setConflictRevision(snapshotReadRevision);
@@ -151,18 +152,20 @@ function AdmittedRepositoryActivationControl({
     onLockedChange(locked);
     return () => onLockedChange(false);
   }, [locked, onLockedChange]);
-  const callbackOperationId = reviewedOperationId(scope, manifestId);
+  const callbackHint = reviewedOperation(scope, manifestId);
+  const callbackOperationId = callbackHint?.operationId;
   const freshVerification =
     reviewInvalidated ||
     (attestation.state.kind === "settled" && !attestation.uncertain && !canAttemptActivation);
-  function verify() {
+  function verify(forceFresh = false) {
     if (!baselineReady || locked || !canConfigure) return;
     setReviewInvalidated(false);
-    if (freshVerification) {
+    if (forceFresh || freshVerification) {
       setConsumedHint(callbackOperationId);
       attestation.start();
-    } else
-      attestation.start(callbackOperationId === consumedHint ? undefined : callbackOperationId);
+    } else if (callbackHint && callbackOperationId !== consumedHint)
+      attestation.start(callbackHint.operationId, callbackHint.expectedActive);
+    else attestation.start();
   }
 
   if (
@@ -225,13 +228,26 @@ function AdmittedRepositoryActivationControl({
           <span>GitHub confirms current maintain or admin permission for this exact proposal.</span>
         </div>
         {canAttemptActivation ? (
-          <StatusBadge tone="positive">reviewed</StatusBadge>
+          <div className="proposal-activation-actions">
+            <StatusBadge tone="positive">reviewed</StatusBadge>
+            {canConfigure ? (
+              <button
+                type="button"
+                className="button button--secondary"
+                disabled={!baselineReady || locked}
+                onClick={() => verify(true)}
+              >
+                <RefreshCw className="button-icon" aria-hidden="true" />
+                Verify authority again
+              </button>
+            ) : null}
+          </div>
         ) : canConfigure ? (
           <button
             type="button"
             className="button button--secondary"
             disabled={!baselineReady || locked}
-            onClick={verify}
+            onClick={() => verify()}
           >
             {attestation.state.kind === "starting" || attestation.state.kind === "redirecting" ? (
               <LoaderCircle className="button-icon spin" aria-hidden="true" />
@@ -389,16 +405,19 @@ function CurrentConfiguration({
   );
 }
 
-function reviewedOperationId(scope: WorkbenchScope, manifestId: string): string | undefined {
+function reviewedOperation(
+  scope: WorkbenchScope,
+  manifestId: string,
+):
+  | {
+      readonly operationId: string;
+      readonly expectedActive: ExpectedActiveEpoch | null;
+    }
+  | undefined {
   const query = new URLSearchParams(globalThis.location.search);
-  const operationId = query.get("reviewOperationId");
-  return operationId !== null &&
-    query.get("repositoryAttestation") === "reviewed" &&
-    query.get("installationId") === String(scope.installationId) &&
-    query.get("repositoryId") === String(scope.repositoryId) &&
-    query.get("proposalManifestId") === manifestId &&
-    operationIdIsAdmitted(operationId)
-    ? operationId
+  const hint = reviewHint(query, scope);
+  return hint && hint.manifestId === manifestId && hint.expectedActive !== undefined
+    ? { operationId: hint.operationId, expectedActive: hint.expectedActive }
     : undefined;
 }
 
@@ -406,6 +425,8 @@ function attestationFailureLabel(kind: RepositoryAttestationFailure): string {
   switch (kind) {
     case "already_reviewed":
       return "Repository review is already retained";
+    case "legacy_new_operation_unsupported":
+      return "This verification request is from an older contract. Start a new verification.";
     case "unauthenticated":
       return "Administrator session expired";
     case "forbidden":
@@ -440,6 +461,8 @@ function attestationFailureLabel(kind: RepositoryAttestationFailure): string {
 
 function activationFailureLabel(kind: ConfigActivationFailure): string {
   switch (kind) {
+    case "legacy_new_operation_unsupported":
+      return "This activation request is from an older contract. Start a new activation.";
     case "unauthenticated":
       return "Administrator session expired";
     case "forbidden":

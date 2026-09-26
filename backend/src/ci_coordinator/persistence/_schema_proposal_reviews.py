@@ -123,12 +123,6 @@ workflow_proposal_reviews = Table(
         "operation_id",
         name="pk_workflow_proposal_reviews",
     ),
-    UniqueConstraint(
-        "installation_id",
-        "repository_id",
-        "proposal_manifest_id",
-        name="uq_workflow_proposal_reviews_scope_manifest",
-    ),
     UniqueConstraint("audit_event_id", name="uq_workflow_proposal_reviews_audit_event"),
     UniqueConstraint(
         "attestation_transaction_digest",

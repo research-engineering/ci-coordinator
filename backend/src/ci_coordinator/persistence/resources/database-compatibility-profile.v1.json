@@ -304,6 +304,26 @@
   ],
   "implementationInventory": [
     {
+      "path": "backend/alembic/versions/20260926_0016_retire_pending_review_authority.py",
+      "responsibility": "exclusive-fence retirement of config/proposal V1 and invalidation of only unconsumed pending attestations",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/alembic/versions/20260926_0017_explicit_review_renewal.py",
+      "responsibility": "explicit config/proposal V2 expansion and immutable review renewal without changing completed receipts or the audit event family",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/review_renewal_migration.py",
+      "responsibility": "exact predecessor and pending-only cutoff admission, historical schema checks and idempotent current expansion",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_review_renewal_migration.py",
+      "responsibility": "native retirement, pending-cookie cutoff, completed-row preservation, current replay and malformed-predecessor falsifiers",
+      "proofClass": "postgres"
+    },
+    {
       "path": "backend/alembic/env.py",
       "responsibility": "online migration transaction and exclusive-fence boundary",
       "proofClass": "postgres"

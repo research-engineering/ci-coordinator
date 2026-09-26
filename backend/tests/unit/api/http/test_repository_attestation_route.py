@@ -39,6 +39,7 @@ _PUBLIC_ORIGIN = "https://ci.example.test"
 _TRANSACTION_COOKIE = "__Secure-ci_coordinator_review"
 _PRINCIPAL = human_principal()
 _BODY = {
+    "schemaVersion": "ci-repository-attestation-start/v2",
     "installationId": 1,
     "repositoryId": 2,
     "operationId": "review-1",
@@ -68,13 +69,16 @@ class _AttestationService:
     )
     callback_failure: Exception | None = None
     calls: list[tuple[object, ...]] = field(default_factory=list)
+    legacy_modes: list[bool] = field(default_factory=list)
 
     async def start(
         self,
         *,
         principal: KeycloakHumanPrincipal,
         command: ProposalReviewCommand,
+        legacy_replay_only: bool = False,
     ) -> RepositoryAttestationStartOutcome:
+        self.legacy_modes.append(legacy_replay_only)
         self.calls.append(("start", principal, command))
         return self.start_result
 
@@ -144,6 +148,7 @@ def test_start_binds_exact_actor_scope_proposal_and_active_pointer() -> None:
     ("state", "status_code"),
     [
         ("already_reviewed", 409),
+        ("legacy_new_operation_unsupported", 409),
         ("baseline_conflict", 409),
         ("blocked", 409),
         ("forbidden", 403),
@@ -169,6 +174,38 @@ def test_start_preserves_complete_outcome_algebra(state: str, status_code: int) 
         {"ok": False, "error": state},
     )
     assert response.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("version", [None, "ci-repository-attestation-start/v1", "unknown"])
+def test_unknown_start_version_never_falls_back_to_legacy(version: object) -> None:
+    service = _AttestationService()
+    response = _client(service).post(
+        REPOSITORY_ATTESTATION_START_PATH,
+        json={**_BODY, "schemaVersion": version},
+        headers=_mutation_headers(),
+    )
+    assert response.status_code == 422
+    assert service.calls == []
+
+
+def test_literal_legacy_start_is_explicitly_replay_only() -> None:
+    service = _AttestationService(
+        start_result=RepositoryAttestationStartOutcome("legacy_new_operation_unsupported")
+    )
+    response = _client(service).post(
+        REPOSITORY_ATTESTATION_START_PATH,
+        json={
+            "installationId": 1,
+            "repositoryId": 2,
+            "operationId": "review-legacy",
+            "expectedManifestId": "proposal:" + "a" * 32,
+            "expectedActive": None,
+        },
+        headers=_mutation_headers(),
+    )
+    assert response.status_code == 409
+    assert response.json() == {"ok": False, "error": "legacy_new_operation_unsupported"}
+    assert service.legacy_modes == [True]
 
 
 @pytest.mark.parametrize(

@@ -66,6 +66,7 @@ from ci_coordinator.persistence.production_cutover_schema_attestation import (
 )
 from ci_coordinator.persistence.proposal_review_schema_attestation import (
     proposal_review_registration_schema_matches_contract_sync,
+    proposal_review_renewal_schema_matches_contract_sync,
 )
 from ci_coordinator.persistence.repository_attestation_schema_attestation import (
     repository_attestation_schema_mismatches_sync,
@@ -148,6 +149,7 @@ _CAPABILITY_ATTESTORS: Final[dict[str, CapabilityAttestor]] = {
     "administrator-activity/v1": activity_schema_matches_contract_sync,
     "audit-ledger/v1": _audit_ledger_matches,
     "config-epoch-lifecycle/v1": config_epoch_lifecycle_schema_matches_contract_sync,
+    "config-epoch-lifecycle/v2": config_epoch_lifecycle_schema_matches_contract_sync,
     "config-epoch-registration-operations/v1": (_config_epoch_registration_matches),
     "ci-economics-evidence/v1": _ci_economics_matches,
     "ci-economics-evidence/v2": lambda connection: _ci_economics_matches(
@@ -171,6 +173,10 @@ _CAPABILITY_ATTESTORS: Final[dict[str, CapabilityAttestor]] = {
     "governance-baseline-state/v1": governance_baseline_schema_matches_contract_sync,
     "operator-override-state/v1": _operator_override_matches,
     "proposal-review-registration/v1": _proposal_review_matches,
+    "proposal-review-registration/v2": lambda connection: (
+        proposal_review_renewal_schema_matches_contract_sync(connection)
+        and not repository_attestation_schema_mismatches_sync(connection)
+    ),
     "runtime-ingress-issuance-state/v1": (
         runtime_ingress_issuance_state_schema_matches_contract_sync
     ),

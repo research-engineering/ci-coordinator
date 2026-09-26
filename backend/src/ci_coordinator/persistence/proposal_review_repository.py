@@ -19,6 +19,7 @@ from ci_coordinator.config_epochs import (
     ActiveConfigEpochSnapshot,
     ConfigEpochRegistrationConflict,
     ConfigEpochRegistrationCreated,
+    ConfigEpochReplayCommand,
     PreparedConfigEpochActivation,
 )
 from ci_coordinator.control_plane_identity import (
@@ -266,6 +267,7 @@ class _PostgresProposalReviewRepository:
         scope: RepositoryScope,
         target_epoch_id: str,
         proposal_manifest_id: str,
+        review_operation_id: str,
     ) -> ProposalReviewRecord | None:
         self._ensure_active()
         try:
@@ -275,6 +277,7 @@ class _PostgresProposalReviewRepository:
                     workflow_proposal_reviews.c.repository_id == scope.repository_id,
                     workflow_proposal_reviews.c.target_epoch_id == target_epoch_id,
                     workflow_proposal_reviews.c.proposal_manifest_id == proposal_manifest_id,
+                    workflow_proposal_reviews.c.operation_id == review_operation_id,
                     workflow_proposal_reviews.c.receipt_expires_at > func.statement_timestamp(),
                 )
             )
@@ -304,6 +307,11 @@ class _PostgresProposalReviewRepository:
             raise PersistenceInvariantViolation("repository activation inputs must be exact")
         try:
             await lock_repository_scope(self._connection, prepared.command.scope)
+            replay = await self._config_epochs.resolve_operation(
+                ConfigEpochReplayCommand.from_activation(prepared.command)
+            )
+            if replay is not None:
+                return replay
             if not await self._activation_authority_is_current(prepared, authority):
                 return RepositoryActivationAuthorityConflict()
             return await self._config_epochs.activate(prepared)
@@ -332,13 +340,6 @@ class _PostgresProposalReviewRepository:
             resolution = _resolve_existing(existing, command)
             if resolution is not None:
                 return resolution
-
-            reviewed_manifest = await self._load_by_manifest(
-                command.scope,
-                command.expected_manifest_id,
-            )
-            if reviewed_manifest is not None:
-                return ProposalReviewDuplicate(record=reviewed_manifest)
 
             active = await self._config_epochs.load_active(command.scope)
             active_pointer = None if active is None else active.active
@@ -421,6 +422,8 @@ class _PostgresProposalReviewRepository:
         reviewer = review.attestation.reviewer
         if (
             command.mutation_kind != "activation"
+            or command.activation_version != 2
+            or command.review_operation_id != review.command.operation_id
             or command.scope != review.command.scope
             or command.target_epoch_id != review.target_epoch_id
             or command.proposal_manifest_id != review.command.expected_manifest_id
@@ -432,6 +435,7 @@ class _PostgresProposalReviewRepository:
             scope=command.scope,
             target_epoch_id=command.target_epoch_id,
             proposal_manifest_id=command.proposal_manifest_id,
+            review_operation_id=review.command.operation_id,
         )
         if retained != review:
             return False
@@ -460,21 +464,6 @@ class _PostgresProposalReviewRepository:
                 workflow_proposal_reviews.c.installation_id == scope.installation_id,
                 workflow_proposal_reviews.c.repository_id == scope.repository_id,
                 workflow_proposal_reviews.c.operation_id == operation_id,
-            )
-        )
-        row = result.mappings().one_or_none()
-        return None if row is None else await self._record_from_row(dict(row))
-
-    async def _load_by_manifest(
-        self,
-        scope: RepositoryScope,
-        manifest_id: str,
-    ) -> ProposalReviewRecord | None:
-        result = await self._connection.execute(
-            select(workflow_proposal_reviews).where(
-                workflow_proposal_reviews.c.installation_id == scope.installation_id,
-                workflow_proposal_reviews.c.repository_id == scope.repository_id,
-                workflow_proposal_reviews.c.proposal_manifest_id == manifest_id,
             )
         )
         row = result.mappings().one_or_none()

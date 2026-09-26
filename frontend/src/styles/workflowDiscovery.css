@@ -312,6 +312,13 @@
   color: var(--text-muted);
   font-size: 0.8rem;
 }
+.proposal-activation-step > .proposal-activation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .proposal-activation-notice {
   display: flex;
   align-items: center;
@@ -514,7 +521,8 @@
     grid-template-columns: 26px minmax(0, 1fr);
     align-items: start;
   }
-  .proposal-activation-step > :last-child:not(div) {
+  .proposal-activation-step > :last-child:not(div),
+  .proposal-activation-step > .proposal-activation-actions {
     grid-column: 1 / -1;
     width: 100%;
   }
