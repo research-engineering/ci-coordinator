@@ -9,10 +9,11 @@ Owner: ci-coordinator.proofkit-adoption
 Keep `agentic-proofkit==0.14.18` and its seven consumed commands. Compose only
 the existing `text-policy` command over deterministic bounded inputs. The
 [adoption specification](../architecture/cross-cutting/proofkit-adoption.md)
-owns the reusable-mechanics boundary; `REQ-CI-PROOFKIT-006` and
+owns the reusable-mechanics boundary; `REQ-CI-PROOFKIT-001` owns executable
+identity; `REQ-CI-PROOFKIT-006` and
 `REQ-CI-PROOFKIT-008` own admission and finite-command obligations in the
 [requirement source](../specs/ci-coordinator-proofkit-adoption/requirements.v1.json).
-This decision owns composition rationale and proof boundaries, not a new policy.
+This decision owns composition rationale and executable-admission boundaries.
 It supersedes no earlier design or implementation plan and has no companions.
 
 The pinned native JSON reader limits one input to 33,554,432 bytes, including
@@ -54,9 +55,24 @@ Invocation timeout/output failures and post-call deadline failure retain the
 exact batch ID and original cause. Preparation deadline failure remains global.
 Cancellation is not broadly caught; no retry or alternate policy is introduced.
 Unsupported arguments still fail before output. The source-input CLI still emits
-one document, not a stream. The other six commands and their admission remain
-unchanged. All lexical, path and content decisions remain in the pinned CLI;
+one document, not a stream. The seven commands retain their argument and output
+contracts. All lexical, path and content decisions remain in the pinned CLI;
 the consumer introduces no duplicate lexical checker.
+
+## Executable Admission
+
+Every production consumer uses the fixed console script inside the active Python
+environment. Its resolved path must remain within that environment and name an
+executable regular file. Missing, escaped or non-executable entrypoints fail
+before invocation; no `PATH` fallback substitutes another installation. This
+aligns invocation with `REQ-CI-PROOFKIT-001` dependency admission. Explicit
+in-process executable injection remains a controlled test seam, not a CLI option.
+Same-UID replacement after observation is not a sandboxing guarantee.
+
+Resolver witnesses must distinguish a valid entrypoint and an in-environment
+symlink from missing, directory, non-executable and escaped-symlink cases while
+`PATH` contains an executable alternative. Preserve explicit test injection and
+the complete existing seven-command native corpus.
 
 ## Alternatives And Cost
 

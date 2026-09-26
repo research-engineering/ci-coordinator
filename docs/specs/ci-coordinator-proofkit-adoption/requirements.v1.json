@@ -8,7 +8,7 @@
     {
       "requirementId": "REQ-CI-PROOFKIT-001",
       "ownerId": "ci-coordinator.proofkit-adoption",
-      "invariant": "CI Coordinator consumes the public `agentic-proofkit` Python distribution through an exact pinned dependency and CLI/JSON contracts rather than vendored binaries, local copied verifier logic, or package-root SDK assumptions; a repository-owned witness admits exact manifest and uv-lock identity, complete supported-platform wheel hashes, installed distribution metadata, executable containment, and CLI smoke without misrepresenting npm-specific Proofkit dependency admission as Python package evidence.",
+      "invariant": "CI Coordinator consumes the public `agentic-proofkit` Python distribution through an exact pinned dependency and CLI/JSON contracts rather than vendored binaries, local copied verifier logic, or package-root SDK assumptions; a repository-owned witness admits exact manifest and uv-lock identity, complete supported-platform wheel hashes, installed distribution metadata, executable containment, and CLI smoke without misrepresenting npm-specific Proofkit dependency admission as Python package evidence. Default CLI resolution requires a regular executable whose resolved path remains inside the active Python environment; a missing or inadmissible entrypoint fails without substituting another installation from PATH.",
       "claimLevel": "blocking",
       "riskClass": "high",
       "proofBindingRefs": ["proofkit/requirement-bindings.json"],

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from time import monotonic
 
@@ -23,7 +22,6 @@ from scripts.proofkit_inputs import (
 def text_policy_report(
     repo_root: Path,
     *,
-    environment: Mapping[str, str] | None = None,
     proofkit_executable: str | Path | None = None,
     maximum_input_bytes: int = TEXT_POLICY_MAX_INPUT_BYTES,
 ) -> JsonObject:
@@ -35,9 +33,7 @@ def text_policy_report(
             raise RuntimeError("text-policy shared deadline exhausted")
         return seconds
 
-    executable = resolve_proofkit_executable(
-        proofkit_executable, env=os.environ if environment is None else environment
-    )
+    executable = resolve_proofkit_executable(proofkit_executable)
     remaining()
     inventory = capture_text_policy_inventory(repo_root, remaining)
     files = tuple(entry for entry in inventory if entry.exclusion is None)

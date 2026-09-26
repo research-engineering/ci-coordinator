@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import os
-import shutil
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,23 +21,23 @@ class ProofkitProcessResult:
 
 def resolve_proofkit_executable(
     injected: str | Path | None = None,
-    *,
-    env: Mapping[str, str] | None = None,
 ) -> str:
     if injected is not None:
         return os.fspath(injected)
     executable_name = "agentic-proofkit.exe" if os.name == "nt" else "agentic-proofkit"
-    environment_candidate = Path(sys.prefix) / ("Scripts" if os.name == "nt" else "bin")
-    environment_candidate /= executable_name
-    if environment_candidate.is_file() and os.access(environment_candidate, os.X_OK):
-        return str(environment_candidate)
-    path = None if env is None else env.get("PATH")
-    resolved = shutil.which("agentic-proofkit", path=path)
-    if resolved is None:
+    environment_root = Path(sys.prefix).resolve(strict=True)
+    executable = (
+        environment_root / ("Scripts" if os.name == "nt" else "bin") / executable_name
+    ).resolve(strict=True)
+    if (
+        not executable.is_relative_to(environment_root)
+        or not executable.is_file()
+        or not os.access(executable, os.X_OK)
+    ):
         raise FileNotFoundError(
-            "agentic-proofkit executable was not found in the active Python environment or PATH"
+            "agentic-proofkit requires an executable inside the active Python environment"
         )
-    return resolved
+    return str(executable)
 
 
 def invoke_proofkit(

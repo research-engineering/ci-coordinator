@@ -48,6 +48,62 @@ def test_installed_carrier_preserves_consumed_cli_contract(command: str) -> None
         assert selected["closed"] is True
 
 
+@pytest.mark.parametrize("linked", [False, True])
+def test_resolver_uses_only_the_active_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, linked: bool
+) -> None:
+    environment = tmp_path / "environment"
+    entrypoint = environment / "bin" / "agentic-proofkit"
+    entrypoint.parent.mkdir(parents=True)
+    target = environment / "carrier" if linked else entrypoint
+    target.write_bytes(b"owned executable\n")
+    target.chmod(0o700)
+    if linked:
+        entrypoint.symlink_to(target)
+    unrelated = tmp_path / "unrelated"
+    unrelated.mkdir()
+    (unrelated / "agentic-proofkit").write_bytes(b"unrelated executable\n")
+    (unrelated / "agentic-proofkit").chmod(0o700)
+    monkeypatch.setattr(sys, "prefix", str(environment))
+    monkeypatch.setenv("PATH", str(unrelated))
+
+    assert resolve_proofkit_executable() == str(target)
+
+
+@pytest.mark.parametrize("case", ["missing", "directory", "not-executable", "escaped-link"])
+def test_resolver_refuses_an_unadmitted_entrypoint_without_path_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    environment = tmp_path / "environment"
+    entrypoint = environment / "bin" / "agentic-proofkit"
+    entrypoint.parent.mkdir(parents=True)
+    unrelated = tmp_path / "unrelated"
+    unrelated.mkdir()
+    fallback = unrelated / "agentic-proofkit"
+    fallback.write_bytes(b"unrelated executable\n")
+    fallback.chmod(0o700)
+    if case == "directory":
+        entrypoint.mkdir()
+    elif case == "not-executable":
+        entrypoint.write_bytes(b"not executable\n")
+        entrypoint.chmod(0o600)
+    elif case == "escaped-link":
+        entrypoint.symlink_to(fallback)
+    monkeypatch.setattr(sys, "prefix", str(environment))
+    monkeypatch.setenv("PATH", str(unrelated))
+
+    with pytest.raises(FileNotFoundError):
+        resolve_proofkit_executable()
+
+
+def test_resolver_preserves_explicit_in_process_test_injection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(sys, "prefix", str(tmp_path / "absent"))
+    injected = tmp_path / "controlled test executable"
+    assert resolve_proofkit_executable(injected) == str(injected)
+
+
 def test_invoke_proofkit_preserves_status_and_streams(tmp_path: Path) -> None:
     result = invoke_proofkit(
         sys.executable,

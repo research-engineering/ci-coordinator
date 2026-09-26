@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -58,20 +57,14 @@ def admission_report(
     mode: str,
     *,
     repo_root: Path = REPO_ROOT,
-    environment: Mapping[str, str] | None = None,
     proofkit_executable: str | Path | None = None,
 ) -> JsonObject:
     if mode == "text-policy":
         return text_policy_report(
             repo_root,
-            environment=environment,
             proofkit_executable=proofkit_executable,
         )
-    selected_environment = os.environ if environment is None else environment
-    executable = resolve_proofkit_executable(
-        proofkit_executable,
-        env=selected_environment,
-    )
+    executable = resolve_proofkit_executable(proofkit_executable)
     if mode == "verify":
         reports = [
             _run_with_input(
