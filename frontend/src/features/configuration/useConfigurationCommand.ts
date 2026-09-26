@@ -7,6 +7,7 @@ import {
 import type { ConfigRegistration, ConfigRollback } from "../../api/configLifecycle/schema";
 import type { LifecycleFailure } from "../../api/configLifecycle/transport";
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
+import type { ExpectedActiveEpoch } from "../../api/repositoryAttestation/client";
 
 type State =
   | { readonly kind: "idle" }
@@ -18,7 +19,10 @@ type State =
     }
   | { readonly kind: "rejected"; readonly failure: LifecycleFailure };
 
-export function useConfigurationCommand(session: ControlPlaneSession) {
+export function useConfigurationCommand(
+  session: ControlPlaneSession,
+  onConfirmed?: (active?: ExpectedActiveEpoch) => void,
+) {
   const [state, setState] = useState<State>({ kind: "idle" });
   const [readRevision, setReadRevision] = useState(0);
   const current = useRef<State>(state);
@@ -54,8 +58,14 @@ export function useConfigurationCommand(session: ControlPlaneSession) {
         publish({ kind: "uncertain", command });
         return;
       }
-      if (result.kind === "ready") publish({ kind: "complete", command, value: result.value });
-      else if (
+      if (result.kind === "ready") {
+        publish({ kind: "complete", command, value: result.value });
+        onConfirmed?.(
+          command.kind === "rollback" && "revision" in result.value
+            ? { epochId: result.value.epochId, revision: result.value.revision }
+            : undefined,
+        );
+      } else if (
         prior.kind !== "uncertain" &&
         [
           "invalid-request",

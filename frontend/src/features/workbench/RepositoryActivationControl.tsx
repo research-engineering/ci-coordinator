@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Zap,
 } from "lucide-react";
+import { useLayoutEffect, useState } from "react";
 import type { ConfigActivationFailure } from "../../api/configActivation/client";
 import type { ControlPlaneRole, ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
 import type {
@@ -25,6 +26,12 @@ interface RepositoryActivationControlProps {
   readonly proposal: WorkflowDiscoveryReport["proposal"];
   readonly expectedActive: ExpectedActiveEpoch | null | undefined;
   readonly session: ControlPlaneSession | undefined;
+  readonly authorityRevision: number;
+  readonly snapshotReadRevision: number;
+  readonly snapshotLoading: boolean;
+  readonly onConfirmed: (active?: ExpectedActiveEpoch) => void;
+  readonly onRefreshSnapshot: () => void;
+  readonly onLockedChange: (locked: boolean) => void;
 }
 
 export function RepositoryActivationControl({
@@ -32,6 +39,12 @@ export function RepositoryActivationControl({
   proposal,
   expectedActive,
   session,
+  authorityRevision,
+  snapshotReadRevision,
+  snapshotLoading,
+  onConfirmed,
+  onRefreshSnapshot,
+  onLockedChange,
 }: RepositoryActivationControlProps) {
   if (proposal.state !== "reviewable") return null;
   if (!session) {
@@ -39,14 +52,6 @@ export function RepositoryActivationControl({
       <div className="proposal-review-control">
         <KeyRound aria-hidden="true" />
         <span>Administrator session required to verify and activate this proposal</span>
-      </div>
-    );
-  }
-  if (expectedActive === undefined) {
-    return (
-      <div className="proposal-review-control">
-        <RefreshCw aria-hidden="true" />
-        <span>Load the active configuration revision before continuing</span>
       </div>
     );
   }
@@ -60,18 +65,34 @@ export function RepositoryActivationControl({
   }
   return (
     <AdmittedRepositoryActivationControl
+      key={`${scope.installationId}:${scope.repositoryId}:${authorityRevision}`}
       expectedActive={expectedActive}
       manifestId={proposal.manifestId}
       scope={scope}
       session={session}
       targetEpochId={proposal.admittedEpochId}
+      authorityRevision={authorityRevision}
+      snapshotReadRevision={snapshotReadRevision}
+      snapshotLoading={snapshotLoading}
+      onConfirmed={onConfirmed}
+      onRefreshSnapshot={onRefreshSnapshot}
+      onLockedChange={onLockedChange}
     />
   );
 }
 
-interface AdmittedRepositoryActivationControlProps {
+interface AdmittedRepositoryActivationControlProps
+  extends Pick<
+    RepositoryActivationControlProps,
+    | "authorityRevision"
+    | "snapshotReadRevision"
+    | "snapshotLoading"
+    | "onConfirmed"
+    | "onRefreshSnapshot"
+    | "onLockedChange"
+  > {
   readonly scope: WorkbenchScope;
-  readonly expectedActive: ExpectedActiveEpoch | null;
+  readonly expectedActive: ExpectedActiveEpoch | null | undefined;
   readonly manifestId: string;
   readonly session: ControlPlaneSession;
   readonly targetEpochId: string;
@@ -83,28 +104,72 @@ function AdmittedRepositoryActivationControl({
   manifestId,
   session,
   targetEpochId,
+  authorityRevision,
+  snapshotReadRevision,
+  snapshotLoading,
+  onConfirmed,
+  onRefreshSnapshot,
+  onLockedChange,
 }: AdmittedRepositoryActivationControlProps) {
+  const [conflictRevision, setConflictRevision] = useState<number>();
+  const [reviewInvalidated, setReviewInvalidated] = useState(false);
+  const [consumedHint, setConsumedHint] = useState<string>();
+  const baselineReady =
+    expectedActive !== undefined &&
+    (conflictRevision === undefined || snapshotReadRevision > conflictRevision);
+  const canConfigure = hasRole(session, "configure");
+  const canActivate = hasRole(session, "activate");
   const attestation = useRepositoryAttestation({
     csrfToken: session.csrfToken,
-    expectedActive,
+    expectedActive: baselineReady ? expectedActive : undefined,
     manifestId,
     scope,
+    authorityRevision,
+    expiresAt: session.expiresAt,
+    allowed: canConfigure,
+    onConflict: () => setConflictRevision(snapshotReadRevision),
   });
+  const canAttemptActivation = attestation.reviewed && !reviewInvalidated && baselineReady;
   const activation = useConfigActivation({
     csrfToken: session.csrfToken,
-    expectedRevision: expectedActive?.revision ?? null,
+    expectedRevision: baselineReady ? (expectedActive?.revision ?? null) : undefined,
     manifestId,
     scope,
     targetEpochId,
+    authorityRevision,
+    expiresAt: session.expiresAt,
+    allowed: canActivate,
+    newCommandAllowed: canAttemptActivation,
+    onConfirmed: (receipt) => onConfirmed({ epochId: receipt.epochId, revision: receipt.revision }),
+    onConflict: () => {
+      setConflictRevision(snapshotReadRevision);
+      setReviewInvalidated(true);
+    },
   });
+  const locked = attestation.locked || activation.locked;
+  useLayoutEffect(() => {
+    onLockedChange(locked);
+    return () => onLockedChange(false);
+  }, [locked, onLockedChange]);
   const callbackOperationId = reviewedOperationId(scope, manifestId);
-  const retainedReview =
-    attestation.state.kind === "settled" && attestation.state.result.kind === "already_reviewed";
-  const canConfigure = hasRole(session, "configure");
-  const canActivate = hasRole(session, "activate");
-  const canAttemptActivation = retainedReview;
+  const freshVerification =
+    reviewInvalidated ||
+    (attestation.state.kind === "settled" && !attestation.uncertain && !canAttemptActivation);
+  function verify() {
+    if (!baselineReady || locked || !canConfigure) return;
+    setReviewInvalidated(false);
+    if (freshVerification) {
+      setConsumedHint(callbackOperationId);
+      attestation.start();
+    } else
+      attestation.start(callbackOperationId === consumedHint ? undefined : callbackOperationId);
+  }
 
-  if (activation.state.kind === "settled" && activation.state.result.kind === "complete") {
+  if (
+    activation.state.kind === "settled" &&
+    !activation.uncertain &&
+    activation.state.result.kind === "complete"
+  ) {
     const result = activation.state.result.activation;
     return (
       <div className="proposal-review-result" role="status">
@@ -112,12 +177,17 @@ function AdmittedRepositoryActivationControl({
           <CheckCircle2 aria-hidden="true" />
           <div>
             <strong>
-              {result.duplicate ? "Configuration already active" : "Configuration activated"}
+              {result.duplicate ? "Activation already recorded" : "Configuration activated"}
             </strong>
-            <span>Revision {result.revision} is now authoritative</span>
+            <span>Activation recorded at revision {result.revision}</span>
           </div>
-          <StatusBadge tone="positive">active</StatusBadge>
+          <StatusBadge tone="positive">recorded</StatusBadge>
         </div>
+        <CurrentConfiguration
+          active={expectedActive}
+          loading={snapshotLoading}
+          onRefresh={onRefreshSnapshot}
+        />
       </div>
     );
   }
@@ -133,6 +203,21 @@ function AdmittedRepositoryActivationControl({
 
   return (
     <div className="proposal-activation-flow">
+      {!baselineReady ? (
+        <div className="proposal-activation-notice" role="status">
+          <span>A fresh active configuration read is required before a new command.</span>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onRefreshSnapshot}
+            title="Refresh active configuration"
+            aria-label="Refresh active configuration"
+            disabled={snapshotLoading}
+          >
+            <RefreshCw aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       <div className="proposal-activation-step">
         <span className="proposal-activation-index">1</span>
         <div>
@@ -145,10 +230,8 @@ function AdmittedRepositoryActivationControl({
           <button
             type="button"
             className="button button--secondary"
-            disabled={
-              attestation.state.kind === "starting" || attestation.state.kind === "redirecting"
-            }
-            onClick={() => attestation.start(callbackOperationId)}
+            disabled={!baselineReady || locked}
+            onClick={verify}
           >
             {attestation.state.kind === "starting" || attestation.state.kind === "redirecting" ? (
               <LoaderCircle className="button-icon spin" aria-hidden="true" />
@@ -157,9 +240,11 @@ function AdmittedRepositoryActivationControl({
             )}
             {attestation.state.kind === "redirecting"
               ? "Opening GitHub"
-              : callbackOperationId
-                ? "Confirm review"
-                : "Verify authority"}
+              : freshVerification
+                ? "Verify authority again"
+                : callbackOperationId && callbackOperationId !== consumedHint
+                  ? "Confirm review"
+                  : "Verify authority"}
           </button>
         ) : (
           <StatusBadge tone="warning">configure role required</StatusBadge>
@@ -176,7 +261,7 @@ function AdmittedRepositoryActivationControl({
           <button
             type="button"
             className="button button--primary"
-            disabled={activation.state.kind === "submitting"}
+            disabled={locked}
             onClick={() => activation.submit()}
           >
             {activation.state.kind === "submitting" ? (
@@ -193,7 +278,7 @@ function AdmittedRepositoryActivationControl({
         )}
       </div>
 
-      {callbackOperationId ? (
+      {callbackOperationId && callbackOperationId !== consumedHint ? (
         <div className="proposal-activation-notice" role="status">
           <ShieldCheck aria-hidden="true" />
           <span>GitHub returned control. Confirm the retained review before activation.</span>
@@ -202,16 +287,31 @@ function AdmittedRepositoryActivationControl({
       {attestationFailure ? (
         <FailureNotice
           label={attestationFailureLabel(attestationFailure)}
-          retry={isRetryableAttestation(attestationFailure) ? attestation.retry : undefined}
+          retry={
+            attestation.uncertain && canConfigure && !attestation.expired
+              ? attestation.retry
+              : undefined
+          }
           retryLabel="Retry repository verification"
         />
       ) : null}
       {activationFailure ? (
         <FailureNotice
           label={activationFailureLabel(activationFailure)}
-          retry={isRetryableActivation(activationFailure) ? activation.retry : undefined}
+          retry={
+            activation.uncertain && canActivate && !activation.expired
+              ? activation.retry
+              : undefined
+          }
           retryLabel="Retry configuration activation"
         />
+      ) : null}
+      {activation.uncertain || attestation.uncertain ? (
+        <p role="status">
+          The outcome is unconfirmed. The original command is retained; a new read does not replace
+          it.
+          {activation.expired || attestation.expired ? " The administrator session expired." : ""}
+        </p>
       ) : null}
     </div>
   );
@@ -245,7 +345,48 @@ function FailureNotice({
 }
 
 function hasRole(session: ControlPlaneSession, role: ControlPlaneRole): boolean {
-  return session.roles.includes(role);
+  return (
+    session.roles.includes(role) &&
+    Number.isFinite(Date.parse(session.expiresAt)) &&
+    Date.parse(session.expiresAt) > Date.now()
+  );
+}
+
+function CurrentConfiguration({
+  active,
+  loading,
+  onRefresh,
+}: {
+  readonly active: ExpectedActiveEpoch | null | undefined;
+  readonly loading: boolean;
+  readonly onRefresh: () => void;
+}) {
+  return (
+    <div className="proposal-activation-notice" role="status">
+      <span>
+        {active === undefined ? (
+          "Current configuration is unproved."
+        ) : active === null ? (
+          "No active configuration was observed."
+        ) : (
+          <>
+            Current observed revision {active.revision}, epoch{" "}
+            <code title={active.epochId}>{active.epochId.slice(0, 12)}</code>.
+          </>
+        )}
+      </span>
+      <button
+        type="button"
+        className="icon-button"
+        title="Refresh active configuration"
+        aria-label="Refresh active configuration"
+        disabled={loading}
+        onClick={onRefresh}
+      >
+        <RefreshCw aria-hidden="true" />
+      </button>
+    </div>
+  );
 }
 
 function reviewedOperationId(scope: WorkbenchScope, manifestId: string): string | undefined {
@@ -259,14 +400,6 @@ function reviewedOperationId(scope: WorkbenchScope, manifestId: string): string 
     operationIdIsAdmitted(operationId)
     ? operationId
     : undefined;
-}
-
-function isRetryableAttestation(kind: RepositoryAttestationFailure): boolean {
-  return kind === "overloaded" || kind === "unavailable" || kind === "network-failure";
-}
-
-function isRetryableActivation(kind: ConfigActivationFailure): boolean {
-  return kind === "overloaded" || kind === "unavailable" || kind === "network-failure";
 }
 
 function attestationFailureLabel(kind: RepositoryAttestationFailure): string {

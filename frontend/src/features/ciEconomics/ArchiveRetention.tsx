@@ -8,6 +8,7 @@ import {
 import {
   type RetentionPreview,
   type RetentionRequest,
+  type RetentionResult,
   type RetentionSelection,
   retentionSelectionSchema,
 } from "../../api/ciEconomics/archiveRetentionSchema";
@@ -29,12 +30,14 @@ export function ArchiveRetention({
   session,
   onChanged,
   onClose,
+  stale = false,
 }: {
   readonly page: ArchiveRead;
   readonly defaultRevision: number;
   readonly session: ControlPlaneSession | undefined;
-  readonly onChanged: () => void;
+  readonly onChanged: (result: RetentionResult) => void;
   readonly onClose: () => void;
+  readonly stale?: boolean;
 }) {
   const record = page.records[0];
   const [state, setState] = useState<State>({ kind: "idle" });
@@ -44,7 +47,7 @@ export function ArchiveRetention({
   const detail = record.detail;
   const authorized = session?.roles.includes("configure") === true;
   async function preview(action: RetentionSelection["action"]) {
-    if (!authorized || controller.current || record === undefined) return;
+    if (!authorized || controller.current || record === undefined || stale) return;
     const active = new AbortController();
     controller.current = active;
     setState({ kind: "previewing" });
@@ -93,7 +96,8 @@ export function ArchiveRetention({
   async function apply(
     review: Extract<State, { readonly kind: "review" | "applying" | "uncertain" }>,
   ) {
-    if (!session || !authorized || controller.current) return;
+    if (!session || !authorized || controller.current || (review.kind === "review" && stale))
+      return;
     const active = new AbortController();
     controller.current = active;
     setState({ ...review, kind: "applying" });
@@ -113,7 +117,7 @@ export function ArchiveRetention({
               ? "The reviewed archive changed. No new change was admitted; refresh and review again."
               : "Retention change confirmed. Permanent statistics are preserved.",
         });
-        onChanged();
+        onChanged(result.value);
       } else setState({ ...review, kind: "uncertain" });
     } catch {
       if (!active.signal.aborted) setState({ ...review, kind: "uncertain" });
@@ -148,12 +152,15 @@ export function ArchiveRetention({
         Permanent run and job statistics are unaffected. Deleted details cannot be restored by
         changing retention.
       </p>
+      {stale && (state.kind === "idle" || state.kind === "review") ? (
+        <p role="status">Archive evidence changed. Close this review and open a fresh preview.</p>
+      ) : null}
       {state.kind === "idle" ? (
         <div className="economics-actions">
           <button
             type="button"
             className="button button--secondary"
-            disabled={!authorized}
+            disabled={!authorized || stale}
             onClick={() => void preview("apply_policy")}
           >
             <Eye className="button-icon" aria-hidden="true" />
@@ -162,7 +169,7 @@ export function ArchiveRetention({
           <button
             type="button"
             className="button button--secondary"
-            disabled={!authorized}
+            disabled={!authorized || stale}
             onClick={() => void preview("erase_details")}
           >
             <Trash2 className="button-icon" aria-hidden="true" />
@@ -194,7 +201,7 @@ export function ArchiveRetention({
               <button
                 type="button"
                 className="button button--primary"
-                disabled={!authorized}
+                disabled={!authorized || stale}
                 onClick={() => void apply(state)}
               >
                 Confirm reviewed change

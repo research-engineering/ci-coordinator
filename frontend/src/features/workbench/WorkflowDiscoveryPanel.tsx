@@ -23,21 +23,33 @@ interface WorkflowDiscoveryPanelProps {
   readonly scope: WorkbenchScope;
   readonly session: ControlPlaneSession | undefined;
   readonly expectedActive: ExpectedActiveEpoch | null | undefined;
+  readonly authorityRevision: number;
+  readonly snapshotReadRevision: number;
+  readonly snapshotLoading: boolean;
+  readonly onConfirmed: (active?: ExpectedActiveEpoch) => void;
+  readonly onRefreshSnapshot: () => void;
 }
 
 export function WorkflowDiscoveryPanel({
   scope,
   session,
   expectedActive,
+  authorityRevision,
+  snapshotReadRevision,
+  snapshotLoading,
+  onConfirmed,
+  onRefreshSnapshot,
 }: WorkflowDiscoveryPanelProps) {
   const [requestedRevision, setRequestedRevision] = useState<string | undefined>();
   const [revisionInput, setRevisionInput] = useState("");
   const [revisionError, setRevisionError] = useState<string>();
+  const [commandLocked, setCommandLocked] = useState(false);
   const query = useWorkflowDiscovery(scope, requestedRevision);
   const result = query.state.kind === "settled" ? query.state.result : undefined;
 
   function submitRevision(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (commandLocked) return;
     const revision = revisionInput.trim();
     if (revision !== "" && !/^[0-9a-f]{40}$/.test(revision)) {
       setRevisionError("Enter an exact 40-character lowercase commit SHA.");
@@ -50,6 +62,7 @@ export function WorkflowDiscoveryPanel({
   }
 
   function useCurrentHead() {
+    if (commandLocked) return;
     setRevisionInput("");
     setRevisionError(undefined);
     if (requestedRevision === undefined) query.refresh();
@@ -68,6 +81,7 @@ export function WorkflowDiscoveryPanel({
           className="icon-button"
           onClick={query.refresh}
           title="Refresh workflow discovery"
+          disabled={commandLocked}
         >
           <RefreshCw aria-hidden="true" />
         </button>
@@ -87,18 +101,24 @@ export function WorkflowDiscoveryPanel({
               placeholder="Current default-branch head"
               spellCheck={false}
               value={revisionInput}
+              disabled={commandLocked}
               onChange={(event) => setRevisionInput(event.target.value)}
               aria-invalid={revisionError !== undefined}
               aria-describedby={revisionError ? "workflow-revision-error" : undefined}
             />
           </span>
         </label>
-        <button type="submit" className="button button--primary">
+        <button type="submit" className="button button--primary" disabled={commandLocked}>
           <Search className="button-icon" aria-hidden="true" />
           Scan
         </button>
         {requestedRevision !== undefined ? (
-          <button type="button" className="button button--secondary" onClick={useCurrentHead}>
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={useCurrentHead}
+            disabled={commandLocked}
+          >
             Use current head
           </button>
         ) : null}
@@ -133,6 +153,12 @@ export function WorkflowDiscoveryPanel({
             report={result.report}
             scope={scope}
             session={session}
+            authorityRevision={authorityRevision}
+            snapshotReadRevision={snapshotReadRevision}
+            snapshotLoading={snapshotLoading}
+            onConfirmed={onConfirmed}
+            onRefreshSnapshot={onRefreshSnapshot}
+            onLockedChange={setCommandLocked}
           />
         </>
       ) : result ? (

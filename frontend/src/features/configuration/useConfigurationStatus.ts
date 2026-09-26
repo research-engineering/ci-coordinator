@@ -8,6 +8,8 @@ export function useConfigurationStatus(
   enabled: boolean,
   minimumActive: ConfigStatus["active"] | undefined,
   readRevision: number,
+  sharedReadRevision = 0,
+  minimumConflict = false,
 ) {
   const [cursors, setCursors] = useState<readonly (string | null)[]>([null]);
   const [version, setVersion] = useState(0);
@@ -17,7 +19,7 @@ export function useConfigurationStatus(
   }>();
   const latestActive = useRef<ConfigStatus["active"] | undefined>(undefined);
   const after = cursors.at(-1) ?? null;
-  const key = `${scope.installationId}:${scope.repositoryId}:${enabled}:${after}:${version}:${minimumActive?.revision}:${minimumActive?.epochId}:${readRevision}`;
+  const key = `${scope.installationId}:${scope.repositoryId}:${enabled}:${after}:${version}:${minimumActive?.revision}:${minimumActive?.epochId}:${readRevision}:${sharedReadRevision}:${minimumConflict}`;
   useLayoutEffect(() => {
     setReceived(undefined);
     if (
@@ -27,6 +29,10 @@ export function useConfigurationStatus(
       latestActive.current = minimumActive;
     if (!enabled) {
       setCursors((current) => (current.length === 1 ? current : [null]));
+      return;
+    }
+    if (minimumConflict) {
+      setReceived({ key, result: { kind: "invalid-response" } });
       return;
     }
     const controller = new AbortController();
@@ -57,7 +63,7 @@ export function useConfigurationStatus(
       setReceived({ key, result });
     });
     return () => controller.abort();
-  }, [scope, after, enabled, key, minimumActive]);
+  }, [scope, after, enabled, key, minimumActive, minimumConflict]);
   function refresh() {
     setCursors([null]);
     setVersion((value) => value + 1);

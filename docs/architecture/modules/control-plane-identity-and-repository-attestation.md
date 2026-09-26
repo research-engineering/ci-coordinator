@@ -268,6 +268,15 @@ types, status codes, and bounded wire models. It does not own token claims,
 roles, proposal validity, repository permission, durable time, or receipt
 semantics.
 
+The development browser proxy projects two distinct callback query contracts:
+Keycloak requires bounded code, state and issuer with optional bounded
+session_state; GitHub requires only its bounded ASCII code and state. Both
+reject duplicate, unknown and structurally invalid fields before forwarding.
+This is structural capability admission under `REQ-CI-UI-002`, not identity
+verification: configured issuer equality, transaction, token and session checks
+remain backend-owned. The proxy neither injects credentials nor becomes part
+of the production bundle's authentication boundary.
+
 ## 9. Failure Algebra
 
 ```text

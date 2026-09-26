@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { boundedFetch, combinedSignal, ResponseLimitError } from "../shared/boundedFetch";
+import { boundedFetch, combinedSignal } from "../shared/boundedFetch";
+import { caughtFailure } from "../shared/responseFailure";
 
 export type EconomicsFailure =
   | {
@@ -89,14 +90,6 @@ export async function requestEconomics<T>(options: {
     return { kind: "invalid-response" };
   } catch (error) {
     if (options.signal?.aborted) throw error;
-    return {
-      kind:
-        error instanceof z.ZodError ||
-        error instanceof SyntaxError ||
-        error instanceof ResponseLimitError ||
-        error instanceof RangeError
-          ? "invalid-response"
-          : "network-failure",
-    };
+    return caughtFailure(error);
   }
 }

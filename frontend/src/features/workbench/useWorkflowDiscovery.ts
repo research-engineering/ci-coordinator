@@ -19,10 +19,15 @@ export function useWorkflowDiscovery(
   revision: string | undefined,
 ) {
   const [refreshRevision, setRefreshRevision] = useState(0);
-  const request = useMemo(
-    () => ({ key: requestKey(scope, revision, refreshRevision), revision, scope }),
-    [refreshRevision, revision, scope],
-  );
+  const installationId = scope?.installationId;
+  const repositoryId = scope?.repositoryId;
+  const request = useMemo(() => {
+    const repository =
+      installationId === undefined || repositoryId === undefined
+        ? undefined
+        : { installationId, repositoryId };
+    return { key: requestKey(repository, revision, refreshRevision), revision, scope: repository };
+  }, [refreshRevision, revision, installationId, repositoryId]);
   const [state, setState] = useState<QueryState>({ kind: "idle" });
 
   useEffect(() => {
@@ -62,7 +67,7 @@ export function useWorkflowDiscovery(
 }
 
 function requestKey(
-  scope: WorkbenchScope | undefined,
+  scope: Pick<WorkbenchScope, "installationId" | "repositoryId"> | undefined,
   revision: string | undefined,
   refreshRevision: number,
 ): string {

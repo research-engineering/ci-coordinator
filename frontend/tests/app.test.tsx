@@ -387,31 +387,56 @@ test.each([true, false])(
   },
 );
 
-test("shows effective governance without claiming a baseline or compliance", async () => {
-  const user = userEvent.setup();
-  renderApp(async (request) => {
-    const path = requestUrl(request).pathname;
-    if (path === "/api/v1/auth/session") return Response.json(controlPlaneSessionFixture());
-    if (path === "/api/v1/workbench/repositories/1/1/governance-comparison") {
-      return Response.json(unbaselinedGovernanceComparisonFixture());
+test.each([false, true])(
+  "shows ruleset-only governance without claiming branch protection (empty=%s)",
+  async (empty) => {
+    const user = userEvent.setup();
+    const evidence = unbaselinedGovernanceComparisonFixture();
+    const body = empty
+      ? {
+          ...evidence,
+          observation: {
+            ...evidence.observation,
+            rules: [],
+            stateDigest: "9bfb0fcc7a8ffb40f6cdb25aaa6fcf30e405a066579ae47efc128ea8ccddb8d1",
+          },
+        }
+      : evidence;
+    renderApp(async (request) => {
+      const path = requestUrl(request).pathname;
+      if (path === "/api/v1/auth/session") return Response.json(controlPlaneSessionFixture());
+      if (path === "/api/v1/workbench/repositories/1/1/governance-comparison") {
+        return Response.json(body);
+      }
+      return admittedResponse(request);
+    });
+    await user.click(await screen.findByRole("button", { name: "Open" }));
+    await user.click(screen.getByRole("link", { name: "Governance" }));
+
+    expect(await screen.findByRole("heading", { name: "Effective governance" })).toBeVisible();
+    expect(await screen.findByText("Observation only")).toBeVisible();
+    expect(screen.getByText("Best effort")).toBeVisible();
+    expect(screen.getByText("Active ruleset rules").nextElementSibling).toHaveTextContent(
+      empty ? /^0$/ : /^1$/,
+    );
+    expect(screen.getByText("Classic branch protection").nextElementSibling).toHaveTextContent(
+      /^Not observed$/,
+    );
+    if (empty) {
+      expect(screen.getByText("No active ruleset rules reported")).toBeVisible();
+      expect(screen.getByText("Branch protection remains unverified.")).toBeVisible();
+      expect(screen.queryByText("required_status_checks")).not.toBeInTheDocument();
+    } else {
+      expect(screen.getByText("required_status_checks")).toBeVisible();
+      expect(screen.getByText("Canonical provider rule")).not.toBeVisible();
+      await user.click(screen.getByText("required_status_checks"));
+      expect(screen.getByText("Canonical provider rule")).toBeVisible();
     }
-    return admittedResponse(request);
-  });
-  await user.click(await screen.findByRole("button", { name: "Open" }));
-  await user.click(screen.getByRole("link", { name: "Governance" }));
-
-  expect(await screen.findByRole("heading", { name: "Effective governance" })).toBeVisible();
-  expect(await screen.findByText("Observation only")).toBeVisible();
-  expect(screen.getByText("Best effort")).toBeVisible();
-  expect(screen.getByText("required_status_checks")).toBeVisible();
-  expect(screen.getByText("Canonical provider rule")).not.toBeVisible();
-
-  await user.click(screen.getByText("required_status_checks"));
-  expect(screen.getByText("Canonical provider rule")).toBeVisible();
-  expect(screen.getByText("No approved baseline")).toBeVisible();
-  expect(screen.getByText("unbaselined")).toBeVisible();
-  expect(screen.queryByRole("button", { name: /compliance|enforce/i })).not.toBeInTheDocument();
-});
+    expect(screen.getByText("No approved baseline")).toBeVisible();
+    expect(screen.getByText("unbaselined")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /compliance|enforce/i })).not.toBeInTheDocument();
+  },
+);
 
 test("binds an approved governance receipt to the current authority revision", async () => {
   const requests: Request[] = [];
@@ -605,17 +630,39 @@ test("aborts and discards an approval from an older comparison generation", asyn
 
 test("requires repository authority before activating the observed proposal", async () => {
   const requests: Request[] = [];
+  let activated = false;
   renderApp(async (request) => {
     requests.push(request);
     const path = requestUrl(request).pathname;
     if (path === "/api/v1/auth/session") return Response.json(controlPlaneSessionFixture());
     if (path === "/api/v1/workbench/repositories/1/1") {
-      return Response.json(workbenchFixture());
+      return Response.json(
+        workbenchFixture({
+          configEpochs: activated
+            ? [
+                {
+                  active: true,
+                  activeRevision: 1,
+                  epochId: "4".repeat(64),
+                  sourceFormat: "json",
+                  sourceHash: "a".repeat(64),
+                  documentHash: "b".repeat(64),
+                  epochHash: "c".repeat(64),
+                  documentSchemaId: "ci-repository-policy/v1",
+                  documentProfileId: "ci-policy-document/v1",
+                  semanticProfileId: "ci-repository-policy-semantics/v1",
+                  compiledSchemaId: "ci-compiled-repository-policy/v1",
+                },
+              ]
+            : [],
+        }),
+      );
     }
     if (path === "/api/v1/repository-attestations/github/start") {
       return Response.json({ error: "already_reviewed", ok: false }, { status: 409 });
     }
     if (path === "/api/v1/config/activations") {
+      activated = true;
       return Response.json(configActivationFixture());
     }
     return admittedResponse(request);
@@ -628,7 +675,8 @@ test("requires repository authority before activating the observed proposal", as
   await userEvent.click(await screen.findByRole("button", { name: "Activate proposal" }));
 
   expect(await screen.findByText("Configuration activated")).toBeVisible();
-  expect(screen.getByText("Revision 1 is now authoritative")).toBeVisible();
+  expect(screen.getByText("Activation recorded at revision 1")).toBeVisible();
+  expect(await screen.findByText(/Current observed revision 1/)).toBeVisible();
   const attestation = requests.find(
     (request) =>
       request.method === "POST" &&
