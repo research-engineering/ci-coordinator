@@ -88,18 +88,32 @@ def test_only_the_direct_capability_runtime_principal_is_admitted(
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize(
+    "privilege",
+    (
+        "INSERT",
+        "UPDATE",
+        "REFERENCES",
+        "INSERT (version_num)",
+        "UPDATE (version_num)",
+        "REFERENCES (version_num)",
+    ),
+)
 def test_principal_attestation_rejects_excess_migration_metadata_authority(
     postgres_database_url: str,
     runtime_postgres_database_url: str,
+    privilege: str,
 ) -> None:
     async def scenario() -> None:
         profile = load_bundled_profile()
         migration_engine = create_postgres_engine(postgres_database_url)
         runtime_engine = create_postgres_engine(runtime_postgres_database_url)
         try:
+            async with runtime_engine.connect() as connection:
+                assert await runtime_principal_is_restricted(connection, profile)
             async with migration_engine.begin() as connection:
                 await connection.execute(
-                    text(f"GRANT UPDATE ON public.alembic_version TO {RUNTIME_ROLE}")
+                    text(f"GRANT {privilege} ON public.alembic_version TO {RUNTIME_ROLE}")
                 )
             try:
                 async with runtime_engine.connect() as connection:
@@ -107,7 +121,7 @@ def test_principal_attestation_rejects_excess_migration_metadata_authority(
             finally:
                 async with migration_engine.begin() as connection:
                     await connection.execute(
-                        text(f"REVOKE UPDATE ON public.alembic_version FROM {RUNTIME_ROLE}")
+                        text(f"REVOKE {privilege} ON public.alembic_version FROM {RUNTIME_ROLE}")
                     )
         finally:
             await runtime_engine.dispose()
