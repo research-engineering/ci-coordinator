@@ -4,14 +4,17 @@ import json
 import logging
 from collections.abc import Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from io import StringIO
 from threading import Barrier
-from typing import Any, Literal, cast
+from typing import Any, Literal, cast, get_args
 
 import pytest
 from _pytest.logging import LogCaptureHandler, catching_logs
-from prometheus_support import prometheus_samples
+from prometheus_client import Counter
+from prometheus_support import SampleKey, prometheus_samples
 
+from ci_coordinator.app.config_management import ConfigActivationState
 from ci_coordinator.observability import (
     BackgroundHealth,
     BackgroundHealthState,
@@ -28,6 +31,56 @@ from ci_coordinator.observability.runtime_metrics import (
     CI_ECONOMICS_COLLECTION_METRIC_OUTCOMES,
     CiEconomicsCollectionItemMetricOutcome,
 )
+
+_ACTIVATION_STATES = (
+    "applied",
+    "attestation_invalid",
+    "coverage_reducing",
+    "coverage_unproven",
+    "duplicate",
+    "forbidden",
+    "operation_conflict",
+    "revision_conflict",
+    "target_unavailable",
+    "unavailable",
+)
+_HISTORY_FAILURE_BASELINES: dict[SampleKey, float] = {
+    **{
+        ("ci_coordinator_ci_history_items_total", (("lane", lane), ("outcome", outcome))): 0
+        for lane in ("backfill", "discovery", "recent", "repair")
+        for outcome in ("store_unavailable", "unexpected_error")
+    },
+    **{
+        (
+            "ci_coordinator_ci_history_provider_results_total",
+            (("lane", lane), ("outcome", outcome)),
+        ): 0
+        for lane in ("backfill", "discovery", "recent", "repair")
+        for outcome in (
+            "access_unavailable",
+            "timed_out",
+            "provider_unavailable",
+            "provider_binding_mismatch",
+            "provider_malformed",
+            "provider_incomplete",
+            "provider_unstable",
+        )
+    },
+    **{
+        ("ci_coordinator_ci_history_delivery_outcomes_total", (("outcome", outcome),)): 0
+        for outcome in ("store_unavailable", "unexpected_error", "timed_out")
+    },
+}
+_HTTP_SAMPLE_NAMES = (
+    "ci_coordinator_http_requests_total",
+    "ci_coordinator_http_request_duration_seconds_bucket",
+    "ci_coordinator_http_request_duration_seconds_count",
+    "ci_coordinator_http_request_duration_seconds_sum",
+)
+
+
+def _samples_for(metrics: RuntimeMetrics, *names: str) -> dict[SampleKey, float]:
+    return {key: value for key, value in prometheus_samples(metrics).items() if key[0] in names}
 
 
 class _ExplodingMapping(Mapping[str, object]):
@@ -134,6 +187,231 @@ def test_runtime_metrics_project_bounded_operational_signals() -> None:
         ]
         == 1
     )
+
+
+def test_activation_metric_literals_cover_the_application_contract() -> None:
+    assert set(_ACTIVATION_STATES) == set(get_args(ConfigActivationState.__value__))
+
+
+@pytest.mark.parametrize("result", (*_ACTIVATION_STATES, "other", "not-admitted"))
+def test_activation_exports_zero_before_each_exact_outcome(result: str) -> None:
+    metrics = RuntimeMetrics()
+    name = "ci_coordinator_config_activations_total"
+    expected = {(name, (("result", state),)): 0 for state in (*_ACTIVATION_STATES, "other")}
+    assert _samples_for(metrics, name) == expected
+
+    metrics.config_activation(result)
+
+    expected[(name, (("result", result if result in _ACTIVATION_STATES else "other"),))] = 1
+    assert _samples_for(metrics, name) == expected
+    assert prometheus_samples(metrics)[
+        ("ci_coordinator_config_activation_cas_conflicts_total", ())
+    ] == int(result == "revision_conflict")
+
+
+@pytest.mark.parametrize(("name", "labels"), _HISTORY_FAILURE_BASELINES)
+def test_history_failure_exports_zero_before_first_and_third_events(
+    name: str, labels: tuple[tuple[str, str], ...]
+) -> None:
+    metrics = RuntimeMetrics()
+    names = {key[0] for key in _HISTORY_FAILURE_BASELINES}
+    expected = _HISTORY_FAILURE_BASELINES.copy()
+    assert len(expected) == 39
+    assert _samples_for(metrics, *names) == expected
+    assert not any(
+        key[0] == "ci_coordinator_ci_history_worker_running" for key in prometheus_samples(metrics)
+    )
+    values = dict(labels)
+    if name == "ci_coordinator_ci_history_items_total":
+        record = partial(metrics.ci_history_item, values["lane"], values["outcome"])
+    elif name == "ci_coordinator_ci_history_provider_results_total":
+        record = partial(metrics.ci_history_provider_result, values["lane"], values["outcome"])
+    else:
+        record = partial(metrics.ci_history_delivery, values["outcome"])
+
+    for count in (1, 2, 3):
+        record()
+        expected[(name, labels)] = count
+        assert _samples_for(metrics, *names) == expected
+
+
+@pytest.mark.parametrize(
+    ("name", "labels"),
+    (
+        ("ci_coordinator_config_activations_total", (("result", "attestation_invalid"),)),
+        (
+            "ci_coordinator_ci_history_items_total",
+            (("lane", "backfill"), ("outcome", "store_unavailable")),
+        ),
+        (
+            "ci_coordinator_ci_history_provider_results_total",
+            (("lane", "backfill"), ("outcome", "access_unavailable")),
+        ),
+        ("ci_coordinator_ci_history_delivery_outcomes_total", (("outcome", "store_unavailable"),)),
+    ),
+)
+def test_failed_counter_seed_does_not_suppress_remaining_children_or_real_events(
+    name: str, labels: tuple[tuple[str, str], ...], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_labels = Counter.labels
+
+    def failing_labels(counter: Counter, *values: str, **named: str) -> Counter:
+        if counter._name == name.removesuffix("_total") and values == tuple(
+            value for _, value in labels
+        ):
+            raise RuntimeError("private exporter failure")
+        return original_labels(counter, *values, **named)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Counter, "labels", failing_labels)
+        metrics = RuntimeMetrics()
+
+    expected: dict[SampleKey, float] = {
+        **_HISTORY_FAILURE_BASELINES,
+        **{
+            ("ci_coordinator_config_activations_total", (("result", state),)): 0
+            for state in (*_ACTIVATION_STATES, "other")
+        },
+    }
+    del expected[(name, labels)]
+    assert _samples_for(metrics, *(key[0] for key in expected)) == expected
+    assert metrics.instrumentation_failure_count == 1
+    assert (
+        prometheus_samples(metrics)[
+            ("ci_coordinator_instrumentation_failures_total", (("surface", "counter"),))
+        ]
+        == 1
+    )
+    metrics.config_activation("attestation_invalid")
+    metrics.ci_history_item("backfill", "store_unavailable")
+    metrics.ci_history_provider_result("backfill", "access_unavailable")
+    metrics.ci_history_delivery("store_unavailable")
+    assert prometheus_samples(metrics)[(name, labels)] == 1
+    assert b"private exporter failure" not in metrics.snapshot().content
+
+
+@pytest.mark.parametrize(
+    "templates",
+    (
+        frozenset(),
+        frozenset({"/unrelated"}),
+        frozenset({"/webhooks/github"}),
+        frozenset({"/api/v1/dynamic-ci/plan"}),
+        frozenset({"/webhooks/github", "/api/v1/dynamic-ci/plan"}),
+    ),
+)
+def test_bound_http_alert_series_export_zero_and_preserve_events_on_rebind(
+    templates: frozenset[str],
+) -> None:
+    metrics = RuntimeMetrics()
+    assert _samples_for(metrics, *_HTTP_SAMPLE_NAMES) == {}
+    metrics.bind_http_route_templates(templates)
+    webhook_labels = (("method", "POST"), ("route", "/webhooks/github"), ("status_class", "5xx"))
+    plan_labels = (
+        ("method", "POST"),
+        ("route", "/api/v1/dynamic-ci/plan"),
+        ("status_class", "2xx"),
+    )
+    expected: dict[SampleKey, float] = {}
+    if "/webhooks/github" in templates:
+        expected[(_HTTP_SAMPLE_NAMES[0], webhook_labels)] = 0
+    if "/api/v1/dynamic-ci/plan" in templates:
+        for le in (
+            "0.005",
+            "0.01",
+            "0.025",
+            "0.05",
+            "0.1",
+            "0.25",
+            "0.5",
+            "1.0",
+            "2.5",
+            "5.0",
+            "10.0",
+            "15.0",
+            "30.0",
+            "60.0",
+            "+Inf",
+        ):
+            expected[(_HTTP_SAMPLE_NAMES[1], (("le", le), *plan_labels))] = 0
+        expected[(_HTTP_SAMPLE_NAMES[2], plan_labels)] = 0
+        expected[(_HTTP_SAMPLE_NAMES[3], plan_labels)] = 0
+    assert _samples_for(metrics, *_HTTP_SAMPLE_NAMES) == expected
+
+    if "/webhooks/github" in templates:
+        metrics.http_request(
+            method="POST", route="/webhooks/github", status_code=503, duration_seconds=0.5
+        )
+        expected[(_HTTP_SAMPLE_NAMES[0], webhook_labels)] = 1
+    if "/api/v1/dynamic-ci/plan" in templates:
+        metrics.http_request(
+            method="POST", route="/api/v1/dynamic-ci/plan", status_code=200, duration_seconds=12
+        )
+        for key in expected:
+            if key[0] == _HTTP_SAMPLE_NAMES[1]:
+                expected[key] = int(float(dict(key[1])["le"]) >= 12)
+        expected[(_HTTP_SAMPLE_NAMES[2], plan_labels)] = 1
+        expected[(_HTTP_SAMPLE_NAMES[3], plan_labels)] = 12
+    after = _samples_for(metrics, *_HTTP_SAMPLE_NAMES)
+    for key, value in expected.items():
+        assert after[key] == value
+    metrics.bind_http_route_templates(templates)
+    assert _samples_for(metrics, *_HTTP_SAMPLE_NAMES) == after
+
+
+def test_rejected_http_catalog_cannot_seed_alert_children() -> None:
+    metrics = RuntimeMetrics()
+    metrics.bind_http_route_templates(frozenset())
+    with pytest.raises(ValueError):
+        metrics.bind_http_route_templates(
+            frozenset({"/webhooks/github", "/api/v1/dynamic-ci/plan"})
+        )
+    assert _samples_for(metrics, *_HTTP_SAMPLE_NAMES) == {}
+
+
+@pytest.mark.parametrize("failed_parent", ("_http_requests", "_http_duration"))
+@pytest.mark.parametrize("failed_recorder", (False, True))
+def test_http_seed_failure_is_per_child_and_non_recursive(
+    failed_parent: str, failed_recorder: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    metrics = RuntimeMetrics()
+
+    def fail(*_: str) -> None:
+        raise RuntimeError("private exporter failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(getattr(metrics, failed_parent), "labels", fail)
+        if failed_recorder:
+            patch.setattr(metrics._instrumentation_failures, "labels", fail)
+        metrics.bind_http_route_templates(
+            frozenset({"/webhooks/github", "/api/v1/dynamic-ci/plan"})
+        )
+    samples = prometheus_samples(metrics)
+    webhook_key = (
+        _HTTP_SAMPLE_NAMES[0],
+        (("method", "POST"), ("route", "/webhooks/github"), ("status_class", "5xx")),
+    )
+    plan_key = (
+        _HTTP_SAMPLE_NAMES[2],
+        (("method", "POST"), ("route", "/api/v1/dynamic-ci/plan"), ("status_class", "2xx")),
+    )
+    failed_key, healthy_key = (
+        (webhook_key, plan_key) if failed_parent == "_http_requests" else (plan_key, webhook_key)
+    )
+    assert failed_key not in samples
+    assert samples[healthy_key] == 0
+    assert metrics.instrumentation_failure_count == 1
+    assert samples[
+        ("ci_coordinator_instrumentation_failures_total", (("surface", "http"),))
+    ] == int(not failed_recorder)
+    metrics.http_request(
+        method="POST", route="/webhooks/github", status_code=503, duration_seconds=0.5
+    )
+    metrics.http_request(
+        method="POST", route="/api/v1/dynamic-ci/plan", status_code=200, duration_seconds=12
+    )
+    samples = prometheus_samples(metrics)
+    assert samples[webhook_key] == samples[plan_key] == 1
 
 
 def test_http_metrics_use_route_templates_and_bound_unknown_dimensions() -> None:

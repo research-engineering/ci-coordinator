@@ -114,6 +114,8 @@ the complete audit parents:
 | [#32](https://github.com/research-engineering/ci-coordinator/pull/32) | Closed server diagnostics, terminal-loop cause reporting and failure-safe structured logging. |
 | [#33](https://github.com/research-engineering/ci-coordinator/pull/33) | Typed admission for integral sharding numbers, oversized advice confidence and incomplete audit scope. |
 | [#34](https://github.com/research-engineering/ci-coordinator/pull/34) | Effective migration-head column privileges and independent PUBLIC column ACL admission. |
+| [#35](https://github.com/research-engineering/ci-coordinator/pull/35) | Aware configuration audit times and defined-offset shadow admission; immutable historical replay is preserved. |
+| [#36](https://github.com/research-engineering/ci-coordinator/pull/36) | Complete bounded text-policy inputs and active-environment executable admission; the existing file exclusions and pinned CLI policy are preserved. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -123,10 +125,12 @@ Live provider enrollment, authentication and deployment recovery remain separate
 mocked APIs are not their evidence. Artifact publication, artifact qualification
 and production omission authority are still distinct.
 
-The next prepared audit repairs address aware-time boundaries and phase-exact
-managed dependency installation. UI read/command freshness requires complete
-bounded text-policy qualification. Provider-catalog observations and finite
-alert baselines share a bounded observational repair batch. Workflow CPU
+The next prepared audit batch joins provider-catalog observations and finite
+alert baselines. Phase-exact managed dependency installation and transitive
+process ownership follow their own lifecycle proof. The text-policy blocker for
+UI read/command freshness is resolved; that candidate still requires its own
+integrated native qualification. Explicit review renewal preserves historical
+replay while rejecting new legacy requests. Workflow CPU
 isolation, readiness freshness and plan-failure telemetry retain their own
 lifecycle and outcome contracts. No prepared scope is qualified merely
 by this ordering or by the preceding PRs; all remain routed through CI-054 and

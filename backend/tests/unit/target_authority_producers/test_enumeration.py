@@ -1,11 +1,22 @@
 from __future__ import annotations
 
-from dataclasses import replace
+import asyncio
+import base64
+import json
+from dataclasses import dataclass, field, replace
 
 import pytest
 from workflow_authority.factories import evidence as workflow_evidence
 
 from ci_coordinator.governance_observation import GovernanceRepository, GovernanceState
+from ci_coordinator.integrations.github.app_transport_profile import GITHUB_API_VERSION
+from ci_coordinator.integrations.github.contracts import (
+    GitHubPaginationEvidence,
+    GitHubRequest,
+    GitHubResponse,
+)
+from ci_coordinator.integrations.github.workflow_catalog_client import WorkflowCatalogClient
+from ci_coordinator.integrations.github.workflow_inventory import GitHubWorkflowInventoryLoader
 from ci_coordinator.repo_context import ProviderWorkflowInventory
 from ci_coordinator.target_authority_producers import (
     ProviderAuthoritySources,
@@ -229,3 +240,90 @@ def test_registration_and_observation_enumerate_target_declarations_independentl
         and candidate.evidence_digest == observed[candidate.candidate_id].evidence_digest
         for candidate in registration.candidates
     )
+
+
+@pytest.mark.parametrize("include_platforms", [False, True])
+@pytest.mark.parametrize("extra_source", [False, True])
+def test_real_inventory_loader_preserves_the_complete_producer_authority_domain(
+    include_platforms: bool, extra_source: bool
+) -> None:
+    sources = observation_sources()
+    repository = sources.workflow_evidence.manifest.repository
+    transport = _WorkflowPopulationTransport(include_platforms, extra_source)
+    loader = GitHubWorkflowInventoryLoader(
+        WorkflowCatalogClient(transport, api_version=GITHUB_API_VERSION)
+    )
+    inventory = asyncio.run(
+        loader.load(repository, revision_sha=REVISION, required_paths=(WORKFLOW_PATH,))
+    )
+    assert inventory is not None, "actual catalogue and content decoding must succeed"
+    assert [request.path for request in transport.requests] == [
+        "/repos/example-org/consumer/actions/workflows",
+        f"/repos/example-org/consumer/contents/{WORKFLOW_PATH}",
+    ]
+    assert [
+        [(item.name, item.value) for item in request.query] for request in transport.requests
+    ] == [[("page", "1"), ("per_page", "100")], [("ref", REVISION)]]
+    actual_sources = replace(
+        sources,
+        provider_authority=ProviderAuthoritySources(
+            inventory, sources.provider_authority.governance
+        ),
+    )
+    if extra_source:
+        assert len(inventory.inventory.default_branch_workflows) == 2
+        with pytest.raises(TargetAuthorityProducerError) as raised:
+            enumerate_observation_candidates(actual_sources)
+        assert raised.value.code == "provider_workflow_domain_mismatch"
+    else:
+        assert inventory == sources.provider_authority.workflows
+        expected = enumerate_observation_candidates(sources)
+        actual = enumerate_observation_candidates(actual_sources)
+        assert actual == expected
+        assert actual.candidate_set_digest == expected.candidate_set_digest
+        assert actual.authority_domain_digest == expected.authority_domain_digest
+        assert actual.provider_authority_digest == expected.provider_authority_digest
+
+
+@dataclass
+class _WorkflowPopulationTransport:
+    include_platforms: bool
+    extra_source: bool
+    requests: list[GitHubRequest] = field(default_factory=list)
+
+    async def send(self, request: GitHubRequest) -> GitHubResponse:
+        self.requests.append(request)
+        total: int | None = None
+        payload: dict[str, object]
+        if request.operation == "workflow_catalog.list_workflows":
+            rows = [{"id": 101, "path": WORKFLOW_PATH, "state": "active"}]
+            if self.include_platforms:
+                rows.extend(
+                    {"id": identity, "path": path, "state": "active"}
+                    for identity, path in (
+                        (901, "dynamic/dependabot/update-graph"),
+                        (902, "dynamic/github-code-scanning/codeql"),
+                    )
+                )
+            if self.extra_source:
+                rows.append({"id": 201, "path": ".github/workflows/extra.yml", "state": "active"})
+            total = len(rows)
+            payload = {"total_count": total, "workflows": rows}
+        elif request.operation == "workflow_catalog.get_content":
+            content = WORKFLOW_DOCUMENT.encode()
+            payload = {
+                "type": "file",
+                "path": WORKFLOW_PATH,
+                "encoding": "base64",
+                "size": len(content),
+                "content": base64.b64encode(content).decode("ascii"),
+            }
+        else:
+            raise AssertionError(f"unexpected provider operation: {request.operation}")
+        return GitHubResponse(
+            status=200,
+            api_version=GITHUB_API_VERSION,
+            headers=(),
+            body=json.dumps(payload, separators=(",", ":")).encode(),
+            pagination=GitHubPaginationEvidence(True, 1, total, None, "not_paginated"),
+        )
