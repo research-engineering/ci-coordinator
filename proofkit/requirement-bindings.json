@@ -5,7 +5,7 @@
   "sourceColumns": ["sourceId","path","sha256"],
   "sources": [
     ["ci-coordinator.routes.control-plane","proofkit/routes/control-plane.v2.json","7d01ff116f333bb9676e54b5561f917cb08b85699938a406b11d7063266c9022"],
-    ["ci-coordinator.routes.core","proofkit/routes/core.v2.json","9802b27ade88a8cee00251daca490d648b148708e5306ee9d79c4ec361766f8b"],
+    ["ci-coordinator.routes.core","proofkit/routes/core.v2.json","c269c13d9093292d390f3c828df85de28ed1119c34b879dbe7b96f937bdd1e2f"],
     ["ci-coordinator.routes.developer-environment","proofkit/routes/developer-environment.v2.json","8d878470a3b7afe50429d1e932caeda7dc7a6ae17cff4d6109eb726435550bf6"],
     ["ci-coordinator.routes.operator-ui","proofkit/routes/operator-ui.v2.json","c37006ef773634ca0d81f3659b360b315af1dc6bb03cfe8d2f56125f64b06e1f"],
     ["ci-coordinator.routes.proofkit-adoption","proofkit/routes/proofkit-adoption.v2.json","3e6cc03613b85f941e59a9f00372a088d6e5f9971b886b32d0d7a1ef7676f57d"],

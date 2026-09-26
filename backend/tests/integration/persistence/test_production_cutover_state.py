@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from datetime import datetime, timedelta
 
 import pytest
 from production_cutover_support import production_cutover_fixture
@@ -16,8 +17,13 @@ from ci_coordinator.operator_controls import (
     OverrideCommand,
     OverrideConflict,
 )
+from ci_coordinator.operator_controls.resolution import (
+    ActiveOverrideRecords,
+    OverrideLookupUnavailable,
+)
 from ci_coordinator.persistence.operator_override_repository import (
     DurableOperatorOverrideStore,
+    PostgresOperatorOverrideRepository,
     PostgresOperatorOverrideUnitOfWork,
 )
 from ci_coordinator.persistence.production_cutover_adapter import (
@@ -135,6 +141,7 @@ def test_real_evidence_stage_latch_activation_restart_and_successor(
                 overrides = await transaction.operator_overrides.resolve_active(
                     scope=scope, subject_id=None, now=await database_time(db.runtime)
                 )
+                assert isinstance(overrides, ActiveOverrideRecords)
                 assert not overrides.force_full_ci
 
             successor = production_cutover_fixture(
@@ -168,6 +175,109 @@ def test_real_evidence_stage_latch_activation_restart_and_successor(
                         .where(audit_events.c.event_type == b"production_cutover_applied")
                     )
                     == 6
+                )
+
+    asyncio.run(scenario())
+
+
+def test_future_subject_force_does_not_change_repository_latch_transitions(
+    postgres_database_url: str, runtime_postgres_database_url: str
+) -> None:
+    async def scenario() -> None:
+        async with cutover_database(postgres_database_url, runtime_postgres_database_url) as db:
+            controls = DurableOperatorOverrideStore(
+                lambda: PostgresOperatorOverrideUnitOfWork(db.runtime)
+            )
+            at = await database_time(db.runtime)
+            future = ActiveOverride.create(
+                OverrideCommand(
+                    "force_full_ci",
+                    db.fixture.draft.scope,
+                    "future-subject",
+                    "future-subject-before-cutover",
+                    "integration-operator",
+                    "subject uncertainty must not become a repository latch",
+                    at + timedelta(minutes=10),
+                ),
+                at + timedelta(minutes=5),
+            )
+            assert isinstance(
+                await controls.apply(future, OverrideAuditEvent.applied(future)), OverrideApplied
+            )
+            assert (
+                await controls.resolve_active(scope=future.command.scope, subject_id=None, now=at)
+                == ActiveOverrideRecords()
+            )
+            latched = await db.begin(await db.stage())
+            assert latched.latch_override_id is not None
+            applied = await db.activate(latched)
+            assert isinstance(applied, ProductionCutoverApplied), applied
+            assert applied.state.latch_override_id is None
+            observed = await database_time(db.runtime)
+            assert observed < future.applied_at
+            assert (
+                await controls.resolve_active(
+                    scope=future.command.scope, subject_id="future-subject", now=observed
+                )
+                == OverrideLookupUnavailable()
+            )
+            assert (
+                await controls.resolve_active(
+                    scope=future.command.scope, subject_id=None, now=observed
+                )
+                == ActiveOverrideRecords()
+            )
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("phase", ["begin", "activate"])
+def test_cutover_narrows_unavailable_override_knowledge_before_mutation(
+    postgres_database_url: str,
+    runtime_postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    phase: str,
+) -> None:
+    async def scenario() -> None:
+        async with cutover_database(postgres_database_url, runtime_postgres_database_url) as db:
+            state = await db.stage()
+            if phase == "activate":
+                state = await db.begin(state)
+            calls: list[tuple[RepositoryScope, str | None]] = []
+
+            async def unavailable(
+                self: PostgresOperatorOverrideRepository,
+                *,
+                scope: RepositoryScope,
+                subject_id: str | None,
+                now: datetime,
+            ) -> OverrideLookupUnavailable:
+                del self, now
+                calls.append((scope, subject_id))
+                return OverrideLookupUnavailable()
+
+            async with db.admin.connect() as connection:
+                audit_count = await connection.scalar(
+                    select(func.count()).select_from(audit_events)
+                )
+            with monkeypatch.context() as patch:
+                patch.setattr(PostgresOperatorOverrideRepository, "resolve_active", unavailable)
+                if phase == "begin":
+                    command = db.command("begin", state.revision, hash_object({}))
+                    result = await db.store.begin(command)
+                else:
+                    command, drain, current = await db.activation_inputs(state)
+                    result = await db.store.activate(
+                        command, grant=db.fixture.signed.grant, current=current, drain=drain
+                    )
+            assert calls == [(state.scope, None)]
+            assert result == ProductionCutoverRejected("override_conflict")
+            assert await db.store.inspect(state.scope) == state
+            assert await db.store.resolve(command) is None
+            async with db.admin.connect() as connection:
+                assert (
+                    await connection.scalar(select(func.count()).select_from(audit_events))
+                    == audit_count
                 )
 
     asyncio.run(scenario())

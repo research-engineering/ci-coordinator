@@ -88,6 +88,14 @@ ActiveForceFullCI(subject, now) or LatchedDisableOmission(scope)
 This second check is necessary. An application-only read could race a control
 commit between planning and selected-envelope insertion.
 
+A retained, unexpired force for the exact subject whose `applied_at` is later
+than the reader instant makes override knowledge unavailable, not absent or
+active. The latest unexpired force by application time and identity is sufficient
+to detect that uncertainty. Unavailable knowledge preserves
+the existing FullCI policy and rejects selected persistence under the same scope
+lock. This does not change `applies_at`, durable timestamps, audit bytes or replay;
+force commands expose an expiry, not a scheduled start time.
+
 ## 5. Policy Rollback Boundary
 
 Config rollback is not an override command. It is owned by `config_epochs` and

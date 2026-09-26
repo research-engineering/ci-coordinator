@@ -4,7 +4,8 @@ import asyncio
 from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text, update
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from ci_coordinator.audit_replay import AuditEventInput, prepare_audit_event
 from ci_coordinator.config_control import RepositoryScope
@@ -15,7 +16,12 @@ from ci_coordinator.operator_controls.override import (
     OverrideCommand,
     OverrideKind,
 )
-from ci_coordinator.operator_controls.resolution import resolve_active_overrides
+from ci_coordinator.operator_controls.resolution import (
+    ActiveOverrideRecords,
+    OverrideLookupUnavailable,
+    OverrideResolution,
+    resolve_active_overrides,
+)
 from ci_coordinator.operator_controls.use_cases import (
     OverrideApplied,
     OverrideConflict,
@@ -23,14 +29,17 @@ from ci_coordinator.operator_controls.use_cases import (
     OverrideUnavailable,
     apply_override,
 )
+from ci_coordinator.persistence.canonical_row import CanonicalRowCodecError
 from ci_coordinator.persistence.connection import create_postgres_engine
-from ci_coordinator.persistence.errors import PersistenceInvariantViolation
+from ci_coordinator.persistence.errors import PersistenceInvariantViolation, StoreUnavailable
 from ci_coordinator.persistence.operator_override_repository import (
     DurableOperatorOverrideStore,
     PostgresOperatorOverrideUnitOfWork,
     operator_override_runtime_principal_is_restricted,
     operator_override_state_schema_matches_contract,
 )
+from ci_coordinator.persistence.operator_override_schema import operator_overrides
+from ci_coordinator.persistence.schema import audit_events
 from ci_coordinator.persistence.unit_of_work import PostgresUnitOfWork
 
 from ._audit_replay_support import load_test_audit_records
@@ -306,6 +315,163 @@ def test_resolution_is_scope_bound_latest_active_per_kind(
             assert repository.disable_dynamic_override == disable
         finally:
             await engine.dispose()
+            await _clear_override_state(postgres_database_url)
+
+    asyncio.run(scenario())
+
+
+def test_future_force_population_is_typed_unavailable_without_rewriting_its_pair(
+    postgres_database_url: str,
+    runtime_postgres_database_url: str,
+) -> None:
+    async def scenario() -> None:
+        await _grant_runtime_columns(postgres_database_url, runtime_postgres_database_url)
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        store = DurableOperatorOverrideStore(lambda: PostgresOperatorOverrideUnitOfWork(engine))
+        old = _override(
+            operation_id="old-due",
+            applied_at=_NOW - timedelta(minutes=20),
+            expires_at=_NOW + timedelta(hours=1),
+        )
+        expired = _override(
+            operation_id="newer-expired",
+            applied_at=_NOW - timedelta(minutes=5),
+            expires_at=_NOW - timedelta(minutes=1),
+        )
+        futures = tuple(
+            _override(
+                operation_id=f"future-{index}",
+                applied_at=_NOW + timedelta(minutes=5),
+                expires_at=_NOW + timedelta(minutes=20),
+            )
+            for index in range(2)
+        )
+        other_subject = _override(operation_id="other-subject-due", subject_id="run-8")
+        foreign = tuple(
+            _override(
+                operation_id=f"foreign-{index}",
+                subject_id="run-8",
+                scope=scope,
+                applied_at=_NOW + timedelta(minutes=5),
+                expires_at=_NOW + timedelta(minutes=20),
+            )
+            for index, scope in enumerate((RepositoryScope(303, 202), RepositoryScope(101, 404)))
+        )
+        try:
+            for override in (old, expired, *futures, other_subject, *foreign):
+                assert isinstance(
+                    await store.apply(override, OverrideAuditEvent.applied(override)),
+                    OverrideApplied,
+                )
+            before = await _stored_override_pairs(engine)
+            async with PostgresOperatorOverrideUnitOfWork(engine) as transaction:
+                assert (
+                    await transaction.operator_overrides.resolve_active(
+                        scope=_SCOPE, subject_id="run-7", now=_NOW
+                    )
+                    == OverrideLookupUnavailable()
+                )
+                unresolved = await resolve_active_overrides(
+                    transaction.operator_overrides,
+                    scope=_SCOPE,
+                    subject_id="run-7",
+                    now=_NOW,
+                )
+                assert unresolved == OverrideResolution(lookup_available=False)
+                assert unresolved.force_full_ci is True
+                await transaction.commit()
+            assert (
+                await store.resolve_active(scope=_SCOPE, subject_id="run-7", now=_NOW)
+                == OverrideLookupUnavailable()
+            )
+            cases = (
+                (
+                    "run-7",
+                    _NOW + timedelta(minutes=5),
+                    max(futures, key=lambda row: row.override_id),
+                ),
+                ("run-7", _NOW + timedelta(minutes=20), old),
+                ("run-7", _NOW + timedelta(hours=1), None),
+                ("run-8", _NOW, other_subject),
+                ("absent-subject", _NOW, None),
+                (None, _NOW, None),
+            )
+            for subject, at, expected in cases:
+                async with PostgresOperatorOverrideUnitOfWork(engine) as transaction:
+                    assert await transaction.operator_overrides.resolve_active(
+                        scope=_SCOPE, subject_id=subject, now=at
+                    ) == ActiveOverrideRecords(force_full_ci=expected)
+                assert await store.resolve_active(
+                    scope=_SCOPE, subject_id=subject, now=at
+                ) == ActiveOverrideRecords(force_full_ci=expected)
+            retry = ActiveOverride.create(futures[0].command, _NOW + timedelta(minutes=6))
+            assert await store.apply(retry, OverrideAuditEvent.applied(retry)) == OverrideDuplicate(
+                futures[0]
+            )
+            assert await _stored_override_pairs(engine) == before
+        finally:
+            await engine.dispose()
+            await _clear_override_state(postgres_database_url)
+
+    asyncio.run(scenario())
+
+
+def test_future_force_is_decoded_before_it_can_become_unavailable_knowledge(
+    postgres_database_url: str,
+    runtime_postgres_database_url: str,
+) -> None:
+    async def scenario() -> None:
+        await _grant_runtime_columns(postgres_database_url, runtime_postgres_database_url)
+        admin = create_postgres_engine(postgres_database_url)
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        store = DurableOperatorOverrideStore(lambda: PostgresOperatorOverrideUnitOfWork(engine))
+        future = _override(
+            operation_id="malformed-future",
+            applied_at=_NOW + timedelta(minutes=5),
+            expires_at=_NOW + timedelta(minutes=20),
+        )
+        try:
+            for override in (_override(operation_id="older-valid"), future):
+                assert isinstance(
+                    await store.apply(override, OverrideAuditEvent.applied(override)),
+                    OverrideApplied,
+                )
+            assert (
+                await store.resolve_active(scope=_SCOPE, subject_id="run-7", now=_NOW)
+                == OverrideLookupUnavailable()
+            )
+            async with admin.begin() as connection:
+                stored_hash = await connection.scalar(
+                    select(operator_overrides.c.semantic_hash).where(
+                        operator_overrides.c.override_id == future.override_id
+                    )
+                )
+                assert type(stored_hash) is str and len(stored_hash) == 64
+                changed_hash = ("0" if stored_hash[0] != "0" else "1") + stored_hash[1:]
+                await connection.execute(text("SET LOCAL session_replication_role = replica"))
+                await connection.execute(
+                    update(operator_overrides)
+                    .where(operator_overrides.c.override_id == future.override_id)
+                    .values(semantic_hash=changed_hash)
+                )
+            async with admin.connect() as connection:
+                assert await connection.scalar(text("SHOW session_replication_role")) == "origin"
+                assert await operator_override_state_schema_matches_contract(connection)
+            before = await _stored_override_pairs(engine)
+            with pytest.raises(StoreUnavailable, match="resolution failed") as failure:
+                async with PostgresOperatorOverrideUnitOfWork(engine) as transaction:
+                    await transaction.operator_overrides.resolve_active(
+                        scope=_SCOPE, subject_id="run-7", now=_NOW
+                    )
+            assert isinstance(failure.value.__cause__, CanonicalRowCodecError)
+            assert (
+                await store.resolve_active(scope=_SCOPE, subject_id="run-7", now=_NOW)
+                == OverrideLookupUnavailable()
+            )
+            assert await _stored_override_pairs(engine) == before
+        finally:
+            await engine.dispose()
+            await admin.dispose()
             await _clear_override_state(postgres_database_url)
 
     asyncio.run(scenario())
@@ -610,6 +776,17 @@ def _override(
         ),
         applied_at,
     )
+
+
+async def _stored_override_pairs(
+    engine: AsyncEngine,
+) -> tuple[tuple[tuple[object, ...], ...], tuple[tuple[object, ...], ...]]:
+    async with engine.connect() as connection:
+        states = await connection.execute(
+            select(operator_overrides).order_by(operator_overrides.c.override_id)
+        )
+        events = await connection.execute(select(audit_events).order_by(audit_events.c.sequence))
+        return tuple(tuple(row) for row in states), tuple(tuple(row) for row in events)
 
 
 async def _grant_runtime_columns(database_url: str, runtime_database_url: str) -> None:
