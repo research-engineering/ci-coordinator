@@ -567,8 +567,8 @@
       "requirementIds": ["REQ-CI-CORE-015"],
       "file": "backend/src/ci_coordinator/persistence/principal_attestation.py",
       "operator": "allow-runtime-migration-head-update",
-      "original": "AND NOT has_table_privilege(principal.oid, to_regclass(:migration_head_relation), 'UPDATE') ",
-      "replacement": "AND true ",
+      "original": "WHERE has_any_column_privilege(principal.oid, ",
+      "replacement": "WHERE privilege.name <> 'UPDATE' AND has_any_column_privilege(principal.oid, ",
       "witnessId": "database-compatibility.allow-runtime-migration-head-update",
       "command": [
         "backend/.venv/bin/python",
