@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import os
 import re
 import stat
 import sys
 import tomllib
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.bounded_git import capture_git_text
+from scripts.bounded_git import DEFAULT_GIT_TIMEOUT_SECONDS, capture_git_text, run_git
 from scripts.proofkit_changed_paths import (
     ChangedPathContext,
     changed_path_context_from_git_context,
@@ -21,6 +23,7 @@ from scripts.proofkit_common import (
     JsonObject,
     as_array,
     as_object,
+    js_json_dumps,
     read_json_object,
     write_json,
 )
@@ -28,6 +31,8 @@ from scripts.proofkit_git_range import ProofkitGitRange
 from scripts.proofkit_selective_plan import selective_gate_plan_input
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+TEXT_POLICY_MAX_INPUT_BYTES = 32 * 1024 * 1024
+TEXT_POLICY_REPORT_ID = "ci-coordinator.text-policy"
 
 GENERATED_ARTIFACTS: tuple[JsonObject, ...] = (
     {
@@ -250,9 +255,13 @@ def changed_path_set_input(changed_paths: Sequence[str]) -> JsonObject:
 
 
 def text_policy_input(repo_root: Path = REPO_ROOT) -> JsonObject:
+    return text_policy_document(text_file_inventory(repo_root), TEXT_POLICY_REPORT_ID)
+
+
+def text_policy_document(files: Sequence[JsonObject], report_id: str) -> JsonObject:
     return {
         "schemaVersion": 1,
-        "reportId": "ci-coordinator.text-policy",
+        "reportId": report_id,
         "nonClaims": [
             "CI Coordinator supplies an explicit tracked and untracked file inventory.",
             "Text policy is not a repository-wide secret scanner.",
@@ -276,7 +285,7 @@ def text_policy_input(repo_root: Path = REPO_ROOT) -> JsonObject:
             "rejectTrailingWhitespace": True,
             "requireFinalNewline": True,
         },
-        "files": text_file_inventory(repo_root),
+        "files": list(files),
     }
 
 
@@ -296,29 +305,150 @@ def repo_profile_tracked_files(repo_root: Path = REPO_ROOT) -> list[str]:
 
 
 def text_file_inventory(repo_root: Path = REPO_ROOT) -> list[JsonObject]:
-    inventory: list[JsonObject] = []
-    for path in repo_files(repo_root):
-        if path.startswith("dist/"):
-            continue
-        full_path = repo_root / path
-        path_stat = full_path.lstat()
-        if (
-            stat.S_ISDIR(path_stat.st_mode)
-            or not stat.S_ISREG(path_stat.st_mode)
-            or path_stat.st_size > 1_000_000
-        ):
-            continue
-        content = full_path.read_bytes()
-        if b"\0" in content:
-            continue
-        inventory.append(
-            {
-                "contentBase64": base64.b64encode(content).decode("ascii"),
-                "path": path,
-                "state": "present",
-            }
-        )
-    return inventory
+    entries = (_text_policy_entry(repo_root, path) for path in repo_files(repo_root))
+    return [entry.row() for entry in entries if entry.exclusion is None]
+
+
+@dataclass(frozen=True)
+class TextPolicyEntry:
+    path: str
+    mode: int | None
+    size: int | None
+    exclusion: str | None
+    content_base64: str | None = None
+    content_sha256: str | None = None
+
+    def row(self) -> JsonObject:
+        if self.exclusion is not None or self.content_base64 is None:
+            raise ValueError(f"excluded text-policy entry cannot become a row: {self.path}")
+        return {"contentBase64": self.content_base64, "path": self.path, "state": "present"}
+
+    def manifest(self) -> JsonObject:
+        return {
+            "path": self.path,
+            "mode": self.mode,
+            "bytes": self.size,
+            "exclusion": self.exclusion,
+            "sha256": self.content_sha256,
+        }
+
+
+@dataclass(frozen=True)
+class TextPolicyBatch:
+    start: int
+    stop: int
+    report_id: str
+    input_bytes: int
+
+
+def capture_text_policy_inventory(
+    repo_root: Path, remaining: Callable[[], float]
+) -> tuple[TextPolicyEntry, ...]:
+    output = run_git(
+        repo_root,
+        ("ls-files", "--cached", "--others", "--exclude-standard", "-z"),
+        timeout_seconds=min(DEFAULT_GIT_TIMEOUT_SECONDS, remaining()),
+    ).stdout
+    if output and not output.endswith("\0"):
+        raise ValueError("text-policy Git inventory is not NUL terminated")
+    paths = output[:-1].split("\0") if output else []
+    if len(paths) != len(set(paths)):
+        raise ValueError("text-policy Git inventory contains duplicate paths")
+    entries: list[TextPolicyEntry] = []
+    for path in sorted(paths):
+        remaining()
+        if _safe_repo_path(path) != path:
+            raise ValueError("text-policy Git inventory contains a noncanonical path")
+        entries.append(_text_policy_entry(repo_root, path))
+        remaining()
+    remaining()
+    return tuple(entries)
+
+
+def _text_policy_entry(repo_root: Path, path: str) -> TextPolicyEntry:
+    full_path = repo_root / path
+    if not full_path.exists():
+        return TextPolicyEntry(path, None, None, "missing")
+    info = full_path.lstat()
+    reason = (
+        "dist"
+        if path.startswith("dist/")
+        else "directory"
+        if stat.S_ISDIR(info.st_mode)
+        else "non-regular"
+        if not stat.S_ISREG(info.st_mode)
+        else "over-size-limit"
+        if info.st_size > 1_000_000
+        else None
+    )
+    if reason is not None:
+        return TextPolicyEntry(path, info.st_mode, info.st_size, reason)
+    with full_path.open("rb") as stream:
+        content = stream.read(1_000_001)
+    after = full_path.lstat()
+    identity_fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns")
+    if any(getattr(info, field) != getattr(after, field) for field in identity_fields) or (
+        len(content) != info.st_size
+    ):
+        raise ValueError(f"text-policy source changed while reading: {path}")
+    if b"\0" in content:
+        return TextPolicyEntry(path, info.st_mode, info.st_size, "nul-content")
+    return TextPolicyEntry(
+        path,
+        info.st_mode,
+        info.st_size,
+        None,
+        base64.b64encode(content).decode("ascii"),
+        hashlib.sha256(content).hexdigest(),
+    )
+
+
+def plan_text_policy_batches(
+    files: Sequence[TextPolicyEntry],
+    remaining: Callable[[], float],
+    *,
+    maximum_bytes: int = TEXT_POLICY_MAX_INPUT_BYTES,
+) -> tuple[TextPolicyBatch, ...]:
+    if type(maximum_bytes) is not int or not 0 < maximum_bytes <= TEXT_POLICY_MAX_INPUT_BYTES:
+        raise ValueError("text-policy input bound must be within the pinned CLI limit")
+    paths = [entry.path for entry in files]
+    if paths != sorted(set(paths)):
+        raise ValueError("text-policy file paths must be globally sorted and unique")
+    sizes: list[int] = []
+    for entry in files:
+        remaining()
+        sizes.append(len(js_json_dumps(entry.row()).encode("utf-8")))
+    whole_bytes = _text_policy_envelope_bytes(TEXT_POLICY_REPORT_ID) + sum(sizes)
+    whole_bytes += max(0, len(files) - 1)
+    if whole_bytes <= maximum_bytes:
+        remaining()
+        return (TextPolicyBatch(0, len(files), TEXT_POLICY_REPORT_ID, whole_bytes),)
+    if not files:
+        raise ValueError("text-policy envelope exceeds the input bound")
+    batches: list[TextPolicyBatch] = []
+    start = 0
+    while start < len(files):
+        remaining()
+        report_id = f"{TEXT_POLICY_REPORT_ID}.batch-{len(batches) + 1}"
+        size = _text_policy_envelope_bytes(report_id)
+        stop = start
+        while stop < len(files):
+            remaining()
+            extra = sizes[stop] + (stop > start)
+            if size + extra > maximum_bytes:
+                break
+            size += extra
+            stop += 1
+        if stop == start:
+            raise ValueError(f"text-policy row exceeds the input bound: {files[start].path}")
+        batches.append(TextPolicyBatch(start, stop, report_id, size))
+        start = stop
+    remaining()
+    return tuple(batches)
+
+
+def _text_policy_envelope_bytes(report_id: str) -> int:
+    return len(js_json_dumps(text_policy_document([], report_id)).encode("utf-8"))
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -58,6 +58,13 @@ Each arrow is independently falsifiable. Structural admission cannot substitute
 for witness execution, and local execution cannot substitute for provider or
 production evidence.
 
+The [bounded text-input decision](../../decisions/proofkit-text-input-composition.md)
+owns the pinned text-policy composition rationale. Its consumer aggregate MUST
+preserve the complete included inventory, disclose prior exclusions, admit every
+bounded native report and conserve the source under one shared deadline before
+PASS. Composition changes capacity, not lexical policy, argument admission or
+execution authority; static route closure does not establish native parity.
+
 ## 4. Governed Change Protocol
 
 ```text

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -16,7 +15,8 @@ from scripts.proofkit_common import (
     read_json_object,
     write_json,
 )
-from scripts.proofkit_inputs import repo_profile_input, text_policy_input
+from scripts.proofkit_inputs import repo_profile_input
+from scripts.proofkit_text_policy import text_policy_report
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 _REPORT_KEYS = frozenset(
@@ -57,24 +57,15 @@ def admission_report(
     mode: str,
     *,
     repo_root: Path = REPO_ROOT,
-    environment: Mapping[str, str] | None = None,
     proofkit_executable: str | Path | None = None,
 ) -> JsonObject:
-    selected_environment = os.environ if environment is None else environment
-    executable = resolve_proofkit_executable(
-        proofkit_executable,
-        env=selected_environment,
-    )
     if mode == "text-policy":
-        reports = [
-            _run_with_input(
-                executable,
-                "text-policy",
-                text_policy_input(repo_root),
-                repo_root,
-            )
-        ]
-    elif mode == "verify":
+        return text_policy_report(
+            repo_root,
+            proofkit_executable=proofkit_executable,
+        )
+    executable = resolve_proofkit_executable(proofkit_executable)
+    if mode == "verify":
         reports = [
             _run_with_input(
                 executable,

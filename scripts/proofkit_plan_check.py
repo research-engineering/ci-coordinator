@@ -147,7 +147,7 @@ def plan_check_report(
     proofkit_executable: str | Path | None = None,
 ) -> JsonObject:
     selected_env = os.environ if env is None else env
-    executable = resolve_proofkit_executable(proofkit_executable, env=selected_env)
+    executable = resolve_proofkit_executable(proofkit_executable)
     context = selective_plan_context(plan_args, repo_root=repo_root, env=selected_env)
     review_snapshot = capture_review_snapshot(context, repo_root=repo_root)
     route_authority = load_route_authority(repo_root=repo_root)

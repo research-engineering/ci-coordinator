@@ -282,6 +282,21 @@
         "scripts/proofkit_requirements.py"
       ],
       "closureOracle": "Requirement authoring offers a bounded compact projection that emits candidate verdicts, owner questions, obligations, and either one materializable next source or content-addressed references without repeating invariant text; the full diagnostic graph remains available through an explicit detail mode or pointer, and compact versus full projections round-trip to the same candidate source digest."
+    },
+    {
+      "id": "APF-CI-018",
+      "category": "adoption_friction",
+      "status": "open",
+      "observedOn": "2026-09-26",
+      "summary": "Observed with pinned agentic-proofkit 0.14.18: a complete consumer text-policy inventory can exceed the intentional 33,554,432-byte monolithic JSON admission limit after base64 encoding. The consumed command has no smaller text-content or path-reference input primitive. The consumer composes bounded native calls with exact inventory, output, deadline and source-conservation admission; this is a consumer mitigation, not an upstream fix or evidence that prior exclusions are checked.",
+      "evidenceRefs": [
+        "docs/decisions/proofkit-text-input-composition.md",
+        "scripts/proofkit_admission.py",
+        "scripts/proofkit_inputs.py",
+        "scripts/proofkit_text_policy.py",
+        "scripts/tests/test_text_policy_batches.py"
+      ],
+      "closureOracle": "A qualified producer-supported bounded streaming or composition primitive admits an inventory whose monolithic encoding exceeds 32 MiB without omitting rows or relaxing per-input policy, proves exact global identity and count closure with whole-input parity below the bound, rejects a bad last file, forged counts and incomplete membership, and preserves a shared deadline and source conservation so the consumer-specific composition can be retired."
     }
   ]
 }

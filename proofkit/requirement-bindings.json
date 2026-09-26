@@ -8,7 +8,7 @@
     ["ci-coordinator.routes.core","proofkit/routes/core.v2.json","9802b27ade88a8cee00251daca490d648b148708e5306ee9d79c4ec361766f8b"],
     ["ci-coordinator.routes.developer-environment","proofkit/routes/developer-environment.v2.json","8d878470a3b7afe50429d1e932caeda7dc7a6ae17cff4d6109eb726435550bf6"],
     ["ci-coordinator.routes.operator-ui","proofkit/routes/operator-ui.v2.json","a8aacc321f0a8d2b993b141384ed8368fe6772b1dcdea0059d3d2d1e4d0338e4"],
-    ["ci-coordinator.routes.proofkit-adoption","proofkit/routes/proofkit-adoption.v2.json","1d681fd61d0d3856e4cb3a10c8ebed6f3b46e916f224eb9130b560e3085a0887"],
+    ["ci-coordinator.routes.proofkit-adoption","proofkit/routes/proofkit-adoption.v2.json","3e6cc03613b85f941e59a9f00372a088d6e5f9971b886b32d0d7a1ef7676f57d"],
     ["ci-coordinator.routes.release","proofkit/routes/release.v2.json","f5c9269de7f4b6683417d647ced437bea85acce88ba762c475d748580cd53f2c"],
     ["ci-coordinator.routes.runtime","proofkit/routes/runtime.v2.json","06f75f2888cb9af0c42966a70073bc8f2a3075993ca2bcdeccad702917ac6978"]
   ],

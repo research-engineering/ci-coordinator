@@ -72,7 +72,7 @@ def requirements_report(
     proofkit_executable: str | Path | None = None,
 ) -> JsonObject:
     selected_env = os.environ if env is None else env
-    executable = resolve_proofkit_executable(proofkit_executable, env=selected_env)
+    executable = resolve_proofkit_executable(proofkit_executable)
     route_authority = load_route_authority(repo_root=repo_root)
     bindings = route_authority.binding_projection
     feedback_summary = validate_proofkit_feedback_ledger(
