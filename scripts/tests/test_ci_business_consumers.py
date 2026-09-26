@@ -93,6 +93,22 @@ def test_compose_consumer_population_and_volatile_root_policy_are_closed() -> No
         assert specification["ulimits"]["core"] == {"soft": 0, "hard": 0}
 
 
+def test_browser_node_requests_trust_only_the_existing_mounted_fixture_ca(tmp_path: Path) -> None:
+    services = YAML(typ="safe").load(_ROOT / "docker/ci/connected-administrator.compose.yaml")[
+        "services"
+    ]
+    assert services["browser"]["environment"] == {
+        "CI": "true",
+        "BUSINESS_FIXTURE_FILE": "/fixture/browser.json",
+        "BUSINESS_EVIDENCE_DIR": "/evidence",
+        "NODE_EXTRA_CA_CERTS": "/fixture/ca.pem",
+    }
+    assert _compose_mounts("browser", tmp_path)["/fixture/ca.pem"] == (
+        (tmp_path / "ca.pem").resolve(),
+        False,
+    )
+
+
 @pytest.mark.parametrize("service", _USERS)
 def test_owned_compose_mounts_match_the_complete_consumer_contract(
     tmp_path: Path, service: str

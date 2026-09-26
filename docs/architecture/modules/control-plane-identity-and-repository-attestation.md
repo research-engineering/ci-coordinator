@@ -80,6 +80,23 @@ expiry, and role-claim validation. Access and refresh tokens are discarded
 before the session write. The session expiry is the minimum of ID-token expiry
 and the configured maximum of 900 seconds.
 
+Production login and reviewer transaction cookies use the exact names
+`__Host-ci_coordinator_oidc_transaction` and
+`__Host-ci_coordinator_reviewer_transaction`. Both are Secure, HttpOnly,
+SameSite=Lax, Path=/ and have no Domain. Their settings-bound readers accept
+only the current name, with existing exact multiplicity. Native route issuance
+and outer response cleanup preserve the same name/host/path tuple. Explicit
+loopback HTTP development retains its distinct non-Secure names and callback
+paths. Transaction cryptography, issuer/nonce/PKCE/time checks and the existing
+reviewer session binding are unchanged.
+
+The [isolation design](../../features/browser-credential-isolation.md) and
+[implementation plan](../../features/browser-credential-isolation-implementation-plan.md)
+define the finite repair and its native browser oracle. Old in-flight production
+transactions must be restarted after all old serving replicas are replaced;
+there is no legacy cookie fallback. This cookie cutover does not rotate session
+keys, change profile identity, delete sessions or rewrite completed receipts.
+
 Browser reads require the opaque session. Browser mutations additionally
 require the exact configured `Origin`, canonical session-bound CSRF proof, and
 `application/json`. Personalized responses are `Cache-Control: no-store`.

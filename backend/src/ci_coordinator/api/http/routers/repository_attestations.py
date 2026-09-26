@@ -219,7 +219,7 @@ def build_repository_attestation_router(
                 dependencies.transaction_cookie_name,
                 outcome.transaction_cookie,
                 max_age=300,
-                path=REPOSITORY_ATTESTATION_CALLBACK_PATH,
+                path="/" if dependencies.secure_cookies else REPOSITORY_ATTESTATION_CALLBACK_PATH,
                 secure=dependencies.secure_cookies,
                 httponly=True,
                 samesite="lax",

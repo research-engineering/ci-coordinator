@@ -275,8 +275,10 @@ def test_callback_consumes_one_exact_transaction_and_replay_stops_before_provide
         {"state": "wrong-state"},
         {"principal": human_principal(roles=frozenset({"read"}))},
         {"principal": replace(_PRINCIPAL, authority_profile_digest="3" * 64)},
+        {"principal": replace(_PRINCIPAL, session_handle="A" * 43)},
+        {"principal": replace(_PRINCIPAL, subject="another-operator")},
     ],
-    ids=("state", "role", "profile"),
+    ids=("state", "role", "profile", "session", "actor"),
 )
 def test_callback_rejects_changed_authority_before_provider(
     mutation: dict[str, object],

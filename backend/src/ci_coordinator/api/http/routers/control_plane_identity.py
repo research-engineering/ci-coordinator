@@ -193,7 +193,7 @@ def build_control_plane_identity_router(
             started.transaction_cookie,
             max_age=started.lifetime_seconds,
             expires=started.expires_at,
-            path=KEYCLOAK_LOGIN_CALLBACK_PATH,
+            path="/" if dependencies.secure_cookies else KEYCLOAK_LOGIN_CALLBACK_PATH,
             secure=dependencies.secure_cookies,
             httponly=True,
             samesite="lax",

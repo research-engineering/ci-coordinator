@@ -1,4 +1,4 @@
-"""FastAPI composition for the non-enforcing dynamic-plan endpoint."""
+"""FastAPI composition for CI Coordinator HTTP capabilities."""
 
 from __future__ import annotations
 
@@ -573,7 +573,11 @@ def _callback_cookie_cleanup_policies(
                 path=KEYCLOAK_LOGIN_CALLBACK_PATH,
                 methods=frozenset({"GET"}),
                 name=routes.control_plane_identity.transaction_cookie_name,
-                cookie_path=KEYCLOAK_LOGIN_CALLBACK_PATH,
+                cookie_path=(
+                    "/"
+                    if routes.control_plane_identity.secure_cookies
+                    else KEYCLOAK_LOGIN_CALLBACK_PATH
+                ),
                 secure=routes.control_plane_identity.secure_cookies,
                 httponly=True,
                 samesite="lax",
@@ -585,7 +589,11 @@ def _callback_cookie_cleanup_policies(
                 path=REPOSITORY_ATTESTATION_CALLBACK_PATH,
                 methods=frozenset({"GET"}),
                 name=routes.repository_attestation.transaction_cookie_name,
-                cookie_path=REPOSITORY_ATTESTATION_CALLBACK_PATH,
+                cookie_path=(
+                    "/"
+                    if routes.repository_attestation.secure_cookies
+                    else REPOSITORY_ATTESTATION_CALLBACK_PATH
+                ),
                 secure=routes.repository_attestation.secure_cookies,
                 httponly=True,
                 samesite="lax",

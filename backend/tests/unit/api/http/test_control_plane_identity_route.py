@@ -4,6 +4,7 @@ import hashlib
 import json
 from dataclasses import dataclass, field, replace
 from datetime import timedelta
+from http.cookies import SimpleCookie
 from pathlib import Path
 from typing import cast
 
@@ -57,7 +58,7 @@ from ci_coordinator.control_plane_identity.activity import (
 _PUBLIC_ORIGIN = "https://ci.example.test"
 _ISSUER = "https://auth.example.test/realms/coordinator"
 _SESSION_COOKIE = "__Host-ci_coordinator_session"
-_LOGIN_COOKIE = "__Secure-ci_coordinator_login"
+_LOGIN_COOKIE = "__Host-ci_coordinator_oidc_transaction"
 _CSRF = "c" * 43
 _PRINCIPAL = human_principal()
 
@@ -183,7 +184,7 @@ def test_login_and_callback_project_only_opaque_cookie_authority(
             f"{_LOGIN_COOKIE}=sealed-login",
             "HttpOnly",
             "Max-Age=300",
-            f"Path={KEYCLOAK_LOGIN_CALLBACK_PATH}",
+            "Path=/",
             "SameSite=lax",
             "Secure",
         )
@@ -200,6 +201,88 @@ def test_login_and_callback_project_only_opaque_cookie_authority(
     assert any(f"{_SESSION_COOKIE}={_PRINCIPAL.session_handle}" in value for value in cookies)
     assert any(f"{_LOGIN_COOKIE}=" in value and "Max-Age=0" in value for value in cookies)
     assert all("provider" not in value.lower() for value in cookies)
+
+
+@pytest.mark.parametrize("secure", [False, True])
+def test_login_cookie_set_and_delete_have_the_same_exact_scope(secure: bool) -> None:
+    identity = _Identity()
+    client = _client(identity, secure_cookies=secure)
+    name = _LOGIN_COOKIE if secure else "ci_coordinator_dev_oidc_transaction"
+    path = "/" if secure else KEYCLOAK_LOGIN_CALLBACK_PATH
+    started = client.get(KEYCLOAK_LOGIN_START_PATH, follow_redirects=False)
+    issued = SimpleCookie()
+    issued.load(started.headers["set-cookie"])
+    assert set(issued) == {name}
+    value = issued[name]
+    assert (value["path"], bool(value["secure"]), bool(value["httponly"])) == (
+        path,
+        secure,
+        True,
+    )
+    assert (value["domain"], value["samesite"], value["max-age"]) == ("", "lax", "300")
+    assert value["expires"]
+
+    completed = client.get(
+        KEYCLOAK_LOGIN_CALLBACK_PATH,
+        params={"code": "provider-code", "state": "s" * 43, "iss": _ISSUER},
+        follow_redirects=False,
+    )
+    deleted = []
+    for header in completed.headers.get_list("set-cookie"):
+        parsed = SimpleCookie()
+        parsed.load(header)
+        if name in parsed:
+            deleted.append(parsed[name])
+    assert completed.status_code == 302
+    assert len(deleted) == 1
+    assert deleted[0]["max-age"] == "0"
+    for attribute in ("path", "domain", "secure", "httponly", "samesite"):
+        assert deleted[0][attribute] == value[attribute]
+
+
+@pytest.mark.parametrize(
+    ("cookie", "status_code"),
+    [
+        ("__Secure-ci_coordinator_oidc_transaction=sealed-login", 400),
+        ("__Host-ci_coordinator_oidc_transaction=sealed-login", 302),
+        (
+            "__Secure-ci_coordinator_oidc_transaction=legacy; "
+            "__Host-ci_coordinator_oidc_transaction=sealed-login",
+            302,
+        ),
+        (
+            "__Host-ci_coordinator_oidc_transaction=sealed-login; "
+            "__Host-ci_coordinator_oidc_transaction=sealed-login",
+            400,
+        ),
+        ("ci_coordinator_dev_oidc_transaction=sealed-login", 400),
+    ],
+)
+def test_login_reads_only_one_current_transaction_cookie(cookie: str, status_code: int) -> None:
+    identity = _Identity()
+    response = _client(identity).get(
+        KEYCLOAK_LOGIN_CALLBACK_PATH,
+        params={"code": "provider-code", "state": "s" * 43, "iss": _ISSUER},
+        headers={"Cookie": cookie},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == status_code
+    assert identity.calls == (
+        [("complete", "provider-code", "s" * 43, "sealed-login", None)]
+        if status_code == 302
+        else []
+    )
+    cleanup = [
+        value
+        for value in response.headers.get_list("set-cookie")
+        if value.startswith(f"{_LOGIN_COOKIE}=")
+    ]
+    assert len(cleanup) == 1
+    parsed = SimpleCookie()
+    parsed.load(cleanup[0])
+    assert parsed[_LOGIN_COOKIE]["path"] == "/"
+    assert parsed[_LOGIN_COOKIE]["max-age"] == "0"
 
 
 def test_login_callback_clears_transaction_cookie_on_redacted_internal_error() -> None:
@@ -481,7 +564,9 @@ def _client(
     mutation_admitted: bool = True,
     ui_directory: Path | None = None,
     activity: IdentityActivityObserver | None = None,
+    secure_cookies: bool = True,
 ) -> TestClient:
+    origin = _PUBLIC_ORIGIN if secure_cookies else "http://localhost:8080"
     dependencies = ControlPlaneIdentityRouteDependencies(
         activity=activity,
         identity=cast(BrowserIdentityUseCase, identity),
@@ -492,17 +577,19 @@ def _client(
         mutation_admission=StaticMutationAdmission(mutation_admitted),
         role_admission=StaticRoleAdmission(),
         issuer=_ISSUER,
-        public_origin=_PUBLIC_ORIGIN,
-        session_cookie_name=_SESSION_COOKIE,
-        transaction_cookie_name=_LOGIN_COOKIE,
-        secure_cookies=True,
+        public_origin=origin,
+        session_cookie_name=_SESSION_COOKIE if secure_cookies else "ci_coordinator_dev_session",
+        transaction_cookie_name=(
+            _LOGIN_COOKIE if secure_cookies else "ci_coordinator_dev_oidc_transaction"
+        ),
+        secure_cookies=secure_cookies,
     )
     return TestClient(
         create_app(
             HttpRouteDependencies(control_plane_identity=dependencies),
             operator_ui_directory=ui_directory,
         ),
-        base_url=_PUBLIC_ORIGIN,
+        base_url=origin,
     )
 
 

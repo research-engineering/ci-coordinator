@@ -139,7 +139,7 @@ class ControlPlaneIdentitySettings:
     @property
     def transaction_cookie_name(self) -> str:
         return (
-            "__Secure-ci_coordinator_oidc_transaction"
+            "__Host-ci_coordinator_oidc_transaction"
             if self.secure_cookies
             else "ci_coordinator_dev_oidc_transaction"
         )
@@ -147,7 +147,7 @@ class ControlPlaneIdentitySettings:
     @property
     def reviewer_transaction_cookie_name(self) -> str:
         return (
-            "__Secure-ci_coordinator_reviewer_transaction"
+            "__Host-ci_coordinator_reviewer_transaction"
             if self.secure_cookies
             else "ci_coordinator_dev_reviewer_transaction"
         )
@@ -238,6 +238,16 @@ class ConnectedRuntimeSettings:
             self.outbound_proxy_url
         ):
             raise ValueError("outbound proxy URL is invalid")
+        if not _break_glass_secrets_are_distinct(
+            self.break_glass_bearer_token.reveal_for_composition(),
+            self.webhook_secret.reveal_for_composition(),
+            session_key=(
+                None
+                if self.control_plane_identity is None
+                else self.control_plane_identity.session_key.reveal_for_composition()
+            ),
+        ):
+            raise ValueError("break-glass bearer must be distinct from webhook and session keys")
 
 
 @dataclass(frozen=True, slots=True)
@@ -603,6 +613,12 @@ def is_metrics_bearer_token(value: object) -> bool:
             maximum_utf8_bytes=_MAX_METRICS_BEARER_TOKEN_UTF8_BYTES,
         )
     )
+
+
+def _break_glass_secrets_are_distinct(
+    bearer: str, webhook_secret: str, *, session_key: str | None
+) -> bool:
+    return bearer != webhook_secret and (session_key is None or bearer != session_key)
 
 
 def _require_distinct_metrics_bearer(settings: ConnectedRuntimeSettings) -> None:

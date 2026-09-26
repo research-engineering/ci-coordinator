@@ -1,6 +1,14 @@
 import { open, readFile, rename } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, type Page, type Request as PlaywrightRequest, test } from "@playwright/test";
+import {
+  type Browser,
+  type BrowserContext,
+  expect,
+  type Page,
+  type Request as PlaywrightRequest,
+  type Route,
+  test,
+} from "@playwright/test";
 
 const mutationPath = "/api/v2/economics/budget-policies";
 const sessionPath = "/api/v1/auth/session";
@@ -51,7 +59,195 @@ async function post(page: Page, body: object, csrf?: string) {
   );
 }
 
+async function authenticateWithHostIsolatedTransaction(
+  browser: Browser,
+  page: Page,
+  context: BrowserContext,
+  username: string,
+  password: string,
+): Promise<void> {
+  const origin = "https://coordinator.test";
+  const callbackPath = "/api/v1/auth/keycloak/callback";
+  const controlName = "__Secure-ci_coordinator_cookie_probe";
+  const controlValue = "browser-carrier-control";
+  const held: { callback?: string; failed: boolean; posts: number } = { failed: false, posts: 0 };
+  let formMatcher: ((url: URL) => boolean) | undefined;
+  let formHandler: ((route: Route) => Promise<void>) | undefined;
+  let victim: BrowserContext | undefined;
+  try {
+    const started = page.waitForResponse(
+      (response) => response.url() === `${origin}/api/v1/auth/keycloak/start`,
+      { timeout: 15_000 },
+    );
+    const [start] = await Promise.all([started, page.goto("/workbench")]);
+    requireValue(start.status() === 302, "secure-session-cookie");
+    requireValue(
+      page.url().startsWith("https://auth.example.test/realms/coordinator/"),
+      "secure-session-cookie",
+    );
+    const transactions = (await context.cookies(origin + callbackPath)).filter((cookie) =>
+      cookie.name.endsWith("_oidc_transaction"),
+    );
+    requireValue(transactions.length === 1, "secure-session-cookie");
+    const transaction = transactions[0];
+    requireValue(transaction !== undefined, "secure-session-cookie");
+    const headers = (await start.headersArray()).filter(
+      (header) =>
+        header.name.toLowerCase() === "set-cookie" &&
+        header.value.startsWith(`${transaction.name}=`),
+    );
+    requireValue(headers.length === 1 && headers[0] !== undefined, "secure-session-cookie");
+    const transactionHeader = headers[0].value;
+    const rawAction = await page.locator("#kc-form-login").getAttribute("action");
+    requireValue(rawAction !== null, "secure-session-cookie");
+    const action = new URL(rawAction, page.url());
+    requireValue(
+      action.origin === "https://auth.example.test" && !action.username && !action.password,
+      "secure-session-cookie",
+    );
+    formMatcher = (url) => url.href === action.href;
+    formHandler = async (route) => {
+      let status = 200;
+      try {
+        held.posts += 1;
+        requireValue(
+          held.posts === 1 && route.request().method() === "POST",
+          "secure-session-cookie",
+        );
+        const response = await route.fetch({ maxRedirects: 0, maxRetries: 0, timeout: 15_000 });
+        try {
+          requireValue([302, 303].includes(response.status()), "secure-session-cookie");
+          const location = response.headers()["location"];
+          requireValue(typeof location === "string", "secure-session-cookie");
+          const callback = new URL(location);
+          requireValue(
+            callback.origin === origin &&
+              callback.pathname === callbackPath &&
+              !callback.username &&
+              !callback.password &&
+              !callback.hash,
+            "secure-session-cookie",
+          );
+          held.callback = callback.href;
+        } finally {
+          await response.dispose();
+        }
+      } catch {
+        held.failed = true;
+        status = 502;
+      }
+      await route
+        .fulfill({
+          status,
+          contentType: "text/plain",
+          body: "",
+          headers: { "cache-control": "no-store" },
+        })
+        .catch(() => {
+          held.failed = true;
+        });
+    };
+    await page.route(formMatcher, formHandler);
+    await page.locator("#username").fill(username);
+    await page.locator("#password").fill(password);
+    const submitted = page.waitForResponse(
+      (response) => response.url() === action.href && response.request().method() === "POST",
+      { timeout: 15_000 },
+    );
+    const [submission] = await Promise.all([submitted, page.locator("#kc-login").click()]);
+    requireValue((await submission.finished()) === null, "secure-session-cookie");
+    requireValue(
+      !held.failed &&
+        held.posts === 1 &&
+        submission.status() === 200 &&
+        typeof held.callback === "string",
+      "secure-session-cookie",
+    );
+    const callback = held.callback;
+    await page.unroute(formMatcher, formHandler);
+    formMatcher = undefined;
+    formHandler = undefined;
+
+    victim = await browser.newContext({ ignoreHTTPSErrors: false });
+    const victimPage = await victim.newPage();
+    await victimPage.route("https://hostile.coordinator.test/plant", async (route) => {
+      try {
+        await route.fulfill({
+          status: 200,
+          contentType: "text/plain",
+          body: "",
+          headers: {
+            "set-cookie": [
+              `${transactionHeader}; Domain=coordinator.test`,
+              `${controlName}=${controlValue}; Domain=coordinator.test; Path=/; Secure; HttpOnly; SameSite=Lax`,
+            ].join("\n"),
+            "cache-control": "no-store",
+          },
+        });
+      } catch {
+        held.failed = true;
+        await route.abort().catch(() => {
+          held.failed = true;
+        });
+      }
+    });
+    await victimPage.goto("https://hostile.coordinator.test/plant");
+    const planted = await victim.cookies(origin + callbackPath);
+    requireValue(
+      !held.failed &&
+        planted.some((cookie) => cookie.name === controlName && cookie.value === controlValue) &&
+        !planted.some((cookie) => cookie.name === transaction.name),
+      "secure-session-cookie",
+    );
+    const denied = await victimPage.goto(callback);
+    requireValue(denied !== null && denied.status() === 400, "session-identity");
+    const sent = (await denied.request().allHeaders())["cookie"] ?? "";
+    requireValue(
+      sent.includes(`${controlName}=${controlValue}`) && !sent.includes(`${transaction.name}=`),
+      "secure-session-cookie",
+    );
+    const anonymous = await victimPage.evaluate(async (path) => {
+      const response = await fetch(path, { credentials: "same-origin", redirect: "error" });
+      return response.status;
+    }, sessionPath);
+    requireValue(anonymous === 401, "session-identity");
+    await victim.close();
+    victim = undefined;
+
+    await page.goto(callback);
+    requireValue(page.url() === `${origin}/workbench`, "session-identity");
+    requireValue(
+      transaction.name === "__Host-ci_coordinator_oidc_transaction" &&
+        transaction.domain === "coordinator.test" &&
+        transaction.path === "/" &&
+        transaction.secure &&
+        transaction.httpOnly &&
+        transaction.sameSite === "Lax" &&
+        !(await context.cookies(origin + callbackPath)).some(
+          (cookie) => cookie.name === transaction.name,
+        ),
+      "secure-session-cookie",
+    );
+  } catch {
+    // Native call logs may contain the held callback or cookie; expose only a fixed failure.
+    held.failed = true;
+  } finally {
+    if (formMatcher && formHandler) {
+      await page.unroute(formMatcher, formHandler).catch(() => {
+        held.failed = true;
+      });
+    }
+    if (victim) {
+      await victim.close().catch(() => {
+        held.failed = true;
+      });
+    }
+  }
+  requireValue(!held.failed, "secure-session-cookie");
+}
+
 test("real administrator budget mutation has one persisted audited effect", async ({
+  browser,
   page,
   context,
 }) => {
@@ -139,12 +335,7 @@ test("real administrator budget mutation has one persisted audited effect", asyn
     stageIndex += 1;
   }
   try {
-    await page.goto("/workbench");
-    await expect(page).toHaveURL(/^https:\/\/auth\.example\.test\/realms\/coordinator\//);
-    await page.locator("#username").fill(username);
-    await page.locator("#password").fill(password);
-    await page.locator("#kc-login").click();
-    await expect(page).toHaveURL("https://coordinator.test/workbench");
+    await authenticateWithHostIsolatedTransaction(browser, page, context, username, password);
     const session = await page.evaluate(async (path) => {
       const response = await fetch(path, { credentials: "same-origin" });
       return {

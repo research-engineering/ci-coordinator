@@ -121,6 +121,7 @@ the complete audit parents:
 | [#39](https://github.com/research-engineering/ci-coordinator/pull/39) | Future exact-subject force evidence is unavailable knowledge before selected issuance; ordinary override reads, immutable replay and the existing FullCI path remain unchanged. |
 | [#40](https://github.com/research-engineering/ci-coordinator/pull/40) | Explicit fresh review and selected-receipt activation use coordinated v2 requests while preserving completed legacy replay; pending-only fenced migration, captured result revisions and bounded outcome metrics retain their separate authorities. |
 | [#41](https://github.com/research-engineering/ci-coordinator/pull/41) | Slowdown baselines use the first seven complete days and preserve later unknown intervals; weighted comparisons, historical events and independent forecast admission remain unchanged. |
+| [#42](https://github.com/research-engineering/ci-coordinator/pull/42) | GitHub credentials are narrowed to the admitted operation and repository, with distinct inventory and organization-runner grants; cache identity and measurement-recipient trust remain explicit. Live effective grants and measured cold-path costs are not implied. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -130,13 +131,16 @@ Live provider enrollment, authentication and deployment recovery remain separate
 mocked APIs are not their evidence. Artifact publication, artifact qualification
 and production omission authority are still distinct.
 
-The next prepared audit batch narrows GitHub credentials by admitted operation
-and repository while preserving complete organization-runner observations.
+All 471 original audit IDs now have initial source-bound dispositions in the
+external register, preserving every scoped refutation, policy and unknown.
+Initial adjudication is not confirmation, repair or native qualification.
+The next prepared audit batch isolates browser transaction cookies and finite
+credential roles through existing settings and HTTP owners.
 Phase-exact managed installation and transitive process ownership retain their
 independent lifecycle proof, including the isolated consumer-lab process path.
-Credential narrowing has a source-reviewed candidate; actual-base integration
-and native qualification remain required. Finite browser credential isolation
-and truthful frontend outcomes are separate prepared repair boundaries.
+Truthful frontend outcomes and retained unsuccessful HTTP-close outcomes are
+separate prepared repair boundaries; their independent review, actual-base
+integration and native qualification remain required.
 All these prepared changes still require their exact-source native qualification.
 Workflow CPU
 isolation, readiness freshness and plan-failure telemetry retain their own

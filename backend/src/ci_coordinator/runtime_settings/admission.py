@@ -17,6 +17,7 @@ from ci_coordinator.runtime_settings.contracts import (
     RuntimeSettings,
     RuntimeSettingsRejection,
     SecretValue,
+    _break_glass_secrets_are_distinct,
     is_authentication_secret_text,
     is_break_glass_bearer_token,
     is_metrics_bearer_token,
@@ -252,6 +253,18 @@ def _admit_runtime_settings(source: dict[str, str]) -> RuntimeSettings:
     if metrics_bearer_token in credential_values:
         raise SettingsRejected(
             RuntimeSettingsRejection("invalid_setting_value", _METRICS_BEARER_TOKEN)
+        ) from None
+    if not _break_glass_secrets_are_distinct(
+        authority.bearer_token,
+        provider.webhook_secret,
+        session_key=(
+            None
+            if control_plane_identity is None
+            else control_plane_identity.session_key.reveal_for_composition()
+        ),
+    ):
+        raise SettingsRejected(
+            RuntimeSettingsRejection("invalid_setting_value", _BREAK_GLASS_BEARER_TOKEN)
         ) from None
     connected = NonEnforcingRuntimeSettings(
         bind_host=common.host,
