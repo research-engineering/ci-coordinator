@@ -113,6 +113,7 @@ the complete audit parents:
 | [#31](https://github.com/research-engineering/ci-coordinator/pull/31) | Single workflow composition and lazy server imports; parser CPU offload and measured capacity remain separate. |
 | [#32](https://github.com/research-engineering/ci-coordinator/pull/32) | Closed server diagnostics, terminal-loop cause reporting and failure-safe structured logging. |
 | [#33](https://github.com/research-engineering/ci-coordinator/pull/33) | Typed admission for integral sharding numbers, oversized advice confidence and incomplete audit scope. |
+| [#34](https://github.com/research-engineering/ci-coordinator/pull/34) | Effective migration-head column privileges and independent PUBLIC column ACL admission. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -122,11 +123,12 @@ Live provider enrollment, authentication and deployment recovery remain separate
 mocked APIs are not their evidence. Artifact publication, artifact qualification
 and production omission authority are still distinct.
 
-The next prepared audit repairs address column privilege attestation and UI
-read/command freshness. Workflow CPU isolation,
-managed dependency installation,
-aware-time boundaries, readiness freshness and plan-failure telemetry follow
-their own lifecycle and outcome contracts. No prepared scope is qualified merely
+The next prepared audit repairs address aware-time boundaries and phase-exact
+managed dependency installation. UI read/command freshness requires complete
+bounded text-policy qualification. Provider-catalog observations and finite
+alert baselines share a bounded observational repair batch. Workflow CPU
+isolation, readiness freshness and plan-failure telemetry retain their own
+lifecycle and outcome contracts. No prepared scope is qualified merely
 by this ordering or by the preceding PRs; all remain routed through CI-054 and
 the existing task dependencies below.
 
@@ -313,7 +315,7 @@ State: open; hypothesis validation, source repair and external qualification rem
 
 | ID | Work And Closure | Depends On |
 | --- | --- | --- |
-| CI-054 | **validate** all residual admitted audit findings, including the 180 unresolved predicate mappings from two retained legacy inputs, the 471 source-bound IDs in the [current-source audit recipe](docs/features/current-source-audit-validation.md), and the 55 primary records of the additional 2026-09-25 cross-review. Validate each atomic claim and disputed rejection before deduplication or repair; conserve source aliases, evidence, current owners and scoped rejection triggers. Supporting disagreement/exclusion/coverage views are not extra findings. Counts are not confirmed defects; do not recreate retired TypeScript. Regenerate current SARIF when needed; deleted report `3ed45d...` is retired-unadjudicated, not a passing review. [Audit acceptance](docs/features/assurance-audit-hardening-plan.md). | Exact current snapshot; no required reconstruction of deleted reports |
+| CI-054 | **validate** all residual admitted audit findings, including the 180 unresolved predicate mappings from two retained legacy inputs, the 471 source-bound IDs in the [current-source audit recipe](docs/features/current-source-audit-validation.md), and the 55 primary records of the additional 2026-09-25 cross-review. Validate each atomic claim and disputed rejection before deduplication or repair; conserve source aliases, evidence, current owners and scoped rejection triggers. Supporting disagreement/exclusion/coverage views are not extra findings. Counts are not confirmed defects; do not recreate retired TypeScript. Retain per-repair counterexamples, review corrections, exact PR/merge identities and native results, including failed attempts. After the repair series, reconcile all findings and reasoned rejections against final source and perform a cross-batch causal retrospective. Distinguish missing rules from incomplete application, invalid oracles, provider assumptions and unresolved product choices; propose only non-duplicate, testable prevention through the existing skill inbox, without automatic skill modification. Missing historical evidence stays unknown. Regenerate current SARIF when needed; deleted report `3ed45d...` is retired-unadjudicated, not a passing review. [Audit acceptance](docs/features/assurance-audit-hardening-plan.md). | Exact current snapshot; no required reconstruction of deleted reports |
 | CI-055 | **source repaired; qualify deployment compatibility**. Producer settings, signer and local verifier now admit only 1-300 seconds and exercise the actual target at 1/300/301. Before live selected execution, establish that the new environment contains no previously issued incompatible envelopes or admit an explicit migration/compatibility receipt. | Current signing/target owners; before affected selected execution |
 | CI-056 | **validate** unjustified abstractions, ownership/co-location, test duplication and contract size. Check the unused `ReconciliationPublisher` against real consumers before removal; prefer existing Pydantic/FastAPI/standard-library capabilities where behavior is preserved. Metrics select review, not god-file verdicts; no indiscriminate DTO/repository classes or whole rewrite. | CI-054; exact invariants and protected observations |
 | CI-057 | **validate** the current shared dynamic-CI blueprint against own-CI requirements and native consumed-input/evidence inventories. Freeze the candidate, disposition every applicable validation class, implement only real gaps, preserve independent baseline and profile coverage before self-optimization. Existing CF01/CF03 source repairs are not the entire comparison. | CI-001; [input coverage](docs/features/own-ci-input-coverage.md) |

@@ -92,6 +92,14 @@ those client facts before loading the live active pointer or recomputing rollbac
 coverage. Therefore an intervening activation cannot reinterpret a completed
 rollback replay as a new live-state decision.
 
+New command preparation projects an aware application-clock instant to UTC
+before its existing millisecond serialization. Equivalent fixed-offset instants
+therefore produce identical timestamps and audit inputs. A missing timezone or
+undefined UTC offset remains invalid; it is never interpreted in the host's
+local timezone. The existing command and audit validators retain their error
+precedence before any store write. Exact activation and rollback operation replay
+does not read the clock.
+
 ## 3. Safety Laws
 
 ```text

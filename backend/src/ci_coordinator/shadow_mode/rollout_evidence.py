@@ -116,7 +116,11 @@ class ShadowEvidenceRecord:
     def __post_init__(self) -> None:
         if type(self.profile_id) is not str or not self.profile_id:
             raise ValueError("shadow evidence requires a non-empty profile id")
-        if type(self.observed_at) is not datetime or self.observed_at.tzinfo is None:
+        if (
+            type(self.observed_at) is not datetime
+            or self.observed_at.tzinfo is None
+            or self.observed_at.utcoffset() is None
+        ):
             raise ValueError("shadow evidence timestamp must be timezone-aware")
         if type(self.comparison) is not ShadowComparison:
             raise TypeError("shadow evidence requires an exact comparison")
@@ -161,7 +165,7 @@ def evaluate_rollout_evidence(
     *,
     now: datetime,
 ) -> RolloutEvidenceAssessment:
-    if type(now) is not datetime or now.tzinfo is None:
+    if type(now) is not datetime or now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("rollout evidence evaluation time must be timezone-aware")
     if type(records) is not tuple or any(
         type(record) is not ShadowEvidenceRecord for record in records

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone, tzinfo
 from typing import Literal, cast
 
 import pytest
@@ -27,6 +27,7 @@ from ci_coordinator.app.config_management import (
     ConfigRegistrationOutcome,
     ConfigRegistrationState,
 )
+from ci_coordinator.audit_replay import AuditEventError
 from ci_coordinator.config_control import (
     PolicyAdmissionResult,
     PolicyDiagnostic,
@@ -57,7 +58,7 @@ from ci_coordinator.config_epochs import (
     PreparedConfigEpochActivation,
     PreparedConfigEpochRegistration,
 )
-from ci_coordinator.kernel import FixedClock
+from ci_coordinator.kernel import Clock, FixedClock
 from ci_coordinator.proposal_review import (
     AttestedConfigActivationResult,
     RepositoryActivationAuthority,
@@ -75,6 +76,26 @@ _AUTHORITY = RepositoryActivationAuthority(
 )
 _ACTIVATION_TARGET = _AUTHORITY.review.target_epoch_id
 _ACTIVATION_MANIFEST = _AUTHORITY.review.command.expected_manifest_id
+
+
+class _ClockDatetime(datetime):
+    pass
+
+
+class _UnknownOffset(tzinfo):
+    def utcoffset(self, dt: datetime | None) -> None:
+        return None
+
+    def dst(self, dt: datetime | None) -> None:
+        return None
+
+    def tzname(self, dt: datetime | None) -> None:
+        return None
+
+
+class _UnreadClock:
+    def now(self) -> datetime:
+        raise AssertionError("retained activation must not read the clock")
 
 
 class _Authorizer:
@@ -265,6 +286,113 @@ class _ActivationAuthorizer:
         return self.result
 
 
+@pytest.mark.parametrize("operation", ("register", "activate", "rollback"))
+@pytest.mark.parametrize(
+    "instant",
+    (
+        datetime(2026, 7, 15, 10),
+        datetime(2026, 7, 15, 10, tzinfo=_UnknownOffset()),
+    ),
+    ids=("naive", "offset-none"),
+)
+def test_config_service_rejects_unaware_clock_before_writes(
+    operation: Literal["register", "activate", "rollback"], instant: datetime
+) -> None:
+    store = _rollback_store() if operation == "rollback" else _Store()
+    service = _service(store, allowed=True, clock=FixedClock(instant))
+
+    with pytest.raises(AuditEventError, match=r"^createdAt must be an ISO timestamp$"):
+        _run_config_operation(service, operation)
+
+    assert store.registration is None
+    assert store.prepared is None
+    assert (
+        store.calls
+        == {
+            "register": [],
+            "activate": ["resolve_operation"],
+            "rollback": ["resolve_operation", "load_active", "load_epoch"],
+        }[operation]
+    )
+
+
+@pytest.mark.parametrize(
+    "instant",
+    (
+        datetime(2026, 7, 15, 10),
+        datetime(2026, 7, 15, 10, tzinfo=_UnknownOffset()),
+        _ClockDatetime(2026, 7, 15, 10, tzinfo=UTC),
+    ),
+    ids=("naive", "offset-none", "aware-subclass"),
+)
+def test_registration_preserves_command_error_precedence_over_clock_validation(
+    instant: datetime,
+) -> None:
+    store = _Store()
+    service = _service(store, allowed=True, clock=FixedClock(instant))
+
+    with pytest.raises(
+        ValueError, match=r"^operation_id is not bounded Unicode scalar text$"
+    ) as error:
+        asyncio.run(service.register(RegisterConfigEpoch(ACTOR, CONFIG_SOURCE, "json", "")))
+
+    assert type(error.value) is ValueError
+    assert store.calls == []
+    assert store.registration is None
+
+
+@pytest.mark.parametrize("operation", ("register", "activate", "rollback"))
+@pytest.mark.parametrize(
+    "instant",
+    (
+        datetime(2026, 7, 15, 12, 0, 0, 123456, tzinfo=timezone(timedelta(hours=2))),
+        datetime(2026, 7, 15, 5, 0, 0, 123456, tzinfo=timezone(timedelta(hours=-5))),
+        _ClockDatetime(2026, 7, 15, 10, 0, 0, 123456, tzinfo=UTC),
+        _ClockDatetime(2026, 7, 15, 12, 0, 0, 123456, tzinfo=timezone(timedelta(hours=2))),
+        _ClockDatetime(2026, 7, 15, 5, 0, 0, 123456, tzinfo=timezone(timedelta(hours=-5))),
+    ),
+    ids=(
+        "positive-offset",
+        "negative-offset",
+        "subclass-utc",
+        "subclass-positive",
+        "subclass-negative",
+    ),
+)
+def test_config_service_prepares_equivalent_utc_identity_for_fixed_offset_clocks(
+    operation: Literal["register", "activate", "rollback"], instant: datetime
+) -> None:
+    pairs: list[PreparedConfigEpochRegistration | PreparedConfigEpochActivation] = []
+    outcomes: list[ConfigRegistrationOutcome | ConfigActivationOutcome] = []
+    for clock_time in (datetime(2026, 7, 15, 10, 0, 0, 123456, tzinfo=UTC), instant):
+        store = _rollback_store() if operation == "rollback" else _Store()
+        service = _service(store, allowed=True, clock=FixedClock(clock_time))
+        outcomes.append(_run_config_operation(service, operation))
+        prepared = store.registration if operation == "register" else store.prepared
+        assert prepared is not None
+        pairs.append(prepared)
+
+    assert outcomes[0] == outcomes[1]
+    assert (
+        outcomes[0].state
+        == {
+            "register": "created",
+            "activate": "target_unavailable",
+            "rollback": "revision_conflict",
+        }[operation]
+    )
+    utc_pair, offset_pair = pairs
+    assert offset_pair.command == utc_pair.command
+    assert offset_pair.command.occurred_at == "2026-07-15T10:00:00.123Z"
+    assert offset_pair.audit_input_hash == utc_pair.audit_input_hash
+    utc_event = utc_pair._take_audit_event()
+    offset_event = offset_pair._take_audit_event()
+    assert offset_event.created_at == utc_event.created_at == "2026-07-15T10:00:00.123Z"
+    assert offset_event.idempotency_key == utc_event.idempotency_key
+    assert offset_event.payload_canonical_bytes == utc_event.payload_canonical_bytes
+    assert offset_event.payload_hash == utc_event.payload_hash
+
+
 def test_config_outcomes_reject_states_outside_their_closed_algebras() -> None:
     with pytest.raises(ValueError, match="unsupported config registration outcome"):
         ConfigRegistrationOutcome(cast(ConfigRegistrationState, "future_state"))
@@ -420,12 +548,16 @@ def test_exact_activation_replay_precedes_repository_reauthorization() -> None:
             store,
             allowed=True,
             activation_authorizer=activation_authorizer,
+            clock=_UnreadClock(),
         ).activate(_activation_command())
     )
 
     assert result.state == "duplicate"
+    assert result.epoch_id == duplicate.record.active.epoch_id
+    assert result.revision == duplicate.record.active.revision
     assert store.calls == ["resolve_operation"]
     assert activation_authorizer.calls == 0
+    assert store.prepared is None
 
 
 def test_lock_time_authority_conflict_is_not_reported_as_activation() -> None:
@@ -508,12 +640,15 @@ def test_exact_rollback_replay_short_circuits_live_state_and_coverage_reads() ->
     duplicate = _rollback_duplicate()
     store = _Store(operation_resolution=duplicate)
 
-    result = asyncio.run(_service(store, allowed=True).rollback(_rollback_command()))
+    result = asyncio.run(
+        _service(store, allowed=True, clock=_UnreadClock()).rollback(_rollback_command())
+    )
 
     assert result.state == "duplicate"
     assert result.epoch_id == duplicate.record.active.epoch_id
     assert result.revision == duplicate.record.active.revision
     assert store.calls == ["resolve_operation"]
+    assert store.prepared is None
 
 
 def test_rollback_requires_an_active_epoch_and_same_scope_admitted_target() -> None:
@@ -575,6 +710,18 @@ def test_rollback_cas_rejects_an_active_epoch_change_after_comparison() -> None:
     assert store.prepared.command.expected_active_epoch_id == active.active.epoch_id
 
 
+def _run_config_operation(
+    service: ConfigManagementService, operation: Literal["register", "activate", "rollback"]
+) -> ConfigRegistrationOutcome | ConfigActivationOutcome:
+    if operation == "register":
+        return asyncio.run(
+            service.register(RegisterConfigEpoch(ACTOR, CONFIG_SOURCE, "json", "register-1"))
+        )
+    if operation == "activate":
+        return asyncio.run(service.activate(_activation_command()))
+    return asyncio.run(service.rollback(_rollback_command()))
+
+
 def _service(
     store: ConfigEpochStore,
     *,
@@ -583,6 +730,7 @@ def _service(
     policy_admission: PolicyAdmission | None = None,
     activation_authorization: RepositoryActivationAuthorization | None = None,
     activation_authorizer: _ActivationAuthorizer | None = None,
+    clock: Clock | None = None,
 ) -> ConfigManagementService:
     resolved_authorizer = activation_authorizer or _ActivationAuthorizer(
         activation_authorization or RepositoryActivationGranted(_AUTHORITY)
@@ -595,7 +743,7 @@ def _service(
             policy_admission=policy_admission or _admit_policy,
         ),
         store=store,
-        clock=FixedClock(datetime(2026, 7, 15, 10, tzinfo=UTC)),
+        clock=clock if clock is not None else FixedClock(datetime(2026, 7, 15, 10, tzinfo=UTC)),
         activation_authorizer=resolved_authorizer,
         attested_activation_store=store,  # type: ignore[arg-type]
         rollback_comparator=comparator,
