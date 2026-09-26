@@ -4,7 +4,8 @@ from typing import Literal, Never
 
 import pytest
 from ruamel.yaml import YAML
-from ruamel.yaml.composer import MaxDepthExceededError
+from ruamel.yaml.composer import Composer, MaxDepthExceededError
+from ruamel.yaml.constructor import SafeConstructor
 from ruamel.yaml.nodes import Node
 
 from ci_coordinator.repo_context import (
@@ -64,54 +65,47 @@ def test_excess_depth_is_rejected_before_graph_validation(
     assert _parse(content) is None
 
 
-@pytest.mark.parametrize("phase", ["compose", "load"])
-def test_each_yaml_instance_enforces_its_own_library_depth_limit(
+def test_single_yaml_instance_enforces_its_library_depth_limit(
     monkeypatch: pytest.MonkeyPatch,
-    phase: str,
 ) -> None:
     assert _parse(_at_depth(64, "flow")) is not None
-    compose = YAML.compose
     load = YAML.load
-    visited: list[tuple[str, YAML]] = []
-    rejected: list[str] = []
+    visited: list[YAML] = []
+    rejected: list[bool] = []
     too_deep = _at_depth(65, "flow").decode()
 
-    def guarded_compose(yaml: YAML, text: str) -> object:
-        visited.append(("compose", yaml))
-        assert yaml.max_depth == 64
-        try:
-            result: object = compose(yaml, too_deep if phase == "compose" else text)
-        except MaxDepthExceededError:
-            rejected.append("compose")
-            raise
-        return result
-
     def guarded_load(yaml: YAML, _text: str) -> object:
-        visited.append(("load", yaml))
+        visited.append(yaml)
+        assert yaml.typ == ["safe"] and yaml.pure is True
+        assert yaml.version == (1, 2) and yaml.allow_duplicate_keys is False
         assert yaml.max_depth == 64
-        # Reach the second guard independently of the first composition guard.
         try:
             result: object = load(yaml, too_deep)
         except MaxDepthExceededError:
-            rejected.append("load")
+            rejected.append(True)
             raise
         return result
 
-    monkeypatch.setattr(YAML, "compose", guarded_compose)
     monkeypatch.setattr(YAML, "load", guarded_load)
     assert _parse(_at_depth(64, "flow")) is None
-    assert rejected == [phase]
-    assert [name for name, _ in visited] == (
-        ["compose"] if phase == "compose" else ["compose", "load"]
-    )
-    if phase == "load":
-        assert visited[0][1] is not visited[1][1]
+    assert rejected == [True]
+    assert len(visited) == 1
 
 
 @pytest.mark.parametrize("error_type", [MemoryError, RecursionError])
 @pytest.mark.parametrize(
     "phase",
-    ["first-loader", "second-loader", "compose", "load", "graph", "projection"],
+    [
+        "loader",
+        "constructor",
+        "compose",
+        "load",
+        "graph",
+        "node-projection",
+        "construction",
+        "control-projection",
+        "capability",
+    ],
 )
 def test_resource_failure_returns_absent_capability_at_each_phase(
     monkeypatch: pytest.MonkeyPatch,
@@ -120,33 +114,37 @@ def test_resource_failure_returns_absent_capability_at_each_phase(
 ) -> None:
     assert _parse(_WORKFLOW) is not None
     calls = 0
-    instances = 0
 
     def fail(*_args: object, **_kwargs: object) -> Never:
         nonlocal calls
         calls += 1
         raise error_type("resource sentinel")
 
-    def make_yaml(*, typ: str, pure: bool) -> YAML:
-        nonlocal instances
-        instances += 1
+    def make_yaml(*, typ: str, pure: bool) -> Never:
         assert typ == "safe" and pure is True
-        if instances == (1 if phase == "first-loader" else 2):
-            fail()
-        return YAML(typ=typ, pure=pure)
+        fail()
 
-    if phase in {"first-loader", "second-loader"}:
+    if phase == "loader":
         monkeypatch.setattr(workflow_syntax, "YAML", make_yaml)
-    elif phase in {"compose", "load"}:
-        monkeypatch.setattr(YAML, phase, fail)
+    elif phase == "constructor":
+        monkeypatch.setattr(SafeConstructor, "__init__", fail)
+    elif phase == "compose":
+        monkeypatch.setattr(Composer, "compose_document", fail)
+    elif phase == "load":
+        monkeypatch.setattr(YAML, "load", fail)
+    elif phase == "construction":
+        monkeypatch.setattr(SafeConstructor, "construct_document", fail)
     else:
-        target = "_validate_node_graph" if phase == "graph" else "_job_authorities"
+        target = {
+            "graph": "_validate_node_graph",
+            "node-projection": "_workflow_node_projection",
+            "control-projection": "control_job_projection_hash",
+            "capability": "RevisionWorkflowCapability",
+        }[phase]
         monkeypatch.setattr(workflow_syntax, target, fail)
 
     assert _parse(_WORKFLOW) is None
     assert calls == 1
-    if phase in {"first-loader", "second-loader"}:
-        assert instances == (1 if phase == "first-loader" else 2)
 
 
 @pytest.mark.parametrize(

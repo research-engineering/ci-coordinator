@@ -6,10 +6,6 @@ import json
 import sys
 from typing import Final
 
-from ci_coordinator.runtime.application import (
-    RuntimeCompositionRejection,
-    compose_runtime_application,
-)
 from ci_coordinator.runtime.environment import load_runtime_settings_from_environment
 from ci_coordinator.runtime.shutdown_budget import partition_shutdown_budget
 from ci_coordinator.runtime_settings import RuntimeSettingsRejection, admit_python_runtime
@@ -18,6 +14,11 @@ UVICORN_MAX_CONCURRENT_REQUESTS: Final = 128
 
 
 def main() -> int:
+    from ci_coordinator.runtime.application import (
+        RuntimeCompositionRejection,
+        compose_runtime_application,
+    )
+
     python_rejection = admit_python_runtime()
     if python_rejection is not None:
         return _reject(

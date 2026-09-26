@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import re
-from typing import Final
+from dataclasses import dataclass
+from typing import Final, cast
 
 from ruamel.yaml import YAML
+from ruamel.yaml.constructor import SafeConstructor
 from ruamel.yaml.error import YAMLError
 from ruamel.yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
 
@@ -44,6 +46,30 @@ _EXPRESSION_BARE_CONTEXT: Final = re.compile(
 _CONTAINER_DIGEST: Final = re.compile(r".+@sha256:[0-9a-f]{64}")
 
 
+@dataclass(frozen=True, slots=True)
+class _WorkflowNodeProjection:
+    job_ids: tuple[str, ...]
+    job_needs: tuple[tuple[str, tuple[str, ...]], ...]
+    provider_job_names: tuple[tuple[str, str], ...]
+    always_job_ids: tuple[str, ...]
+    triggers: tuple[str, ...]
+    local_reusable_workflow_paths: tuple[str, ...]
+    authority_inputs: tuple[tuple[str, tuple[str, ...], bool], ...]
+    declares_workflow_environment: bool
+    declares_workflow_defaults: bool
+    job_runner_selectors: tuple[WorkflowJobRunnerSelector, ...]
+
+
+class _WorkflowConstructor(SafeConstructor):
+    node_projection: _WorkflowNodeProjection | None = None
+
+    def construct_document(self, node: Node) -> object:
+        # Safe construction can flatten mappings and retag keys in place.
+        self.node_projection = _workflow_node_projection(node)
+        value: object = super().construct_document(node)
+        return value
+
+
 def parse_workflow_capability(
     content: bytes,
     *,
@@ -63,48 +89,56 @@ def parse_workflow_capability(
         yaml.version = (1, 2)
         yaml.allow_duplicate_keys = False
         yaml.max_depth = _MAX_WORKFLOW_DEPTH
-        root = yaml.compose(text)
-        if not isinstance(root, MappingNode):
+        yaml.Constructor = _WorkflowConstructor
+        constructor = cast(_WorkflowConstructor, yaml.constructor)
+        loaded = yaml.load(text)
+        projection = constructor.node_projection
+        if projection is None or type(loaded) is not dict or type(loaded.get("jobs")) is not dict:
             return None
-        _validate_node_graph(root)
-        root_fields = _mapping_fields(root)
-        jobs = root_fields.get("jobs")
-        triggers = root_fields.get("on")
-        if not isinstance(jobs, MappingNode) or triggers is None:
-            return None
-        loaded_yaml = YAML(typ="safe", pure=True)
-        loaded_yaml.version = (1, 2)
-        loaded_yaml.allow_duplicate_keys = False
-        loaded_yaml.max_depth = _MAX_WORKFLOW_DEPTH
-        loaded = loaded_yaml.load(text)
-        if type(loaded) is not dict or type(loaded.get("jobs")) is not dict:
-            return None
-        job_fields = _mapping_fields(jobs)
-        job_ids = tuple(sorted(job_fields, key=utf16_sort_key))
-        job_needs = _job_needs(job_fields)
-        provider_job_names = _provider_job_names(job_fields)
-        always_job_ids = _always_job_ids(job_fields)
-        trigger_ids = tuple(sorted(_trigger_ids(triggers), key=utf16_sort_key))
         return RevisionWorkflowCapability(
             path=path,
             revision_sha=revision_sha,
-            job_ids=job_ids,
-            job_needs=job_needs,
-            provider_job_names=provider_job_names,
-            always_job_ids=always_job_ids,
-            triggers=trigger_ids,
-            local_reusable_workflow_paths=_local_reusable_workflow_paths(job_fields),
+            job_ids=projection.job_ids,
+            job_needs=projection.job_needs,
+            provider_job_names=projection.provider_job_names,
+            always_job_ids=projection.always_job_ids,
+            triggers=projection.triggers,
+            local_reusable_workflow_paths=projection.local_reusable_workflow_paths,
             job_authorities=_job_authorities(
-                job_fields,
+                projection.authority_inputs,
                 raw_jobs=loaded["jobs"],
                 raw_workflow=loaded,
             ),
-            declares_workflow_environment="env" in root_fields,
-            declares_workflow_defaults="defaults" in root_fields,
-            job_runner_selectors=_job_runner_selectors(job_fields),
+            declares_workflow_environment=projection.declares_workflow_environment,
+            declares_workflow_defaults=projection.declares_workflow_defaults,
+            job_runner_selectors=projection.job_runner_selectors,
         )
     except (MemoryError, RecursionError, TypeError, ValueError, YAMLError):
         return None
+
+
+def _workflow_node_projection(root: Node) -> _WorkflowNodeProjection:
+    if not isinstance(root, MappingNode):
+        raise ValueError("workflow root must be a mapping")
+    _validate_node_graph(root)
+    root_fields = _mapping_fields(root)
+    jobs = root_fields.get("jobs")
+    triggers = root_fields.get("on")
+    if not isinstance(jobs, MappingNode) or triggers is None:
+        raise ValueError("workflow jobs and triggers are required")
+    job_fields = _mapping_fields(jobs)
+    return _WorkflowNodeProjection(
+        job_ids=tuple(sorted(job_fields, key=utf16_sort_key)),
+        job_needs=_job_needs(job_fields),
+        provider_job_names=_provider_job_names(job_fields),
+        always_job_ids=_always_job_ids(job_fields),
+        triggers=tuple(sorted(_trigger_ids(triggers), key=utf16_sort_key)),
+        local_reusable_workflow_paths=_local_reusable_workflow_paths(job_fields),
+        authority_inputs=_job_authority_inputs(job_fields),
+        declares_workflow_environment="env" in root_fields,
+        declares_workflow_defaults="defaults" in root_fields,
+        job_runner_selectors=_job_runner_selectors(job_fields),
+    )
 
 
 def _validate_node_graph(root: Node) -> None:
@@ -292,13 +326,10 @@ def _is_immutable_external_reusable_workflow(value: str) -> bool:
     )
 
 
-def _job_authorities(
+def _job_authority_inputs(
     jobs: dict[str, Node],
-    *,
-    raw_jobs: dict[object, object],
-    raw_workflow: dict[object, object],
-) -> tuple[WorkflowJobAuthority, ...]:
-    authorities: list[WorkflowJobAuthority] = []
+) -> tuple[tuple[str, tuple[str, ...], bool], ...]:
+    inputs: list[tuple[str, tuple[str, ...], bool]] = []
     for job_id, job_node in jobs.items():
         if not isinstance(job_node, MappingNode):
             raise ValueError("workflow job declaration must be a mapping")
@@ -324,6 +355,24 @@ def _job_authorities(
             "workflow job condition",
             4_096,
         )
+        inputs.append(
+            (
+                job_id,
+                tuple(sorted(_expression_contexts(condition or ""), key=utf16_sort_key)),
+                "continue-on-error" in fields or step_declares_continue_on_error,
+            )
+        )
+    return tuple(sorted(inputs, key=lambda item: utf16_sort_key(item[0])))
+
+
+def _job_authorities(
+    inputs: tuple[tuple[str, tuple[str, ...], bool], ...],
+    *,
+    raw_jobs: dict[object, object],
+    raw_workflow: dict[object, object],
+) -> tuple[WorkflowJobAuthority, ...]:
+    authorities: list[WorkflowJobAuthority] = []
+    for job_id, contexts, declares_continue_on_error in inputs:
         raw_job = raw_jobs.get(job_id)
         raw_root = (
             {key: value for key, value in raw_workflow.items() if type(key) is str}
@@ -339,15 +388,8 @@ def _job_authorities(
             WorkflowJobAuthority(
                 job_id=job_id,
                 control_projection_hash=projection_hash,
-                condition_contexts=tuple(
-                    sorted(
-                        _expression_contexts(condition or ""),
-                        key=utf16_sort_key,
-                    )
-                ),
-                declares_continue_on_error=(
-                    "continue-on-error" in fields or step_declares_continue_on_error
-                ),
+                condition_contexts=contexts,
+                declares_continue_on_error=declares_continue_on_error,
             )
         )
     return tuple(sorted(authorities, key=lambda item: utf16_sort_key(item.job_id)))

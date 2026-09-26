@@ -60,6 +60,12 @@ infrastructure. It may not import private predicates, execute SQL, or perform
 provider HTTP directly; planning, verification, identity, persistence, GitHub,
 and authorization decisions remain in their owners.
 
+The executable main module imports the server application only when `main()` is
+invoked. Replaying that module under a worker's guarded main name does not import
+the server application through this edge. Interpreter admission, settings and
+composition rejection, server options and shutdown ordering remain unchanged;
+this does not bound worker startup duration or change worker isolation.
+
 ## 4. Constructive Non-Enforcing Closure
 
 Both admitted modes are now constructible. Before either mode is constructed,
