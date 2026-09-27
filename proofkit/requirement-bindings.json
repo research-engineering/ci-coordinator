@@ -10,7 +10,7 @@
     ["ci-coordinator.routes.operator-ui","proofkit/routes/operator-ui.v2.json","4c61bad01f7f2c53553b24b09130860dd74ba3117a62a1282a6b6bc9e45507e3"],
     ["ci-coordinator.routes.proofkit-adoption","proofkit/routes/proofkit-adoption.v2.json","e89a0e5843b76680bc8695b6a0aee1ef60e5b157333afbac9386af8eff10e2be"],
     ["ci-coordinator.routes.release","proofkit/routes/release.v2.json","f5c9269de7f4b6683417d647ced437bea85acce88ba762c475d748580cd53f2c"],
-    ["ci-coordinator.routes.runtime","proofkit/routes/runtime.v2.json","0634b120aeaa1f78e2a2f99110145fc25ddb689e5a14710eae3e1e08ee09eb34"]
+    ["ci-coordinator.routes.runtime","proofkit/routes/runtime.v2.json","181680971bc49be8e3eabbe58fe1f8a1c21df3686bede19aeb56a5917a468586"]
   ],
   "nonClaims": ["This index authenticates route-source bytes; final route admission remains owned by Agentic Proofkit."]
 }
