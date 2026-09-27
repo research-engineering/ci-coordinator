@@ -394,11 +394,14 @@ def test_native_task_quality_witness_leaf_retains_lease_and_drains_controlled_ca
             row["argv"] = [
                 sys.executable,
                 "-c",
-                _TRANSITIVE_WITNESS_ENTRY,
+                _TRANSITIVE_WITNESS_ENTRY.strip(),
                 str(_SOURCE_ROOT),
                 str(root),
             ]
     catalog_path.write_text(json.dumps(catalog))
+    selected = select_quality_plan(["portable"], root)
+    assert [command.command_id for command in selected.commands] == ["python.lint"]
+    assert selected.write_scopes == ()
     read_ready, write_ready = os.pipe()
     read_release, write_release = os.pipe()
     process: subprocess.Popen[bytes] | None = None
@@ -410,11 +413,11 @@ def test_native_task_quality_witness_leaf_retains_lease_and_drains_controlled_ca
             managed_entry_context(outer_identity)
         )
         value = json.loads(context)
-        value["deadline"] = time.monotonic() + 60
+        stop_grace = 5 if cut == "task-exhausted" else 30
+        value["deadline"] = time.monotonic() + 60 + stop_grace + 2
         outer = lifetime.enter_context(borrow_managed_process(json.dumps(value)))
         assert current_process_scope() is outer
         # Task owns 30s; Q and W each retain their existing kill1 + return1 reserve.
-        stop_grace = 5 if cut == "task-exhausted" else 30
         invocation = lifetime.enter_context(
             managed_process_invocation(
                 (

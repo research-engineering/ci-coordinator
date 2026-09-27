@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 import pytest
 from scripts import bounded_process
-from scripts.dev_environment.environment import managed_process_invocation
+from scripts.dev_environment.environment import borrow_managed_process, managed_process_invocation
 from scripts.dev_environment.identity import InstanceIdentity, derive_instance_identity
 from scripts.dev_environment.lifecycle import (
     OperationBlocked,
@@ -25,6 +25,10 @@ from scripts.dev_environment.lifecycle import (
 from scripts.dev_environment.private_files import PrivateLockBusy, bounded_private_lock
 from scripts.dev_environment.watch_session import cancel_watch, owned_watch_session
 from scripts.repository_paths import read_bounded_regular_file
+from scripts.tests.test_dev_environment_dependencies import (
+    dependency_identity_fixture,
+    managed_entry_context,
+)
 
 _SOURCE_ROOT = Path(__file__).resolve().parents[2]
 _PYTHON = getattr(sys, "_base_executable", sys.executable)
@@ -46,8 +50,9 @@ print('PROVIDER_DONE', flush=True)
 
 
 class _Witness:
-    def __init__(self, process: subprocess.Popen[bytes]) -> None:
+    def __init__(self, process: subprocess.Popen[bytes], phase_write: int) -> None:
         self.process = process
+        self._phase_write = phase_write
         self._buffer = bytearray()
         self._stderr = bytearray()
 
@@ -85,6 +90,9 @@ class _Witness:
         assert self.process.stdin is not None
         self.process.stdin.write(b"exit\n")
         self.process.stdin.flush()
+
+    def release_parent(self) -> None:
+        assert os.write(self._phase_write, b"1") == 1
 
 
 @contextmanager
@@ -134,7 +142,7 @@ def _witness(
             stderr=subprocess.PIPE,
             pass_fds=(*invocation.inherited_fds, phase_read),
         )
-        yield _Witness(process)
+        yield _Witness(process, phase_write)
     except BaseException as error:
         paths = operation_paths(identity, create=False)
         for name, path in (("completion", paths.completed), ("session", paths.session)):
@@ -257,11 +265,20 @@ def test_interrupt_during_spawn_transfer_preserves_the_ambiguous_mutation_fence(
     identity: InstanceIdentity,
 ) -> None:
     paths = operation_paths(identity)
-    with _witness(identity, joined_client_fixture=True, parent_phase="transfer") as witness:
+    with _witness(identity, joined_client_fixture=True, parent_phase="transfer-fault") as witness:
         nonce = json.loads(witness.line())["publishedNonce"]
-        assert {witness.line(), witness.line()} == {"PROVIDER_READY", "PARENT_TRANSFERRING"}
-        witness.process.send_signal(signal.SIGINT)
+        lines = [witness.line(), witness.line()]
+        assert lines.count("PROVIDER_READY") == 1
+        lines.remove("PROVIDER_READY")
+        phase = json.loads(lines[0])
+        assert set(phase) == {"phase", "pid"}
+        assert phase["phase"] == "PARENT_TRANSFER_FAULT"
+        provider_pid = phase["pid"]
+        assert type(provider_pid) is int and provider_pid > 0
+        witness.release_parent()
         assert witness.process.wait(timeout=5) != 0
+        os.kill(provider_pid, 0)
+        assert os.getpgid(provider_pid) == provider_pid
         with pytest.raises(PrivateLockBusy), bounded_private_lock(paths.mutation):
             pytest.fail("ownership transfer lost the surviving child's mutation descriptor")
         assert not paths.completed.exists()
@@ -277,6 +294,54 @@ def test_interrupt_during_spawn_transfer_preserves_the_ambiguous_mutation_fence(
     assert (result.state, result.reason) == ("blocked", "watch_abandoned")
     with pytest.raises(OperationBlocked), instance_operation_lock(identity):
         pytest.fail("child exit erased the unresolved ownership transfer fence")
+
+
+def test_deferred_interrupt_during_spawn_transfer_drains_before_mutation_admission(
+    identity: InstanceIdentity,
+    tmp_path: Path,
+) -> None:
+    lifetime_root = tmp_path / "managed-lifetime"
+    lifetime_root.mkdir()
+    managed_identity = dependency_identity_fixture(lifetime_root)
+    with (
+        managed_entry_context(managed_identity) as (context, _writer, _lease),
+        borrow_managed_process(context),
+        _witness(identity, joined_client_fixture=True, parent_phase="transfer") as witness,
+    ):
+        nonce = json.loads(witness.line())["publishedNonce"]
+        lines = [witness.line(), witness.line()]
+        assert lines.count("PROVIDER_READY") == 1
+        lines.remove("PROVIDER_READY")
+        phase = json.loads(lines[0])
+        assert set(phase) == {"phase", "pid"}
+        assert phase["phase"] == "PARENT_TRANSFERRING"
+        provider_pid = phase["pid"]
+        assert type(provider_pid) is int and provider_pid > 0
+        os.kill(provider_pid, 0)
+        assert os.getpgid(provider_pid) == provider_pid
+        witness.process.send_signal(signal.SIGINT)
+        assert witness.line() == "PARENT_TRANSFER_SIGINT_DEFERRED"
+        witness.release_parent()
+        assert witness.line() == "PROVIDER_TERM"
+        assert witness.process.wait(timeout=5) != 0
+        with pytest.raises(ProcessLookupError):
+            os.kill(provider_pid, 0)
+        with pytest.raises(ProcessLookupError):
+            os.killpg(provider_pid, 0)
+        completion = json.loads(operation_paths(identity).completed.read_text())
+        assert completion["nonce"] == nonce
+        assert completion["process"] == {
+            "returncode": 0,
+            "process_group_quiescent": True,
+            "failure_kind": "cancelled",
+            "escalated": False,
+            "started": True,
+            "cancellation_signal_sent": True,
+        }
+        result = cancel_watch(identity, expected_nonce=nonce)
+        assert (result.state, result.reason) == ("quiescent", "watch_client_stopped")
+        with instance_operation_lock(identity):
+            pass
 
 
 @pytest.mark.parametrize("owner_signal", [None, signal.SIGINT, signal.SIGTERM])

@@ -317,6 +317,7 @@ def test_managed_lifecycle_manifest_has_exactly_nine_causal_witnesses() -> None:
                 "-c",
                 "backend/pyproject.toml",
                 "-q",
+                "--rootdir=.",
                 "scripts/tests/test_detached_worktree_lifecycle.py::test_native_owned_cleanup_uses_one_remaining_parent_allowance[residual]",
             ],
         ],

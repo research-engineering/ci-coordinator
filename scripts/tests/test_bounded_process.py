@@ -92,6 +92,7 @@ def test_spawn_projects_exact_environment_and_stdin(tmp_path: Path) -> None:
         status=0,
         stdout="absent:present:payload",
         stderr="",
+        process_group_quiescent=True,
     )
 
 

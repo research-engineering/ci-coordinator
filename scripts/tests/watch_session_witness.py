@@ -6,11 +6,13 @@ import argparse
 import json
 import os
 import select
+import signal
 import subprocess
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict
 from pathlib import Path
+from types import FrameType
 from typing import Any
 from unittest.mock import patch
 
@@ -48,13 +50,28 @@ def _parent_phase(phase: str | None, descriptor: int | None) -> Iterator[None]:
                 return stop_requested(session)
 
             stack.enter_context(patch.object(WatchSession, "stop_requested", supervised))
-        elif phase == "transfer":
+        elif phase in {"transfer", "transfer-fault"}:
             popen = subprocess.Popen
 
             def transferring(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
                 process = popen(*args, **kwargs)
                 # Native spawn succeeded, but run_interactive has not received its handle.
-                barrier("PARENT_TRANSFERRING")
+                if phase == "transfer-fault":
+                    barrier(json.dumps({"phase": "PARENT_TRANSFER_FAULT", "pid": process.pid}))
+                    raise KeyboardInterrupt("fixture transfer fault")
+                previous = signal.getsignal(signal.SIGINT)
+                if not callable(previous):
+                    raise ValueError("managed transfer requires a callable SIGINT handler")
+
+                def observed_interrupt(number: int, frame: FrameType | None) -> None:
+                    previous(number, frame)
+                    print("PARENT_TRANSFER_SIGINT_DEFERRED", flush=True)
+
+                signal.signal(signal.SIGINT, observed_interrupt)
+                try:
+                    barrier(json.dumps({"phase": "PARENT_TRANSFERRING", "pid": process.pid}))
+                finally:
+                    signal.signal(signal.SIGINT, previous)
                 return process
 
             stack.enter_context(patch.object(subprocess, "Popen", transferring))
@@ -66,7 +83,7 @@ def main() -> int:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--state-home", type=Path, required=True)
     parser.add_argument("--joined-client-fixture", action="store_true")
-    parser.add_argument("--parent-phase", choices=("supervised", "transfer"))
+    parser.add_argument("--parent-phase", choices=("supervised", "transfer", "transfer-fault"))
     parser.add_argument("--phase-release-fd", type=int)
     parser.add_argument("provider", nargs=argparse.REMAINDER)
     args = parser.parse_args()

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from xml.etree.ElementTree import fromstring
 
 import pytest
 from scripts.mutation import pytest_report
-from scripts.mutation.detached_worktree_lifecycle import DetachedWorktreeLifecycle
+from scripts.mutation.detached_worktree_lifecycle import CleanupResult, DetachedWorktreeLifecycle
 from scripts.mutation.mutation_manifest import Mutant, MutationManifest
 from scripts.mutation.mutation_suite_runner import (
     ExecutionClassificationInput,
@@ -25,6 +28,47 @@ _SUCCESS_CASE = (
 _SKIP = (
     '<testcase classname="test_probe" name="test_skip" file="test_probe.py"><skipped /></testcase>'
 )
+
+
+def _require_fixture_cleanup(lifecycle: DetachedWorktreeLifecycle) -> None:
+    assert lifecycle.cleanup().state == "passed", "registered pytest fixture cleanup failed"
+
+
+@contextmanager
+def _registered_pytest_worktree(tmp_path: Path) -> Iterator[DetachedWorktreeLifecycle]:
+    repository = tmp_path / "source"
+    repository.mkdir()
+    lifecycle = DetachedWorktreeLifecycle(repo_root=repository, temp_prefix="pytest-evidence-")
+    try:
+        lifecycle.git(("init",))
+        lifecycle.git(
+            (
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "commit",
+                "--allow-empty",
+                "--no-gpg-sign",
+                "-m",
+                "Pytest fixture",
+            )
+        )
+        revision = lifecycle.git(("rev-parse", "HEAD")).stdout.strip()
+        lifecycle.add_detached_worktree(revision)
+        yield lifecycle
+    except BaseException as primary:
+        try:
+            _require_fixture_cleanup(lifecycle)
+        except BaseException as cleanup_error:
+            BaseException.add_note(
+                primary, f"registered pytest fixture cleanup failed: {type(cleanup_error).__name__}"
+            )
+        raise
+    else:
+        _require_fixture_cleanup(lifecycle)
 
 
 def _report(cases: str, *, tests: int = 1, failures: int = 0, skipped: int = 0) -> str:
@@ -73,6 +117,21 @@ def test_invalid_report_diagnostic_excludes_error_payload(tmp_path: Path) -> Non
     assert evidence["state"] == "invalid"
     assert evidence["admissionDetail"] == "report contains setup, teardown, or collection errors"
     assert "private payload" not in str(evidence)
+
+
+def test_report_rejects_literal_empty_classname_even_when_counts_pass(tmp_path: Path) -> None:
+    _write_report(
+        tmp_path,
+        _report(
+            '<testcase classname="" name="test_outside_config_identity[residual]" '
+            'file="../scripts/tests/test_outside_config_identity.py" />'
+        ),
+    )
+
+    evidence = read_pytest_evidence(tmp_path)
+
+    assert evidence["state"] == "invalid"
+    assert evidence["admissionDetail"] == "report test identity is invalid"
 
 
 @pytest.mark.parametrize(
@@ -292,7 +351,6 @@ def test_guard(resource):
         pytest.skip("skip")
     assert MODE not in {"call", "interrupt"}
 """
-    lifecycle = DetachedWorktreeLifecycle(repo_root=tmp_path, temp_prefix="pytest-evidence-")
     manifest: MutationManifest = {
         "expectedKilled": 1,
         "expectedMutantIds": ["phase"],
@@ -318,8 +376,7 @@ def test_guard(resource):
             "test_probe.py",
         ],
     }
-    try:
-        lifecycle.worktree.mkdir()
+    with _registered_pytest_worktree(tmp_path) as lifecycle:
         path = lifecycle.worktree / "test_probe.py"
         path.write_text(source)
         if mode == "interrupt":
@@ -344,5 +401,122 @@ def test_guard(resource):
             assert execution["exitCode"] == 2
             assert execution["pytestEvidence"]["state"] == "failed_tests"
         assert classify_mutation_execution(mutant, execution)["status"] == "invalid"
-    finally:
-        assert lifecycle.cleanup().state == "passed"
+
+
+@pytest.mark.parametrize("has_primary", [False, True])
+def test_registered_fixture_keeps_primary_and_exposes_cleanup_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, has_primary: bool
+) -> None:
+    primary = ValueError("original test failure")
+    expected = ValueError if has_primary else AssertionError
+    with pytest.raises(expected) as captured, _registered_pytest_worktree(tmp_path) as lifecycle:
+        original_cleanup = lifecycle.cleanup
+
+        def uncertain_cleanup() -> CleanupResult:
+            result = original_cleanup()
+            assert result.state == "passed"
+            return CleanupResult(state="failed", worktree_removal="removed")
+
+        monkeypatch.setattr(lifecycle, "cleanup", uncertain_cleanup)
+        if has_primary:
+            raise primary
+
+    if has_primary:
+        assert captured.value is primary
+        assert primary.__notes__ == ["registered pytest fixture cleanup failed: AssertionError"]
+    else:
+        assert "registered pytest fixture cleanup failed" in str(captured.value)
+
+
+def test_native_outside_config_rootdir_changes_only_report_identity(tmp_path: Path) -> None:
+    source = """from pathlib import Path
+import pytest
+
+@pytest.mark.parametrize("mode", ["residual"])
+def test_outside_config_identity(mode, pytestconfig):
+    assert mode == "residual"
+    assert pytestconfig.inipath == Path.cwd() / "backend" / "pyproject.toml"
+    assert [path.resolve() for path in pytestconfig.getini("pythonpath")] == [
+        Path.cwd() / "backend" / "src",
+        Path.cwd() / "backend" / "tests" / "unit",
+        Path.cwd(),
+    ]
+"""
+    config = Path(__file__).resolve().parents[2] / "backend" / "pyproject.toml"
+    relative = "scripts/tests/test_outside_config_identity.py"
+    name = "test_outside_config_identity[residual]"
+    manifest: MutationManifest = {
+        "expectedKilled": 1,
+        "expectedMutantIds": ["rootdir"],
+        "mutants": [],
+        "outerTimeoutMs": 40_000,
+        "timeoutMs": 15_000,
+    }
+    probe: Mutant = {
+        "id": "rootdir",
+        "file": relative,
+        "operator": "remove-rootdir",
+        "original": "--rootdir=.",
+        "replacement": "",
+        "witnessId": "rootdir",
+        "requirementIds": ["REQ-PROBE-001"],
+        "command": [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            "backend/pyproject.toml",
+            "-q",
+            "--rootdir=.",
+            f"{relative}::{name}",
+        ],
+    }
+    with _registered_pytest_worktree(tmp_path) as lifecycle:
+        target = lifecycle.worktree / relative
+        target.parent.mkdir(parents=True)
+        target.write_text(source)
+        copied_config = lifecycle.worktree / "backend" / "pyproject.toml"
+        copied_config.parent.mkdir()
+        copied_config.write_bytes(config.read_bytes())
+
+        positive = _execute_witness(lifecycle, manifest, probe)
+        assert positive["executable"] and positive["exitCode"] == 0, positive
+        assert _baseline_is_valid(probe, positive)
+        positive_evidence = positive["pytestEvidence"]
+        assert positive_evidence["state"] == "passed_tests"
+        assert positive_evidence["totalTests"] == 1
+        raw = (lifecycle.worktree / PYTEST_REPORT_RELATIVE_PATH).read_bytes()
+        assert len(raw) < 16_384
+        document = fromstring(raw)  # noqa: S314 - bounded report from the closed native fixture
+        cases = list(document.iter("testcase"))
+        assert len(cases) == 1
+        assert tuple(cases[0].get(key) for key in ("file", "classname", "name")) == (
+            relative,
+            "scripts.tests.test_outside_config_identity",
+            name,
+        )
+
+        without_root: Mutant = {
+            **probe,
+            "command": [argument for argument in probe["command"] if argument != "--rootdir=."],
+        }
+        negative = _execute_witness(lifecycle, manifest, without_root)
+        assert negative["executable"] and negative["exitCode"] == 0, negative
+        assert not _baseline_is_valid(without_root, negative)
+        evidence = negative["pytestEvidence"]
+        assert evidence["state"] == "invalid"
+        assert evidence["admissionDetail"] == "report test identity is invalid"
+        raw = (lifecycle.worktree / PYTEST_REPORT_RELATIVE_PATH).read_bytes()
+        assert len(raw) < 16_384
+        document = fromstring(raw)  # noqa: S314 - same bounded closed-fixture producer
+        cases = list(document.iter("testcase"))
+        assert len(cases) == 1
+        assert tuple(cases[0].get(key) for key in ("file", "classname", "name")) == (
+            "../" + relative,
+            "",
+            name,
+        )
+        assert (
+            classify_mutation_execution(without_root, negative, baseline=positive)["status"]
+            == "invalid"
+        )

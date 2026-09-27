@@ -352,7 +352,26 @@ def test_provider_workflow_provisions_tools_before_their_first_use() -> None:
             assert job_name in reusable_workflows
             assert _mapping(job)["uses"] == reusable_workflows[job_name]
             continue
-        assert all("setup-node" not in str(step.get("uses", "")) for step in _sequence(steps))
+        node_steps = [
+            (index, step)
+            for index, step in enumerate(_sequence(steps))
+            if "setup-node" in str(step.get("uses", ""))
+        ]
+        if job_name == "persistence-mutation":
+            assert len(node_steps) == 1
+            node_index, node = node_steps[0]
+            assert node["if"] == "matrix.suite == 'python-managed-lifecycle'"
+            assert node["uses"] == "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020"
+            assert node["with"] == {"node-version": "24.21.0"}
+            execution_indices = [
+                index
+                for index, step in enumerate(_sequence(steps))
+                if "scripts.mutation.mutation_suite_specs" in str(step.get("run", ""))
+            ]
+            assert len(execution_indices) == 1
+            assert node_index < execution_indices[0]
+        else:
+            assert not node_steps
 
     for job_name in (
         "repository-quality",
@@ -379,6 +398,36 @@ def test_provider_workflow_provisions_tools_before_their_first_use() -> None:
             if "backend/.venv/" in str(step.get("run", ""))
         )
         assert steps.index(install) < first_environment_use
+
+
+@pytest.mark.parametrize(
+    "change", ["missing", "duplicate", "unconditional", "suite", "version", "action", "late"]
+)
+def test_mutation_node_provisioning_rejects_nonexact_setup(
+    monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:
+    workflow = _read_workflow(_PROVIDER_WORKFLOW_PATH)
+    steps = _sequence(_mapping(_mapping(workflow["jobs"])["persistence-mutation"])["steps"])
+    node = next(step for step in steps if "setup-node" in str(step.get("uses", "")))
+    if change == "missing":
+        steps.remove(node)
+    elif change == "duplicate":
+        steps.append(dict(node))
+    elif change == "unconditional":
+        node.pop("if")
+    elif change == "suite":
+        node["if"] = "matrix.suite == 'python-persistence'"
+    elif change == "version":
+        node["with"] = {"node-version": "24.20.0"}
+    elif change == "action":
+        node["uses"] = "actions/setup-node@unadmitted"
+    else:
+        steps.remove(node)
+        steps.append(node)
+    monkeypatch.setattr(f"{__name__}._read_workflow", lambda path: workflow)
+
+    with pytest.raises((AssertionError, KeyError)):
+        test_provider_workflow_provisions_tools_before_their_first_use()
 
 
 def test_native_jobs_require_unconditional_execution_and_coverage_join() -> None:

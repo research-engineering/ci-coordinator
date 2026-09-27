@@ -201,6 +201,7 @@
         "-c",
         "backend/pyproject.toml",
         "-q",
+        "--rootdir=.",
         "scripts/tests/test_detached_worktree_lifecycle.py::test_native_owned_cleanup_uses_one_remaining_parent_allowance[residual]"
       ],
       "environment": {

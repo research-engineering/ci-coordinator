@@ -267,6 +267,10 @@ class FakeRunner:
         raise AssertionError(f"unexpected command: {args!r}")
 
 
+_TIMING_PRIVATE_SENTINEL = "__timing_private_15a1c73b__"
+_TIMING_SENSITIVE_SENTINEL = "__timing_sensitive_7e0429ad__"
+
+
 class _TimingRunner(FakeRunner):
     def __init__(self, output: str, failure: str | None = None) -> None:
         super().__init__(failure)
@@ -275,8 +279,8 @@ class _TimingRunner(FakeRunner):
     def __call__(self, argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
         result = super().__call__(argv, timeout_seconds=timeout_seconds)
         if "check:portable" in argv:
-            return replace(result, stdout=self.output, stderr="private portable stderr")
-        return replace(result, stderr="private provider stderr")
+            return replace(result, stdout=self.output, stderr=_TIMING_PRIVATE_SENTINEL)
+        return replace(result, stderr=_TIMING_SENSITIVE_SENTINEL)
 
 
 def _timing_rows() -> list[dict[str, object]]:
@@ -336,6 +340,7 @@ def test_successful_portable_boundary_forwards_existing_quality_timings(
     ]
     assert commands == list(plan.portable_command_ids)
     assert [json.loads(line) for line in emitted.splitlines()] == expected
+    monkeypatch.setattr(devcontainer_witness, "monotonic", lambda: 100.0)
     baseline = FakeRunner()
     verify_devcontainer(runner=baseline, witness_id="test-witness")
     assert json.loads(capsys.readouterr().out) == {
@@ -352,11 +357,12 @@ def test_successful_portable_boundary_forwards_existing_quality_timings(
                 tuple(argv[:3]) == (*devcontainer_witness._DEVCONTAINER_COMMAND, "up")
                 or argv[-1] == "scripts/conformance/installed_mise_node_test.py"
             ):
-                return replace(result, stdout=decoy + "\nprivate provisioning text")
+                return replace(result, stdout=decoy + "\n" + _TIMING_PRIVATE_SENTINEL)
             return result
 
     runner = DecoyRunner(
-        "private prefix\n"
+        _TIMING_SENSITIVE_SENTINEL
+        + "\n"
         + "".join("[check:portable] " + line + "\n" for line in emitted.splitlines())
     )
     verify_devcontainer(runner=runner, witness_id="test-witness")
@@ -366,9 +372,12 @@ def test_successful_portable_boundary_forwards_existing_quality_timings(
         "expectedCommandCount": 26,
         "timings": expected,
     }
-    assert "private" not in captured.out and captured.err == ""
+    assert _TIMING_PRIVATE_SENTINEL not in captured.out
+    assert _TIMING_SENSITIVE_SENTINEL not in captured.out
+    assert captured.err == ""
     assert runner.calls == baseline.calls
     assert runner.calls[-1][0] == ("docker", "rm", "--force", _CONTAINER_ID)
+    assert runner.calls[-1][1] == 115.0
 
 
 @pytest.mark.parametrize(
@@ -409,18 +418,24 @@ def test_incomplete_timing_diagnostics_preserve_successful_proof(
     elif fault == "duplicate-key":
         lines[5] = lines[5].replace('"elapsedSeconds":', '"elapsedSeconds": 9, "elapsedSeconds":')
     elif fault == "malformed":
-        lines[5] = '{"qualityCommand": private malformed text'
+        lines[5] = '{"qualityCommand": ' + _TIMING_PRIVATE_SENTINEL
     elif fault == "oversized-row":
         lines[5] += " " * 1_024
     elif fault == "deep":
-        lines[5] = '{"qualityCommand":' + "[" * 300 + '"private"' + "]" * 300 + "}"
+        lines[5] = (
+            '{"qualityCommand":'
+            + "[" * 300
+            + json.dumps(_TIMING_PRIVATE_SENTINEL)
+            + "]" * 300
+            + "}"
+        )
     elif fault == "excess-candidates":
         lines.append(lines[0])
     else:
         if fault == "unknown":
-            changed["qualityCommand"] = "private unknown command"
+            changed["qualityCommand"] = _TIMING_PRIVATE_SENTINEL
         elif fault == "extra":
-            changed["private"] = "secret extra field"
+            changed[_TIMING_PRIVATE_SENTINEL] = _TIMING_SENSITIVE_SENTINEL
         elif fault == "not-bool":
             changed["succeeded"] = 1
         elif fault == "false-succeeded":
@@ -432,7 +447,7 @@ def test_incomplete_timing_diagnostics_preserve_successful_proof(
                 "infinite": float("inf"),
                 "overflow": 10**400,
                 "bool-seconds": True,
-                "string-seconds": "private seconds",
+                "string-seconds": _TIMING_PRIVATE_SENTINEL,
             }[fault]
         lines[5] = json.dumps(changed)
     runner = _TimingRunner("\n".join(lines))
@@ -442,7 +457,21 @@ def test_incomplete_timing_diagnostics_preserve_successful_proof(
     assert report["devcontainerTimingDiagnostics"] == "incomplete"
     assert report["expectedCommandCount"] == 26
     assert len(report["timings"]) <= 26
-    assert "private" not in captured.out and "secret" not in captured.out
+    expected_rows = list(rows)
+    if fault == "reordered":
+        expected_rows[4], expected_rows[5] = expected_rows[5], expected_rows[4]
+    elif fault == "false-succeeded":
+        expected_rows[5] = {**rows[5], "succeeded": False}
+    elif fault != "excess-candidates":
+        del expected_rows[5]
+    assert report == {
+        "devcontainerTimingDiagnostics": "incomplete",
+        "expectedCommandCount": 26,
+        "timings": expected_rows,
+    }
+    assert any(row["qualityCommand"] == "secret.scan" for row in report["timings"])
+    assert _TIMING_PRIVATE_SENTINEL not in captured.out
+    assert _TIMING_SENSITIVE_SENTINEL not in captured.out
     assert captured.err == ""
     if fault == "false-succeeded":
         assert report["timings"][5] == {

@@ -119,7 +119,7 @@ def test_developer_cancellation_reaps_nested_campaign_child_before_releasing_lea
             managed_process_invocation(
                 ("-c", _DISPATCHER, str(root), str(identity.state_home)),
                 timeout_seconds=None,
-                graceful_seconds=3,
+                graceful_seconds=30,
             )
         )
         process = subprocess.Popen(
