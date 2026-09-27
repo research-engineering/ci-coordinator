@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 
 from starlette.routing import compile_path
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ci_coordinator.kernel import NoQueueAdmission
+from ci_coordinator.observability import scope_request_observation
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +123,9 @@ class RequestAdmissionMiddleware:
         hard_deadline = asyncio.get_running_loop().time() + timeout_seconds
         send_reserve = min(1.0, timeout_seconds / 10)
         hard_timeout = asyncio.timeout_at(hard_deadline)
+        observation = scope_request_observation(scope)
+        if observation is not None:
+            observation.hard_timeout = hard_timeout
         try:
             async with hard_timeout:
                 lease = None
@@ -140,6 +145,8 @@ class RequestAdmissionMiddleware:
                     await send(message)
 
                 work_timeout = asyncio.timeout_at(hard_deadline - send_reserve)
+                if observation is not None:
+                    observation.work_timeout = work_timeout
                 timed_out = False
                 try:
                     async with work_timeout:
@@ -151,6 +158,9 @@ class RequestAdmissionMiddleware:
                 finally:
                     if lease is not None:
                         lease.release()
+                    if observation is not None:
+                        with suppress(Exception):
+                            observation.capture_expiry()
                 if timed_out:
                     payload = (
                         self._default_timeout_response
@@ -162,6 +172,10 @@ class RequestAdmissionMiddleware:
             if hard_timeout.expired():
                 raise asyncio.CancelledError("request response deadline expired") from None
             raise
+        finally:
+            if observation is not None:
+                with suppress(Exception):
+                    observation.capture_expiry()
 
     def _policy_for_scope(self, scope: Scope) -> RequestAdmissionPolicy | None:
         path = scope["path"]

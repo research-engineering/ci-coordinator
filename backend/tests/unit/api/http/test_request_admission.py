@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from dataclasses import replace
+from io import StringIO
 
 import pytest
+from prometheus_support import prometheus_samples
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from ci_coordinator.api.http.request_admission import (
     RequestAdmissionMiddleware,
     RequestAdmissionPolicy,
+)
+from ci_coordinator.observability import (
+    HttpRequestObservationMiddleware,
+    RuntimeMetrics,
+    StructuredEventLogger,
+    scope_request_observation,
 )
 
 _POLICY = RequestAdmissionPolicy(
@@ -313,3 +323,166 @@ def _scope() -> Scope:
         "path": "/bounded/42",
         "headers": [],
     }
+
+
+@pytest.mark.parametrize(
+    ("cut", "status_code", "completed", "result", "termination"),
+    [
+        ("before", 503, True, "timed_out", "work_timeout"),
+        ("after_start", 200, False, "timed_out", "work_timeout"),
+        ("hard_start", None, False, "timed_out", "work_timeout"),
+        ("hard_body", 503, False, "timed_out", "work_timeout"),
+        ("suppressed", 200, True, "timed_out", "work_timeout"),
+        ("cleanup", 200, True, "issued", "completed"),
+        ("second_cancel", None, False, "timed_out", "work_timeout"),
+    ],
+)
+def test_owner_expiry_cut_survives_send_unwind_and_cancellation_suppression(
+    cut: str,
+    status_code: int | None,
+    completed: bool,
+    result: str,
+    termination: str,
+) -> None:
+    async def scenario() -> None:
+        metrics = RuntimeMetrics()
+        output = StringIO()
+        logger = logging.Logger("owned-expiry")
+        logger.addHandler(logging.StreamHandler(output))
+        attempts: list[Message] = []
+        calls = 0
+
+        async def downstream(scope: Scope, _: Receive, send: Send) -> None:
+            nonlocal calls
+            calls += 1
+            observation = scope_request_observation(scope)
+            assert observation is not None
+            observation.plan_authenticated = True
+            observation.plan_route_result = "issued"
+            if calls > 1:
+                await send({"type": "http.response.start", "status": 200, "headers": []})
+                await send({"type": "http.response.body", "body": b"probe"})
+                return
+            if cut in {"after_start", "cleanup"}:
+                await send({"type": "http.response.start", "status": 200, "headers": []})
+            if cut == "cleanup":
+                await send({"type": "http.response.body", "body": b"complete"})
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                if cut == "suppressed":
+                    await send({"type": "http.response.start", "status": 200, "headers": []})
+                    await send({"type": "http.response.body", "body": b"late"})
+                    return
+                if cut == "second_cancel":
+                    task = asyncio.current_task()
+                    assert task is not None
+                    task.cancel("external during owned unwind")
+                    await asyncio.Event().wait()
+                raise
+
+        async def receive() -> Message:
+            raise AssertionError("no receive in this deadline-owner witness")
+
+        async def send(message: Message) -> None:
+            attempts.append(message)
+            if (cut == "hard_start" and message["type"] == "http.response.start") or (
+                cut == "hard_body" and message["type"] == "http.response.body"
+            ):
+                await asyncio.Event().wait()
+
+        observed = HttpRequestObservationMiddleware(
+            _middleware(downstream, timeout_seconds=1),
+            metrics=metrics,
+            plan_metrics=metrics,
+            admitted_routes=(),
+            logger=StructuredEventLogger(logger),
+        )
+
+        async def first() -> None:
+            await observed(_scope(), receive, send)
+
+        task = asyncio.create_task(first())
+        if cut in {"before", "suppressed"}:
+            await task
+        else:
+            with pytest.raises(
+                asyncio.CancelledError
+                if cut in {"hard_start", "hard_body", "second_cancel"}
+                else TimeoutError
+            ):
+                await task
+        record = json.loads(output.getvalue())
+        assert record["statusCode"] == status_code
+        assert record["responseCompleted"] is completed
+        assert record["termination"] == termination
+        assert len([m for m in attempts if m["type"] == "http.response.start"]) <= 1
+        counts = {
+            dict(labels)["result"]: value
+            for (name, labels), value in prometheus_samples(metrics).items()
+            if name == "ci_coordinator_plan_requests_total" and value
+        }
+        assert counts == {result: 1}
+        probe: list[Message] = []
+
+        async def probe_send(message: Message) -> None:
+            probe.append(message)
+
+        await observed(_scope(), receive, probe_send)
+        assert calls == 2 and probe[0]["status"] == 200
+
+    asyncio.run(scenario())
+
+
+def test_overload_hard_expiry_is_not_misattributed_to_work_or_plan() -> None:
+    async def scenario() -> None:
+        entered, release = asyncio.Event(), asyncio.Event()
+        output = StringIO()
+        logger = logging.Logger("hard-only")
+        logger.addHandler(logging.StreamHandler(output))
+        metrics = RuntimeMetrics()
+
+        async def downstream(_: Scope, __: Receive, send: Send) -> None:
+            entered.set()
+            await release.wait()
+            await send({"type": "http.response.start", "status": 204, "headers": []})
+            await send({"type": "http.response.body", "body": b""})
+
+        async def receive() -> Message:
+            raise AssertionError("no body read")
+
+        async def discard(_: Message) -> None:
+            pass
+
+        async def blocked(_: Message) -> None:
+            release.set()
+            await asyncio.Event().wait()
+
+        observed = HttpRequestObservationMiddleware(
+            _middleware(downstream, timeout_seconds=1),
+            metrics=metrics,
+            plan_metrics=metrics,
+            admitted_routes=(),
+            logger=StructuredEventLogger(logger),
+        )
+        first = asyncio.create_task(observed(_scope(), receive, discard))
+        try:
+            await entered.wait()
+            with pytest.raises(asyncio.CancelledError):
+                await observed(_scope(), receive, blocked)
+            await first
+        finally:
+            first.cancel()
+            await asyncio.gather(first, return_exceptions=True)
+        records = [json.loads(line) for line in output.getvalue().splitlines()]
+        assert {(row["statusCode"], row["termination"]) for row in records} == {
+            (204, "completed"),
+            (None, "response_timeout"),
+        }
+        assert not any(
+            value
+            for (name, _), value in prometheus_samples(metrics).items()
+            if name == "ci_coordinator_plan_requests_total"
+        )
+
+    asyncio.run(scenario())

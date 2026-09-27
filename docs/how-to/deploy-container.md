@@ -242,6 +242,7 @@ publication alone is not proof that every bypass path is closed.
 ```sh
 docker run --detach \
   --init \
+  --stop-timeout 45 \
   --name ci-coordinator \
   --publish 127.0.0.1:3000:3000 \
   --read-only \
@@ -332,6 +333,7 @@ docker stop --time 45 ci-coordinator
 docker rm ci-coordinator
 docker run --detach \
   --init \
+  --stop-timeout 45 \
   --name ci-coordinator \
   --publish 127.0.0.1:3000:3000 \
   --read-only \
@@ -485,7 +487,10 @@ the others.
 
 Set the container grace period strictly above
 `CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS`. This setting is required, with no
-default; the example below assumes it is configured to `30` seconds:
+default; both persisted `--stop-timeout 45` create recipes and the explicit
+stop example below assume it is configured to `30` seconds. Adjust the
+container bound if the admitted application total changes; flags alone do
+not prove an observed stop duration:
 
 ```sh
 docker stop --time 45 ci-coordinator

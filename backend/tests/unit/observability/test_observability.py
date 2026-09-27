@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import Iterator, Mapping
@@ -13,18 +14,22 @@ import pytest
 from _pytest.logging import LogCaptureHandler, catching_logs
 from prometheus_client import Counter
 from prometheus_support import SampleKey, prometheus_samples
+from starlette.routing import Route
+from starlette.types import Message, Receive, Scope, Send
 
 from ci_coordinator.app.config_management import ConfigActivationState
 from ci_coordinator.observability import (
     BackgroundHealth,
     BackgroundHealthState,
     DependencyReadiness,
+    HttpRequestObservationMiddleware,
     RuntimeDiagnosticObserver,
     RuntimeMetrics,
     StructuredEventLogger,
     assess_readiness,
     health,
     redacted_log_event,
+    scope_request_observation,
 )
 from ci_coordinator.observability import logging as event_logging
 from ci_coordinator.observability.runtime_metrics import (
@@ -82,6 +87,307 @@ _HTTP_SAMPLE_NAMES = (
 
 def _samples_for(metrics: RuntimeMetrics, *names: str) -> dict[SampleKey, float]:
     return {key: value for key, value in prometheus_samples(metrics).items() if key[0] in names}
+
+
+@pytest.mark.parametrize("result", ["internal_error", "timed_out", "response_failed", "cancelled"])
+def test_new_plan_results_have_real_zero_baselines_and_independent_increments(result: str) -> None:
+    metrics = RuntimeMetrics()
+    names = ("internal_error", "timed_out", "response_failed", "cancelled")
+    assert all(
+        prometheus_samples(metrics)[
+            (
+                "ci_coordinator_plan_requests_total",
+                (("result", name),),
+            )
+        ]
+        == 0
+        for name in names
+    )
+    metrics.plan_request(result)
+    assert {
+        name: prometheus_samples(metrics)[
+            (
+                "ci_coordinator_plan_requests_total",
+                (("result", name),),
+            )
+        ]
+        for name in names
+    } == {name: int(name == result) for name in names}
+
+
+@pytest.mark.parametrize(
+    ("result", "authenticated"),
+    [("invalid", False), ("unauthenticated", False), ("forbidden", False), ("conflict", True)],
+)
+@pytest.mark.parametrize(
+    ("cancelled", "send_failed", "unexpected_error", "owned_expiry", "eligible_result"),
+    [
+        (False, False, False, None, "response_failed"),
+        (True, False, False, None, "cancelled"),
+        (False, True, False, None, "response_failed"),
+        (False, False, True, None, "internal_error"),
+        (False, False, False, "work_timeout", "timed_out"),
+        (False, False, False, "response_timeout", "timed_out"),
+    ],
+    ids=["incomplete", "cancel", "send", "unexpected", "work-expiry", "response-expiry"],
+)
+def test_incomplete_plan_exclusions_precede_each_isolated_fault_projection(
+    result: Literal["invalid", "unauthenticated", "forbidden", "conflict"],
+    authenticated: bool,
+    cancelled: bool,
+    send_failed: bool,
+    unexpected_error: bool,
+    owned_expiry: Literal["work_timeout", "response_timeout"] | None,
+    eligible_result: str,
+) -> None:
+    from ci_coordinator.observability.request_observation import RequestObservation
+
+    excluded = RequestObservation(
+        plan_authenticated=authenticated,
+        plan_route_result=result,
+        cancelled=cancelled,
+        send_failed=send_failed,
+        unexpected_error=unexpected_error,
+        owned_expiry=owned_expiry,
+    )
+    eligible = RequestObservation(
+        plan_authenticated=True,
+        plan_route_result="issued",
+        cancelled=cancelled,
+        send_failed=send_failed,
+        unexpected_error=unexpected_error,
+        owned_expiry=owned_expiry,
+    )
+    assert excluded.plan_result() == result
+    assert eligible.plan_result() == eligible_result
+
+
+def test_unknown_status_and_absent_duration_do_not_fabricate_status_or_latency() -> None:
+    metrics = RuntimeMetrics()
+    metrics.bind_http_route_templates(frozenset({"/known"}))
+    metrics.http_request(method="GET", route="/known", status_code=None, duration_seconds=None)
+    labels = (("method", "GET"), ("route", "/known"), ("status_class", "unknown"))
+    samples = prometheus_samples(metrics)
+    assert samples[("ci_coordinator_http_requests_total", labels)] == 1
+    assert ("ci_coordinator_http_request_duration_seconds_count", labels) not in samples
+
+
+def test_non_http_observation_is_an_identity_passthrough() -> None:
+    async def scenario() -> None:
+        metrics = RuntimeMetrics()
+        scope: Scope = {"type": "websocket", "path": "/socket"}
+        message: Message = {"type": "websocket.close", "code": 1000}
+
+        async def receive() -> Message:
+            raise AssertionError("unused")
+
+        async def send(actual: Message) -> None:
+            assert actual is message
+
+        async def downstream(actual: Scope, actual_receive: Receive, actual_send: Send) -> None:
+            assert actual is scope and actual_receive is receive and actual_send is send
+            await actual_send(message)
+
+        await HttpRequestObservationMiddleware(
+            downstream,
+            metrics=metrics,
+            admitted_routes=(),
+            plan_metrics=metrics,
+        )(scope, receive, send)
+        assert "state" not in scope
+        assert not any(
+            name == "ci_coordinator_http_requests_total" for name, _ in prometheus_samples(metrics)
+        )
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("case", ["no_start", "partial", "trailers_pending", "trailers_complete"])
+def test_response_completion_requires_successful_start_and_terminal_message(case: str) -> None:
+    async def scenario() -> None:
+        metrics = RuntimeMetrics()
+        output = StringIO()
+        logger = logging.Logger("completion-boundary")
+        logger.addHandler(logging.StreamHandler(output))
+        delivered: list[Message] = []
+
+        async def downstream(scope: Scope, _: Receive, send: Send) -> None:
+            observation = scope_request_observation(scope)
+            assert observation is not None
+            observation.plan_authenticated = True
+            observation.plan_route_result = "issued"
+            if case != "no_start":
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 200,
+                        "trailers": case.startswith("trailers"),
+                        "headers": [],
+                    }
+                )
+            await send(
+                {
+                    "type": "http.response.body",
+                    "body": b"same bytes",
+                    "more_body": case == "partial",
+                }
+            )
+            if case == "trailers_complete":
+                await send({"type": "http.response.trailers", "headers": [], "more_trailers": True})
+                assert observation.completed_duration is None
+                await send({"type": "http.response.trailers", "headers": []})
+
+        async def receive() -> Message:
+            raise AssertionError("observer must not read")
+
+        async def send(message: Message) -> None:
+            delivered.append(message)
+
+        await HttpRequestObservationMiddleware(
+            downstream,
+            metrics=metrics,
+            plan_metrics=metrics,
+            admitted_routes=(),
+            logger=StructuredEventLogger(logger),
+        )({"type": "http", "method": "POST", "path": "/plan"}, receive, send)
+        expected = "issued" if case == "trailers_complete" else "response_failed"
+        counts = {
+            dict(labels)["result"]: value
+            for (name, labels), value in prometheus_samples(metrics).items()
+            if name == "ci_coordinator_plan_requests_total" and value
+        }
+        assert counts == {expected: 1}
+        record = json.loads(output.getvalue())
+        assert record["responseCompleted"] is (case == "trailers_complete")
+        assert record["statusCode"] == (None if case == "no_start" else 200)
+        assert record["termination"] == (
+            "completed" if case == "trailers_complete" else "incomplete"
+        )
+        assert (
+            next(m["body"] for m in delivered if m["type"] == "http.response.body") == b"same bytes"
+        )
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("failed_projection", ["plan", "http", "terminal", "send_observation"])
+def test_observation_failure_preserves_primary_error_and_independent_sinks(
+    monkeypatch: pytest.MonkeyPatch,
+    failed_projection: str,
+) -> None:
+    from ci_coordinator.observability.request_observation import RequestObservation
+
+    async def scenario() -> None:
+        plan_metrics, http_metrics = RuntimeMetrics(), RuntimeMetrics()
+        sent: list[Message] = []
+        primary = LookupError("primary failure after complete response")
+
+        def telemetry_failure(*_: object, **__: object) -> None:
+            raise ValueError("instrumentation")
+
+        if failed_projection == "plan":
+            monkeypatch.setattr(plan_metrics, "plan_request", telemetry_failure)
+        elif failed_projection == "http":
+            monkeypatch.setattr(http_metrics, "http_request", telemetry_failure)
+        elif failed_projection == "terminal":
+            monkeypatch.setattr(HttpRequestObservationMiddleware, "_observe", telemetry_failure)
+        else:
+            monkeypatch.setattr(RequestObservation, "sent", telemetry_failure)
+
+        async def downstream(scope: Scope, _: Receive, send: Send) -> None:
+            observation = scope_request_observation(scope)
+            assert observation is not None
+            observation.plan_authenticated = True
+            observation.plan_route_result = "issued"
+            await send({"type": "http.response.start", "status": 200, "headers": []})
+            await send({"type": "http.response.body", "body": b"kept"})
+            raise primary
+
+        async def receive() -> Message:
+            raise AssertionError("no body read")
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        with pytest.raises(LookupError) as caught:
+            await HttpRequestObservationMiddleware(
+                downstream,
+                metrics=http_metrics,
+                plan_metrics=plan_metrics,
+                admitted_routes=(),
+            )({"type": "http", "method": "POST", "path": "/plan"}, receive, send)
+        assert caught.value is primary
+        assert [m["type"] for m in sent] == ["http.response.start", "http.response.body"]
+        if failed_projection == "send_observation":
+            assert not any(
+                value
+                for (name, _), value in prometheus_samples(plan_metrics).items()
+                if name == "ci_coordinator_plan_requests_total"
+            )
+        if failed_projection == "http":
+            assert (
+                prometheus_samples(plan_metrics)[
+                    (
+                        "ci_coordinator_plan_requests_total",
+                        (("result", "issued"),),
+                    )
+                ]
+                == 1
+            )
+        if failed_projection == "plan":
+            assert (
+                prometheus_samples(http_metrics)[
+                    (
+                        "ci_coordinator_http_requests_total",
+                        (("method", "POST"), ("route", "unmatched"), ("status_class", "2xx")),
+                    )
+                ]
+                == 1
+            )
+
+    asyncio.run(scenario())
+
+
+def test_plan_latency_ends_at_send_completion_not_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
+    import ci_coordinator.observability.request_observation as observation_module
+
+    ticks = iter((100.0, 101.0, 104.0, 110.0))
+    monkeypatch.setattr(observation_module, "monotonic", lambda: next(ticks))
+    metrics = RuntimeMetrics()
+
+    async def downstream(scope: Scope, _: Receive, send: Send) -> None:
+        observation = scope_request_observation(scope)
+        assert observation is not None
+        observation.plan_authenticated = True
+        observation.plan_route_result = "issued"
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"ok"})
+        raise RuntimeError("cleanup")
+
+    async def receive() -> Message:
+        raise AssertionError("no read")
+
+    async def send(_: Message) -> None:
+        pass
+
+    with pytest.raises(RuntimeError, match="cleanup"):
+        asyncio.run(
+            HttpRequestObservationMiddleware(
+                downstream,
+                metrics=metrics,
+                plan_metrics=metrics,
+                admitted_routes=(Route("/api/v1/dynamic-ci/plan", downstream, methods=["POST"]),),
+            )({"type": "http", "method": "POST", "path": "/api/v1/dynamic-ci/plan"}, receive, send)
+        )
+    labels = (("method", "POST"), ("route", "/api/v1/dynamic-ci/plan"), ("status_class", "2xx"))
+    assert (
+        prometheus_samples(metrics)[("ci_coordinator_http_request_duration_seconds_sum", labels)]
+        == 4
+    )
+    assert (
+        prometheus_samples(metrics)[("ci_coordinator_http_request_duration_seconds_count", labels)]
+        == 1
+    )
 
 
 class _ExplodingMapping(Mapping[str, object]):

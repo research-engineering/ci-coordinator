@@ -21,10 +21,13 @@ from ci_coordinator.api.http.security import (
     WWW_AUTHENTICATE_OPENAPI,
 )
 from ci_coordinator.app.dynamic_plan import DynamicPlanCommand
+from ci_coordinator.identity_admission import TrustedActionsRun
 from ci_coordinator.observability import (
     PlanOperationDiagnostic,
     bind_plan_operation_diagnostic,
+    scope_request_observation,
 )
+from ci_coordinator.observability.request_observation import PlanRouteResult
 from ci_coordinator.plan_issuance import (
     IssuanceConflict,
     IssuanceRejected,
@@ -71,7 +74,7 @@ def build_plan_request_router(dependencies: PlanRouteDependencies) -> APIRouter:
     ) -> SignedPlanEnvelopeBody:
         parsed = parse_plan_request(body.to_wire_mapping())
         if isinstance(parsed, str):
-            _observe_plan_result(dependencies, "invalid")
+            _observe_plan_result(request, "invalid")
             return _raise_error(status.HTTP_400_BAD_REQUEST, "invalid_plan_request")
         authorization_values = tuple(
             value.decode("latin-1")
@@ -79,29 +82,34 @@ def build_plan_request_router(dependencies: PlanRouteDependencies) -> APIRouter:
             if name.lower() == b"authorization"
         )
         if len(authorization_values) != 1:
-            _observe_plan_result(dependencies, "unauthenticated")
+            _observe_plan_result(request, "unauthenticated")
             return _raise_error(status.HTTP_401_UNAUTHORIZED, "unauthenticated")
         identity = await dependencies.authenticator.authenticate(authorization_values[0], parsed)
         if isinstance(identity, InvalidCredential):
-            _observe_plan_result(dependencies, "unauthenticated")
+            _observe_plan_result(request, "unauthenticated")
             return _raise_error(status.HTTP_401_UNAUTHORIZED, "unauthenticated")
         if isinstance(identity, ForbiddenIdentity):
-            _observe_plan_result(dependencies, "forbidden")
+            _observe_plan_result(request, "forbidden")
             return _raise_error(status.HTTP_403_FORBIDDEN, "forbidden")
         if isinstance(identity, AuthenticationDependencyUnavailable):
-            _observe_plan_result(dependencies, "dependency_unavailable")
+            _observe_plan_result(request, "dependency_unavailable")
             return _raise_error(status.HTTP_503_SERVICE_UNAVAILABLE, "plan_unavailable")
+        observation = scope_request_observation(request.scope)
+        if observation is not None and isinstance(identity, TrustedActionsRun):
+            observation.plan_authenticated = True
         outcome = await dependencies.use_case.request_dynamic_plan(
             DynamicPlanCommand(parsed, identity)
         )
         if isinstance(outcome, Issued):
             _observe_issued(dependencies, request, outcome)
-            return SignedPlanEnvelopeBody.model_validate(_serialize_envelope(outcome))
+            response = SignedPlanEnvelopeBody.model_validate(_serialize_envelope(outcome))
+            _observe_plan_result(request, "issued")
+            return response
         if isinstance(outcome, IssuanceConflict):
-            _observe_plan_result(dependencies, "conflict")
+            _observe_plan_result(request, "conflict")
             return _raise_error(status.HTTP_409_CONFLICT, "plan_request_conflict")
         if isinstance(outcome, IssuanceRejected):
-            _observe_plan_result(dependencies, "issuance_unavailable")
+            _observe_plan_result(request, "issuance_unavailable")
             return _raise_error(status.HTTP_503_SERVICE_UNAVAILABLE, "plan_unavailable")
         raise RuntimeError("unsupported dynamic plan outcome")
 
@@ -121,9 +129,10 @@ def _serialize_envelope(outcome: Issued) -> dict[str, object]:
     }
 
 
-def _observe_plan_result(dependencies: PlanRouteDependencies, result: str) -> None:
-    if dependencies.runtime_metrics is not None:
-        dependencies.runtime_metrics.plan_request(result)
+def _observe_plan_result(request: Request, result: PlanRouteResult) -> None:
+    observation = scope_request_observation(request.scope)
+    if observation is not None:
+        observation.plan_route_result = result
 
 
 def _observe_issued(
@@ -135,7 +144,6 @@ def _observe_issued(
     if metrics is None:
         pass
     else:
-        metrics.plan_request("issued")
         metrics.signed_envelope(duplicate=outcome.duplicate)
         reason = outcome.record.envelope.payload.fallback_reason
         if reason is not None:

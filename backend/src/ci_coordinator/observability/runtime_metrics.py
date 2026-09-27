@@ -82,12 +82,16 @@ _PLANNING_REASONS: Final[tuple[PlanningUnavailabilityReason, ...]] = (
 )
 
 _PLAN_RESULTS: Final = (
+    "cancelled",
     "conflict",
     "dependency_unavailable",
     "forbidden",
     "invalid",
+    "internal_error",
     "issuance_unavailable",
     "issued",
+    "response_failed",
+    "timed_out",
     "unauthenticated",
 )
 _CONFIG_ACTIVATION_RESULTS: Final = frozenset(
@@ -645,8 +649,8 @@ class RuntimeMetrics:
         *,
         method: str,
         route: str,
-        status_code: int,
-        duration_seconds: float,
+        status_code: int | None,
+        duration_seconds: float | None,
     ) -> None:
         bounded_method = method if method in _HTTP_METHODS else "OTHER"
         bounded_route = (
@@ -655,11 +659,11 @@ class RuntimeMetrics:
             else "unmatched"
         )
         status_class = _status_class(status_code)
-        duration = duration_seconds if duration_seconds >= 0 else 0.0
         try:
             labels = (bounded_method, bounded_route, status_class)
             self._http_requests.labels(*labels).inc()
-            self._http_duration.labels(*labels).observe(duration)
+            if duration_seconds is not None:
+                self._http_duration.labels(*labels).observe(max(0.0, duration_seconds))
         except Exception:
             self._record_instrumentation_failure("http")
             return
@@ -941,7 +945,7 @@ def _admitted_dependency(dependency: str) -> bool:
     )
 
 
-def _status_class(status_code: int) -> str:
+def _status_class(status_code: int | None) -> str:
     if type(status_code) is not int or not 100 <= status_code <= 599:
         return "unknown"
     return f"{status_code // 100}xx"

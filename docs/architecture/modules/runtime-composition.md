@@ -129,12 +129,14 @@ Readiness samples background health after its asynchronous dependency probes,
 which defines one final-observation linearization point. Periodic cadence begins
 after terminal completion, not after a round is merely started.
 
-The admitted shutdown timeout bounds the complete owner-controlled sequence:
-background drain, GitHub transport close, JWKS close, and engine disposal. A
+The admitted shutdown timeout partitions the server's graceful drain, runtime
+cleanup and orchestration reserve. With an admitted total of 30 seconds, these
+are 15, 14 and 1 seconds respectively. Background drain receives 7 seconds
+inside the 14-second cleanup partition, followed by GitHub transport close,
+JWKS close and engine disposal within that same cleanup deadline. A
 deadline breach is terminal and redacted; the deployment may then terminate the
-process. The reconciliation drain receives exactly half of that total bound, so
-its retryable timeout is strictly earlier than the outer owner deadline and the
-remaining half is reserved for external-resource closure. A deadline with an
+process. The reconciliation drain receives half of the cleanup partition,
+not half of the process total. A deadline with an
 unsettled cleanup child enters `cleanup_pending`; the runtime remains not ready,
 cannot restart or retry cleanup, and advances to `deadline_exceeded` only when
 the child settles. A deadline fence prevents that child from initiating any

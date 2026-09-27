@@ -124,6 +124,7 @@ the complete audit parents:
 | [#42](https://github.com/research-engineering/ci-coordinator/pull/42) | GitHub credentials are narrowed to the admitted operation and repository, with distinct inventory and organization-runner grants; cache identity and measurement-recipient trust remain explicit. Live effective grants and measured cold-path costs are not implied. |
 | [#43](https://github.com/research-engineering/ci-coordinator/pull/43) | Browser transaction cookies use secure host-only ownership, and settings reject collisions between the admitted credential roles. Exact-head native checks cover the controlled sibling-domain counterexample; deployment and arbitrary-browser guarantees remain separate. |
 | [#44](https://github.com/research-engineering/ci-coordinator/pull/44) | Operator states distinguish initial refusal from earlier uncertainty, catalog normalization from absence, and bounded fractional audit payloads from integer identifiers. UTC presentation and the shared numeric wire vector are qualified; the corrected PostgreSQL replay fixture prepares a fresh single-use input. Initial failed native evidence is retained, not rewritten as success. |
+| [#45](https://github.com/research-engineering/ci-coordinator/pull/45) | HTTP clients retain their first unsuccessful close outcome instead of accepting a later no-op as successful cleanup. Independent waiter cancellation, eligible outer retries and the original shutdown bound remain; native qualification does not establish physical release under arbitrary failure. The initial macOS fixture failure and its bounded correction remain retained. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -136,12 +137,14 @@ and production omission authority are still distinct.
 All 471 original audit IDs now have initial source-bound dispositions in the
 external register, preserving every scoped refutation, policy and unknown.
 Initial adjudication is not confirmation, repair or native qualification.
-The next prepared audit batch retains unsuccessful HTTP-client cleanup outcomes
-without suppressing generic resource retry or extending shutdown authority.
+The next prepared audit batch separates terminal plan-response observation from
+durable issuance, preserves explicit exclusion priority and classifies unknown
+cancellation separately from service-owned deadline expiry. Authenticated metrics
+exposition failure is bounded and cannot bypass authentication or suppress cancellation.
 Phase-exact managed installation and transitive process ownership retain their
 independent lifecycle proof, including the isolated consumer-lab process path.
-Request-outcome telemetry and retained unsuccessful HTTP-close outcomes are
-separate prepared repair boundaries; their independent review, actual-base
+Request-outcome telemetry, managed-process ownership and build-input admission
+retain separate repair boundaries; their independent review, actual-base
 integration and native qualification remain required.
 All these prepared changes still require their exact-source native qualification.
 Workflow CPU

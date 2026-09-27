@@ -47,20 +47,20 @@ groups:
       - alert: CIPlanAvailabilityFastBurn
         expr: |
           (
-            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable"}[5m]))
+            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[5m]))
             /
-            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[5m]))
+            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[5m]))
             > 0.0144
           )
           and
           (
-            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable"}[1h]))
+            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[1h]))
             /
-            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[1h]))
+            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[1h]))
             > 0.0144
           )
           and
-          sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[5m])) >= 20
+          sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[5m])) >= 20
         for: 2m
         keep_firing_for: 15m
         labels:
@@ -72,20 +72,20 @@ groups:
       - alert: CIPlanAvailabilitySlowBurn
         expr: |
           (
-            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable"}[30m]))
+            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[30m]))
             /
-            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[30m]))
+            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[30m]))
             > 0.006
           )
           and
           (
-            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable"}[6h]))
+            sum(rate(ci_coordinator_plan_requests_total{result=~"dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[6h]))
             /
-            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[6h]))
+            sum(rate(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[6h]))
             > 0.006
           )
           and
-          sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[30m])) >= 100
+          sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[30m])) >= 100
         for: 15m
         keep_firing_for: 30m
         labels:

@@ -25,6 +25,7 @@ from ci_coordinator.observability.request_observation import (
     HttpRequestObservationMiddleware,
     PlanOperationDiagnostic,
     bind_plan_operation_diagnostic,
+    scope_request_observation,
 )
 from ci_coordinator.observability.runtime_metrics import (
     MaintenanceOperationName,
@@ -58,4 +59,5 @@ __all__ = [
     "default_structured_event_logger",
     "health",
     "redacted_log_event",
+    "scope_request_observation",
 ]
