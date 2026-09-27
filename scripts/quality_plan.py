@@ -1,15 +1,26 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from time import monotonic
+from typing import Literal
 
 from scripts.bounded_process import spawn
+from scripts.dev_environment.environment import (
+    DependencyScope,
+    ManagedDependencyBorrow,
+    borrow_managed_dependencies,
+    current_managed_process,
+    managed_dependency_process_scope,
+    managed_process_invocation,
+)
+from scripts.diagram_process import DiagramCancellation, cancellation_signals
 from scripts.proofkit_common import as_array, as_object, read_json_object
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -17,6 +28,41 @@ QUALITY_PLAN_RELATIVE_PATH = "proofkit/quality-plan.v1.json"
 WITNESS_PLAN_RELATIVE_PATH = "proofkit/witness-plan-input.json"
 MAX_GITHUB_JOB_TIMEOUT_MINUTES = 360
 MAX_COMMAND_OUTPUT_BYTES = 16 * 1024 * 1024
+MANAGED_DEPENDENCY_ARGUMENT = "--managed-dependency-context"
+_MANAGED_ADAPTER_COMMANDS = frozenset(
+    {
+        "python.lock-check",
+        "python.install-check",
+        "dependency.check",
+        "requirements.admission",
+        "matrix.admission",
+        "self-ci.check",
+        "architecture.ownership",
+        "documentation.graph",
+        "documentation.graph-falsifiers",
+        "documentation.diagrams-inventory",
+        "selective.plan",
+        "target-control-bundle.check",
+        "text.policy",
+        "proofkit.verify",
+        "python.package-check",
+        "python.lint",
+        "python.typecheck",
+        "python.import-boundary",
+        "secret.scan",
+        "python.dependency-usage",
+        "python.coverage",
+        "python.persistence-test",
+        "repository.json",
+        "workflow.lint",
+        "observability.rules",
+        "python.test",
+    }
+)
+_DEPENDENCY_INSTALL_SCOPES: dict[str, DependencyScope] = {
+    "python.install-check": "backend",
+    "frontend.install": "frontend",
+}
 _ENVIRONMENT_NAME = re.compile(r"[A-Z_][A-Z0-9_]*")
 _SENSITIVE_ENVIRONMENT_TOKEN = re.compile(
     r"(?:^|_)(?:ACCESS_KEY|API_KEY|AUTH|COOKIE|CREDENTIALS?|PASSWD|PASSWORD|"
@@ -61,6 +107,53 @@ class QualityPlan:
 
 
 CommandExecutor = Callable[[WitnessCommand], None]
+
+
+class QualityPlanUsageError(ValueError):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class QualitySelection:
+    mode: Literal["local", "portable"]
+    commands: tuple[WitnessCommand, ...]
+
+    @property
+    def write_scopes(self) -> tuple[DependencyScope, ...]:
+        return tuple(
+            _DEPENDENCY_INSTALL_SCOPES[command.command_id]
+            for command in self.commands
+            if command.command_id in _DEPENDENCY_INSTALL_SCOPES
+        )
+
+    @property
+    def sha256(self) -> str:
+        payload = {
+            "mode": self.mode,
+            "commands": [{**asdict(command), "cwd": str(command.cwd)} for command in self.commands],
+            "dependencyEffects": [
+                [command.command_id, _DEPENDENCY_INSTALL_SCOPES[command.command_id]]
+                for command in self.commands
+                if command.command_id in _DEPENDENCY_INSTALL_SCOPES
+            ],
+        }
+        return hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
+
+def select_quality_plan(arguments: Sequence[str], repo_root: Path = REPO_ROOT) -> QualitySelection:
+    values = list(arguments)
+    if values not in ([], ["local"], ["portable"]):
+        raise QualityPlanUsageError("usage: python -m scripts.quality_plan [local|portable]")
+    plan = load_quality_plan(repo_root)
+    selection = QualitySelection(
+        "portable" if values == ["portable"] else "local",
+        plan.portable_commands() if values == ["portable"] else plan.local_commands(),
+    )
+    if selection.mode == "portable" and selection.write_scopes:
+        raise ValueError("portable quality commands must not install dependencies")
+    return selection
 
 
 def load_quality_plan(repo_root: Path = REPO_ROOT) -> QualityPlan:
@@ -178,6 +271,7 @@ def execute_commands(
     *,
     environment: Mapping[str, str] | None = None,
     executor: CommandExecutor | None = None,
+    managed_dependencies: ManagedDependencyBorrow | None = None,
 ) -> None:
     source_environment = os.environ if environment is None else environment
     selected_executor = (
@@ -189,7 +283,19 @@ def execute_commands(
         started = monotonic()
         succeeded = False
         try:
+            process_scope = current_managed_process()
+            if process_scope is not None:
+                process_scope.assert_running()
+            scope = _DEPENDENCY_INSTALL_SCOPES.get(command.command_id)
+            if managed_dependencies is not None and scope is not None:
+                managed_dependencies.begin(scope)
             selected_executor(command)
+            if process_scope is not None:
+                process_scope.assert_running()
+            if managed_dependencies is not None and scope is not None:
+                managed_dependencies.complete(scope)
+            if process_scope is not None:
+                process_scope.assert_running()
             succeeded = True
         finally:
             print(
@@ -221,18 +327,41 @@ def project_command_environment(
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if arguments not in ([], ["local"], ["portable"]):
-        print("usage: python -m scripts.quality_plan [local|portable]", file=sys.stderr)
-        return 2
+    cancellation: DiagramCancellation | None = None
     try:
-        plan = load_quality_plan()
-        execute_commands(
-            plan.portable_commands() if arguments == ["portable"] else plan.local_commands()
-        )
+        context: str | None = None
+        if MANAGED_DEPENDENCY_ARGUMENT in arguments:
+            if (
+                len(arguments) < 2
+                or arguments[-2] != MANAGED_DEPENDENCY_ARGUMENT
+                or arguments.count(MANAGED_DEPENDENCY_ARGUMENT) != 1
+            ):
+                raise QualityPlanUsageError("invalid managed quality invocation")
+            context = arguments[-1]
+            arguments = arguments[:-2]
+        selection = select_quality_plan(arguments, REPO_ROOT)
+        if context is None:
+            execute_commands(selection.commands)
+        else:
+            with (
+                cancellation_signals() as cancellation,
+                borrow_managed_dependencies(
+                    REPO_ROOT,
+                    context,
+                    selection_sha256=selection.sha256,
+                    write_scopes=selection.write_scopes,
+                    environment=os.environ,
+                ) as borrow,
+                managed_dependency_process_scope(borrow, selection.sha256, cancellation),
+            ):
+                execute_commands(selection.commands, managed_dependencies=borrow)
+    except QualityPlanUsageError as error:
+        print(str(error), file=sys.stderr)
+        return 2
     except (OSError, RuntimeError, TypeError, ValueError) as error:
         print(str(error), file=sys.stderr)
-        return 1
-    return 0
+        return 1 if cancellation is None else cancellation.exit_code(1)
+    return 0 if cancellation is None else cancellation.exit_code(0)
 
 
 def _command_catalog(
@@ -329,14 +458,39 @@ def _execute_command(
     *,
     source_environment: Mapping[str, str],
 ) -> None:
-    result = spawn(
-        command.argv[0],
-        command.argv[1:],
-        cwd=command.cwd,
-        env=project_command_environment(command, source_environment),
-        max_buffer=MAX_COMMAND_OUTPUT_BYTES,
-        timeout_seconds=command.timeout_ms / 1000,
-    )
+    if current_managed_process() is not None and command.command_id in _MANAGED_ADAPTER_COMMANDS:
+        grace = (
+            5
+            if command.command_id
+            in {"python.package-check", "python.test", "python.coverage", "python.persistence-test"}
+            else 3
+        )
+        with managed_process_invocation(
+            command.argv[1:],
+            timeout_seconds=command.timeout_ms / 1000,
+            graceful_seconds=grace,
+            pytest_participant=command.command_id == "documentation.graph-falsifiers",
+        ) as invocation:
+            result = spawn(
+                command.argv[0],
+                invocation.arguments,
+                cwd=command.cwd,
+                env=project_command_environment(command, source_environment),
+                max_buffer=MAX_COMMAND_OUTPUT_BYTES,
+                timeout_seconds=command.timeout_ms / 1000,
+                inherited_fds=invocation.inherited_fds,
+                graceful_seconds=grace,
+                cancellation_fd=invocation.cancellation_fd,
+            )
+    else:
+        result = spawn(
+            command.argv[0],
+            command.argv[1:],
+            cwd=command.cwd,
+            env=project_command_environment(command, source_environment),
+            max_buffer=MAX_COMMAND_OUTPUT_BYTES,
+            timeout_seconds=command.timeout_ms / 1000,
+        )
     sys.stdout.write(result.stdout)
     sys.stderr.write(result.stderr)
     if result.error is not None:
@@ -345,6 +499,8 @@ def _execute_command(
         raise RuntimeError(
             f"witness command {command.command_id} failed with status {result.status}"
         )
+    if current_managed_process() is not None and result.process_group_quiescent is not True:
+        raise RuntimeError(f"witness command {command.command_id} has no owned-group drain")
 
 
 def _admitted_environment_policies(
@@ -450,4 +606,6 @@ def _exact_keys(value: Mapping[str, object], expected: Sequence[str], context: s
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from scripts.dev_environment.environment import managed_process_entrypoint
+
+    raise SystemExit(managed_process_entrypoint(main))

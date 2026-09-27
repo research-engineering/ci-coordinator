@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import sys
 import tempfile
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import replace
 from pathlib import Path
 from time import monotonic
@@ -19,6 +20,7 @@ from scripts.dev_environment.private_files import (
     bounded_private_lock,
     ensure_private_directory,
 )
+from scripts.proofkit_common import parse_json_object
 from scripts.python_witness import PYTHON_TEST_PROCESS_TIMEOUT_SECONDS
 from scripts.quality_plan import load_quality_plan
 
@@ -43,6 +45,8 @@ _SOURCE_FINALIZATION_SECONDS: Final = 60
 _OUTER_WRAPPER_RESERVE_SECONDS: Final = 60
 _PROCESS_DRAIN_RESERVE_SECONDS: Final = 5
 _DIAGNOSTIC_TAIL_CHARACTERS: Final = 8_192
+_MAX_TIMING_SCAN_LINES: Final = 65_536
+_MAX_TIMING_ROW_CHARACTERS: Final = 1_024
 _DEVCONTAINER_COMMAND: Final = (
     "node",
     "node_modules/@devcontainers/cli/devcontainer.js",
@@ -89,7 +93,7 @@ def verify_devcontainer(
     if execution_deadline is None:
         execution_deadline = monotonic() + _EXECUTION_TIMEOUT_SECONDS
     workspace = workspace_root.resolve(strict=True)
-    _admit_portable_proof_deadlines(workspace)
+    portable_command_ids = _admit_portable_proof_deadlines(workspace)
     container_workspace = Path("/workspaces") / workspace.name
     identity = (
         derive_instance_identity(REPO_ROOT).project_name if witness_id is None else witness_id
@@ -154,25 +158,24 @@ def verify_devcontainer(
             ),
             "Dev Container installed Node resolution",
         )
-        _checked(
-            execute(
-                (
-                    *_DEVCONTAINER_COMMAND,
-                    "exec",
-                    "--container-id",
-                    container_id,
-                    "--workspace-folder",
-                    str(workspace),
-                    "--id-label",
-                    label,
-                    "mise",
-                    "run",
-                    "check:portable",
-                ),
-                timeout_seconds=_PORTABLE_PROOF_TIMEOUT_SECONDS,
+        portable = execute(
+            (
+                *_DEVCONTAINER_COMMAND,
+                "exec",
+                "--container-id",
+                container_id,
+                "--workspace-folder",
+                str(workspace),
+                "--id-label",
+                label,
+                "mise",
+                "run",
+                "check:portable",
             ),
-            "Dev Container portable proof",
+            timeout_seconds=_PORTABLE_PROOF_TIMEOUT_SECONDS,
         )
+        _checked(portable, "Dev Container portable proof")
+        _report_portable_timings(portable.stdout, portable_command_ids)
     except BaseException as error:
         primary_error = error
         raise
@@ -189,7 +192,7 @@ def verify_devcontainer(
             primary_error.add_note(f"Dev Container cleanup also failed: {cleanup_error}")
 
 
-def _admit_portable_proof_deadlines(workspace: Path) -> None:
+def _admit_portable_proof_deadlines(workspace: Path) -> tuple[str, ...]:
     plan = load_quality_plan(workspace)
     python_test = plan.commands.get("python.test")
     if python_test is None or "python.test" not in plan.portable_command_ids:
@@ -214,6 +217,83 @@ def _admit_portable_proof_deadlines(workspace: Path) -> None:
     ) * 1_000
     if container_command is None or container_command.timeout_ms < stage_budget_ms:
         raise RuntimeError("Dev Container command does not preserve its stage deadline budget")
+    return plan.portable_command_ids
+
+
+def _portable_timing_diagnostic(output: str, expected: tuple[str, ...]) -> dict[str, object]:
+    rows: list[dict[str, object]] = []
+    seen: set[str] = set()
+    complete = len(output) <= _MAX_OUTPUT_BYTES
+    offset = 0
+    candidates = 0
+    if complete:
+        for _ in range(_MAX_TIMING_SCAN_LINES):
+            if offset >= len(output):
+                break
+            end = output.find("\n", offset)
+            if end < 0:
+                end = len(output)
+            start = output.find('{"qualityCommand"', offset, end)
+            offset = end + 1
+            if start < 0:
+                continue
+            candidates += 1
+            if candidates > len(expected):
+                complete = False
+                break
+            if end - start > _MAX_TIMING_ROW_CHARACTERS:
+                complete = False
+                continue
+            try:
+                row = parse_json_object(output[start:end], "portable timing diagnostic")
+                command = row.get("qualityCommand")
+                elapsed = row.get("elapsedSeconds")
+                succeeded = row.get("succeeded")
+                if (
+                    set(row) != {"qualityCommand", "elapsedSeconds", "succeeded"}
+                    or type(command) is not str
+                    or command not in expected
+                    or command in seen
+                    or not isinstance(elapsed, int | float)
+                    or isinstance(elapsed, bool)
+                    or not math.isfinite(elapsed)
+                    or elapsed < 0
+                    or type(succeeded) is not bool
+                ):
+                    complete = False
+                    continue
+            except (TypeError, ValueError, OverflowError):
+                complete = False
+                continue
+            seen.add(command)
+            rows.append(
+                {"qualityCommand": command, "elapsedSeconds": elapsed, "succeeded": succeeded}
+            )
+        complete = complete and offset >= len(output)
+    complete = (
+        complete
+        and bool(expected)
+        and [row["qualityCommand"] for row in rows] == list(expected)
+        and all(row["succeeded"] is True for row in rows)
+    )
+    return {
+        "devcontainerTimingDiagnostics": "complete" if complete else "incomplete",
+        "expectedCommandCount": len(expected),
+        "timings": rows,
+    }
+
+
+def _report_portable_timings(output: str, expected: tuple[str, ...]) -> None:
+    try:
+        diagnostic = _portable_timing_diagnostic(output, expected)
+    except Exception:
+        diagnostic = {
+            "devcontainerTimingDiagnostics": "incomplete",
+            "expectedCommandCount": len(expected),
+            "timings": [],
+        }
+    with suppress(Exception):
+        print(json.dumps(diagnostic), flush=True)
 
 
 @contextmanager

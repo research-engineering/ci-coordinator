@@ -7,7 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from scripts import devcontainer_witness
+from scripts import devcontainer_witness, quality_plan
 from scripts.bounded_process import CommandResult, ResidualProcessGroupPolicy
 from scripts.dev_environment.identity import InstanceIdentity, derive_instance_identity
 from scripts.dev_environment.private_files import bounded_private_lock, ensure_private_directory
@@ -15,6 +15,7 @@ from scripts.devcontainer_witness import (
     admitted_devcontainer_source,
     verify_devcontainer,
 )
+from scripts.proofkit_common import parse_json_object
 from scripts.python_witness import PYTHON_TEST_PROCESS_TIMEOUT_SECONDS
 from scripts.quality_plan import load_quality_plan
 
@@ -264,6 +265,319 @@ class FakeRunner:
                 return CommandResult(1, "", "cleanup failed")
             return CommandResult(0, "", "")
         raise AssertionError(f"unexpected command: {args!r}")
+
+
+class _TimingRunner(FakeRunner):
+    def __init__(self, output: str, failure: str | None = None) -> None:
+        super().__init__(failure)
+        self.output = output
+
+    def __call__(self, argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+        result = super().__call__(argv, timeout_seconds=timeout_seconds)
+        if "check:portable" in argv:
+            return replace(result, stdout=self.output, stderr="private portable stderr")
+        return replace(result, stderr="private provider stderr")
+
+
+def _timing_rows() -> list[dict[str, object]]:
+    return [
+        {"qualityCommand": name, "elapsedSeconds": 1.25, "succeeded": True}
+        for name in load_quality_plan().portable_command_ids
+    ]
+
+
+def test_successful_portable_boundary_forwards_existing_quality_timings(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    plan = load_quality_plan()
+    assert len(plan.portable_command_ids) == 26
+    durations = (
+        0.25,
+        0.5,
+        0.75,
+        1.0,
+        1.25,
+        1.5,
+        1.75,
+        2.0,
+        2.25,
+        2.5,
+        2.75,
+        3.0,
+        3.25,
+        3.5,
+        3.75,
+        4.0,
+        4.25,
+        4.5,
+        4.75,
+        5.0,
+        5.25,
+        5.5,
+        5.75,
+        6.0,
+        6.25,
+        6.5,
+    )
+    ticks = iter(
+        tick
+        for index, duration in enumerate(durations)
+        for tick in (index * 10, index * 10 + duration)
+    )
+    monkeypatch.setattr(quality_plan, "monotonic", lambda: next(ticks))
+    commands: list[str] = []
+    quality_plan.execute_commands(
+        plan.portable_commands(), executor=lambda command: commands.append(command.command_id)
+    )
+    emitted = capsys.readouterr().out
+    expected = [
+        {"qualityCommand": name, "elapsedSeconds": duration, "succeeded": True}
+        for name, duration in zip(plan.portable_command_ids, durations, strict=True)
+    ]
+    assert commands == list(plan.portable_command_ids)
+    assert [json.loads(line) for line in emitted.splitlines()] == expected
+    baseline = FakeRunner()
+    verify_devcontainer(runner=baseline, witness_id="test-witness")
+    assert json.loads(capsys.readouterr().out) == {
+        "devcontainerTimingDiagnostics": "incomplete",
+        "expectedCommandCount": 26,
+        "timings": [],
+    }
+    decoy = "\n".join(json.dumps({**row, "elapsedSeconds": 999.0}) for row in expected)
+
+    class DecoyRunner(_TimingRunner):
+        def __call__(self, argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+            result = super().__call__(argv, timeout_seconds=timeout_seconds)
+            if (
+                tuple(argv[:3]) == (*devcontainer_witness._DEVCONTAINER_COMMAND, "up")
+                or argv[-1] == "scripts/conformance/installed_mise_node_test.py"
+            ):
+                return replace(result, stdout=decoy + "\nprivate provisioning text")
+            return result
+
+    runner = DecoyRunner(
+        "private prefix\n"
+        + "".join("[check:portable] " + line + "\n" for line in emitted.splitlines())
+    )
+    verify_devcontainer(runner=runner, witness_id="test-witness")
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {
+        "devcontainerTimingDiagnostics": "complete",
+        "expectedCommandCount": 26,
+        "timings": expected,
+    }
+    assert "private" not in captured.out and captured.err == ""
+    assert runner.calls == baseline.calls
+    assert runner.calls[-1][0] == ("docker", "rm", "--force", _CONTAINER_ID)
+
+
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "missing",
+        "duplicate",
+        "reordered",
+        "unknown",
+        "extra",
+        "duplicate-key",
+        "malformed",
+        "negative",
+        "nan",
+        "infinite",
+        "overflow",
+        "bool-seconds",
+        "string-seconds",
+        "not-bool",
+        "false-succeeded",
+        "oversized-row",
+        "deep",
+        "excess-candidates",
+    ],
+)
+def test_incomplete_timing_diagnostics_preserve_successful_proof(
+    fault: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rows = _timing_rows()
+    lines = [json.dumps(row) for row in rows]
+    changed = dict(rows[5])
+    if fault == "missing":
+        del lines[5]
+    elif fault == "duplicate":
+        lines[5] = lines[4]
+    elif fault == "reordered":
+        lines[4], lines[5] = lines[5], lines[4]
+    elif fault == "duplicate-key":
+        lines[5] = lines[5].replace('"elapsedSeconds":', '"elapsedSeconds": 9, "elapsedSeconds":')
+    elif fault == "malformed":
+        lines[5] = '{"qualityCommand": private malformed text'
+    elif fault == "oversized-row":
+        lines[5] += " " * 1_024
+    elif fault == "deep":
+        lines[5] = '{"qualityCommand":' + "[" * 300 + '"private"' + "]" * 300 + "}"
+    elif fault == "excess-candidates":
+        lines.append(lines[0])
+    else:
+        if fault == "unknown":
+            changed["qualityCommand"] = "private unknown command"
+        elif fault == "extra":
+            changed["private"] = "secret extra field"
+        elif fault == "not-bool":
+            changed["succeeded"] = 1
+        elif fault == "false-succeeded":
+            changed["succeeded"] = False
+        else:
+            changed["elapsedSeconds"] = {
+                "negative": -1,
+                "nan": float("nan"),
+                "infinite": float("inf"),
+                "overflow": 10**400,
+                "bool-seconds": True,
+                "string-seconds": "private seconds",
+            }[fault]
+        lines[5] = json.dumps(changed)
+    runner = _TimingRunner("\n".join(lines))
+    verify_devcontainer(runner=runner, witness_id="test-witness")
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    assert report["devcontainerTimingDiagnostics"] == "incomplete"
+    assert report["expectedCommandCount"] == 26
+    assert len(report["timings"]) <= 26
+    assert "private" not in captured.out and "secret" not in captured.out
+    assert captured.err == ""
+    if fault == "false-succeeded":
+        assert report["timings"][5] == {
+            "qualityCommand": rows[5]["qualityCommand"],
+            "elapsedSeconds": 1.25,
+            "succeeded": False,
+        }
+    assert sum("check:portable" in call[0] for call in runner.calls) == 1
+    assert runner.calls[-1][0] == ("docker", "rm", "--force", _CONTAINER_ID)
+
+
+@pytest.mark.parametrize("bound", ["capture", "lines", "row"])
+def test_timing_diagnostic_bounds_have_exact_positive_controls(
+    bound: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = ("python.test",)
+    line = '{"qualityCommand":"python.test","elapsedSeconds":0.25,"succeeded":true}'
+    calls: list[int] = []
+    parse = parse_json_object
+
+    def counted(source: str, context: str) -> dict[str, object]:
+        calls.append(len(source))
+        return parse(source, context)
+
+    monkeypatch.setattr(devcontainer_witness, "parse_json_object", counted)
+    if bound == "capture":
+        positive = "x" * (16 * 1024 * 1024 - len(line) - 1) + "\n" + line
+        negative = "x" + positive
+    elif bound == "lines":
+        positive = "\n" * (65_536 - 1) + line
+        negative = "\n" + positive
+    else:
+        positive = line + " " * (1_024 - len(line))
+        negative = positive + " "
+    assert devcontainer_witness._portable_timing_diagnostic(positive, expected) == {
+        "devcontainerTimingDiagnostics": "complete",
+        "expectedCommandCount": 1,
+        "timings": [{"qualityCommand": "python.test", "elapsedSeconds": 0.25, "succeeded": True}],
+    }
+    assert len(calls) == 1
+    calls.clear()
+    assert devcontainer_witness._portable_timing_diagnostic(negative, expected) == {
+        "devcontainerTimingDiagnostics": "incomplete",
+        "expectedCommandCount": 1,
+        "timings": [],
+    }
+    assert calls == []
+
+
+def test_excess_timing_candidates_stop_parsing_at_the_existing_population(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = _timing_rows()
+    expected = load_quality_plan().portable_command_ids
+    calls: list[int] = []
+
+    def counted(source: str, context: str) -> dict[str, object]:
+        calls.append(len(source))
+        return parse_json_object(source, context)
+
+    monkeypatch.setattr(devcontainer_witness, "parse_json_object", counted)
+    output = "\n".join(json.dumps(row) for row in [*rows, *rows])
+    assert devcontainer_witness._portable_timing_diagnostic(output, expected) == {
+        "devcontainerTimingDiagnostics": "incomplete",
+        "expectedCommandCount": 26,
+        "timings": rows,
+    }
+    assert len(calls) == 26
+
+
+@pytest.mark.parametrize("fault", ["projection", "output"])
+def test_ordinary_timing_diagnostic_failure_does_not_change_proof_or_cleanup(
+    fault: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise OSError("private diagnostic failure")
+
+    runner = _TimingRunner("\n".join(json.dumps(row) for row in _timing_rows()))
+    if fault == "projection":
+        monkeypatch.setattr(devcontainer_witness, "_portable_timing_diagnostic", fail)
+    else:
+        monkeypatch.setattr("builtins.print", fail)
+    verify_devcontainer(runner=runner, witness_id="test-witness")
+    captured = capsys.readouterr()
+    if fault == "projection":
+        assert json.loads(captured.out) == {
+            "devcontainerTimingDiagnostics": "incomplete",
+            "expectedCommandCount": 26,
+            "timings": [],
+        }
+    else:
+        assert captured.out == ""
+    assert captured.err == ""
+    assert runner.calls[-1][0] == ("docker", "rm", "--force", _CONTAINER_ID)
+
+
+def test_timing_output_does_not_swallow_interruption(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    interruption = KeyboardInterrupt("external cancellation")
+
+    def interrupted(*_args: object, **_kwargs: object) -> None:
+        raise interruption
+
+    runner = _TimingRunner("\n".join(json.dumps(row) for row in _timing_rows()))
+    monkeypatch.setattr("builtins.print", interrupted)
+    with pytest.raises(KeyboardInterrupt) as caught:
+        verify_devcontainer(runner=runner, witness_id="test-witness")
+    assert caught.value is interruption
+    assert runner.calls[-1][0] == ("docker", "rm", "--force", _CONTAINER_ID)
+
+
+@pytest.mark.parametrize("failure", ["proof", "executor-timeout", "cleanup"])
+def test_timing_rows_cannot_turn_primary_failure_into_success(
+    failure: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    class FailedRunner(_TimingRunner):
+        def __call__(self, argv: Sequence[str], *, timeout_seconds: float) -> CommandResult:
+            result = super().__call__(argv, timeout_seconds=timeout_seconds)
+            if "check:portable" in argv and failure == "executor-timeout":
+                return replace(result, status=None, error="primary timeout", failure_kind="timeout")
+            return result
+
+    runner = FailedRunner("\n".join(json.dumps(row) for row in _timing_rows()), failure)
+    with pytest.raises(
+        RuntimeError, match="primary timeout" if failure == "executor-timeout" else failure
+    ):
+        verify_devcontainer(runner=runner, witness_id="test-witness")
+    captured = capsys.readouterr()
+    if failure == "cleanup":
+        assert json.loads(captured.out)["devcontainerTimingDiagnostics"] == "complete"
+        assert '"state"' not in captured.out
+    else:
+        assert captured.out == ""
+    assert runner.calls[-1][0] == ("docker", "rm", "--force", _CONTAINER_ID)
 
 
 def test_witness_provisions_proves_and_cleans_one_owned_container() -> None:

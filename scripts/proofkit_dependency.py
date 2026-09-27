@@ -249,4 +249,6 @@ def _wheel_suffix(filename: str) -> str:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from scripts.dev_environment.environment import managed_process_entrypoint
+
+    raise SystemExit(managed_process_entrypoint(main))

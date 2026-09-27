@@ -10,6 +10,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from scripts.bounded_process import spawn
+from scripts.dev_environment.environment import managed_process_entrypoint
 from scripts.dev_environment.identity import derive_instance_identity
 from scripts.dev_environment.lifecycle import instance_operation_lock
 from scripts.dev_environment.private_files import bounded_private_lock, ensure_private_directory
@@ -27,7 +28,7 @@ if ready:
 """
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--lock", type=Path, required=True)
     parser.add_argument("--ready-fd", type=int, required=True)
@@ -52,7 +53,8 @@ def main() -> None:
             inherited_fds=(descriptor, args.ready_fd, args.release_fd),
         )
     print(json.dumps(asdict(result)), flush=True)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(managed_process_entrypoint(main, interrupt=True))

@@ -7,7 +7,6 @@ import gzip
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Final, cast
 
 from ci_coordinator.consumer_contract_lab.composition import IssuedScenario
@@ -17,7 +16,7 @@ from ci_coordinator.consumer_contract_lab.node_executable import (
     NodeExecutableError,
     admit_node_executable,
 )
-from ci_coordinator.consumer_contract_lab.process import run_bounded
+from ci_coordinator.consumer_contract_lab.process import owned_temporary_directory, run_bounded
 from ci_coordinator.consumer_contract_lab.source_epoch import PreparedConsumerContract
 from ci_coordinator.kernel import canonical_json
 from ci_coordinator.target_artifacts import render_plan_trust_root
@@ -76,7 +75,7 @@ def _execute_consumer_controls(
         raise ConsumerControlError("consumer lab requires a native-job-set workflow")
     controls = target_root / contract.profile.target_artifacts_directory
     harness = Path(__file__).with_name("resources") / "runtime-harness.cjs"
-    with TemporaryDirectory(prefix="ci-consumer-lab-") as temporary:
+    with owned_temporary_directory(prefix="ci-consumer-lab-") as temporary:
         root = Path(temporary).resolve()
         plan_path = root / "plan.json"
         output_path = root / "github-output"

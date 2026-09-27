@@ -1,16 +1,37 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import signal
 import sys
+from contextlib import suppress
 from pathlib import Path
 
 import pytest
+from scripts import quality_plan
 from scripts.ci_matrix_contract import load_matrix
+from scripts.dev_environment.diagnostics import Reason
+from scripts.dev_environment.environment import (
+    EnvironmentError,
+    admit_dependencies,
+    dependency_lease,
+    managed_dependency_context,
+)
+from scripts.dev_environment.lifecycle import TerminationRequest
 from scripts.quality_plan import (
+    MANAGED_DEPENDENCY_ARGUMENT,
+    QualityPlanUsageError,
     WitnessCommand,
     execute_commands,
     load_quality_plan,
     project_command_environment,
+    select_quality_plan,
+)
+from scripts.tests.test_dev_environment_dependencies import (
+    pending_scopes,
+    prepared_quality_identity,
+    quality_dependency_borrow,
 )
 
 
@@ -93,6 +114,296 @@ def test_quality_plan_preserves_declared_execution_order(tmp_path: Path) -> None
         "python.coverage",
         "mutation.probe",
     ]
+
+
+@pytest.mark.parametrize(
+    "arguments,mode", [([], "local"), (["local"], "local"), (["portable"], "portable")]
+)
+def test_shared_quality_selection_has_exact_modes_and_install_effects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, arguments: list[str], mode: str
+) -> None:
+    identity = prepared_quality_identity(tmp_path, monkeypatch)
+    selected = select_quality_plan(arguments, identity.repo_root)
+    assert selected.mode == mode
+    assert selected.write_scopes == (("backend", "frontend") if mode == "local" else ())
+    assert [command.command_id for command in selected.commands] == (
+        ["python.lock-check", "python.install-check", "frontend.install", "python.lint"]
+        if mode == "local"
+        else ["python.test"]
+    )
+    assert pending_scopes(identity) == set()
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["portable", "local"],
+        ["portable", "portable"],
+        ["unknown"],
+        [MANAGED_DEPENDENCY_ARGUMENT, "{}"],
+    ],
+)
+def test_public_quality_selection_rejects_private_or_invalid_forwarding(
+    tmp_path: Path, arguments: list[str]
+) -> None:
+    with pytest.raises(QualityPlanUsageError):
+        select_quality_plan(arguments, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_portable_selection_rejects_an_installer_even_with_provider_free_metadata(
+    tmp_path: Path,
+) -> None:
+    plan = _quality()
+    plan["portableCommandIds"] = ["python.install-check"]
+    _write_documents(tmp_path, quality=plan)
+    with pytest.raises(ValueError, match="must not install dependencies"):
+        select_quality_plan(["portable"], tmp_path)
+
+
+def test_selection_identity_binds_the_complete_command_and_effect_projection(
+    tmp_path: Path,
+) -> None:
+    _write_documents(tmp_path, quality=_quality())
+    selected = select_quality_plan([], tmp_path)
+    literal = {
+        "mode": "local",
+        "commands": [
+            {
+                "argv": ["true"],
+                "cache_policy": "read-only",
+                "command_id": command_id,
+                "credential_class": "none",
+                "cwd": str(tmp_path),
+                "environment_allowlist": ["PATH"],
+                "environment_classes": ["local-python"],
+                "environment_inherit": "allowlist",
+                "network_policy": "none",
+                "timeout_ms": 1000,
+            }
+            for command_id in ("python.lock-check", "python.install-check", "python.coverage")
+        ],
+        "dependencyEffects": [["python.install-check", "backend"]],
+    }
+    expected = hashlib.sha256(
+        json.dumps(literal, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert selected.sha256 == expected
+
+
+@pytest.mark.parametrize(
+    "failure,pending",
+    [
+        (None, set()),
+        ("python.lock-check", set()),
+        ("python.install-check", {"backend"}),
+        ("frontend.install", {"frontend"}),
+        ("python.lint", set()),
+    ],
+)
+def test_managed_quality_fences_only_reached_install_phases(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    failure: str | None,
+    pending: set[str],
+) -> None:
+    identity = prepared_quality_identity(tmp_path, monkeypatch)
+    commands = select_quality_plan([], identity.repo_root).commands
+    executed: list[str] = []
+
+    def execute(command: WitnessCommand) -> None:
+        expected = {"python.install-check": {"backend"}, "frontend.install": {"frontend"}}
+        assert pending_scopes(identity) == expected.get(command.command_id, set())
+        executed.append(command.command_id)
+        if command.command_id == failure:
+            raise RuntimeError("command failure")
+
+    with quality_dependency_borrow(identity) as borrow:
+        if failure is None:
+            execute_commands(commands, executor=execute, managed_dependencies=borrow)
+        else:
+            with pytest.raises(RuntimeError, match="command failure"):
+                execute_commands(commands, executor=execute, managed_dependencies=borrow)
+    expected_ids = [command.command_id for command in commands]
+    assert executed == (
+        expected_ids if failure is None else expected_ids[: expected_ids.index(failure) + 1]
+    )
+    receipts = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert [row["qualityCommand"] for row in receipts] == executed
+    assert [row["succeeded"] for row in receipts] == [name != failure for name in executed]
+    assert pending_scopes(identity) == pending
+    for scope in ("backend", "frontend"):
+        if scope in pending:
+            with pytest.raises(EnvironmentError, match=Reason.ENVIRONMENT_STALE):
+                admit_dependencies(identity, scope)
+        else:
+            admit_dependencies(identity, scope)
+
+
+@pytest.mark.parametrize("signal_number", [signal.SIGINT, signal.SIGTERM])
+@pytest.mark.parametrize(
+    "cut,pending",
+    [
+        ("python.lock-check", set()),
+        ("python.install-check", {"backend"}),
+        ("frontend.install", {"frontend"}),
+        ("python.lint", set()),
+    ],
+)
+def test_managed_quality_cancellation_does_not_reopen_completed_scopes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    signal_number: int,
+    cut: str,
+    pending: set[str],
+) -> None:
+    identity = prepared_quality_identity(tmp_path, monkeypatch)
+
+    def execute(command: WitnessCommand) -> None:
+        if command.command_id == cut:
+            if signal_number == signal.SIGINT:
+                raise KeyboardInterrupt
+            raise TerminationRequest(signal_number)
+
+    with (
+        quality_dependency_borrow(identity) as borrow,
+        pytest.raises((KeyboardInterrupt, TerminationRequest)),
+    ):
+        execute_commands(
+            select_quality_plan([], identity.repo_root).commands,
+            executor=execute,
+            managed_dependencies=borrow,
+        )
+    assert pending_scopes(identity) == pending
+
+
+def test_export_changed_after_lock_check_is_rejected_before_install_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    identity = prepared_quality_identity(tmp_path, monkeypatch)
+    executed: list[str] = []
+
+    def execute(command: WitnessCommand) -> None:
+        executed.append(command.command_id)
+        if command.command_id == "python.lock-check":
+            (identity.repo_root / "backend/requirements-dev.lock").write_text("changed\n")
+
+    with (
+        quality_dependency_borrow(identity) as borrow,
+        pytest.raises(EnvironmentError, match=Reason.ENVIRONMENT_STALE),
+    ):
+        execute_commands(
+            select_quality_plan([], identity.repo_root).commands,
+            executor=execute,
+            managed_dependencies=borrow,
+        )
+    assert executed == ["python.lock-check"]
+    assert pending_scopes(identity) == set()
+    receipts = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert receipts[-1]["qualityCommand"] == "python.install-check"
+    assert receipts[-1]["succeeded"] is False
+
+
+def test_managed_completion_failure_cannot_emit_success_or_dispatch_next_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    identity = prepared_quality_identity(tmp_path, monkeypatch)
+    executed: list[str] = []
+
+    def execute(command: WitnessCommand) -> None:
+        executed.append(command.command_id)
+        if command.command_id == "python.install-check":
+            (identity.repo_root / "backend/uv.lock").write_text("changed\n")
+
+    with (
+        quality_dependency_borrow(identity) as borrow,
+        pytest.raises(EnvironmentError, match=Reason.ENVIRONMENT_STALE),
+    ):
+        execute_commands(
+            select_quality_plan([], identity.repo_root).commands,
+            executor=execute,
+            managed_dependencies=borrow,
+        )
+    assert executed == ["python.lock-check", "python.install-check"]
+    assert pending_scopes(identity) == {"backend"}
+    assert json.loads(capsys.readouterr().out.splitlines()[-1])["succeeded"] is False
+
+
+@pytest.mark.parametrize("managed_context", [None, "{}", "private-invalid-json"])
+def test_quality_entry_has_no_implicit_managed_mode_or_malformed_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    managed_context: str | None,
+) -> None:
+    identity = prepared_quality_identity(tmp_path, monkeypatch)
+    monkeypatch.setattr(quality_plan, "REPO_ROOT", identity.repo_root)
+    monkeypatch.setenv("CI_COORDINATOR_DEV_STATE_HOME", str(identity.state_home))
+    executed: list[str] = []
+    monkeypatch.setattr(
+        quality_plan,
+        "_execute_command",
+        lambda command, **_options: executed.append(command.command_id),
+    )
+    arguments = [] if managed_context is None else [MANAGED_DEPENDENCY_ARGUMENT, managed_context]
+    assert quality_plan.main(arguments) == (0 if managed_context is None else 1)
+    assert executed == (
+        ["python.lock-check", "python.install-check", "frontend.install", "python.lint"]
+        if managed_context is None
+        else []
+    )
+    assert pending_scopes(identity) == set()
+    captured = capsys.readouterr()
+    if managed_context is not None:
+        assert captured.err.strip() == Reason.INVALID_STATE
+        assert managed_context not in captured.err
+
+
+@pytest.mark.parametrize("changed", ["metadata", "mode"])
+def test_quality_entry_rejects_selection_drift_before_any_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    changed: str,
+) -> None:
+    identity = prepared_quality_identity(tmp_path, monkeypatch)
+    monkeypatch.setattr(quality_plan, "REPO_ROOT", identity.repo_root)
+    monkeypatch.setenv("CI_COORDINATOR_DEV_STATE_HOME", str(identity.state_home))
+    selected = select_quality_plan([], identity.repo_root)
+    executed: list[str] = []
+    monkeypatch.setattr(
+        quality_plan,
+        "_execute_command",
+        lambda command, **_options: executed.append(command.command_id),
+    )
+    with dependency_lease(identity, exclusive=True) as descriptor:
+        positive_context = managed_dependency_context(identity, os.dup(descriptor), selected.sha256)
+        assert quality_plan.main([MANAGED_DEPENDENCY_ARGUMENT, positive_context]) == 0
+        assert executed == [command.command_id for command in selected.commands]
+        assert pending_scopes(identity) == set()
+        executed.clear()
+        capsys.readouterr()
+        child_descriptor = os.dup(descriptor)
+        try:
+            context = managed_dependency_context(identity, child_descriptor, selected.sha256)
+            arguments = ["portable"] if changed == "mode" else []
+            if changed == "metadata":
+                path = identity.repo_root / "proofkit/witness-plan-input.json"
+                catalog = json.loads(path.read_text())
+                command = next(
+                    row for row in catalog["commands"] if row["id"] == "python.install-check"
+                )
+                command["timeoutMs"] += 1
+                path.write_text(json.dumps(catalog))
+            assert quality_plan.main([*arguments, MANAGED_DEPENDENCY_ARGUMENT, context]) == 1
+            assert executed == []
+            assert pending_scopes(identity) == set()
+            captured = capsys.readouterr()
+            assert captured.out == "" and captured.err.strip() == Reason.INVALID_STATE
+        finally:
+            with suppress(OSError):
+                os.close(child_descriptor)
 
 
 def test_quality_plan_preserves_execution_policy(tmp_path: Path) -> None:

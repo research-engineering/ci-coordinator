@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from scripts.dev_environment.environment import managed_process_entrypoint
 from scripts.dev_environment.identity import derive_instance_identity
 from scripts.dev_environment.lifecycle import sigterm_guard
 from scripts.dev_environment.watch_session import (
@@ -60,7 +61,7 @@ def _parent_phase(phase: str | None, descriptor: int | None) -> Iterator[None]:
         yield
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--state-home", type=Path, required=True)
@@ -86,7 +87,8 @@ def main() -> None:
             timeout_seconds=20,
         )
     print(json.dumps({"outcome": asdict(session.outcome), "process": asdict(process)}), flush=True)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(managed_process_entrypoint(main, interrupt=True))

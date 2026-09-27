@@ -1,23 +1,32 @@
 from __future__ import annotations
 
+import contextlib
 import errno
 import os
+import selectors
 import signal
 import subprocess
 import sys
 import time
-from contextlib import suppress
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import cast
+from types import FrameType
+from typing import Any, Literal, cast
 
 import pytest
 from process_timeout_support import descendant_timeout_probe
-from scripts import bounded_process
+from scripts import bounded_process, diagram_process
 from scripts.bounded_process import (
     DecodeErrors,
     ResidualProcessGroupPolicy,
     StopPredicate,
     spawn,
+)
+from scripts.dev_environment.environment import borrow_managed_process
+from scripts.tests.test_dev_environment_dependencies import (
+    dependency_identity_fixture,
+    managed_entry_context,
 )
 
 
@@ -183,7 +192,11 @@ def test_termination_schedule_has_two_independent_one_second_intervals(
 
     monkeypatch.setattr(bounded_process, "_signal_process_group", recording_signal)
 
-    force_kill_at, hard_stop_at = bounded_process._begin_termination(123, 10.0)
+    schedule = bounded_process._Termination(None, None)
+    force_kill_at, hard_stop_at = bounded_process._begin_termination(
+        123, 10.0, termination=schedule
+    )
+    assert bounded_process._begin_termination(123, 20.0, termination=schedule) == (11.0, 12.0)
 
     assert observed_signals == [signal.SIGTERM]
     assert force_kill_at == 11.0
@@ -298,9 +311,14 @@ def test_spawn_bounds_post_deadline_termination_grace_without_reset(
     def recording_begin_termination(
         process_group_id: int,
         now: float,
+        *,
+        graceful_seconds: float = 1,
+        termination: bounded_process._Termination,
     ) -> tuple[float, float]:
         termination_starts.append(now)
-        return real_begin_termination(process_group_id, now)
+        return real_begin_termination(
+            process_group_id, now, graceful_seconds=graceful_seconds, termination=termination
+        )
 
     monkeypatch.setattr(
         bounded_process,
@@ -620,7 +638,13 @@ def test_spawn_preserves_the_first_terminal_failure_kind(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fail_termination(_process_group_id: int, _now: float) -> tuple[float, float]:
+    def fail_termination(
+        _process_group_id: int,
+        _now: float,
+        *,
+        graceful_seconds: float = 1,
+        termination: bounded_process._Termination,
+    ) -> tuple[float, float]:
         raise OSError(errno.EIO, "injected termination failure")
 
     monkeypatch.setattr(bounded_process, "_begin_termination", fail_termination)
@@ -706,6 +730,11 @@ def test_linux_process_group_retains_zombie_leader_with_live_threads() -> None:
     process = subprocess.Popen(
         (sys.executable, "-c", child),
         start_new_session=True,
+        pass_fds=(
+            ()
+            if (scope := bounded_process.current_process_scope()) is None
+            else scope.inherited_fds
+        ),
     )
 
     try:
@@ -725,6 +754,311 @@ def test_linux_process_group_retains_zombie_leader_with_live_threads() -> None:
         with suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
         process.wait(timeout=2)
+
+
+@pytest.mark.parametrize("interrupt", [False, True])
+def test_native_managed_group_drain_survives_interrupt_after_direct_parent_exit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, interrupt: bool
+) -> None:
+    identity = dependency_identity_fixture(tmp_path)
+    release = tmp_path / "release"
+    descendant = (
+        "import time\nfrom pathlib import Path\n"
+        f"release = Path({str(release)!r})\n"
+        "while not release.exists(): time.sleep(0.01)\n"
+    )
+    parent = f"import subprocess, sys\nsubprocess.Popen([sys.executable, '-c', {descendant!r}])\n"
+    original_probe = bounded_process._is_process_group_alive
+    groups: list[int] = []
+    failure = KeyboardInterrupt("owned post-exit cut")
+
+    def observe(group: int) -> bool:
+        alive = original_probe(group)
+        if alive and not groups:
+            groups.append(group)
+            if interrupt:
+                raise failure
+            release.touch()
+            deadline = time.monotonic() + 2
+            while original_probe(group):
+                assert time.monotonic() < deadline, "positive descendant did not quiesce"
+                time.sleep(0.01)
+            return False
+        return alive
+
+    monkeypatch.setattr(bounded_process, "_is_process_group_alive", observe)
+    try:
+        with managed_entry_context(identity) as (context, _stop, _inherited):
+            with borrow_managed_process(context):
+                if interrupt:
+                    with pytest.raises(KeyboardInterrupt) as caught:
+                        spawn(
+                            sys.executable,
+                            ("-c", parent),
+                            cwd=tmp_path,
+                            max_buffer=4096,
+                            timeout_seconds=5,
+                        )
+                    assert caught.value is failure
+                else:
+                    result = spawn(
+                        sys.executable,
+                        ("-c", parent),
+                        cwd=tmp_path,
+                        max_buffer=4096,
+                        timeout_seconds=5,
+                    )
+                    assert result.status == 0 and result.error is None
+            assert len(groups) == 1
+            assert not original_probe(groups[0]), "managed interrupt left an executable descendant"
+    finally:
+        release.touch()
+        for group in groups:
+            with suppress(ProcessLookupError):
+                os.killpg(group, signal.SIGKILL)
+
+
+@pytest.mark.parametrize("interactive", [False, True], ids=["capture", "interactive"])
+@pytest.mark.parametrize("cut", ["positive", "accept-term"])
+def test_native_managed_handle_acceptance_latches_first_signal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, interactive: bool, cut: str
+) -> None:
+    _native_capture_cut(tmp_path, monkeypatch, cut=cut, interactive=interactive)
+
+
+@pytest.mark.parametrize(
+    "cut", ["construct", "register", "register-term", "register-close", "close"]
+)
+def test_native_managed_capture_setup_and_close_preserve_primary_and_drain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cut: str
+) -> None:
+    _native_capture_cut(tmp_path, monkeypatch, cut=cut, interactive=False)
+
+
+@pytest.mark.parametrize(
+    "cut",
+    ["exit-error", "exit-term", "caught-work-term", "caught-close-term", "unrelated-exit-term"],
+)
+def test_native_managed_exit_transition_preserves_only_propagating_primary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cut: str
+) -> None:
+    _native_capture_cut(tmp_path, monkeypatch, cut=cut, interactive=False)
+
+
+@pytest.mark.parametrize(
+    "cut", ["positive", "exit-error", "exit-term", "caught-work-term", "register-term"]
+)
+def test_native_interactive_exit_flush_reaches_the_existing_callback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cut: str
+) -> None:
+    _native_capture_cut(tmp_path, monkeypatch, cut=cut, interactive=True)
+
+
+def _native_capture_cut(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, cut: str, interactive: bool
+) -> None:
+    identity = dependency_identity_fixture(tmp_path)
+    ready = tmp_path / "child-ready"
+    positive = cut in {"positive", "close", "caught-close-term"}
+    source = f"from pathlib import Path\nimport time\nPath({str(ready)!r}).touch()\n" + (
+        "print('accepted')\n" if positive else "time.sleep(60)\n"
+    )
+    children: list[subprocess.Popen[bytes]] = []
+    cancellation = KeyboardInterrupt("first owned TERM")
+    first = cancellation if "term" in cut and cut != "exit-term" else ValueError("setup cut")
+    secondary = RuntimeError("secondary close cut")
+    original_popen = subprocess.Popen
+    original_selector = selectors.DefaultSelector
+    signal_times: list[float] = []
+    exit_cuts: list[BaseException] = []
+    recoveries: list[str] = []
+    callbacks: list[tuple[bounded_process.InteractiveResult, BaseException]] = []
+    work_injected = False
+    previous_profile = sys.getprofile()
+
+    def signal_now() -> None:
+        signal_times.append(time.monotonic())
+        os.kill(os.getpid(), signal.SIGTERM)
+        first_received = scope._cancellation.received_at
+        os.kill(os.getpid(), signal.SIGTERM)
+        assert scope._cancellation.received_at == first_received
+
+    def exit_cut(
+        frame: FrameType,
+        event: Literal["call", "return", "c_call", "c_return", "c_exception"],
+        argument: object,
+    ) -> None:
+        if previous_profile is not None:
+            previous_profile(frame, event, argument)
+        if (
+            not exit_cuts
+            and cut in {"exit-error", "exit-term"}
+            and event == "call"
+            and frame.f_code is contextlib._GeneratorContextManager.__exit__.__code__
+            and frame.f_locals.get("value") is first
+        ):
+            assert ready.exists() and len(children) == 1
+            exit_cuts.append(first)
+            if cut == "exit-term":
+                signal_now()
+
+    @contextmanager
+    def unrelated_exit() -> Iterator[None]:
+        try:
+            yield
+        finally:
+            signal_now()
+
+    def work_cut() -> None:
+        nonlocal work_injected
+        if work_injected:
+            return
+        work_injected = True
+        if cut == "caught-work-term":
+            try:
+                raise ValueError("caught while work is still running")
+            except ValueError:
+                signal_now()
+                assert scope.stop_requested()
+                recoveries.append(cut)
+        if cut == "unrelated-exit-term":
+            handled = ValueError("unrelated context exit")
+            try:
+                with unrelated_exit():
+                    raise handled
+            except ValueError as error:
+                assert error is handled and scope.stop_requested()
+                recoveries.append(cut)
+        if cut == "register-term":
+            signal_now()
+            pytest.fail("ordinary work did not interrupt")
+        if cut in {"register", "register-close", "exit-error", "exit-term"}:
+            raise first
+
+    def accepted(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        child = original_popen(*args, **kwargs)
+        children.append(child)
+        deadline = time.monotonic() + 5
+        while not ready.exists():
+            assert child.poll() is None or ready.exists()
+            assert time.monotonic() < deadline, "real child never reached acceptance barrier"
+            time.sleep(0.01)
+        if cut == "accept-term":
+            signal_now()
+        if interactive:
+            poll = child.poll
+
+            def poll_cut() -> int | None:
+                work_cut()
+                return poll()
+
+            monkeypatch.setattr(child, "poll", poll_cut)
+        return child
+
+    def selector() -> selectors.BaseSelector:
+        if cut == "construct":
+            raise first
+        instance = original_selector()
+        register, close = instance.register, instance.close
+
+        def register_cut(*args: Any, **kwargs: Any) -> selectors.SelectorKey:
+            work_cut()
+            return register(*args, **kwargs)
+
+        def close_cut() -> None:
+            close()
+            if cut == "caught-close-term":
+                signal_now()
+            if cut in {"register-close", "close"}:
+                raise secondary
+
+        monkeypatch.setattr(instance, "register", register_cut)
+        monkeypatch.setattr(instance, "close", close_cut)
+        return instance
+
+    monkeypatch.setattr(subprocess, "Popen", accepted)
+    monkeypatch.setattr(selectors, "DefaultSelector", selector)
+    monkeypatch.setattr(diagram_process, "KeyboardInterrupt", lambda: cancellation, raising=False)
+    try:
+        with managed_entry_context(identity) as (context, _writer, _descriptor):
+            with borrow_managed_process(context, interrupt=True) as scope:
+                pending_before = diagram_process._DEFERRED_INTERRUPT.get()
+                mode_before = diagram_process._INTERRUPTIBLE.get()
+
+                def observe(
+                    result: bounded_process.InteractiveResult, error: BaseException
+                ) -> None:
+                    callbacks.append((result, error))
+
+                def invoke() -> int | None:
+                    if interactive:
+                        return bounded_process.run_interactive(
+                            sys.executable,
+                            ("-c", source),
+                            cwd=tmp_path,
+                            env=dict(os.environ),
+                            timeout_seconds=5,
+                            on_interrupt=observe,
+                        ).returncode
+                    return spawn(
+                        sys.executable,
+                        ("-c", source),
+                        cwd=tmp_path,
+                        max_buffer=4096,
+                        timeout_seconds=5,
+                    ).status
+
+                sys.setprofile(exit_cut)
+                try:
+                    if cut == "positive":
+                        assert invoke() == 0
+                    elif cut == "caught-close-term":
+                        try:
+                            raise ValueError("ambient already-handled error")
+                        except ValueError:
+                            with pytest.raises(KeyboardInterrupt) as caught_cancel:
+                                invoke()
+                            assert caught_cancel.value is cancellation
+                    else:
+                        expected = secondary if cut == "close" else first
+                        with pytest.raises(type(expected)) as caught:
+                            invoke()
+                        assert caught.value is expected
+                finally:
+                    sys.setprofile(previous_profile)
+                assert exit_cuts == ([first] if cut in {"exit-error", "exit-term"} else [])
+                assert recoveries == (
+                    [cut] if cut in {"caught-work-term", "unrelated-exit-term"} else []
+                )
+                assert diagram_process._DEFERRED_INTERRUPT.get() is pending_before
+                assert diagram_process._INTERRUPTIBLE.get() is mode_before
+                assert sys.getprofile() is previous_profile
+                if interactive and cut != "positive":
+                    assert len(callbacks) == 1
+                    assert callbacks[0][1] is first
+                    assert callbacks[0][0].process_group_quiescent is True
+                else:
+                    assert callbacks == []
+                if signal_times:
+                    observed = scope._cancellation.received_at
+                    assert observed is not None and signal_times[0] <= observed
+                    assert scope.cancellation_deadline == observed + 3
+            assert len(children) == 1
+            child = children[0]
+            assert child.poll() is not None, "accepted direct child was not reaped"
+            with pytest.raises(ProcessLookupError):
+                os.killpg(child.pid, 0)
+            assert all(
+                stream.closed
+                for stream in (child.stdin, child.stdout, child.stderr)
+                if stream is not None
+            )
+    finally:
+        sys.setprofile(previous_profile)
+        for child in children:
+            with suppress(ProcessLookupError):
+                os.killpg(child.pid, signal.SIGKILL)
+            child.wait(timeout=2)
 
 
 def test_linux_process_group_parser_handles_parentheses_in_process_name(

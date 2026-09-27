@@ -40,6 +40,7 @@ type SuiteName = Literal[
     "python-config-policy-admission",
     "python-database-compatibility",
     "python-http-admission",
+    "python-managed-lifecycle",
     "python-plan-identity",
     "python-persistence",
 ]
@@ -90,12 +91,14 @@ def _config(
     manifest_relative_path: str,
     report_id: str,
     temp_prefix: str,
+    retain_pytest_evidence: bool = False,
 ) -> MutationSuiteConfig:
     return MutationSuiteConfig(
         dependencies=dependencies,
         manifest_relative_path=manifest_relative_path,
         report_id=report_id,
         temp_prefix=temp_prefix,
+        retain_pytest_evidence=retain_pytest_evidence,
         authority_relative_paths=(
             SPECS_RELATIVE_PATH,
             *EXECUTION_ENVELOPE_AUTHORITY_RELATIVE_PATHS,
@@ -186,6 +189,16 @@ SUITES: Final[dict[SuiteName, MutationSuiteSpec]] = {
         ),
         command_id="mutation.python-http-admission",
         inventory_policy=InventoryPolicy.HTTP_ADMISSION,
+    ),
+    "python-managed-lifecycle": MutationSuiteSpec(
+        config=_config(
+            dependencies=("backend/.venv",),
+            manifest_relative_path="fixtures/conformance/v1/python-managed-lifecycle-mutants.v1.json",
+            report_id="ci-coordinator.python-managed-lifecycle-mutation",
+            temp_prefix="ci-python-managed-lifecycle-mutation-",
+            retain_pytest_evidence=True,
+        ),
+        command_id="mutation.python-managed-lifecycle",
     ),
     "python-plan-identity": MutationSuiteSpec(
         config=_config(

@@ -15,7 +15,14 @@ from types import FrameType
 from typing import Final, Literal
 
 from scripts.bounded_git import BoundedGitError, BoundedGitResult, run_git
-from scripts.bounded_process import SUPPORTED_PLATFORMS, CommandResult, spawn
+from scripts.bounded_process import (
+    SUPPORTED_PLATFORMS,
+    BorrowedProcessScope,
+    CommandResult,
+    borrowed_process_scope,
+    current_process_scope,
+    spawn,
+)
 
 DEFAULT_MAX_BUFFER_BYTES: Final = 10 * 1024 * 1024
 DEFAULT_TIMEOUT_MS: Final = 600_000
@@ -49,6 +56,79 @@ class CleanupResult:
         if self.output is not None:
             report["output"] = self.output
         return report
+
+
+@dataclass(slots=True)
+class _GitCleanupScope:
+    owner: DetachedWorktreeLifecycle
+    parent: BorrowedProcessScope
+    executable: str | None
+    active: bool = True
+    _ceiling: float | None = None
+
+    @property
+    def inherited_fds(self) -> tuple[int, ...]:
+        if not self.active:
+            raise RuntimeError("cleanup scope is closed")
+        return self.parent.inherited_fds
+
+    @property
+    def cancellation_deadline(self) -> float | None:
+        return self.parent.cancellation_deadline
+
+    @property
+    def deadline(self) -> float | None:
+        cancellation = self.parent.cancellation_deadline
+        limits = [
+            value
+            for value in (self._ceiling, self.parent.deadline, cancellation)
+            if value is not None
+        ]
+        if not self.active or (self.parent.stop_requested() and cancellation is None):
+            limits.append(0.0)
+        self._ceiling = min(limits) if limits else None
+        return self._ceiling
+
+    @property
+    def term_grace_cap(self) -> float | None:
+        return 0.0 if self.parent.stop_requested() else None
+
+    def stop_requested(self) -> bool:
+        return not self.active
+
+    def assert_remaining(self) -> None:
+        deadline = self.deadline
+        if deadline is not None and time.monotonic() >= deadline:
+            raise TimeoutError("owned cleanup allowance exhausted")
+
+    def admit_command(self, command: str, args: Sequence[str], cwd: Path) -> None:
+        root = self.owner._temp_root
+        allowed: set[tuple[str, ...]] = set()
+        if root is not None and self.owner.worktree_registration_attempted:
+            allowed = {
+                ("worktree", "remove", "--force", str(root / "worktree")),
+            }
+        if (
+            not self.active
+            or not self.owner._cleanup_started
+            or self.owner._cleanup_result is not None
+            or command != self.executable
+            or cwd != self.owner.repo_root
+            or tuple(args) not in allowed
+        ):
+            raise ValueError("command is outside owned Git cleanup")
+        self.assert_remaining()
+
+    def remove(self, path: Path) -> None:
+        root = self.owner._temp_root
+        if root is None or path not in {root, root / "worktree"}:
+            raise ValueError("path is outside owned cleanup")
+        self.assert_remaining()
+        if path.is_symlink() or path.is_file():
+            path.unlink(missing_ok=True)
+        elif path.exists():
+            path.rmdir()
+        self.assert_remaining()
 
 
 class DetachedWorktreeLifecycle:
@@ -179,7 +259,17 @@ class DetachedWorktreeLifecycle:
 
         self._cleanup_started = True
         try:
-            result = self._perform_cleanup()
+            parent = current_process_scope()
+            if parent is None:
+                result = self._perform_cleanup()
+            else:
+                scope = _GitCleanupScope(self, parent, shutil.which("git"))
+                try:
+                    with borrowed_process_scope(scope):
+                        result = self._perform_cleanup(scope)
+                        scope.assert_remaining()
+                finally:
+                    scope.active = False
         except Exception as error:
             result = CleanupResult(
                 state="failed",
@@ -191,24 +281,47 @@ class DetachedWorktreeLifecycle:
         self._cleanup_result = result
         return result
 
-    def _perform_cleanup(self) -> CleanupResult:
+    def _perform_cleanup(self, scope: _GitCleanupScope | None = None) -> CleanupResult:
         temp_root = self._temp_root
         if temp_root is None:
             return CleanupResult(state="passed", worktree_removal="not-needed")
+        remove = _remove_path if scope is None else scope.remove
         if not self.worktree_registration_attempted:
-            _remove_path(temp_root)
+            remove(temp_root)
             return CleanupResult(state="passed", worktree_removal="not-needed")
 
         worktree = temp_root / "worktree"
         removal = self._cleanup_git(("worktree", "remove", "--force", str(worktree)))
         if removal.status == 0:
-            _remove_path(temp_root)
+            try:
+                remove(temp_root)
+            except (OSError, TimeoutError):
+                if scope is None:
+                    raise
+                return CleanupResult(
+                    state="failed",
+                    worktree_removal="removed",
+                    removal_exit_code=0,
+                    residual_registration=False,
+                    output="owned wrapper cleanup incomplete",
+                )
             return CleanupResult(state="passed", worktree_removal="removed")
 
-        _remove_path(worktree)
+        if scope is not None:
+            return CleanupResult(
+                state="failed",
+                worktree_removal="failed",
+                removal_exit_code=removal.status,
+                residual_registration=None,
+                output="\n".join(
+                    part for part in (removal.stdout, removal.stderr, removal.error) if part
+                ),
+            )
+
+        remove(worktree)
         prune = self._cleanup_git(("worktree", "prune"))
         listed = self._cleanup_git(("worktree", "list", "--porcelain"))
-        _remove_path(temp_root)
+        remove(temp_root)
         return CleanupResult(
             state="failed",
             worktree_removal="failed",

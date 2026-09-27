@@ -2777,7 +2777,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "c57afd32a12d9d9bb7d7c1a336d70a620c41b2fcdcbc726952008d25d1870dcf"
+          "sourceSha256": "5bd08f272df833a14019b9dadf5837c665ecfe2c9bb9973a196fc3a9f759f9cc"
         },
         {
           "requirementId": "REQ-CI-PROOFKIT-008",
@@ -2793,7 +2793,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "c57afd32a12d9d9bb7d7c1a336d70a620c41b2fcdcbc726952008d25d1870dcf"
+          "sourceSha256": "5bd08f272df833a14019b9dadf5837c665ecfe2c9bb9973a196fc3a9f759f9cc"
         }
       ]
     },
@@ -3016,7 +3016,7 @@
     "Existing Proofkit requirements, route bindings and command catalogs retain authority."
   ],
   "executionInputs": {
-    ".github/workflows/python-persistence.yml": "4d324b75285e843dcd47e522e5b8af9b96eef62f2b3c91c15b4de97a6a016684",
+    ".github/workflows/python-persistence.yml": "a25b78ba9585c180a05437cb36f348480bdca5ae002ab570bf17f282ec901712",
     "docker/ci/connected-administrator.compose.yaml": "f5f9c76fca733f9e6285469ee2a259ae6caea84d29ad622765b39729190b2f50",
     "docker/ci/connected-browser.Dockerfile": "98d669c9e2bb25062aefaa084e097bfa2eb45acc0a1a6817343a529ae8abce25",
     "frontend/connected.playwright.config.ts": "c8a3e6a7f8671d2bef34a7d9fa9b3dd9a465f242819b493d9c212e0558566603",
@@ -3038,7 +3038,7 @@
     "scripts/ci_test_execution.py": "b8e85f8a8ff8142b4039adde46c7238f17834a03b8dd75c21da30ba241339328",
     "scripts/ci_test_plan.py": "14b58acbc84b8c12675a18018a4efe6a76d9ba118e527fe08547c07fd3ee8076",
     "scripts/ci_test_report.py": "88765ae21a14c5bf55c4e238fb24e4dd8f556863564a18d7674591edaf82cad8",
-    "scripts/python_coverage_diagnostics.py": "f847802c417d4ddc4f4d4bb6506d1f9696a31c1d4f7156cb7c4eee44738bc11b",
-    "scripts/python_witness.py": "4aa12d366198471a64b5743f50bb8bc8f2abc2e402f1bc0c06d02a77f498a7db"
+    "scripts/python_coverage_diagnostics.py": "57809eb1c9b06eee294948c99b2d752e48d8d913accbfe11c05b618ad5b77f99",
+    "scripts/python_witness.py": "ddee421bc4de8ef621e300e7afc63d46d11041c8988084aa54f38bd8a3aa61f8"
   }
 }

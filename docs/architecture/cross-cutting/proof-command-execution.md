@@ -186,6 +186,18 @@ provider authority.
 
 ## 6. Classification Non-Claims
 
+The [managed check lifetime](../../features/managed-check-lifetime.md) extends
+these existing owners to explicitly participating nested sessions. A tighter
+inherited first-stop bound clips the standalone termination intervals above;
+no child renews them. Accepted handles remain cleanup-owned before interruptible
+setup. Pending cancellation remains visible during an active error, and normal
+interruptible exit observes it inside the existing catch/callback. Actual
+propagated primary errors are distinct from ambient caught errors. This is an
+owned-checkpoint guarantee, not every-bytecode interruption or immunity after
+the owned context ends. Physical group observation, pipe closure and caller
+postconditions remain required; arbitrary detached actors are not inferred
+quiescent from an inherited descriptor or a parent exit alone.
+
 `networkPolicy=none` does not prevent socket syscalls. `cachePolicy=read-only`
 does not make the filesystem immutable. Those fields remain necessary route
 facts for provider/container isolation, but local execution may claim only

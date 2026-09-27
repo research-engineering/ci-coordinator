@@ -8,12 +8,13 @@ import subprocess
 import sys
 import time
 from collections.abc import Iterator
-from contextlib import contextmanager, suppress
+from contextlib import ExitStack, contextmanager, suppress
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from scripts import bounded_process
+from scripts.dev_environment.environment import managed_process_invocation
 from scripts.dev_environment.identity import InstanceIdentity, derive_instance_identity
 from scripts.dev_environment.lifecycle import (
     OperationBlocked,
@@ -97,34 +98,41 @@ def _witness(
 ) -> Iterator[_Witness]:
     phase_read, phase_write = os.pipe()
     process: subprocess.Popen[bytes] | None = None
+    lifetime = ExitStack()
     try:
-        process = subprocess.Popen(
-            [
-                _PYTHON,
-                "-S",
-                "-m",
-                "scripts.tests.watch_session_witness",
-                "--repo-root",
-                str(identity.repo_root),
-                "--state-home",
-                str(identity.state_home),
-                *(["--joined-client-fixture"] if joined_client_fixture else []),
-                *(
-                    ["--parent-phase", parent_phase, "--phase-release-fd", str(phase_read)]
-                    if parent_phase is not None
-                    else []
+        invocation = lifetime.enter_context(
+            managed_process_invocation(
+                (
+                    "-S",
+                    "-m",
+                    "scripts.tests.watch_session_witness",
+                    "--repo-root",
+                    str(identity.repo_root),
+                    "--state-home",
+                    str(identity.state_home),
+                    *(["--joined-client-fixture"] if joined_client_fixture else []),
+                    *(
+                        ["--parent-phase", parent_phase, "--phase-release-fd", str(phase_read)]
+                        if parent_phase is not None
+                        else []
+                    ),
+                    _PYTHON,
+                    "-S",
+                    "-c",
+                    program,
+                    mode,
                 ),
-                _PYTHON,
-                "-S",
-                "-c",
-                program,
-                mode,
-            ],
+                timeout_seconds=30,
+                graceful_seconds=3,
+            )
+        )
+        process = subprocess.Popen(
+            [_PYTHON, *invocation.arguments],
             cwd=_SOURCE_ROOT,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            pass_fds=(phase_read,),
+            pass_fds=(*invocation.inherited_fds, phase_read),
         )
         yield _Witness(process)
     except BaseException as error:
@@ -153,6 +161,7 @@ def _witness(
             for stream in (process.stdout, process.stderr):
                 if stream is not None:
                     stream.close()
+        lifetime.close()
 
 
 @pytest.fixture
@@ -547,6 +556,8 @@ def test_interactive_stdout_rejects_unowned_capture_sentinels_and_stdio_aliases(
 def test_detached_effect_fixture_exposes_the_group_exit_non_implication(
     identity: InstanceIdentity,
 ) -> None:
+    outer = bounded_process.current_process_scope()
+    descriptors = () if outer is None else outer.inherited_fds
     effect = """
 import os, select, sys
 ready_descriptor = int(sys.argv[1])
@@ -562,7 +573,7 @@ import os, select, subprocess, sys
 read_descriptor, write_descriptor = os.pipe()
 effect = subprocess.Popen(
     [sys.executable, '-S', '-c', {effect!r}, str(write_descriptor)],
-    pass_fds=(write_descriptor,), start_new_session=True,
+    pass_fds=(write_descriptor, *{descriptors!r}), start_new_session=True,
 )
 os.close(write_descriptor)
 ready, _, _ = select.select([read_descriptor], [], [], 5)

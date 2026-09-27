@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Never, Protocol, cast
 
 from scripts.bounded_process import spawn
+from scripts.dev_environment.environment import current_managed_process, managed_process_invocation
 
 
 class FailReporter(Protocol):
@@ -174,19 +175,35 @@ class PythonEnvironmentWitnesses:
                     "path": context.repo_path(context.venv_python),
                 },
             )
-        result = spawn(
+        arguments = (
+            "-m",
+            "scripts.python_package_witness",
+            str(context.repo_root),
+            str(context.backend_root),
             str(context.venv_python),
-            (
-                "-m",
-                "scripts.python_package_witness",
-                str(context.repo_root),
-                str(context.backend_root),
-                str(context.venv_python),
-            ),
-            cwd=context.repo_root,
-            env=context.environment,
-            max_buffer=16 * 1024 * 1024,
         )
+        if current_managed_process() is not None:
+            with managed_process_invocation(
+                arguments, timeout_seconds=600, graceful_seconds=3
+            ) as invocation:
+                result = spawn(
+                    str(context.venv_python),
+                    invocation.arguments,
+                    cwd=context.repo_root,
+                    env=context.environment,
+                    max_buffer=16 * 1024 * 1024,
+                    inherited_fds=invocation.inherited_fds,
+                    graceful_seconds=3,
+                    cancellation_fd=invocation.cancellation_fd,
+                )
+        else:
+            result = spawn(
+                str(context.venv_python),
+                arguments,
+                cwd=context.repo_root,
+                env=context.environment,
+                max_buffer=16 * 1024 * 1024,
+            )
         if result.error is not None:
             context.fail(
                 f"failed to start Python package witness: {result.error}",

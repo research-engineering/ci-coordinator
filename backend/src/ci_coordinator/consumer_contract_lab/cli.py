@@ -12,6 +12,10 @@ from tempfile import NamedTemporaryFile
 from ci_coordinator.consumer_contract_lab.codec import ConsumerLabAdmissionError
 from ci_coordinator.consumer_contract_lab.composition import ConsumerLabExecutionError
 from ci_coordinator.consumer_contract_lab.node_runtime import ConsumerControlError
+from ci_coordinator.consumer_contract_lab.process import (
+    ConsumerLabCleanupError,
+    assert_lifetime_running,
+)
 from ci_coordinator.consumer_contract_lab.runner import run_consumer_contract_lab
 from ci_coordinator.consumer_contract_lab.source_epoch import ConsumerContractSourceError
 from ci_coordinator.runtime_settings import admit_python_runtime
@@ -30,6 +34,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     target_root = Path(arguments.target_root).expanduser().resolve()
     output = Path(arguments.output).expanduser().resolve()
     try:
+        assert_lifetime_running()
         _require_external_output(output, coordinator_root, target_root)
         receipt = run_consumer_contract_lab(
             coordinator_root=coordinator_root,
@@ -48,8 +53,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ConsumerLabAdmissionError,
         ConsumerLabCommandError,
         ConsumerLabExecutionError,
+        ConsumerLabCleanupError,
     ) as error:
         return _reject("consumer_contract_lab_failed", detail=type(error).__name__)
+    assert_lifetime_running()
     return _report(
         "consumer_contract_lab_passed",
         receiptId=receipt.receipt_id,
@@ -83,6 +90,7 @@ def _require_external_output(output: Path, *roots: Path) -> None:
 
 
 def _write_atomic(output: Path, content: bytes) -> None:
+    assert_lifetime_running()
     temporary_path: Path | None = None
     try:
         with NamedTemporaryFile(
@@ -94,6 +102,7 @@ def _write_atomic(output: Path, content: bytes) -> None:
             temporary.write(content)
             temporary.flush()
             temporary_path = Path(temporary.name)
+        assert_lifetime_running()
         temporary_path.replace(output)
     finally:
         if temporary_path is not None:

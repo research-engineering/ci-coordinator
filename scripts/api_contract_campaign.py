@@ -17,6 +17,10 @@ from pathlib import Path
 from types import FrameType
 
 from scripts.bounded_process import StopPredicate, spawn
+from scripts.dev_environment.environment import (
+    managed_process_entrypoint,
+    managed_process_invocation,
+)
 
 _BUDGETS = {"fast": 180, "deep": 300}
 _DEFAULT_SEED = 20260919
@@ -67,15 +71,23 @@ def _run_campaign(arguments: argparse.Namespace, stop_requested: StopPredicate) 
     )
     started = time.monotonic()
     cpu_before = resource.getrusage(resource.RUSAGE_CHILDREN)
-    result = spawn(
-        sys.executable,
+    with managed_process_invocation(
         ("-m", "pytest", "-ra", "tests/unit/api_contract"),
-        cwd=root / "backend",
-        env=environment,
         timeout_seconds=_BUDGETS[arguments.profile],
-        max_buffer=1024 * 1024,
-        stop_requested=stop_requested,
-    )
+        graceful_seconds=1,
+        pytest_participant=True,
+    ) as invocation:
+        result = spawn(
+            sys.executable,
+            invocation.arguments,
+            cwd=root / "backend",
+            env=environment,
+            timeout_seconds=_BUDGETS[arguments.profile],
+            max_buffer=1024 * 1024,
+            stop_requested=stop_requested,
+            inherited_fds=invocation.inherited_fds,
+            cancellation_fd=invocation.cancellation_fd,
+        )
     elapsed = time.monotonic() - started
     cpu_after = resource.getrusage(resource.RUSAGE_CHILDREN)
     summary = {
@@ -116,4 +128,4 @@ def _run_campaign(arguments: argparse.Namespace, stop_requested: StopPredicate) 
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(managed_process_entrypoint(main))

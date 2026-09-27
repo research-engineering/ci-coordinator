@@ -11,6 +11,7 @@ from ci_coordinator.consumer_contract_lab.node_runtime import (
     ConsumerControlResult,
     execute_consumer_controls,
 )
+from ci_coordinator.consumer_contract_lab.process import assert_lifetime_running
 from ci_coordinator.consumer_contract_lab.source_epoch import (
     PreparedConsumerContract,
     assert_consumer_contract_unchanged,
@@ -58,6 +59,7 @@ def run_consumer_contract_lab(
     target_root: Path,
     profile_path: Path,
 ) -> ConsumerLabReceipt:
+    assert_lifetime_running()
     contract = prepare_consumer_contract(
         coordinator_root=coordinator_root,
         coordinator_commit=coordinator_commit,
@@ -65,14 +67,18 @@ def run_consumer_contract_lab(
         target_root=target_root,
         profile_path=profile_path,
     )
-    results = tuple(
-        execute_consumer_controls(
-            contract,
-            scenario,
-            issue_scenario(contract, scenario, scenario_index=index),
+    completed = []
+    for index, scenario in enumerate(contract.corpus.scenarios, start=1):
+        assert_lifetime_running()
+        completed.append(
+            execute_consumer_controls(
+                contract,
+                scenario,
+                issue_scenario(contract, scenario, scenario_index=index),
+            )
         )
-        for index, scenario in enumerate(contract.corpus.scenarios, start=1)
-    )
+    results = tuple(completed)
+    assert_lifetime_running()
     assert_consumer_contract_unchanged(contract)
     return ConsumerLabReceipt(_receipt_id(contract, results), contract, results)
 

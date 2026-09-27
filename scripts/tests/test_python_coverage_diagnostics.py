@@ -10,6 +10,12 @@ from typing import cast
 
 import pytest
 from scripts import python_coverage_diagnostics as diagnostics
+from scripts.bounded_process import current_process_scope, spawn
+from scripts.dev_environment.environment import MANAGED_PROCESS_ARGUMENT
+from scripts.tests.test_dev_environment_dependencies import (
+    dependency_identity_fixture,
+    managed_entry_context,
+)
 
 
 def test_progress_stream_bounds_records_and_total_bytes_and_drops_forked_writes(
@@ -140,6 +146,7 @@ def test_native_entrypoint_retains_outcomes_with_composed_plugin(
         "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
         "PYTEST_ADDOPTS": "",
     }
+    scope = current_process_scope()
     outcomes = [
         subprocess.run(
             [sys.executable, "-m", "pytest", *plugins, "--color=no", "-q", str(path)],
@@ -150,6 +157,7 @@ def test_native_entrypoint_retains_outcomes_with_composed_plugin(
             text=True,
             timeout=30,
             check=False,
+            pass_fds=() if scope is None else scope.inherited_fds,
         )
         for plugins in ([], ["-p", "scripts.python_coverage_diagnostics"])
     ]
@@ -169,3 +177,136 @@ def test_native_entrypoint_retains_outcomes_with_composed_plugin(
     assert all(set(row) == {"coveragePhase", "elapsedSeconds"} for row in phases)
     elapsed = [row["elapsedSeconds"] for row in phases]
     assert elapsed == sorted(elapsed) and elapsed[0] >= 0
+
+
+_PYTEST_MANAGED_RECEIPT = """
+import json, os, signal, sys
+from pathlib import Path
+import pytest
+from scripts.bounded_process import current_process_scope
+receipt, inherited, *arguments = sys.argv[1:]
+before = current_process_scope()
+handlers = {number: signal.getsignal(number) for number in (signal.SIGINT, signal.SIGTERM)}
+status = pytest.main(arguments)
+try:
+    os.fstat(int(inherited))
+    closed = False
+except OSError:
+    closed = True
+Path(receipt).write_text(json.dumps({
+    'status': int(status), 'scopeRestored': current_process_scope() is before,
+    'handlersRestored': all(signal.getsignal(number) is handler
+        for number, handler in handlers.items()),
+    'leaseClosed': closed,
+}))
+"""
+
+
+@pytest.mark.parametrize("cut", ["positive", "invalid", "early-failure"])
+def test_native_managed_admission_precedes_cov_erase_and_restores_early_failure(
+    tmp_path: Path, cut: str
+) -> None:
+    identity = dependency_identity_fixture(tmp_path)
+    data = tmp_path / ".coverage"
+    data.write_bytes(b"pre-admission-coverage-sentinel")
+    collected = tmp_path / "collected"
+    receipt = tmp_path / "receipt.json"
+    (tmp_path / "pytest.ini").write_text("[pytest]\n")
+    (tmp_path / "fixture_module.py").write_text("VALUE = 3\n")
+    test = tmp_path / "test_case.py"
+    test.write_text(
+        "from pathlib import Path\n"
+        "from scripts.dev_environment.environment import current_managed_process\n"
+        f"Path({str(collected)!r}).write_text('collected')\n"
+        "import fixture_module\n"
+        "def test_case():\n"
+        "    assert current_managed_process() is not None\n"
+        "    assert fixture_module.VALUE == 3\n"
+    )
+    (tmp_path / "early_failure.py").write_text(
+        "import pytest\n"
+        "@pytest.hookimpl(trylast=True)\n"
+        "def pytest_load_initial_conftests():\n"
+        "    raise pytest.UsageError('owned early failure')\n"
+    )
+    with managed_entry_context(identity) as (context, _stop, inherited):
+        stop_read = json.loads(context)["stopFd"]
+        result = spawn(
+            sys.executable,
+            (
+                "-c",
+                _PYTEST_MANAGED_RECEIPT,
+                str(receipt),
+                str(inherited),
+                "-p",
+                "scripts.python_coverage_diagnostics",
+                "-p",
+                "pytest_cov.plugin",
+                *(["-p", "early_failure"] if cut == "early-failure" else []),
+                "-c",
+                str(tmp_path / "pytest.ini"),
+                "--cov=fixture_module",
+                "--cov-report=",
+                "--color=no",
+                "-q",
+                str(test),
+                MANAGED_PROCESS_ARGUMENT,
+                "{}" if cut == "invalid" else context,
+            ),
+            cwd=tmp_path,
+            env={
+                **os.environ,
+                "PYTHONPATH": os.pathsep.join(
+                    (str(Path(__file__).resolve().parents[2]), str(tmp_path))
+                ),
+                "PYTEST_ADDOPTS": "",
+                "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+                "COVERAGE_FILE": str(data),
+            },
+            max_buffer=1024 * 1024,
+            timeout_seconds=20,
+            graceful_seconds=3,
+            inherited_fds=(inherited, stop_read),
+        )
+        assert result.status == 0 and result.error is None, result.stderr
+        assert json.loads(receipt.read_text()) == {
+            "status": 0 if cut == "positive" else 4,
+            "scopeRestored": True,
+            "handlersRestored": True,
+            "leaseClosed": cut != "invalid",
+        }
+        if cut == "positive":
+            assert collected.read_text() == "collected"
+            assert data.read_bytes().startswith(b"SQLite format 3")
+        elif cut == "invalid":
+            assert not collected.exists()
+            assert data.read_bytes() == b"pre-admission-coverage-sentinel"
+            assert "managed process admission failed" in result.stderr
+        else:
+            assert not collected.exists()
+            assert "owned early failure" in result.stderr
+
+
+def test_native_unmanaged_diagnostics_does_not_import_managed_environment(tmp_path: Path) -> None:
+    test = tmp_path / "test_case.py"
+    test.write_text("def test_case(): assert True\n")
+    program = (
+        "import sys, pytest\n"
+        "sys.modules['scripts.dev_environment.environment'] = None\n"
+        "raise SystemExit(pytest.main(sys.argv[1:]))\n"
+    )
+    result = spawn(
+        sys.executable,
+        ("-c", program, "-p", "scripts.python_coverage_diagnostics", "-q", str(test)),
+        cwd=tmp_path,
+        env={
+            **os.environ,
+            "PYTHONPATH": str(Path(__file__).resolve().parents[2]),
+            "PYTEST_ADDOPTS": "",
+            "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+        },
+        max_buffer=1024 * 1024,
+        timeout_seconds=20,
+    )
+    assert result.status == 0 and result.error is None, result.stderr
+    assert '"coveragePhase": "session_finished"' in result.stdout

@@ -6,10 +6,12 @@ import selectors
 import signal
 import subprocess
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 
 import pytest
 from scripts.bounded_process import spawn
+from scripts.dev_environment.environment import managed_process_invocation
 from scripts.dev_environment.identity import derive_instance_identity
 from scripts.dev_environment.lifecycle import (
     OperationBusy,
@@ -36,29 +38,36 @@ def test_captured_child_keeps_its_admitted_lease_until_its_own_exit(
     ready_read, ready_write = os.pipe()
     release_read, release_write = os.pipe()
     process: subprocess.Popen[bytes] | None = None
+    lifetime = ExitStack()
     try:
-        process = subprocess.Popen(
-            [
-                _PYTHON,
-                "-S",
-                "-m",
-                "scripts.tests.bounded_process_lock_witness",
-                "--lock",
-                str(lock),
-                "--ready-fd",
-                str(ready_write),
-                "--release-fd",
-                str(release_read),
-                *(
-                    ["--instance-root", str(root), "--state-home", str(identity.state_home)]
-                    if instance_lease
-                    else []
+        invocation = lifetime.enter_context(
+            managed_process_invocation(
+                (
+                    "-S",
+                    "-m",
+                    "scripts.tests.bounded_process_lock_witness",
+                    "--lock",
+                    str(lock),
+                    "--ready-fd",
+                    str(ready_write),
+                    "--release-fd",
+                    str(release_read),
+                    *(
+                        ["--instance-root", str(root), "--state-home", str(identity.state_home)]
+                        if instance_lease
+                        else []
+                    ),
                 ),
-            ],
+                timeout_seconds=30,
+                graceful_seconds=3,
+            )
+        )
+        process = subprocess.Popen(
+            [_PYTHON, *invocation.arguments],
             cwd=_SOURCE_ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            pass_fds=(ready_write, release_read),
+            pass_fds=(*invocation.inherited_fds, ready_write, release_read),
         )
         os.close(ready_write)
         ready_write = -1
@@ -104,6 +113,7 @@ def test_captured_child_keeps_its_admitted_lease_until_its_own_exit(
             for stream in (process.stdout, process.stderr):
                 if stream is not None:
                     stream.close()
+        lifetime.close()
 
 
 @pytest.mark.parametrize("descriptors", [(True,), (-1,), (0,), (1,), (2,), "bad"])

@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 import pytest
+from scripts.bounded_process import current_process_scope
 from scripts.dev_environment.private_files import (
     PrivateFileError,
     PrivateLockBusy,
@@ -70,6 +71,7 @@ def test_closing_the_parent_descriptor_does_not_unlock_the_inheriting_child(tmp_
     child: subprocess.Popen[bytes] | None = None
     try:
         with bounded_private_lock(path) as descriptor:
+            outer = current_process_scope()
             child = subprocess.Popen(
                 [
                     sys.executable,
@@ -78,7 +80,7 @@ def test_closing_the_parent_descriptor_does_not_unlock_the_inheriting_child(tmp_
                     "import os, select; select.select([0], [], [], 10); os.read(0, 1)",
                 ],
                 stdin=subprocess.PIPE,
-                pass_fds=(descriptor,),
+                pass_fds=(descriptor, *(() if outer is None else outer.inherited_fds)),
             )
         # The direct Popen child inherits the descriptor at exec. This proves
         # the lock primitive, not inheritance through Docker/Compose plugins.
