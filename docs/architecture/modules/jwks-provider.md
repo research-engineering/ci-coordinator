@@ -116,8 +116,14 @@ mutated key set.
 Close is a terminal lifecycle transition. It marks the provider closed before
 cancelling and draining any shared refresh, clears the cached snapshot, and
 rejects all later `get` and `probe` work with typed unavailability. A refresh
-that completes after close cannot publish a replacement. Repeated close calls
-are idempotent.
+that completes after close cannot publish a replacement. Its HTTP transport
+retains one shielded close task and rejects later direct fetches before I/O.
+Repeated close observes the original task outcome: success stays successful;
+failure or cancellation cannot become success through the HTTP client's no-op
+close. A terminal observer retrieves failure without rendering it even when
+all close waiters cancel. This is retained unsuccessful cleanup, not proof of
+physical release or a new client. See the
+[close-outcome design](../../features/http-close-outcome.md).
 
 ```text
 Closed(provider)
@@ -159,6 +165,9 @@ cache transition logic.
 - cancellation of one waiter does not cancel another caller's shared refresh.
 - close drains an in-flight refresh, rejects later work, publishes no late
   snapshot, and remains idempotent.
+- a partially failed HTTP close becomes successful on repeat without releasing
+  the independently observed remaining resource;
+- cancellation of all close waiters leaves an unobserved terminal failure.
 
 ## 8. Non-Claims
 

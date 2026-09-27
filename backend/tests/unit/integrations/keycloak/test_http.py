@@ -374,7 +374,7 @@ def test_declared_body_limit_rejects_before_stream_iteration() -> None:
     assert stream.iterated is False
 
 
-def test_shared_lifecycle_drains_retries_close_and_shares_cancelled_callers() -> None:
+def test_shared_lifecycle_drains_and_retains_failure_without_reopening() -> None:
     async def scenario() -> None:
         lifecycle = _SharedLifecycle()
         assert await lifecycle.enter() is True
@@ -391,25 +391,41 @@ def test_shared_lifecycle_drains_retries_close_and_shares_cancelled_callers() ->
                 raise OSError("transient")
 
         draining = asyncio.create_task(lifecycle.close(close_resource))
+        close_admitted = asyncio.Event()
+        asyncio.get_running_loop().call_soon(close_admitted.set)
+        await close_admitted.wait()
+        assert lifecycle.is_open is False
+        assert await lifecycle.enter() is False
         assert close_started.is_set() is False
         await lifecycle.leave()
         await close_started.wait()
         release_close.set()
         with pytest.raises(OSError, match="transient"):
             await draining
-        assert lifecycle.is_open is True
+        assert lifecycle.is_open is False
+        assert await lifecycle.enter() is False
+        with pytest.raises(OSError, match="transient"):
+            await lifecycle.close(close_resource)
+        assert attempts == 1
 
+    asyncio.run(scenario())
+
+
+def test_shared_lifecycle_shields_success_from_waiter_cancellation() -> None:
+    async def scenario() -> None:
+        lifecycle = _SharedLifecycle()
         release_close = asyncio.Event()
-        second_started = asyncio.Event()
+        close_started = asyncio.Event()
+        attempts = 0
 
         async def successful_close() -> None:
             nonlocal attempts
             attempts += 1
-            second_started.set()
+            close_started.set()
             await release_close.wait()
 
         caller = asyncio.create_task(lifecycle.close(successful_close))
-        await second_started.wait()
+        await close_started.wait()
         peer = asyncio.create_task(lifecycle.close(successful_close))
         caller.cancel()
         with pytest.raises(asyncio.CancelledError):
@@ -417,7 +433,7 @@ def test_shared_lifecycle_drains_retries_close_and_shares_cancelled_callers() ->
         release_close.set()
         await peer
         await lifecycle.close(successful_close)
-        assert attempts == 2
+        assert attempts == 1
         assert lifecycle.is_open is False
         assert await lifecycle.enter() is False
 

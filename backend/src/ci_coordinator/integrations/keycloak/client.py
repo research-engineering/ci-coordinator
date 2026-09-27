@@ -16,7 +16,7 @@ from ci_coordinator.control_plane_identity import (
     KeycloakUnavailable,
 )
 from ci_coordinator.control_plane_identity.model import is_canonical_oidc_issuer
-from ci_coordinator.integrations.keycloak._http import _KeycloakHttpClient
+from ci_coordinator.integrations.keycloak._http import _consume_close_outcome, _KeycloakHttpClient
 from ci_coordinator.integrations.keycloak._text import bounded_text as _bounded_text
 from ci_coordinator.integrations.keycloak.discovery import (
     FAILED_REFRESH_RETRY_SECONDS,
@@ -226,6 +226,7 @@ class KeycloakIntegration:
             close_task = self._close_task
             if close_task is None:
                 close_task = asyncio.create_task(self._close_all())
+                close_task.add_done_callback(_consume_close_outcome)
                 self._close_task = close_task
         try:
             await asyncio.shield(close_task)

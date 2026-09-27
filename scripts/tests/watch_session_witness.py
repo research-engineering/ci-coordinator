@@ -84,8 +84,6 @@ def main() -> None:
                 WatchClientContract.COMPOSE_JOINED_WATCH if args.joined_client_fixture else None
             ),
             timeout_seconds=20,
-            graceful_seconds=0.2,
-            kill_seconds=0.2,
         )
     print(json.dumps({"outcome": asdict(session.outcome), "process": asdict(process)}), flush=True)
 

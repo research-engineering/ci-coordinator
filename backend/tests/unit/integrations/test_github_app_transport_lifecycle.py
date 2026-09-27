@@ -69,7 +69,7 @@ def test_factory_drains_an_accepted_send_before_closing_the_shared_client() -> N
     assert after_close.kind == "unavailable"
 
 
-def test_shared_client_close_failure_is_retryable_without_reopening_admission() -> None:
+def test_shared_client_close_retains_failure_without_reopening_admission() -> None:
     async def scenario() -> None:
         lifecycle = _SharedClientLifecycle()
         attempts = 0
@@ -86,22 +86,21 @@ def test_shared_client_close_failure_is_retryable_without_reopening_admission() 
         assert lifecycle.is_open is False
         assert await lifecycle.enter_send() is False
 
-        await lifecycle.close(close_resource)
-        await lifecycle.close(close_resource)
+        for _ in range(2):
+            with pytest.raises(OSError, match="transient close failure"):
+                await lifecycle.close(close_resource)
 
-        assert attempts == 2
+        assert attempts == 1
 
     asyncio.run(scenario())
 
 
-def test_concurrent_shared_client_close_callers_share_each_attempt() -> None:
+def test_concurrent_shared_client_close_callers_share_the_retained_failure() -> None:
     async def scenario() -> None:
         lifecycle = _SharedClientLifecycle()
         attempts = 0
         first_started = asyncio.Event()
         release_first = asyncio.Event()
-        retry_started = asyncio.Event()
-        release_retry = asyncio.Event()
         transient_failure = OSError("transient close failure")
 
         async def close_resource() -> None:
@@ -111,11 +110,7 @@ def test_concurrent_shared_client_close_callers_share_each_attempt() -> None:
                 first_started.set()
                 await release_first.wait()
                 raise transient_failure
-            if attempts == 2:
-                retry_started.set()
-                await release_retry.wait()
-                return
-            raise AssertionError("successful close must be terminal")
+            raise AssertionError("unsuccessful HTTP close must not be repeated")
 
         first = asyncio.create_task(lifecycle.close(close_resource))
         await first_started.wait()
@@ -128,20 +123,11 @@ def test_concurrent_shared_client_close_callers_share_each_attempt() -> None:
         assert first_results[1] is transient_failure
         assert attempts == 1
 
-        retry = asyncio.create_task(lifecycle.close(close_resource))
-        await retry_started.wait()
-        retry_peer = asyncio.create_task(lifecycle.close(close_resource))
-        await asyncio.sleep(0)
-
-        assert retry.done() is False
-        assert retry_peer.done() is False
-        assert attempts == 2
-
-        release_retry.set()
-        await asyncio.gather(retry, retry_peer)
-        await lifecycle.close(close_resource)
-
-        assert attempts == 2
+        repeated = await asyncio.gather(
+            lifecycle.close(close_resource), lifecycle.close(close_resource), return_exceptions=True
+        )
+        assert all(result is transient_failure for result in repeated)
+        assert attempts == 1
 
     asyncio.run(scenario())
 

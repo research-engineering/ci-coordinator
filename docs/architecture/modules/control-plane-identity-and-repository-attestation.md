@@ -118,6 +118,16 @@ revalidates the existing opaque session and may repeat ordinary top-level SSO;
 it does not extend the session, retain provider tokens or replay mutations.
 Its non-authoritative navigation hint cannot affect any server admission.
 
+The shared Keycloak HTTP owner retains its first shielded close outcome and
+never reopens admission after failure or cancellation. The integration's outer
+cleanup retains its existing retry so an earlier failure cannot abandon an
+unattempted component. Retrying that outer sequence does not retry an already
+unsuccessful HTTP client. Both close tasks have non-rendering terminal observers;
+cancelled waiters neither cancel shared work nor leave a late failure unobserved.
+Discovery and key-cache closure continue to fence public identity work. The
+[close-outcome design](../../features/http-close-outcome.md) changes no identity,
+session, reviewer or provider authority.
+
 ### 3.2 Machine Identity
 
 One workload obtains an access token from Keycloak through its own confidential

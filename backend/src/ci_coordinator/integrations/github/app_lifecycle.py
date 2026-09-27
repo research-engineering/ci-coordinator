@@ -47,17 +47,17 @@ class _SharedClientLifecycle:
             if self._close_task is None:
                 self._state = _LifecycleState.CLOSING
                 self._close_task = asyncio.create_task(self._drain_and_close(close_resource))
+                self._close_task.add_done_callback(_consume_close_outcome)
             close_task = self._close_task
         await asyncio.shield(close_task)
 
     async def _drain_and_close(self, close_resource: Callable[[], Awaitable[None]]) -> None:
-        try:
-            await self._idle.wait()
-            await close_resource()
-        except BaseException:
-            async with self._lock:
-                if self._close_task is asyncio.current_task():
-                    self._close_task = None
-            raise
+        await self._idle.wait()
+        await close_resource()
         async with self._lock:
             self._state = _LifecycleState.CLOSED
+
+
+def _consume_close_outcome(task: asyncio.Task[None]) -> None:
+    if not task.cancelled():
+        task.exception()

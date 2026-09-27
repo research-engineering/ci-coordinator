@@ -144,6 +144,19 @@ lifespan logging boundary. This is a cooperative asynchronous bound and does not
 claim control over code that blocks the event loop or suppresses cancellation
 indefinitely.
 
+Generic pre-deadline cleanup retry remains valid for unattempted or independently
+retry-capable resources, while completed resources are skipped. GitHub, Keycloak
+and Actions JWKS HTTP clients instead retain their first close outcome because
+their pinned client may make a repeated close a no-op after partial failure.
+Such failure or cancellation remains terminally incomplete and cannot set the
+runtime's successful-close marker. The existing process shutdown/operator owner
+handles that uncertainty; no physical-release or automatic-recovery guarantee
+is implied. Keycloak's outer component sequence remains retryable without
+resetting its consumed HTTP child. Late settlement cannot renew an expired
+cleanup deadline or reactivate the runtime. Details and native oracles are in
+the [close-outcome design](../../features/http-close-outcome.md) and its
+[implementation plan](../../features/http-close-outcome-implementation-plan.md).
+
 ```text
 ConstructedNonEnforcingRuntime
 and EnforcementEnabled = false
@@ -281,7 +294,9 @@ secret, bearer token, raw request body, or stack trace.
   cleanup deadline fence;
 - a timed-out reconciliation drain makes a later safe close impossible;
 - one failed external close causes already closed resources to be closed twice
-  or makes the unfinished resource permanently unreachable;
+  or makes an unattempted or independently retry-capable resource unreachable;
+- repeated HTTP close hides a retained unsuccessful outcome, falsely marks the
+  child closed, or renders an orphaned close-task failure;
 - a composed route dispatches selected work or marks an omission successful;
 - an enforcing runtime starts from a mode string or credential presence without
   a valid same-binding production-admission receipt;

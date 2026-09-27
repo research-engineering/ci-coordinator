@@ -400,6 +400,15 @@ close during an accepted send => drain before client close
 Cancellation is deliberately not converted to `unavailable`: callers that own
 shutdown or request cancellation must retain that control signal.
 
+The factory retains the first shared, shielded HTTP close task, including its
+failure or cancellation. Close fences all new bindings and sends; accepted
+sends still drain first. Repeated close observes the same outcome and cannot
+turn a lower client's post-failure no-op into successful cleanup. A terminal
+observer retrieves task failure without rendering it even when all waiters
+cancel. This does not prove physical release after failure or recreate a client.
+See the [close-outcome design](../../features/http-close-outcome.md) and
+[implementation plan](../../features/http-close-outcome-implementation-plan.md).
+
 ### 8.2 Non-Claims
 
 This transport does not grant GitHub App permissions, approve any repository,
