@@ -106,6 +106,9 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
         (lab / "cli.py").write_text(
             "def main(arguments):\n"
             + "\n".join("    " + line for line in source.splitlines())
+            + "\n    import os\n"
+            + "    assert 'COVERAGE_PROCESS_CONFIG' not in os.environ\n"
+            + "    assert 'COVERAGE_PROCESS_START' not in os.environ\n"
             + "\n    return 7\n"
         )
     children: list[subprocess.Popen[bytes]] = []
@@ -227,16 +230,19 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
 
                     def invoke() -> tuple[bytes, int | None]:
                         if owner == "image-entry":
-                            status = bootstrap._run_exact_image(
-                                source_root=image_source,
-                                package_root=package,
-                                cache_root=tmp_path / "cache",
-                                coordinator_root=tmp_path,
-                                coordinator_commit=_COMMIT,
-                                target_root=tmp_path,
-                                profile="fixture.json",
-                                output="-",
-                            )
+                            with monkeypatch.context() as image_environment:
+                                image_environment.delenv("COVERAGE_PROCESS_CONFIG", raising=False)
+                                image_environment.delenv("COVERAGE_PROCESS_START", raising=False)
+                                status = bootstrap._run_exact_image(
+                                    source_root=image_source,
+                                    package_root=package,
+                                    cache_root=tmp_path / "cache",
+                                    coordinator_root=tmp_path,
+                                    coordinator_commit=_COMMIT,
+                                    target_root=tmp_path,
+                                    profile="fixture.json",
+                                    output="-",
+                                )
                             return b"", status
                         if owner is bootstrap:
                             stdout, _stderr, status = bootstrap._capture_bounded(
