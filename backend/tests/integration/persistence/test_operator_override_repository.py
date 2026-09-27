@@ -320,6 +320,94 @@ def test_resolution_is_scope_bound_latest_active_per_kind(
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize(
+    ("offsets", "available", "disabled"),
+    [
+        ((), True, False),
+        ((-1,), True, True),
+        ((0,), True, True),
+        ((1,), False, False),
+        ((-2, -1), True, False),
+        ((0, 0), True, False),
+        ((-1, 1), False, False),
+        ((1, 1), False, False),
+        ((-2, -1, 1), False, False),
+        ((0, 0, 0), True, True),
+    ],
+)
+def test_latest_omission_control_precedes_reader_time_projection(
+    postgres_database_url: str,
+    runtime_postgres_database_url: str,
+    offsets: tuple[int, ...],
+    available: bool,
+    disabled: bool,
+) -> None:
+    async def scenario() -> None:
+        await _grant_runtime_columns(postgres_database_url, runtime_postgres_database_url)
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        store = DurableOperatorOverrideStore(lambda: PostgresOperatorOverrideUnitOfWork(engine))
+        controls: list[ActiveOverride] = []
+        try:
+            for index, seconds in enumerate(offsets):
+                override = _override(
+                    operation_id=f"latch-{index}",
+                    kind="disable_omission" if index % 2 == 0 else "enable_omission",
+                    subject_id=None if index % 2 == 0 else controls[-1].override_id,
+                    applied_at=_NOW + timedelta(seconds=seconds),
+                )
+                assert isinstance(
+                    await store.apply(override, OverrideAuditEvent.applied(override)),
+                    OverrideApplied,
+                )
+                controls.append(override)
+            for scope in (RepositoryScope(303, 202), RepositoryScope(101, 404)):
+                foreign = _override(
+                    operation_id="foreign-latch",
+                    kind="disable_omission",
+                    subject_id=None,
+                    scope=scope,
+                    applied_at=_NOW + timedelta(minutes=5),
+                )
+                assert isinstance(
+                    await store.apply(foreign, OverrideAuditEvent.applied(foreign)), OverrideApplied
+                )
+            before = await _stored_override_pairs(engine)
+            expected = (
+                ActiveOverrideRecords(disable_dynamic=controls[-1] if disabled else None)
+                if available
+                else OverrideLookupUnavailable()
+            )
+            for subject in ("run-7", None):
+                assert (
+                    await store.resolve_active(scope=_SCOPE, subject_id=subject, now=_NOW)
+                    == expected
+                )
+                async with PostgresOperatorOverrideUnitOfWork(engine) as transaction:
+                    assert (
+                        await transaction.operator_overrides.resolve_active(
+                            scope=_SCOPE, subject_id=subject, now=_NOW
+                        )
+                        == expected
+                    )
+                    resolved = await resolve_active_overrides(
+                        transaction.operator_overrides, scope=_SCOPE, subject_id=subject, now=_NOW
+                    )
+                    assert resolved.lookup_available is available
+                    assert resolved.force_full_ci is (not available or disabled)
+                    await transaction.commit()
+            if controls:
+                retry = ActiveOverride.create(controls[-1].command, _NOW + timedelta(minutes=10))
+                assert await store.apply(
+                    retry, OverrideAuditEvent.applied(retry)
+                ) == OverrideDuplicate(controls[-1])
+            assert await _stored_override_pairs(engine) == before
+        finally:
+            await engine.dispose()
+            await _clear_override_state(postgres_database_url)
+
+    asyncio.run(scenario())
+
+
 def test_future_force_population_is_typed_unavailable_without_rewriting_its_pair(
     postgres_database_url: str,
     runtime_postgres_database_url: str,

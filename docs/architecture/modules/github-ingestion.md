@@ -85,6 +85,12 @@ integers, unpaired surrogates, non-object roots, and profile-limit violations
 are typed rejections. Rejection messages contain stable codes only and never
 copy raw payload values.
 
+A syntactically valid numeric token that raises `Decimal.InvalidOperation`
+during host conversion is also an `invalid_json` rejection. This expected
+input failure is translated at the conversion boundary, before immutable
+preparation or a delivery claim. Finite decimal values keep their exact
+representation; unrelated exceptions and cancellation still propagate.
+
 Lexical preflight advances plain string, whitespace and scalar spans with
 bounded standard-library character-class matches; it does not construct their
 decoded values. Plain spans stop no later than the first code point exceeding

@@ -126,6 +126,7 @@ the complete audit parents:
 | [#44](https://github.com/research-engineering/ci-coordinator/pull/44) | Operator states distinguish initial refusal from earlier uncertainty, catalog normalization from absence, and bounded fractional audit payloads from integer identifiers. UTC presentation and the shared numeric wire vector are qualified; the corrected PostgreSQL replay fixture prepares a fresh single-use input. Initial failed native evidence is retained, not rewritten as success. |
 | [#45](https://github.com/research-engineering/ci-coordinator/pull/45) | HTTP clients retain their first unsuccessful close outcome instead of accepting a later no-op as successful cleanup. Independent waiter cancellation, eligible outer retries and the original shutdown bound remain; native qualification does not establish physical release under arbitrary failure. The initial macOS fixture failure and its bounded correction remain retained. |
 | [#46](https://github.com/research-engineering/ci-coordinator/pull/46) | Plan availability reflects the observed terminal response, separately from durable issuance. Owned deadlines and unattributed cancellation remain distinct; excluded policy populations stay excluded under later send failure. Authenticated metrics failure returns unavailable, and shutdown recipes preserve their declared grace. Autonomous readiness, client delivery and live SLO attainment remain separate. |
+| [#47](https://github.com/research-engineering/ci-coordinator/pull/47) | Managed checks conserve installation phases, dependency leases and bounded participant cleanup, including the exact-image consumer path. Native qualification is scoped; later ambient-exception cleanup counterexamples remain open under CI-054. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -138,21 +139,18 @@ and production omission authority are still distinct.
 All 471 original audit IDs now have initial source-bound dispositions in the
 external register, preserving every scoped refutation, policy and unknown.
 Initial adjudication is not confirmation, repair or native qualification.
-The next prepared audit batch separates terminal plan-response observation from
-durable issuance, preserves explicit exclusion priority and classifies unknown
-cancellation separately from service-owned deadline expiry. Authenticated metrics
-exposition failure is bounded and cannot bypass authentication or suppress cancellation.
-Phase-exact managed installation and transitive process ownership retain their
-independent lifecycle proof, including the isolated consumer-lab process path.
-Request-outcome telemetry, managed-process ownership and build-input admission
-retain separate repair boundaries; their independent review, actual-base
-integration and native qualification remain required.
-All these prepared changes still require their exact-source native qualification.
-Workflow CPU
-isolation, readiness freshness and plan-failure telemetry retain their own
-lifecycle and outcome contracts. No prepared scope is qualified merely
-by this ordering or by the preceding PRs; all remain routed through CI-054 and
-the existing task dependencies below.
+The next admission repair reads the latest durable omission control before
+classifying future application time and rejects unrepresentable webhook numeric
+tokens through the existing typed input boundary. Independent review and exact
+native qualification remain required; no change to timestamp authority, audit
+replay or accepted finite decimal representation is intended.
+Ambient-exception cleanup, readiness cost/freshness, build-input admission and
+signed-verifier parity retain their separate scoped repairs. Requalify dated
+runtime-image repairs before their October 5 expiry rather than extending the
+date without evidence. Workflow CPU isolation and measured capacity remain open.
+Current scanner inputs and disputed simplifications stay in the same CI-054
+register; metric counts neither establish defects nor waive semantic review.
+No prepared scope is qualified merely by this ordering or an earlier green run.
 
 Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.

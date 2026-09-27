@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+from decimal import Decimal
+
 import pytest
 
 from ci_coordinator.github_ingestion.payload_limits import WebhookPayloadLimits
@@ -104,3 +107,31 @@ def test_valid_json_is_immutable_and_lookup_preserves_the_admitted_value() -> No
     assert parsed["values"] == (True, None)
     assert isinstance(repository, FrozenJsonObject)
     assert repository["id"] == 1
+
+
+@pytest.mark.parametrize("token", [b"1e9999999999999999999", b"1e-9999999999999999999"])
+def test_unrepresentable_decimal_is_an_expected_input_rejection(token: bytes) -> None:
+    with pytest.raises(JsonPayloadError, match=r"^invalid_json$"):
+        parse_json_object(b'{"value":' + token + b"}", limits())
+
+
+@pytest.mark.parametrize("token", ["1.25", "1e-30", "-0.125"])
+def test_finite_decimal_retains_exact_value(token: str) -> None:
+    parsed = parse_json_object(f'{{"value":{token}}}'.encode(), limits())
+    assert type(parsed["value"]) is Decimal
+    assert parsed["value"] == Decimal(token)
+
+
+@pytest.mark.parametrize(
+    "error", [AssertionError("unexpected parser failure"), asyncio.CancelledError()]
+)
+def test_unexpected_conversion_failures_are_not_input_rejections(
+    monkeypatch: pytest.MonkeyPatch, error: BaseException
+) -> None:
+    def fail(*_: object, **__: object) -> object:
+        raise error
+
+    monkeypatch.setattr("ci_coordinator.github_ingestion.strict_json.json.loads", fail)
+    with pytest.raises(type(error)) as caught:
+        parse_json_object(b'{"value":1.25}', limits())
+    assert caught.value is error

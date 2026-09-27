@@ -12,6 +12,7 @@ from ci_coordinator.operator_controls import (
     OverrideAuditEvent,
     OverrideCommand,
 )
+from ci_coordinator.operator_controls.override import OverrideKind
 from ci_coordinator.operator_controls.resolution import OverrideLookupUnavailable
 from ci_coordinator.persistence import (
     PostgresIngressIssuanceUnitOfWork,
@@ -172,10 +173,12 @@ def test_selected_issuance_is_linearized_with_the_active_config_epoch(
 
 
 @pytest.mark.parametrize("completion", ["commit", "rollback", "cancel"])
+@pytest.mark.parametrize("kind", ["force_full_ci", "disable_omission"])
 def test_future_force_is_observed_after_the_scope_holder_releases(
     postgres_database_url: str,
     runtime_postgres_database_url: str,
     completion: str,
+    kind: OverrideKind,
 ) -> None:
     async def scenario() -> None:
         admin = create_postgres_engine(postgres_database_url)
@@ -199,13 +202,13 @@ def test_future_force_is_observed_after_the_scope_holder_releases(
             applied_at = await database_time(admin) + timedelta(minutes=5)
             future = ActiveOverride.create(
                 OverrideCommand(
-                    "force_full_ci",
+                    kind,
                     guard.scope,
-                    guard.reconciliation_subject_id,
-                    "future-force-during-selected-issuance",
+                    guard.reconciliation_subject_id if kind == "force_full_ci" else None,
+                    "future-control-during-selected-issuance",
                     "integration-operator",
-                    "committed future force must withhold selected authority",
-                    applied_at + timedelta(minutes=5),
+                    "committed future control must withhold selected authority",
+                    applied_at + timedelta(minutes=5) if kind == "force_full_ci" else None,
                 ),
                 applied_at,
             )
@@ -255,8 +258,10 @@ def test_future_force_is_observed_after_the_scope_holder_releases(
                 )
                 assert result == expected
             after_release = await database_time(admin)
-            assert future.command.expires_at is not None
-            assert before_release <= after_release < future.applied_at < future.command.expires_at
+            assert before_release <= after_release < future.applied_at
+            if kind == "force_full_ci":
+                assert future.command.expires_at is not None
+                assert future.applied_at < future.command.expires_at
             current = guard.current_evidence
             assert current is not None
             assert after_release < min(
