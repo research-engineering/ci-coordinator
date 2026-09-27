@@ -6,13 +6,21 @@ import json
 import subprocess
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal, TypedDict, cast
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+    PublicFormat,
+)
 from package_b_support import (
     BASE_SHA,
     HEAD_SHA,
@@ -28,6 +36,7 @@ from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.identity_admission import TrustedActionsRun
 from ci_coordinator.kernel import FixedClock, canonical_json
 from ci_coordinator.plan_issuance import (
+    AuthenticatedRunBinding,
     FullCiExecution,
     InMemoryIssuanceStore,
     IssuanceGuardRejected,
@@ -42,6 +51,7 @@ from ci_coordinator.plan_issuance import (
     SignedNativeProfileExecution,
     SignedPlanEnvelope,
     SignedPlanIssuer,
+    SignedPlanPayload,
     SignedPlanSigner,
     SignedProfileExecution,
     parse_plan_request,
@@ -114,15 +124,22 @@ process.stdout.write(JSON.stringify(verifyEnvelope(
 """
 
 
-def _target_rejection(envelope: SignedPlanEnvelope, public_key_pem: bytes) -> str | None:
+def _target_rejection(
+    envelope: SignedPlanEnvelope,
+    public_key_pem: bytes,
+    *,
+    expected_key_id: str,
+    now: datetime,
+) -> str | None:
     completed = subprocess.run(
         ["node", "-e", _VALIDATE_ENVELOPE, str(_TARGET_VALIDATOR)],
         input=json.dumps(
             {
                 "envelope": {**envelope.unsigned_mapping(), "signature": envelope.signature},
                 "publicKey": public_key_pem.decode("ascii"),
-                "keyId": envelope.key_id,
-                "now": int(NOW.timestamp() * 1000) + 500,
+                "keyId": expected_key_id,
+                "now": (now.astimezone(UTC) - datetime(1970, 1, 1, tzinfo=UTC))
+                // timedelta(milliseconds=1),
             }
         ),
         text=True,
@@ -134,6 +151,456 @@ def _target_rejection(envelope: SignedPlanEnvelope, public_key_pem: bytes) -> st
     reason = json.loads(completed.stdout)
     assert reason is None or isinstance(reason, str)
     return reason
+
+
+class _EnvelopeVector(TypedDict):
+    id: str
+    issuedAt: str
+    expiresAt: str
+    now: str
+    keyId: str
+    expectedKeyId: str
+    mutation: str
+    pythonReason: str | None
+    jsReason: str | None
+
+
+class _EnvelopeVectorDocument(TypedDict):
+    schemaVersion: str
+    canonicalUnsigned: str
+    cases: list[_EnvelopeVector]
+
+
+_VECTOR_DOCUMENT = cast(
+    _EnvelopeVectorDocument,
+    json.loads(
+        (
+            Path(__file__).resolve().parents[3]
+            / "fixtures/conformance/v1/signed-plan-envelope-admission.v1.json"
+        ).read_text(encoding="utf-8")
+    ),
+)
+
+
+def _vector_payload() -> SignedPlanPayload:
+    return SignedPlanPayload(
+        schema_version="dynamic-ci-signed-plan-payload/v2",
+        plan_id="fallback-plan",
+        repository=RepositoryBinding(100, 200, "example-org", "ci-coordinator"),
+        request=_plan_request(),
+        authenticated_run=AuthenticatedRunBinding(
+            issuer="https://token.actions.githubusercontent.com",
+            audience="ci-coordinator",
+            repository="example-org/ci-coordinator",
+            repository_id=200,
+            ref="refs/pull/42/merge",
+            execution_sha=EXECUTION_SHA,
+            run_id=7001,
+            run_attempt=1,
+            event_name="pull_request",
+            workflow_ref="workflow@ref",
+            workflow_sha=None,
+            job_workflow_ref=None,
+            job_workflow_sha=None,
+            check_run_id=None,
+            verified_at=NOW,
+            verifier_version="fixture-oidc/v1",
+            claim_hash=None,
+        ),
+        verified_plan_id=None,
+        production_admission_receipt_id=None,
+        execution=FullCiExecution("full-ci", "verified_plan_unavailable"),
+        verifier_version=None,
+        fallback_reason="verified_plan_unavailable",
+    )
+
+
+def _independently_signed_envelope(
+    *,
+    issued_at: datetime = NOW,
+    expires_at: datetime = NOW + timedelta(seconds=60),
+    key_id: str = "vector-key",
+) -> tuple[SignedPlanEnvelope, bytes]:
+    assert _VECTOR_DOCUMENT["schemaVersion"] == "ci-coordinator-signed-envelope-vectors/v1"
+    unsigned = json.loads(_VECTOR_DOCUMENT["canonicalUnsigned"])
+    assert (
+        json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        == (_VECTOR_DOCUMENT["canonicalUnsigned"])
+    )
+    unsigned.update(issuedAt=issued_at.isoformat(), expiresAt=expires_at.isoformat(), keyId=key_id)
+    # The literal payload uses integers/nulls; key-ID variants remain scalar strings.
+    signing_bytes = json.dumps(
+        unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    key = Ed25519PrivateKey.from_private_bytes(bytes(range(1, 33)))
+    signature = key.sign(signing_bytes)
+    key.public_key().verify(signature, signing_bytes)
+    envelope = SignedPlanEnvelope(
+        schema_version="dynamic-ci-signed-plan-envelope/v1",
+        key_id=key_id,
+        algorithm="Ed25519",
+        issued_at=issued_at,
+        expires_at=expires_at,
+        payload=_vector_payload(),
+        signature=base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii"),
+    )
+    assert envelope.unsigned_mapping() == unsigned
+    assert canonical_json(envelope.unsigned_mapping()) == signing_bytes
+    return envelope, key.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+
+
+def _signature_variant(signature: str, mutation: str) -> str:
+    decoded = base64.urlsafe_b64decode(signature + "==")
+    assert len(decoded) == 64
+    if mutation == "padded":
+        variant = signature + "=="
+    elif mutation == "pad-bit-alias":
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        index = alphabet.index(signature[-1])
+        assert index % 16 == 0
+        variant = signature[:-1] + alphabet[index + 1]
+    elif mutation == "standard-alphabet":
+        variant = signature.translate(str.maketrans("-_", "+/"))
+        assert variant != signature
+    elif mutation == "whitespace":
+        variant = signature + "\n"
+    elif mutation == "non-ascii":
+        variant = signature[:-1] + "\u00e9"
+    elif mutation == "short":
+        return signature[:-1]
+    elif mutation == "long":
+        return signature + "A"
+    elif mutation == "empty":
+        return ""
+    elif mutation == "changed-byte":
+        changed = bytes([decoded[0] ^ 1]) + decoded[1:]
+        return base64.urlsafe_b64encode(changed).rstrip(b"=").decode("ascii")
+    else:
+        raise AssertionError(f"unknown signature vector: {mutation}")
+    if mutation in {"padded", "pad-bit-alias", "standard-alphabet", "whitespace"}:
+        assert base64.urlsafe_b64decode(variant + "==") == decoded
+    return variant
+
+
+@pytest.mark.parametrize("case", _VECTOR_DOCUMENT["cases"], ids=lambda case: case["id"])
+def test_signed_envelope_admission_matches_independent_vectors(case: _EnvelopeVector) -> None:
+    envelope, public_key = _independently_signed_envelope(
+        issued_at=datetime.fromisoformat(case["issuedAt"]),
+        expires_at=datetime.fromisoformat(case["expiresAt"]),
+        key_id=case["keyId"],
+    )
+    now = datetime.fromisoformat(case["now"])
+    if case["mutation"] == "wrong-public-key":
+        public_key = (
+            Ed25519PrivateKey.from_private_bytes(bytes(range(2, 34)))
+            .public_key()
+            .public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+        )
+    elif case["mutation"] == "tampered-kid":
+        envelope = replace(envelope, key_id="tampered-key")
+    elif case["mutation"] != "valid":
+        envelope = replace(
+            envelope, signature=_signature_variant(envelope.signature, case["mutation"])
+        )
+    assert (
+        verify_signed_plan(
+            envelope,
+            public_key_pem=public_key,
+            expected_key_id=case["expectedKeyId"],
+            clock=FixedClock(now),
+        )
+        == case["pythonReason"]
+    )
+    assert (
+        _target_rejection(envelope, public_key, expected_key_id=case["expectedKeyId"], now=now)
+        == case["jsReason"]
+    )
+
+
+def test_signer_preserves_the_independent_canonical_envelope() -> None:
+    expected, public_key = _independently_signed_envelope()
+    key = Ed25519PrivateKey.from_private_bytes(bytes(range(1, 33)))
+    signer = SignedPlanSigner(
+        key_id="vector-key",
+        private_key_pem=key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()),
+        ttl_seconds=60,
+        clock=FixedClock(NOW),
+    )
+    actual = signer.sign(_vector_payload())
+    assert actual == expected
+    assert signer.public_key_pem() == public_key
+    assert (
+        canonical_json(actual.unsigned_mapping()).decode("utf-8")
+        == (_VECTOR_DOCUMENT["canonicalUnsigned"])
+    )
+
+
+@pytest.mark.parametrize("expected_key_id", ["", "bad key", "a" * 129, "\u00e9", None])
+def test_python_envelope_requires_an_admitted_independent_key_id(
+    expected_key_id: object,
+) -> None:
+    envelope, public_key = _independently_signed_envelope()
+    assert (
+        verify_signed_plan(
+            envelope,
+            public_key_pem=public_key,
+            expected_key_id=cast(str, expected_key_id),
+            clock=FixedClock(NOW),
+        )
+        == "signed_plan_key_id_mismatch"
+    )
+
+
+def test_python_envelope_has_no_missing_key_id_compatibility_default() -> None:
+    envelope, public_key = _independently_signed_envelope()
+    with pytest.raises(TypeError, match="expected_key_id"):
+        verify_signed_plan(  # type: ignore[call-arg]
+            envelope, public_key_pem=public_key, clock=FixedClock(NOW)
+        )
+
+
+@pytest.mark.parametrize(
+    ("key_id", "expected"),
+    [
+        ("", "signed_plan_key_id_mismatch"),
+        ("bad key", "signed_plan_key_id_mismatch"),
+        ("bad/key", "signed_plan_key_id_mismatch"),
+        ("bad\nkey", "signed_plan_key_id_mismatch"),
+        ("a" * 129, "signed_plan_key_id_mismatch"),
+        ("\u00e9", "signed_plan_key_id_mismatch"),
+        ("a", None),
+        ("A9._-" + "a" * 123, None),
+    ],
+)
+def test_python_envelope_key_grammar_is_independent_of_key_equality(
+    key_id: str, expected: str | None
+) -> None:
+    envelope, public_key = _independently_signed_envelope(key_id=key_id)
+    assert envelope.key_id == key_id
+    assert (
+        verify_signed_plan(
+            envelope, public_key_pem=public_key, expected_key_id=key_id, clock=FixedClock(NOW)
+        )
+        == expected
+    )
+    if expected is None:
+        assert _target_rejection(envelope, public_key, expected_key_id=key_id, now=NOW) is None
+
+
+@pytest.mark.parametrize("field", ["issued_at", "expires_at", "clock"])
+def test_python_envelope_admits_no_override_datetime_subclasses(field: str) -> None:
+    class PlainInstant(datetime):
+        pass
+
+    issued_at = PlainInstant(2026, 7, 14, tzinfo=UTC) if field == "issued_at" else NOW
+    expires_at = (
+        PlainInstant(2026, 7, 14, 0, 1, tzinfo=UTC)
+        if field == "expires_at"
+        else NOW + timedelta(seconds=60)
+    )
+    now = PlainInstant(2026, 7, 14, tzinfo=UTC) if field == "clock" else NOW
+    assert (
+        type({"issued_at": issued_at, "expires_at": expires_at, "clock": now}[field])
+        is PlainInstant
+    )
+    baseline, baseline_key = _independently_signed_envelope()
+    envelope, public_key = _independently_signed_envelope(
+        issued_at=issued_at, expires_at=expires_at
+    )
+    assert envelope.unsigned_mapping() == baseline.unsigned_mapping()
+    assert envelope.signature == baseline.signature
+    assert public_key == baseline_key
+    assert now.isoformat() == NOW.isoformat()
+    assert (
+        verify_signed_plan(
+            envelope, public_key_pem=public_key, expected_key_id="vector-key", clock=FixedClock(now)
+        )
+        is None
+    )
+    assert _target_rejection(envelope, public_key, expected_key_id="vector-key", now=now) is None
+
+
+@pytest.mark.parametrize(
+    "issued_at",
+    [
+        NOW.replace(tzinfo=None),
+        NOW.replace(tzinfo=timezone(timedelta(seconds=1))),
+        datetime(1, 1, 1, tzinfo=timezone(timedelta(hours=1))),
+    ],
+)
+def test_python_envelope_rejects_unprojectable_time_without_rewriting_it(
+    issued_at: datetime,
+) -> None:
+    envelope, public_key = _independently_signed_envelope(issued_at=issued_at)
+    assert (
+        verify_signed_plan(
+            envelope,
+            public_key_pem=public_key,
+            expected_key_id="vector-key",
+            clock=FixedClock(NOW),
+        )
+        == "signed_plan_time_invalid"
+    )
+
+
+@pytest.mark.parametrize("field", ["issued_at", "expires_at", "clock", "naive-clock"])
+def test_python_envelope_rejects_wrong_time_types(field: str) -> None:
+    envelope, public_key = _independently_signed_envelope()
+    now = NOW
+    if field == "clock":
+        now = cast(datetime, None)
+    elif field == "naive-clock":
+        now = NOW.replace(tzinfo=None)
+    elif field == "issued_at":
+        envelope = replace(envelope, issued_at=cast(datetime, "invalid"))
+    else:
+        envelope = replace(envelope, expires_at=cast(datetime, "invalid"))
+    assert (
+        verify_signed_plan(
+            envelope,
+            public_key_pem=public_key,
+            expected_key_id="vector-key",
+            clock=FixedClock(now),
+        )
+        == "signed_plan_time_invalid"
+    )
+
+
+@pytest.mark.parametrize("fold_countermodel", [False, True])
+def test_zoneinfo_admission_preserves_the_original_python_lifetime_conjunct(
+    fold_countermodel: bool,
+) -> None:
+    zone = ZoneInfo("America/Los_Angeles")
+    expected: str | None
+    if fold_countermodel:
+        issued_at = datetime(2020, 11, 1, 1, 59, tzinfo=zone, fold=0)
+        expires_at = datetime(2020, 11, 1, 1, 1, tzinfo=zone, fold=1)
+        now = datetime(2020, 11, 1, 9, tzinfo=UTC)
+        assert expires_at - issued_at == timedelta(minutes=-58)
+        assert expires_at.astimezone(UTC) - issued_at.astimezone(UTC) == timedelta(minutes=2)
+        expected = "signed_plan_ttl_invalid"
+    else:
+        issued_at = NOW.astimezone(zone)
+        expires_at = (NOW + timedelta(seconds=60)).astimezone(zone)
+        now = NOW
+        expected = None
+    envelope, public_key = _independently_signed_envelope(
+        issued_at=issued_at, expires_at=expires_at
+    )
+    assert (
+        verify_signed_plan(
+            envelope, public_key_pem=public_key, expected_key_id="vector-key", clock=FixedClock(now)
+        )
+        == expected
+    )
+    assert _target_rejection(envelope, public_key, expected_key_id="vector-key", now=now) is None
+
+
+@pytest.mark.parametrize(
+    ("expiry_fold", "utc_ttl_seconds", "expected"),
+    [(0, 120, None), (1, 3720, "signed_plan_ttl_invalid")],
+)
+def test_zoneinfo_utc_ttl_upper_bound_is_independent_of_python_lifetime(
+    expiry_fold: Literal[0, 1], utc_ttl_seconds: int, expected: str | None
+) -> None:
+    zone = ZoneInfo("America/Los_Angeles")
+    issued_at = datetime(2020, 11, 1, 1, 0, tzinfo=zone, fold=0)
+    expires_at = datetime(2020, 11, 1, 1, 2, tzinfo=zone, fold=expiry_fold)
+    now = datetime(2020, 11, 1, 8, 1, tzinfo=UTC)
+    assert expires_at - issued_at == timedelta(seconds=120)
+    assert expires_at.astimezone(UTC) - issued_at.astimezone(UTC) == timedelta(
+        seconds=utc_ttl_seconds
+    )
+    assert now - issued_at.astimezone(UTC) == timedelta(seconds=60)
+    assert expires_at > now
+    assert expires_at.astimezone(UTC) > now
+    envelope, public_key = _independently_signed_envelope(
+        issued_at=issued_at, expires_at=expires_at
+    )
+    assert (
+        verify_signed_plan(
+            envelope, public_key_pem=public_key, expected_key_id="vector-key", clock=FixedClock(now)
+        )
+        == expected
+    )
+    assert (
+        _target_rejection(envelope, public_key, expected_key_id="vector-key", now=now) == expected
+    )
+
+
+def test_python_envelope_samples_its_clock_once() -> None:
+    class CountingClock:
+        calls = 0
+
+        def now(self) -> datetime:
+            self.calls += 1
+            return NOW + timedelta(days=self.calls - 1)
+
+    envelope, public_key = _independently_signed_envelope()
+    clock = CountingClock()
+    assert (
+        verify_signed_plan(
+            envelope, public_key_pem=public_key, expected_key_id="vector-key", clock=clock
+        )
+        is None
+    )
+    assert clock.calls == 1
+
+
+@pytest.mark.parametrize("field", ["schema", "algorithm"])
+def test_python_envelope_preserves_unsupported_version_diagnostics(field: str) -> None:
+    envelope, public_key = _independently_signed_envelope()
+    unsigned = json.loads(_VECTOR_DOCUMENT["canonicalUnsigned"])
+    if field == "schema":
+        envelope = replace(
+            envelope,
+            schema_version=cast(Literal["dynamic-ci-signed-plan-envelope/v1"], "unsupported"),
+        )
+        unsigned["schemaVersion"] = "unsupported"
+        reason = "signed_plan_schema_unsupported"
+    else:
+        envelope = replace(envelope, algorithm=cast(Literal["Ed25519"], "unsupported"))
+        unsigned["algorithm"] = "unsupported"
+        reason = "signed_plan_algorithm_unsupported"
+    signing_bytes = json.dumps(unsigned, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    key = Ed25519PrivateKey.from_private_bytes(bytes(range(1, 33)))
+    signature = key.sign(signing_bytes)
+    key.public_key().verify(signature, signing_bytes)
+    envelope = replace(
+        envelope, signature=base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
+    )
+    assert envelope.unsigned_mapping() == unsigned
+    assert (
+        verify_signed_plan(
+            envelope, public_key_pem=public_key, expected_key_id="vector-key", clock=FixedClock(NOW)
+        )
+        == reason
+    )
+    assert (
+        _target_rejection(envelope, public_key, expected_key_id="vector-key", now=NOW)
+        == "signed_plan_envelope_schema_unsupported"
+    )
+
+
+def test_python_envelope_preserves_public_key_type_diagnostic() -> None:
+    envelope, _public_key = _independently_signed_envelope()
+    public_key = (
+        ec.generate_private_key(ec.SECP256R1())
+        .public_key()
+        .public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo)
+    )
+    assert (
+        verify_signed_plan(
+            envelope, public_key_pem=public_key, expected_key_id="vector-key", clock=FixedClock(NOW)
+        )
+        == "signed_plan_public_key_invalid"
+    )
+    assert (
+        verify_signed_plan(
+            envelope, public_key_pem=b"not PEM", expected_key_id="vector-key", clock=FixedClock(NOW)
+        )
+        == "signed_plan_signature_invalid"
+    )
 
 
 @pytest.mark.parametrize("ttl_seconds", [0, 301, 3600, True])
@@ -198,6 +665,7 @@ def test_signed_issuer_rejects_identity_mismatch_before_effects(
             verify_signed_plan(
                 positive.record.envelope,
                 public_key_pem=signer.public_key_pem(),
+                expected_key_id="test-key",
                 clock=FixedClock(NOW),
             )
             is None
@@ -276,7 +744,12 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails(ttl_seconds: 
     assert first.record.envelope.expires_at - first.record.envelope.issued_at == timedelta(
         seconds=ttl_seconds
     )
-    assert _target_rejection(first.record.envelope, signer.public_key_pem()) is None
+    assert (
+        _target_rejection(
+            first.record.envelope, signer.public_key_pem(), expected_key_id="test-key", now=NOW
+        )
+        is None
+    )
     if ttl_seconds == 300:
         unsigned = {
             **first.record.envelope.unsigned_mapping(),
@@ -288,11 +761,17 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails(ttl_seconds: 
             expires_at=NOW + timedelta(seconds=301),
             signature=signature.decode("ascii"),
         )
-        assert _target_rejection(too_long, signer.public_key_pem()) == "signed_plan_ttl_invalid"
+        assert (
+            _target_rejection(
+                too_long, signer.public_key_pem(), expected_key_id="test-key", now=NOW
+            )
+            == "signed_plan_ttl_invalid"
+        )
         assert (
             verify_signed_plan(
                 too_long,
                 public_key_pem=signer.public_key_pem(),
+                expected_key_id="test-key",
                 clock=FixedClock(NOW),
             )
             == "signed_plan_ttl_invalid"
@@ -301,6 +780,7 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails(ttl_seconds: 
         verify_signed_plan(
             first.record.envelope,
             public_key_pem=signer.public_key_pem(),
+            expected_key_id="test-key",
             clock=FixedClock(NOW),
         )
         is None
@@ -335,6 +815,7 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails(ttl_seconds: 
         verify_signed_plan(
             tampered_envelope,
             public_key_pem=signer.public_key_pem(),
+            expected_key_id="test-key",
             clock=FixedClock(NOW),
         )
         == "signed_plan_signature_invalid"
@@ -343,6 +824,7 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails(ttl_seconds: 
         verify_signed_plan(
             replace(first.record.envelope, signature="invalid"),
             public_key_pem=signer.public_key_pem(),
+            expected_key_id="test-key",
             clock=FixedClock(NOW),
         )
         == "signed_plan_signature_invalid"
@@ -352,6 +834,7 @@ def test_signed_issuance_is_idempotent_and_payload_tampering_fails(ttl_seconds: 
         verify_signed_plan(
             second.record.envelope,
             public_key_pem=signer.public_key_pem(),
+            expected_key_id="test-key",
             clock=FixedClock(NOW + timedelta(seconds=ttl_seconds)),
         )
         == "signed_plan_expired"
@@ -754,7 +1237,12 @@ def test_production_authority_bounds_expiry_and_revalidation_falls_back(
     assert isinstance(selected, Issued)
     assert selected.duplicate is False
     assert selected.record.envelope.expires_at == authorization.not_after
-    assert _target_rejection(selected.record.envelope, signer.public_key_pem()) is None
+    assert (
+        _target_rejection(
+            selected.record.envelope, signer.public_key_pem(), expected_key_id="test-key", now=NOW
+        )
+        is None
+    )
     guard = authorization.issuance_guard()
     assert production_guard_binds_record(guard, selected.record)
     payload = selected.record.envelope.payload

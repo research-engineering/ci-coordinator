@@ -15,6 +15,7 @@ workflow run, or it receives a signed FullCI fallback envelope.
 parse_plan_request(raw_body) -> PlanRequest | RequestError
 issue_signed_plan(request, trusted_identity) -> SignedPlanEnvelope
 verify_issuance_idempotency(identity, request_hash) -> ExistingOrNewIssue
+verify_signed_plan(envelope, *, public_key_pem, expected_key_id, clock) -> reason | None
 ```
 
 ## 3. Envelope Binding
@@ -53,6 +54,39 @@ An idempotent replay returns its persisted envelope without re-signing it.
 Reusing a nonempty issuance store created under an older lifetime rule therefore
 requires an explicit compatibility or migration receipt; an empty-store claim
 must be verified for the exact deployment, not inferred from source history.
+
+### Typed Envelope Verification
+
+The exported Python helper requires an independently admitted expected key ID
+and public key. Under the pre-first-release support reset, calls without
+`expected_key_id` reject; there is no compatibility or candidate-derived default.
+Expected IDs use the target trust-root grammar `[A-Za-z0-9._-]{1,128}`.
+Signature admission reuses the kernel Ed25519 primitive: exactly 86 unpadded
+base64url characters, 64 decoded bytes and exact canonical re-encoding.
+
+One captured unsigned mapping supplies both signing bytes and temporal strings.
+One injected clock sample supplies now. Aware datetimes are admitted by their
+original ISO numeric whole-minute offset and representable UTC projection, not
+by `tzinfo` class. Integer UTC milliseconds Q enforce the unchanged target law:
+
+```text
+Q(issued) <= Q(now) + 300000
+Q(expires) > Q(now)
+0 < Q(expires) - Q(issued) <= 300000
+```
+
+The original Python expiry/order/exact-300-second TTL predicate remains an
+additional conjunct on the original datetime operands. Thus a sub-millisecond
+TTL excess or same-ZoneInfo fold can remain Python-invalid while the target
+envelope primitive accepts. Equality is scoped to values satisfying that old
+conjunct, not every Python value or JavaScript date string. Neither signed
+strings nor signer/replay bytes are normalized. Malformed/unprojectable times
+reject explicitly. Repository, run, execution and raw-wire shape admission
+remain separate target gates; this helper cannot authorize selected execution.
+
+The independent native table is
+`fixtures/conformance/v1/signed-plan-envelope-admission.v1.json`; literal outcomes
+and valid signatures must precede comparison of Python and target results.
 
 ## 4. Failure Behavior
 

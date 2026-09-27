@@ -117,6 +117,12 @@ Missing(.ci-coordinator/run) => failure
 No plan field can supply a command, executable path, argument vector, action,
 workflow reference, runner label, permission, credential, fixture, or service.
 
+The [typed envelope verification contract](architecture/modules/plan-issuance.md#typed-envelope-verification)
+binds the Python helper's independent key identity and target-compatible temporal
+projection. It does not replace this target's raw-wire, trust-root, run or execution
+gates. The existing JavaScript admission language and 300-second skew remain
+unchanged; the helper retains its additional original Python lifetime conjunct.
+
 The generated gate validator admits exactly one terminal route:
 
 ```text

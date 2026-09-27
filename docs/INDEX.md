@@ -289,6 +289,8 @@ does not by itself make the document obsolete.
 - [Deployment entrypoint admission implementation plan](features/deployment-entrypoint-admission-implementation-plan.md)
 - [Thin target consumer control](features/thin-target-consumer-control.md)
 - [Thin target consumer control implementation plan](features/thin-target-consumer-control-implementation-plan.md)
+- [Signed plan envelope admission](features/signed-plan-envelope-admission.md)
+- [Signed plan envelope admission implementation plan](features/signed-plan-envelope-admission-implementation-plan.md)
 - [Target-local plan requester](features/target-local-plan-requester.md)
 - [Target-local plan requester implementation plan](features/target-local-plan-requester-implementation-plan.md)
 - [Pre-CI context preparation](features/pre-ci-context-preparation.md)

@@ -2732,7 +2732,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "d6ef23a20f73a7df14e2b770110b00e9ab34160f1f17630a46f357790ed39ef1"
+          "sourceSha256": "fb32b1944404470d159f704a14d50ae89b701f02439c9bd8dad1be9796f0d825"
         },
         {
           "requirementId": "REQ-CI-RUNTIME-006",
@@ -2748,7 +2748,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "d6ef23a20f73a7df14e2b770110b00e9ab34160f1f17630a46f357790ed39ef1"
+          "sourceSha256": "fb32b1944404470d159f704a14d50ae89b701f02439c9bd8dad1be9796f0d825"
         }
       ]
     },

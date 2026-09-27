@@ -1,0 +1,353 @@
+{
+  "schemaVersion": "ci-coordinator-signed-envelope-vectors/v1",
+  "owner": "docs/architecture/modules/plan-issuance.md#typed-envelope-verification",
+  "nonClaims": [
+    "Synthetic fixed test key only; signatures are produced independently inside native tests.",
+    "This corpus does not define raw-parser or complete target-execution equivalence.",
+    "old-python-exact-ttl deliberately retains a Python rejection accepted by the JS envelope primitive."
+  ],
+  "canonicalUnsigned": "{\"algorithm\":\"Ed25519\",\"expiresAt\":\"2026-07-14T00:01:00+00:00\",\"issuedAt\":\"2026-07-14T00:00:00+00:00\",\"keyId\":\"vector-key\",\"payload\":{\"authenticatedRun\":{\"audience\":\"ci-coordinator\",\"checkRunId\":null,\"claimHash\":null,\"eventName\":\"pull_request\",\"executionSha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"issuer\":\"https://token.actions.githubusercontent.com\",\"jobWorkflowRef\":null,\"jobWorkflowSha\":null,\"ref\":\"refs/pull/42/merge\",\"repository\":\"example-org/ci-coordinator\",\"repositoryId\":200,\"runAttempt\":1,\"runId\":7001,\"verifiedAt\":\"2026-07-14T00:00:00+00:00\",\"verifierVersion\":\"fixture-oidc/v1\",\"workflowRef\":\"workflow@ref\",\"workflowSha\":null},\"execution\":{\"mode\":\"full-ci\",\"reason\":\"verified_plan_unavailable\"},\"fallbackReason\":\"verified_plan_unavailable\",\"planId\":\"fallback-plan\",\"productionAdmissionReceiptId\":null,\"repository\":{\"installationId\":100,\"owner\":\"example-org\",\"repository\":\"ci-coordinator\",\"repositoryId\":200},\"request\":{\"baseSha\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"eventName\":\"pull_request\",\"executionSha\":\"cccccccccccccccccccccccccccccccccccccccc\",\"headSha\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"installationId\":100,\"mergeGroupHeadRef\":null,\"owner\":\"example-org\",\"pullRequestNumber\":42,\"ref\":\"refs/pull/42/merge\",\"repository\":\"ci-coordinator\",\"repositoryId\":200,\"requestId\":\"request-1\",\"runAttempt\":1,\"schemaVersion\":\"dynamic-ci-plan-request/v2\",\"workflowRunId\":7001},\"schemaVersion\":\"dynamic-ci-signed-plan-payload/v2\",\"verifiedPlanId\":null,\"verifierVersion\":null},\"schemaVersion\":\"dynamic-ci-signed-plan-envelope/v1\"}",
+  "cases": [
+    {
+      "id": "negative-epoch-floor",
+      "issuedAt": "1969-12-31T23:59:59+00:00",
+      "expiresAt": "1970-01-01T00:00:00+00:00",
+      "now": "1969-12-31T23:59:59.999999+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "valid-60",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "valid-1",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:00:01+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "valid-300",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:05:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "future-before-boundary",
+      "issuedAt": "2026-07-14T00:04:59.999000+00:00",
+      "expiresAt": "2026-07-14T00:05:59.999000+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "future-boundary",
+      "issuedAt": "2026-07-14T00:05:00+00:00",
+      "expiresAt": "2026-07-14T00:06:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "future-one-ms-over",
+      "issuedAt": "2026-07-14T00:05:00.001000+00:00",
+      "expiresAt": "2026-07-14T00:06:00.001000+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_issued_in_future",
+      "jsReason": "signed_plan_issued_in_future"
+    },
+    {
+      "id": "future-original-countermodel",
+      "issuedAt": "2026-07-14T00:05:01+00:00",
+      "expiresAt": "2026-07-14T00:05:02+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_issued_in_future",
+      "jsReason": "signed_plan_issued_in_future"
+    },
+    {
+      "id": "future-same-ms-cell",
+      "issuedAt": "2026-07-14T00:05:00.000001+00:00",
+      "expiresAt": "2026-07-14T00:05:01.000001+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "expiry-equal-now",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:01:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_expired",
+      "jsReason": "signed_plan_expired"
+    },
+    {
+      "id": "expiry-same-ms",
+      "issuedAt": "2026-07-13T23:59:00+00:00",
+      "expiresAt": "2026-07-14T00:00:00.000500+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_expired",
+      "jsReason": "signed_plan_expired"
+    },
+    {
+      "id": "expiry-next-ms",
+      "issuedAt": "2026-07-13T23:59:00+00:00",
+      "expiresAt": "2026-07-14T00:00:00.001000+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "lifetime-same-ms",
+      "issuedAt": "2026-07-14T00:00:00.000100+00:00",
+      "expiresAt": "2026-07-14T00:00:00.000900+00:00",
+      "now": "2026-07-13T23:59:59+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_ttl_invalid",
+      "jsReason": "signed_plan_ttl_invalid"
+    },
+    {
+      "id": "lifetime-reversed",
+      "issuedAt": "2026-07-14T00:00:30+00:00",
+      "expiresAt": "2026-07-14T00:00:29+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_ttl_invalid",
+      "jsReason": "signed_plan_ttl_invalid"
+    },
+    {
+      "id": "lifetime-equal",
+      "issuedAt": "2026-07-14T00:00:30+00:00",
+      "expiresAt": "2026-07-14T00:00:30+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_ttl_invalid",
+      "jsReason": "signed_plan_ttl_invalid"
+    },
+    {
+      "id": "lifetime-one-ms-over",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:05:00.001000+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_ttl_invalid",
+      "jsReason": "signed_plan_ttl_invalid"
+    },
+    {
+      "id": "old-python-exact-ttl",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:05:00.000001+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_ttl_invalid",
+      "jsReason": null
+    },
+    {
+      "id": "equivalent-offset",
+      "issuedAt": "2026-07-14T02:00:00+02:00",
+      "expiresAt": "2026-07-14T02:01:00+02:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": null,
+      "jsReason": null
+    },
+    {
+      "id": "wrong-expected-kid",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "other-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_key_id_mismatch",
+      "jsReason": "signed_plan_key_id_mismatch"
+    },
+    {
+      "id": "resigned-wrong-kid",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "other-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "valid",
+      "pythonReason": "signed_plan_key_id_mismatch",
+      "jsReason": "signed_plan_key_id_mismatch"
+    },
+    {
+      "id": "padded",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "padded",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "pad-bit-alias",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "pad-bit-alias",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "standard-alphabet",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "standard-alphabet",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "whitespace",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "whitespace",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "non-ascii",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "non-ascii",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "short",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "short",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "long",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "long",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "changed-byte",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "changed-byte",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "wrong-public-key",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "wrong-public-key",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "tampered-kid",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "tampered-key",
+      "mutation": "tampered-kid",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_invalid"
+    },
+    {
+      "id": "missing-signature",
+      "issuedAt": "2026-07-14T00:00:00+00:00",
+      "expiresAt": "2026-07-14T00:01:00+00:00",
+      "now": "2026-07-14T00:00:00+00:00",
+      "keyId": "vector-key",
+      "expectedKeyId": "vector-key",
+      "mutation": "empty",
+      "pythonReason": "signed_plan_signature_invalid",
+      "jsReason": "signed_plan_signature_missing"
+    }
+  ]
+}
