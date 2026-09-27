@@ -65,6 +65,7 @@ class _LabEpoch:
     coordinator_root: Path
     target_root: Path
     coordinator_commit: str
+    coverage_source_matches_checkout: bool
 
 
 def test_native_managed_cli_preserves_stable_receipt(
@@ -617,7 +618,37 @@ def epoch(epoch_seed: _LabEpoch, tmp_path: Path) -> _LabEpoch:
 def _copy_epoch(seed: _LabEpoch, root: Path) -> _LabEpoch:
     coordinator = shutil.copytree(seed.coordinator_root, root / "coordinator")
     target = shutil.copytree(seed.target_root, root / "target")
-    return _LabEpoch(Path(coordinator), Path(target), seed.coordinator_commit)
+    return _LabEpoch(
+        Path(coordinator),
+        Path(target),
+        seed.coordinator_commit,
+        seed.coverage_source_matches_checkout,
+    )
+
+
+@pytest.mark.parametrize("variant", ["canonical", "receiver", "startup", "lifecycle"])
+def test_epoch_coverage_requires_unchanged_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: str
+) -> None:
+    coverage = {
+        "COVERAGE_PROCESS_CONFIG": "controlled-serialized-config",
+        "COVERAGE_PROCESS_START": "controlled-config-path",
+    }
+    for name, value in coverage.items():
+        monkeypatch.setenv(name, value)
+    original = _build_epoch(
+        tmp_path / "original",
+        receiver_version=0 if variant == "receiver" else 1,
+        startup_marker=tmp_path / "startup" if variant == "startup" else None,
+        lifecycle_probe=tmp_path / "probe" if variant == "lifecycle" else None,
+    )
+    copied = _copy_epoch(original, tmp_path / "copied")
+    expected = coverage if variant == "canonical" else {}
+    for candidate in (original, copied):
+        assert candidate.coverage_source_matches_checkout is (variant == "canonical")
+        environment = _python_environment(candidate)
+        assert {name: environment[name] for name in coverage if name in environment} == expected
+        assert environment["PYTHONPATH"] == str(candidate.coordinator_root / "backend/src")
 
 
 def test_epoch_copies_keep_independent_git_and_worktree_state(
@@ -795,7 +826,12 @@ def main(argv=None):
     )
     _write(target / _PROFILE_PATH, canonical_json(profile.to_mapping()) + b"\n")
     _initialize_repository(target, "consumer lab target")
-    return _LabEpoch(coordinator, target, coordinator_commit)
+    return _LabEpoch(
+        coordinator,
+        target,
+        coordinator_commit,
+        receiver_version == 1 and startup_marker is None and lifecycle_probe is None,
+    )
 
 
 def _run_cli(epoch: _LabEpoch, output: Path) -> subprocess.CompletedProcess[str]:
@@ -936,7 +972,7 @@ def _python_environment(epoch: _LabEpoch) -> dict[str, str]:
         **{
             name: os.environ[name]
             for name in ("COVERAGE_PROCESS_CONFIG", "COVERAGE_PROCESS_START")
-            if name in os.environ
+            if epoch.coverage_source_matches_checkout and name in os.environ
         },
         "HOME": str(epoch.coordinator_root),
         "LANG": "C",
