@@ -2,6 +2,7 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { ArchiveBrowser } from "../src/features/ciEconomics/ArchiveBrowser";
+import { ArchiveRetention } from "../src/features/ciEconomics/ArchiveRetention";
 import { archiveDetailPage, archivePage, archiveQuery, retentionPreview } from "./archiveFixture";
 import { controlPlaneSessionFixture } from "./fixture";
 import { historyStatus } from "./historyFixture";
@@ -64,6 +65,198 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
+
+test.each([
+  [401, "unauthenticated"],
+  [403, "forbidden"],
+] as const)(
+  "first current typed %s retention refusal is closable, not success",
+  async (status, error) => {
+    const bodies: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const path = new URL(request.url).pathname;
+        if (path.endsWith("/preview")) return Response.json(preview());
+        if (path.endsWith("/apply")) {
+          bodies.push(await request.text());
+          return Response.json({ ok: false, error }, { status });
+        }
+        if (path.includes("/history/attempts/")) return Response.json(detail());
+        return Response.json(path.endsWith("/jobs") ? jobs() : archivePage());
+      }),
+    );
+    const input = props();
+    render(<ArchiveBrowser {...input} />);
+    await openRetention();
+    const retention = screen.getByRole("region", { name: "Optional detail retention" });
+    expect(
+      Array.from(retention.querySelectorAll("time"), (cell) => [
+        cell.getAttribute("datetime"),
+        cell.textContent,
+      ]),
+    ).toEqual([
+      ["2026-09-12T10:00:00Z", "12 Sep 2026, 10:00:00 UTC"],
+      ["2026-10-12T10:00:00Z", "12 Oct 2026, 10:00:00 UTC"],
+      ["2026-10-12T10:00:00Z", "12 Oct 2026, 10:00:00 UTC"],
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: "Confirm reviewed change" }));
+    await screen.findByText("The retention request was denied. No retention change was admitted.");
+    expect(screen.getByRole("button", { name: "Close" })).toBeEnabled();
+    expect(screen.queryByText(/The result is unknown/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Confirm existing operation" }),
+    ).not.toBeInTheDocument();
+    expect(input.onChanged).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(bodies).toHaveLength(1);
+  },
+);
+
+test.each([
+  [401, "unauthenticated"],
+  [403, "forbidden"],
+] as const)(
+  "typed %s after a lost retention reply preserves the original operation",
+  async (status, error) => {
+    const bodies: string[] = [];
+    let modeledEffects = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const path = new URL(request.url).pathname;
+        if (path.endsWith("/preview")) return Response.json(preview());
+        if (path.endsWith("/apply")) {
+          const body = await request.text();
+          bodies.push(body);
+          if (bodies.length === 1) {
+            modeledEffects += 1;
+            throw new TypeError("effect modeled, reply lost");
+          }
+          if (bodies.length === 2) return Response.json({ ok: false, error }, { status });
+          const command = JSON.parse(body) as { operationId: string };
+          return Response.json({
+            outcome: "replayed",
+            operationId: command.operationId,
+            dataRevision: 6,
+            preview: preview().preview,
+          });
+        }
+        if (path.includes("/history/attempts/")) return Response.json(detail());
+        return Response.json(path.endsWith("/jobs") ? jobs() : archivePage());
+      }),
+    );
+    const input = props();
+    render(<ArchiveBrowser {...input} />);
+    await openRetention();
+    await userEvent.click(screen.getByRole("button", { name: "Confirm reviewed change" }));
+    await screen.findByText(/The result is unknown/);
+    await userEvent.click(screen.getByRole("button", { name: "Confirm existing operation" }));
+    await waitFor(() => expect(bodies).toHaveLength(2));
+    expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+    expect(screen.getByText(/The result is unknown/)).toBeVisible();
+    expect(input.onChanged).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Confirm existing operation" }));
+    await screen.findByText(/Retention change confirmed/);
+    expect(bodies).toEqual([bodies[0], bodies[0], bodies[0]]);
+    expect(modeledEffects).toBe(1);
+    expect(input.onChanged).toHaveBeenCalledTimes(1);
+  },
+);
+
+test.each([
+  [403, "unavailable"],
+  [503, "forbidden"],
+  [503, "unavailable"],
+  [404, "not_found"],
+] as const)("first retention HTTP %s/%s remains uncertain", async (status, error) => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      const path = new URL(request.url).pathname;
+      if (path.endsWith("/preview")) return Response.json(preview());
+      if (path.endsWith("/apply")) return Response.json({ ok: false, error }, { status });
+      if (path.includes("/history/attempts/")) return Response.json(detail());
+      return Response.json(path.endsWith("/jobs") ? jobs() : archivePage());
+    }),
+  );
+  const input = props();
+  render(<ArchiveBrowser {...input} />);
+  await openRetention();
+  await userEvent.click(screen.getByRole("button", { name: "Confirm reviewed change" }));
+  await screen.findByText(/The result is unknown/);
+  expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+  expect(input.onChanged).not.toHaveBeenCalled();
+});
+
+test("retention null instants keep their existing labels without invented time values", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => Response.json(retentionPreview())),
+  );
+  const view = render(
+    <ArchiveRetention
+      page={archivePage()}
+      defaultRevision={1}
+      session={props().session}
+      onChanged={vi.fn()}
+      onClose={vi.fn()}
+    />,
+  );
+  expect(screen.getByText("Not imported")).toBeVisible();
+  expect(screen.getByText("No finite expiry")).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Preview detail deletion" }));
+  await screen.findByRole("button", { name: "Confirm reviewed change" });
+  expect(screen.getByText(/expiry none/)).toBeVisible();
+  expect(view.container.querySelectorAll("time")).toHaveLength(0);
+});
+
+test.each(["forbidden", "replayed"] as const)(
+  "pending retention is sent once and unmount suppresses late %s",
+  async (outcome) => {
+    const pending = Promise.withResolvers<Response>();
+    const writes: Request[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        const path = new URL(request.url).pathname;
+        if (path.endsWith("/preview")) return Response.json(preview());
+        if (path.endsWith("/apply")) {
+          writes.push(request);
+          return pending.promise;
+        }
+        if (path.includes("/history/attempts/")) return Response.json(detail());
+        return Response.json(path.endsWith("/jobs") ? jobs() : archivePage());
+      }),
+    );
+    const input = props();
+    const view = render(<ArchiveBrowser {...input} />);
+    await openRetention();
+    await userEvent.dblClick(screen.getByRole("button", { name: "Confirm reviewed change" }));
+    await screen.findByText("Applying reviewed change");
+    expect(writes).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+    const command = (await writes[0]?.json()) as { operationId: string };
+    view.unmount();
+    expect(writes[0]?.signal.aborted).toBe(true);
+    await act(async () =>
+      pending.resolve(
+        outcome === "forbidden"
+          ? Response.json({ ok: false, error: "forbidden" }, { status: 403 })
+          : Response.json({
+              outcome,
+              operationId: command.operationId,
+              dataRevision: 6,
+              preview: preview().preview,
+            }),
+      ),
+    );
+    expect(input.onChanged).not.toHaveBeenCalled();
+    expect(
+      screen.queryByText(/retention request was denied|Retention change confirmed/),
+    ).not.toBeInTheDocument();
+  },
+);
 
 test("confirmed deletion invalidates both selected reads, retains a receipt and binds the next preview to revision 6", async () => {
   const nextJobs = Promise.withResolvers<Response>();

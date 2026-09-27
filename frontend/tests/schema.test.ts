@@ -28,6 +28,39 @@ describe("workbench response admission", () => {
     expect(workbenchSnapshotSchema.parse(workbenchFixture()).ledgerRevision).toBe(42);
   });
 
+  test.each([
+    ["positive fraction", 0.5],
+    ["negative fraction", -0.25],
+    ["nested fractions", { values: [0.5, { delta: -0.25 }] }],
+    ["zero", 0],
+    ["negative zero", -0],
+    ["positive safe boundary", 9_007_199_254_740_991],
+    ["negative safe boundary", -9_007_199_254_740_991],
+  ])("admits finite safe-magnitude payload %s", (_label, payload) => {
+    const result = workbenchSnapshotSchema.parse(
+      workbenchFixture({ auditEvents: [auditEventWithPayload(payload)] }),
+    );
+    expect(result.auditEvents[0]?.payload).toEqual(payload);
+  });
+
+  test.each([
+    ["fractional installation", { scope: { installationId: 1.5, repositoryId: 1 } }],
+    ["fractional repository", { scope: { installationId: 1, repositoryId: 1.5 } }],
+    ["fractional ledger revision", { ledgerRevision: 1.5 }],
+    [
+      "fractional event sequence",
+      { auditEvents: [{ ...auditEventWithPayload(0.5), sequence: 1.5 }] },
+    ],
+    [
+      "fractional replay revision",
+      { replay: { status: "valid", snapshotRevision: 1.5, verifiedRevision: 1, reason: null } },
+    ],
+  ])("fractional payload does not relax %s", (_label, delta) => {
+    expect(workbenchSnapshotSchema.safeParse({ ...workbenchFixture(), ...delta }).success).toBe(
+      false,
+    );
+  });
+
   test("admits every bounded workbench projection variant", () => {
     const snapshot = workbenchFixture({
       auditEvents: [auditEventWithPayload({ nested: [null, true, "value", 7] })],
@@ -156,6 +189,9 @@ describe("workbench response admission", () => {
   test.each([
     ["oversized string", "x".repeat(65_537)],
     ["non-finite number", Number.POSITIVE_INFINITY],
+    ["negative infinity", Number.NEGATIVE_INFINITY],
+    ["NaN", Number.NaN],
+    ["unsafe negative magnitude", -9_007_199_254_740_992],
     ["unsafe integer", Number.MAX_SAFE_INTEGER + 1],
     ["unsupported scalar", undefined],
     ["oversized array", Array.from({ length: 1_001 }, () => null)],

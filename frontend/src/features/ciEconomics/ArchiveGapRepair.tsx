@@ -36,6 +36,7 @@ export function ArchiveGapRepair({
   async function submit() {
     if (!allowed || !session || controller.current || !["ready", "uncertain"].includes(state))
       return;
+    const initial = state === "ready";
     const active = new AbortController();
     controller.current = active;
     setState("sending");
@@ -56,6 +57,9 @@ export function ArchiveGapRepair({
             : `No new retry admitted: ${result.value.outcome.replaceAll("_", " ")}.`,
         );
         if (accepted) onChanged();
+      } else if (initial && (result.kind === "unauthenticated" || result.kind === "forbidden")) {
+        setState("rejected");
+        setMessage("The archive retry request was denied. No new retry was admitted.");
       } else {
         setState("uncertain");
         setMessage("The result is unknown. Retry the same request to recover its receipt.");

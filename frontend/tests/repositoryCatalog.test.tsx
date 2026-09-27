@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Profiler } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { RepositoryCatalog } from "../src/features/workbench/RepositoryCatalog";
 import {
@@ -17,6 +18,117 @@ function renderCatalog(handler: (request: Request) => Promise<Response>) {
   render(<RepositoryCatalog itemLimit={10} onSelect={vi.fn()} />);
   return fetch;
 }
+
+test("every active-inventory commit is pending or truthful before passive normalization", async () => {
+  const inventory = Promise.withResolvers<Response>();
+  const repositories = Promise.withResolvers<Response>();
+  const commits: { selection: string; text: string; pending: boolean }[] = [];
+  const reads: Request[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((request: Request) => {
+      reads.push(request);
+      return new URL(request.url).pathname.endsWith("/installations")
+        ? inventory.promise
+        : repositories.promise;
+    }),
+  );
+  render(
+    <Profiler
+      id="catalog"
+      onRender={() => {
+        const selection = document.querySelector<HTMLSelectElement>("select");
+        if (selection)
+          commits.push({
+            selection: selection.value,
+            text: document.body.textContent ?? "",
+            pending: screen.queryByRole("progressbar", { name: "Loading repositories" }) !== null,
+          });
+      }}
+    >
+      <RepositoryCatalog itemLimit={10} onSelect={vi.fn()} />
+    </Profiler>,
+  );
+  await act(async () => inventory.resolve(Response.json(installationCatalogFixture())));
+  await waitFor(() => expect(reads).toHaveLength(2));
+  expect(commits.some((commit) => commit.selection === "")).toBe(true);
+  expect(commits.every((commit) => commit.pending)).toBe(true);
+  expect(
+    commits.every(
+      (commit) => !/No active organizations|Repositories connection failed/.test(commit.text),
+    ),
+  ).toBe(true);
+  await act(async () => repositories.resolve(Response.json(repositoryPageFixture())));
+  expect(await screen.findByText("ci-coordinator")).toBeVisible();
+  expect(commits.at(-1)?.pending).toBe(false);
+  expect(reads).toHaveLength(2);
+});
+
+test("a nonempty suspended catalog is genuinely inactive and sends no repository request", async () => {
+  const fetch = renderCatalog(async () =>
+    Response.json(
+      installationCatalogFixture({
+        installations: [installationFixture({ state: "suspended" })],
+      }),
+    ),
+  );
+  expect(await screen.findByText("No active organizations")).toBeVisible();
+  expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+test.each(["removed", "suspended"] as const)(
+  "a %s selection cannot publish its late repository response",
+  async (replacement) => {
+    const obsolete = Promise.withResolvers<Response>();
+    const oldReads: Request[] = [];
+    const newReads: Request[] = [];
+    let replaced = false;
+    const other = installationFixture({ installationId: 2, accountLogin: "other-org" });
+    renderCatalog(async (request) => {
+      const url = new URL(request.url);
+      if (url.pathname.endsWith("/installations"))
+        return Response.json(
+          installationCatalogFixture({
+            installations: !replaced
+              ? [installationFixture()]
+              : replacement === "removed"
+                ? [other]
+                : [installationFixture({ state: "suspended" }), other],
+          }),
+        );
+      if (url.pathname.includes("/1/repositories")) {
+        oldReads.push(request);
+        return obsolete.promise;
+      }
+      newReads.push(request);
+      return Response.json(
+        repositoryPageFixture({
+          installation: other,
+          repositories: [
+            repositoryFixture({
+              scope: { installationId: 2, repositoryId: 2 },
+              ownerLogin: "other-org",
+              name: "current-repo",
+              fullName: "other-org/current-repo",
+            }),
+          ],
+        }),
+      );
+    });
+    await waitFor(() => expect(oldReads).toHaveLength(1));
+    replaced = true;
+    await userEvent.click(screen.getByRole("button", { name: "Refresh repositories" }));
+    expect(await screen.findByText("current-repo")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Organization" })).toHaveValue("2");
+    expect(oldReads.every((request) => request.signal.aborted)).toBe(true);
+    expect(newReads).toHaveLength(1);
+    expect(new URL(newReads[0]?.url ?? "").searchParams.get("page")).toBe("1");
+    await act(async () => obsolete.resolve(Response.json(repositoryPageFixture())));
+    expect(screen.queryByText("ci-coordinator")).not.toBeInTheDocument();
+    expect(screen.getByText("current-repo")).toBeVisible();
+  },
+);
 
 test("repository selection carries admitted creation metadata without changing scope", async () => {
   const onSelect = vi.fn();
@@ -273,6 +385,9 @@ test("refresh retains an active selection, repository page and search; selection
   expect(screen.getByRole("searchbox")).toHaveValue("");
   expect(repositoryReads.at(-1)).toBe(
     "/api/v1/workbench/installations/1/repositories?page=1&perPage=100",
+  );
+  expect(repositoryReads).not.toContain(
+    "/api/v1/workbench/installations/1/repositories?page=2&perPage=100",
   );
 });
 

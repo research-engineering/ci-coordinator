@@ -116,6 +116,13 @@ mutation, but does not substitute for the separate capability and scope proofs.
 
 ## 6. Projection Contract
 
+Generic audit payloads retain the admitted canonical JSON numeric domain,
+including finite safe-magnitude fractions. Browser identifiers and ledger
+revisions remain integers. The
+[operator outcome contract](../../features/operator-outcome-truthfulness.md)
+binds this projection to its complete shared response vector without changing
+database authority, replay validation or the existing resource bounds.
+
 | Section       | Included facts                                                                        | Deliberately omitted facts                         |
 |---------------|---------------------------------------------------------------------------------------|----------------------------------------------------|
 | Plans         | request/run identity, selected and omitted obligations, witnesses, profiles, fallback | Ed25519 signature and raw envelope                 |

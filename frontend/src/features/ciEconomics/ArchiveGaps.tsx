@@ -102,9 +102,19 @@ export function ArchiveGaps({
                 </td>
                 <td>{evidenceLabels[gap.resolution]}</td>
                 <td>
-                  {gap.sourceWindow === null
-                    ? "Not applicable"
-                    : `${gap.sourceWindow.windowFrom} - ${gap.sourceWindow.windowThrough}`}
+                  {gap.sourceWindow === null ? (
+                    "Not applicable"
+                  ) : (
+                    <>
+                      <time dateTime={gap.sourceWindow.windowFrom}>
+                        {formatDateTime(gap.sourceWindow.windowFrom)}
+                      </time>
+                      {" - "}
+                      <time dateTime={gap.sourceWindow.windowThrough}>
+                        {formatDateTime(gap.sourceWindow.windowThrough)}
+                      </time>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}

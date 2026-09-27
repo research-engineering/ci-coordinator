@@ -245,7 +245,10 @@ The frontend API boundary is capability-oriented:
 
 ```text
 frontend/src/api/
+  activity/            authorized administrator activity and export
+  ciEconomics/         economics evidence admission and transport
   configActivation/    attested repository configuration activation
+  configLifecycle/     source validation, registration, epochs, export and rollback
   controlPlaneIdentity/ Keycloak administrator session and logout
   development/         local proxy admission
   governanceBaseline/  approved expected-governance baseline

@@ -25,7 +25,12 @@ from ci_coordinator.api.http.routers.ci_history_read import (
     history_attempt_detail_request_limit,
     history_read_request_limit,
 )
-from ci_coordinator.app.ci_history_read import CiHistoryReadService, HistoryReadResult
+from ci_coordinator.app.ci_history_read import (
+    CiHistoryReadService,
+    CiHistoryReadUseCase,
+    HistoryProductStore,
+    HistoryReadResult,
+)
 from ci_coordinator.ci_economics.archive_retention_payload import ForeverDetailRetentionPayload
 from ci_coordinator.ci_economics.archive_statistics import ArchivedAttemptHeader
 from ci_coordinator.ci_economics.history_read import (
@@ -35,9 +40,13 @@ from ci_coordinator.ci_economics.history_read import (
     HistoryReadRejected,
     HistoryRecordSummary,
 )
+from ci_coordinator.ci_economics.history_read_cursor import HistoryCursorCodec
 from ci_coordinator.ci_economics.history_retention_commands import (
     ApplyHistoryRetention,
+    HistoryRetentionEffect,
+    HistoryRetentionPreview,
     HistoryRetentionResult,
+    HistoryRetentionSelection,
 )
 from ci_coordinator.control_plane_identity import CONTROL_PLANE_ROLES, ControlPlaneRole
 
@@ -58,7 +67,7 @@ _APPLY = {"selection": _SELECTION, "reviewedDigest": "a" * 64, "operationId": "a
 
 
 def _app(
-    service: AsyncMock,
+    service: CiHistoryReadUseCase,
     *,
     valid: bool = True,
     integrity: bool = True,
@@ -297,6 +306,78 @@ def test_mutation_requires_integrity_and_server_actor() -> None:
     command = service.apply.await_args.args[0]
     assert isinstance(command, ApplyHistoryRetention)
     assert command.actor == human_principal().actor_id and command.selection.repository_id == 202
+
+
+@pytest.mark.parametrize("denial", ["role", "integrity", "scope"])
+def test_first_retention_refusal_precedes_target_store_with_a_matching_preview(denial: str) -> None:
+    authorizer = AsyncMock()
+    authorizer.allows_scope.return_value = True
+    store = AsyncMock(spec=HistoryProductStore)
+    selection = HistoryRetentionSelection.model_validate(_SELECTION)
+    detail = HistoryDetailView(
+        state="not_imported",
+        firstImportedAt=None,
+        expiresAt=None,
+        appliedPolicy=None,
+        policySource=None,
+        policyRevision=None,
+        content="not_imported",
+    )
+    preview = HistoryRetentionPreview(
+        selection=selection,
+        effects=(
+            HistoryRetentionEffect(
+                key=selection.keys[0],
+                before=detail,
+                after=detail,
+                payloadBytes=0,
+                deletePayload=False,
+            ),
+        ),
+        releasedBytes=0,
+        deletedDetails=0,
+    )
+    store.preview_retention.return_value = preview
+    service = CiHistoryReadService(
+        authorizer=authorizer,
+        store=store,
+        cursors=HistoryCursorCodec(b"test-only-archive-cursor-key-value"),
+    )
+    with TestClient(_app(service)) as client:
+        reviewed = client.post(HISTORY_RETENTION_PREVIEW_PATH, json=_SELECTION)
+    assert reviewed.status_code == 200
+    body = {**_APPLY, "reviewedDigest": reviewed.json()["reviewedDigest"]}
+    assert body["reviewedDigest"] == preview.review_digest
+    store.apply_retention.return_value = HistoryRetentionResult(
+        outcome="committed",
+        operationId=body["operationId"],
+        preview=preview,
+        dataRevision=2,
+    )
+    store.reset_mock()
+    authorizer.allows_scope.return_value = denial != "scope"
+    with TestClient(
+        _app(
+            service,
+            integrity=denial != "integrity",
+            roles=frozenset({"audit"}) if denial == "role" else CONTROL_PLANE_ROLES,
+        )
+    ) as client:
+        denied = client.post(HISTORY_RETENTION_APPLY_PATH, json=body)
+    assert (denied.status_code, denied.json()) == (403, {"ok": False, "error": "forbidden"})
+    assert not store.mock_calls
+    authorizer.allows_scope.return_value = True
+    with TestClient(_app(service)) as client:
+        accepted = client.post(HISTORY_RETENTION_APPLY_PATH, json=body)
+    assert accepted.status_code == 200 and accepted.json()["outcome"] == "committed"
+    store.apply_retention.assert_awaited_once_with(
+        ApplyHistoryRetention.model_validate(
+            {
+                **body,
+                "actor": human_principal().actor_id,
+            }
+        )
+    )
 
 
 @pytest.mark.parametrize(
