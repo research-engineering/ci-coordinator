@@ -129,25 +129,34 @@ def received_lifetime(payload: str) -> Iterator[_ReceivedLifetime]:
     if parent is not None:
         raise ValueError("exec receiver cannot replace an active borrowed scope")
     previous = {number: signal.getsignal(number) for number in (signal.SIGINT, signal.SIGTERM)}
+    primary: BaseException | None = None
     try:
         for number in previous:
             signal.signal(number, scope.signal)
         with borrowed_lifetime(scope):
             assert_lifetime_running()
             yield scope
+    except BaseException as error:
+        primary = error
+        raise
     finally:
-        primary = sys.exception()
-        close_error: OSError | None = None
+        close_error: BaseException | None = None
         for number, handler in previous.items():
-            signal.signal(number, handler)
+            try:
+                signal.signal(number, handler)
+            except BaseException as error:
+                if close_error is None:
+                    close_error = error
         for descriptor in (scope.reader, *scope.inherited_fds):
             try:
                 os.close(descriptor)
-            except OSError as error:
-                if primary is None and close_error is None:
+            except BaseException as error:
+                if close_error is None:
                     close_error = error
         if close_error is not None:
-            raise close_error
+            if primary is None:
+                raise close_error
+            primary.add_note("consumer lab lifetime cleanup raised a secondary exception")
 
 
 def managed_lifetime_entrypoint(main: Callable[[], int]) -> int:
@@ -399,6 +408,7 @@ def _run_managed(
     failure: str | None = None
     quiescent = False
     process: subprocess.Popen[bytes] | None = None
+    primary: BaseException | None = None
     with _defer_cancellation():
         try:
             process = subprocess.Popen(  # noqa: S603
@@ -455,20 +465,31 @@ def _run_managed(
                     if failure is not None:
                         break
         except OSError as error:
-            if process is None:
-                return BoundedProcessResult(None, b"", b"", _spawn_error(command, error), True)
-            failure = _spawn_error(command, error)
+            try:
+                if process is None:
+                    return BoundedProcessResult(None, b"", b"", _spawn_error(command, error), True)
+                failure = _spawn_error(command, error)
+            except BaseException as handler_error:
+                primary = handler_error
+                raise
+        except BaseException as error:
+            primary = error
+            raise
         finally:
             if process is not None:
-                primary = sys.exception()
+                cleanup_primary = primary
                 try:
                     try:
                         if not quiescent:
                             quiescent = _drain_managed(process, schedule)
+                    except BaseException as error:
+                        if cleanup_primary is None:
+                            cleanup_primary = error
+                        raise
                     finally:
-                        _close_capture(process, selector)
-                except BaseException:
-                    if primary is None and failure is None:
+                        _close_capture(process, selector, cleanup_primary)
+                except BaseException as error:
+                    if primary is None and (failure is None or not isinstance(error, Exception)):
                         raise
                     if primary is not None:
                         primary.add_note("consumer lab owned cleanup failed")
@@ -535,10 +556,13 @@ def owned_temporary_directory(*, prefix: str) -> Iterator[str]:
     assert_lifetime_running()
     root = Path(tempfile.mkdtemp(prefix=prefix)).resolve()
     identity = root.stat()
+    primary: BaseException | None = None
     try:
         yield str(root)
+    except BaseException as error:
+        primary = error
+        raise
     finally:
-        primary = sys.exception()
         try:
             scope = _CleanupScope(parent, root, (identity.st_dev, identity.st_ino))
             with borrowed_lifetime(scope):
@@ -566,7 +590,7 @@ def owned_temporary_directory(*, prefix: str) -> Iterator[str]:
                     )
         except BaseException as error:
             if primary is None:
-                if isinstance(error, ConsumerLabCleanupError):
+                if isinstance(error, ConsumerLabCleanupError) or not isinstance(error, Exception):
                     raise
                 raise ConsumerLabCleanupError("owned temporary cleanup failed") from error
             primary.add_note("consumer lab owned temporary cleanup incomplete")

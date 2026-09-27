@@ -206,14 +206,58 @@ def test_native_managed_leaf_cancellation_drains_before_return(
                     os.killpg(pid, signal.SIGKILL)
 
 
-@pytest.mark.parametrize("expired", [False, True])
+@pytest.mark.parametrize("remaining", [-1.0, 0.0, 1.0])
+def test_bootstrap_cleanup_checkpoint_preserves_typed_expiry(
+    managed_consumer_lifetime: tuple[LifetimeScope, int, int],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    remaining: float,
+) -> None:
+    parent, _, _ = managed_consumer_lifetime
+    identity = tmp_path.stat()
+    scope = consumer_bootstrap._SourceCleanupScope(
+        parent, tmp_path, (identity.st_dev, identity.st_ino), _ceiling=10.0
+    )
+    with monkeypatch.context() as patch, consumer_bootstrap.borrowed_lifetime(scope):
+        patch.setattr(time, "monotonic", lambda: 10.0 - remaining)
+        if remaining <= 0:
+            with pytest.raises(ConsumerLabBootstrapError, match="cleanup allowance exhausted"):
+                consumer_bootstrap.assert_lifetime_running()
+        else:
+            consumer_bootstrap.assert_lifetime_running()
+
+
 @pytest.mark.parametrize("owner", ["bootstrap", "process"])
+@pytest.mark.parametrize(
+    "cleanup,outcome",
+    [
+        (cleanup, outcome)
+        for cleanup in ("complete", "expired")
+        for outcome in ("normal", "ambient", "primary", "interrupt")
+    ]
+    + [("retained", "ambient"), ("interrupted", "ambient")],
+)
 def test_native_owned_lab_cleanup_has_no_later_recursive_finalizer(
     managed_consumer_lifetime: tuple[LifetimeScope, int, int],
-    expired: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    cleanup: str,
     owner: str,
+    outcome: str,
 ) -> None:
     scope, writer, _ = managed_consumer_lifetime
+    expired = cleanup == "expired"
+    module = consumer_bootstrap if owner == "bootstrap" else consumer_process
+    cleanup_interrupt = consumer_process.LifetimeCancelled(signal.SIGTERM)
+    if cleanup == "retained":
+        monkeypatch.setattr(module, "_DELETE_TREE", "import sys")
+    elif cleanup == "interrupted":
+
+        def interrupted(*_args: object, **_kwargs: object) -> None:
+            raise cleanup_interrupt
+
+        monkeypatch.setattr(
+            module, "_capture_bounded" if owner == "bootstrap" else "run_bounded", interrupted
+        )
     root: Path | None = None
     context = (
         consumer_bootstrap._owned_source_directory()
@@ -225,22 +269,56 @@ def test_native_owned_lab_cleanup_has_no_later_recursive_finalizer(
         if owner == "bootstrap"
         else consumer_process.ConsumerLabCleanupError
     )
-    try:
-        if expired:
-            with (
-                pytest.raises(failure),
-                context as temporary,
-            ):
-                root = Path(temporary)
-                (root / "retained.txt").write_text("owned data")
+    primary = (
+        consumer_process.LifetimeCancelled(signal.SIGTERM)
+        if outcome == "interrupt"
+        else ValueError("owned directory body failure")
+    )
+
+    def invoke() -> None:
+        nonlocal root
+        with context as temporary:
+            root = Path(temporary)
+            (root / "owned.txt").write_text("owned data")
+            if expired:
                 os.write(writer, struct.pack("!4sd", b"CF1:", time.monotonic() - 1))
-            assert root is not None and (root / "retained.txt").read_text() == "owned data"
+            if outcome in {"primary", "interrupt"}:
+                raise primary
+
+    def observe() -> None:
+        if cleanup == "interrupted":
+            with pytest.raises(type(cleanup_interrupt)) as interrupted_cleanup:
+                invoke()
+            assert interrupted_cleanup.value is cleanup_interrupt
+        elif outcome in {"primary", "interrupt"}:
+            with pytest.raises(type(primary)) as caught:
+                invoke()
+            assert caught.value is primary
+            assert bool(getattr(primary, "__notes__", [])) is expired
+        elif cleanup in {"expired", "retained"}:
+            with pytest.raises(failure):
+                invoke()
         else:
-            with context as temporary:
-                root = Path(temporary)
-                (root / "removed.txt").write_text("owned data")
+            invoke()
+
+    try:
+        if outcome == "ambient":
+            ambient = ValueError("already-handled directory caller error")
+            try:
+                raise ambient
+            except ValueError:
+                observe()
+                assert not getattr(ambient, "__notes__", [])
+        else:
+            observe()
+        assert root is not None
+        if cleanup != "complete":
+            assert (root / "owned.txt").read_text() == "owned data"
+        else:
             assert not root.exists()
         assert consumer_process.current_lifetime() is scope
+        for descriptor in scope.inherited_fds:
+            os.fstat(descriptor)
     finally:
         if root is not None:
             shutil.rmtree(root, ignore_errors=True)

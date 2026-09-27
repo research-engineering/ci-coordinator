@@ -67,6 +67,13 @@ _SCENARIO = ConsumerLabScenario("source-change", "pull_request", (_CHANGE,), _OU
             "register-term",
             "register-close",
             "close",
+            "ambient-positive",
+            "ambient-close",
+            "ambient-close-interrupt",
+            "ambient-register-close",
+            "register-drain-close",
+            "oserror-close",
+            "oserror-close-interrupt",
             "exit-error",
             "exit-term",
             "caught-work-term",
@@ -77,7 +84,12 @@ _SCENARIO = ConsumerLabScenario("source-change", "pull_request", (_CHANGE,), _OU
     + [
         pytest.param("image-entry", cut, id=f"image-entry-{cut}")
         for cut in ("positive", "accept-term")
-    ],
+    ]
+    + [
+        pytest.param(bootstrap, f"unmanaged-{cut}", id=f"unmanaged-bootstrap-{cut}")
+        for cut in ("close", "ambient-positive", "ambient-close", "ambient-close-interrupt")
+    ]
+    + [pytest.param(process, "handler-close", id="verified-image-handler-close")],
 )
 def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
     tmp_path: Path,
@@ -86,9 +98,18 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
     owner: ModuleType | str,
     cut: str,
 ) -> None:
+    unmanaged = cut.startswith("unmanaged-")
+    cut = cut.removeprefix("unmanaged-")
     outer, _, _ = managed_consumer_lifetime
     ready = tmp_path / "capture-ready"
-    positive = cut in {"positive", "close", "caught-close-term"}
+    positive = cut in {
+        "positive",
+        "close",
+        "caught-close-term",
+        "ambient-close",
+        "ambient-close-interrupt",
+        "ambient-positive",
+    }
     source = f"from pathlib import Path\nimport time\nPath({str(ready)!r}).touch()\n" + (
         "print('accepted')\n" if positive else "time.sleep(60)\n"
     )
@@ -117,7 +138,13 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
     children: list[subprocess.Popen[bytes]] = []
     cancellation = bootstrap.LifetimeCancelled(signal.SIGTERM)
     first = cancellation if "term" in cut and cut != "exit-term" else ValueError("setup cut")
-    secondary = RuntimeError("secondary close cut")
+    secondary: BaseException = RuntimeError("secondary close cut")
+    if cut in {"ambient-close-interrupt", "oserror-close-interrupt"}:
+        secondary = KeyboardInterrupt("capture close interrupted")
+    lifecycle = OSError("lifecycle cut")
+    drain_error = RuntimeError("drain cut")
+    close_attempts: list[str] = []
+    capture_closing = False
     original_popen = subprocess.Popen
     original_selector = selectors.DefaultSelector
     signal_times: list[float] = []
@@ -182,7 +209,16 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
         if cut == "register-term":
             signal_now()
             pytest.fail("ordinary work did not interrupt")
-        if cut in {"register", "register-close", "exit-error", "exit-term"}:
+        if cut in {"oserror-close", "handler-close", "oserror-close-interrupt"}:
+            raise lifecycle
+        if cut in {
+            "register",
+            "register-close",
+            "exit-error",
+            "exit-term",
+            "ambient-register-close",
+            "register-drain-close",
+        }:
             raise first
 
     def accepted(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
@@ -195,6 +231,20 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
             time.sleep(0.01)
         if cut == "accept-term":
             signal_now()
+        for name in ("stdout", "stderr"):
+            stream = getattr(child, name)
+            if stream is not None:
+
+                def close_stream(
+                    close: Callable[[], None] = stream.close, label: str = name
+                ) -> None:
+                    close()
+                    if capture_closing:
+                        close_attempts.append(label)
+                        if cut.startswith("ambient-") and cut != "ambient-positive":
+                            raise RuntimeError("later stream close cut")
+
+                monkeypatch.setattr(stream, "close", close_stream)
         return child
 
     def selector() -> selectors.BaseSelector:
@@ -208,10 +258,23 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
             return register(*args, **kwargs)
 
         def close_cut() -> None:
+            nonlocal capture_closing
+            capture_closing = True
+            close_attempts.append("selector")
             close()
             if cut == "caught-close-term":
                 signal_now()
-            if cut in {"register-close", "close"}:
+            if cut in {
+                "register-close",
+                "close",
+                "ambient-close",
+                "ambient-close-interrupt",
+                "ambient-register-close",
+                "register-drain-close",
+                "oserror-close",
+                "oserror-close-interrupt",
+                "handler-close",
+            }:
                 raise secondary
 
         monkeypatch.setattr(instance, "register", register_cut)
@@ -221,6 +284,20 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
     monkeypatch.setattr(subprocess, "Popen", accepted)
     monkeypatch.setattr(selectors, "DefaultSelector", selector)
     monkeypatch.setattr(bootstrap, "LifetimeCancelled", lambda _number=0: cancellation)
+    if cut == "register-drain-close":
+        drain = cast(ModuleType, owner)._drain_managed
+
+        def drain_cut(*args: Any, **kwargs: Any) -> bool:
+            assert drain(*args, **kwargs)
+            raise drain_error
+
+        monkeypatch.setattr(owner, "_drain_managed", drain_cut)
+    if cut == "handler-close":
+
+        def handler_cut(*_args: object) -> str:
+            raise first
+
+        monkeypatch.setattr(process, "_spawn_error", handler_cut)
     try:
         with bootstrap.lifetime_invocation(("-c", source), timeout_seconds=10) as invocation:
             lifetime_owner = bootstrap if owner == "image-entry" else cast(ModuleType, owner)
@@ -248,12 +325,15 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
                                 )
                             return b"", status
                         if owner is bootstrap:
-                            stdout, _stderr, status = bootstrap._capture_bounded(
-                                (sys.executable, "-c", source),
-                                cwd=tmp_path,
-                                env=dict(os.environ),
-                                stdout_limit=4096,
-                            )
+                            with monkeypatch.context() as execution:
+                                if unmanaged:
+                                    execution.setattr(bootstrap, "current_lifetime", lambda: None)
+                                stdout, _stderr, status = bootstrap._capture_bounded(
+                                    (sys.executable, "-c", source),
+                                    cwd=tmp_path,
+                                    env=dict(os.environ),
+                                    stdout_limit=4096,
+                                )
                             return stdout, status
                         result = process.run_bounded(
                             sys.executable,
@@ -263,6 +343,8 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
                             max_output_bytes=4096,
                             timeout_seconds=5,
                         )
+                        if cut == "oserror-close":
+                            assert result.error is not None and result.process_group_quiescent
                         return result.stdout, result.status
 
                     sys.setprofile(exit_cut)
@@ -278,6 +360,33 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
                                 with pytest.raises(type(cancellation)) as caught_cancel:
                                     invoke()
                                 assert caught_cancel.value is cancellation
+                        elif cut.startswith("ambient-"):
+                            ambient = ValueError("ambient already-handled error")
+                            try:
+                                raise ambient
+                            except ValueError:
+                                expected = first if cut == "ambient-register-close" else secondary
+                                if cut == "ambient-positive":
+                                    assert invoke() == (b"accepted\n", 0)
+                                else:
+                                    with pytest.raises(type(expected)) as caught:
+                                        invoke()
+                                    assert caught.value is expected
+                                assert not getattr(ambient, "__notes__", [])
+                        elif cut in {"oserror-close", "oserror-close-interrupt"}:
+                            if owner is bootstrap:
+                                with pytest.raises(
+                                    bootstrap.ConsumerLabBootstrapError
+                                ) as translated:
+                                    invoke()
+                                assert translated.value.__cause__ is lifecycle
+                                assert getattr(translated.value, "__notes__", [])
+                            elif cut == "oserror-close-interrupt":
+                                with pytest.raises(type(secondary)) as interrupted:
+                                    invoke()
+                                assert interrupted.value is secondary
+                            else:
+                                assert invoke()[1] is None
                         else:
                             expected = secondary if cut == "close" else first
                             with pytest.raises(type(expected)) as caught:
@@ -292,6 +401,8 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
                     assert bootstrap._DEFERRED_CANCELLATION.get() is pending_before
                     assert bootstrap._INTERRUPTIBLE.get() is mode_before
                     assert sys.getprofile() is previous_profile
+                    if cut.startswith("ambient-") or cut == "register-drain-close":
+                        assert close_attempts == ["selector", "stdout", "stderr"]
                     if signal_times:
                         observed = received.signal_at
                         assert observed is not None and signal_times[0] <= observed
@@ -456,6 +567,11 @@ def test_first_stop_frame_is_not_a_renewable_or_multicast_grant(
         ("exit", 7),
         ("exception", 1),
         ("exit-zero-stop", 143),
+        ("close", 1),
+        ("ambient-close", 1),
+        ("exception-close", 1),
+        ("cancel-close", 143),
+        ("ambient-interrupt-close", 143),
     ],
 )
 def test_native_lifetime_entry_preserves_primary_outcome_and_restores_scope(
@@ -472,11 +588,25 @@ from ci_coordinator.consumer_contract_lab import {owner} as owner
 original=sys.argv
 payload=json.loads(sys.argv[-1])
 descriptors=[payload['stopFd'],*[row['fd'] for row in payload['leases']]]
+handlers={{number:signal.getsignal(number) for number in (signal.SIGINT,signal.SIGTERM)}}
+mode={mode!r}
+primary=ValueError('primary-probe-error')
+first=(owner.LifetimeCancelled(signal.SIGTERM) if mode=='ambient-interrupt-close'
+       else OSError('first-close-error'))
+close=os.close
+attempts=[]
+def close_cut(fd):
+    close(fd)
+    if fd in descriptors:
+        attempts.append(fd)
+        raise first if fd==descriptors[0] else OSError('later-close-error')
+if mode.endswith('close'): os.close=close_cut
 def main():
     assert sys.argv[1]=={mode!r}
     assert owner.current_lifetime() is not None
     print('body',flush=True)
-    if {mode!r}=='exception': raise ValueError('primary-probe-error')
+    if mode in ('exception','exception-close'): raise primary
+    if mode=='cancel-close': raise owner.LifetimeCancelled(signal.SIGTERM)
     if {mode!r}=='exit': raise SystemExit(7)
     if {mode!r}=='exit-zero-stop':
         try: os.kill(os.getpid(),signal.SIGTERM)
@@ -484,14 +614,28 @@ def main():
         raise SystemExit(0)
     return 7
 try:
-    status=owner.managed_lifetime_entrypoint(main)
+    if mode.startswith('ambient-'):
+        try: raise ValueError('already-handled receiver caller error')
+        except ValueError as ambient:
+            try: status=owner.managed_lifetime_entrypoint(main)
+            finally: assert not getattr(ambient,'__notes__',[])
+    else:
+        status=owner.managed_lifetime_entrypoint(main)
+except BaseException as error:
+    if mode in ('close','ambient-close'): assert error is first
+    if mode=='exception-close': assert error is primary and primary.__notes__
+    raise
 finally:
+    os.close=close
     closed=[]
     for fd in descriptors:
         try: os.fstat(fd); closed.append(False)
         except OSError: closed.append(True)
-    print(json.dumps({{'restored':sys.argv is original,'empty':owner.current_lifetime() is None,
-                      'closed':closed}}),flush=True)
+    terminal={{'restored':sys.argv is original,'empty':owner.current_lifetime() is None,
+               'closed':closed,
+               'allCloses':attempts==descriptors if mode.endswith('close') else True,
+               'handlers':all(signal.getsignal(n)==h for n,h in handlers.items())}}
+    print(json.dumps(terminal),flush=True)
 raise SystemExit(status)
 """
     with process.lifetime_invocation(("-c", program, mode), timeout_seconds=10) as invocation:
@@ -511,8 +655,9 @@ raise SystemExit(status)
     assert lines[0] == "body"
     terminal = json.loads(lines[1])
     assert terminal["restored"] is True and terminal["empty"] is True
+    assert terminal["handlers"] is True and terminal["allCloses"] is True
     assert terminal["closed"] and all(value is True for value in terminal["closed"])
-    assert (b"primary-probe-error" in result.stderr) is (mode == "exception")
+    assert (b"primary-probe-error" in result.stderr) is (mode in {"exception", "exception-close"})
     assert result.process_group_quiescent is True
 
 

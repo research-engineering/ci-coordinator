@@ -39,10 +39,12 @@ def run(
                 raise scanner.ScanError(
                     "tool left a child process running", stage="process", code="residual_process"
                 )
-        except BaseException:
+        except BaseException as error:
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(process.pid, signal.SIGKILL)
             process.wait(timeout=5)
+            if isinstance(error, scanner.ScanError):
+                raise
             raise scanner.ScanError(
                 "tool execution did not complete", stage="process", code="incomplete_process"
             ) from None

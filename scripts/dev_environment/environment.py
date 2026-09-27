@@ -354,19 +354,29 @@ def borrow_managed_process(
             _parent=parent,
             _stop_grace=float(stop_grace),
         )
+        primary_error: BaseException | None = None
         try:
             with borrowed_process_scope(borrow):
                 borrow.assert_running()
                 yield borrow
+        except BaseException as error:
+            primary_error = error
+            raise
         finally:
             borrow._active = False
-            primary_error = sys.exception()
+            close_error: BaseException | None = None
             for descriptor in descriptors:
                 try:
                     os.close(descriptor)
-                except OSError:
-                    if primary_error is None:
-                        raise
+                except BaseException as error:
+                    if close_error is None:
+                        close_error = error
+            if close_error is not None:
+                if primary_error is None:
+                    raise close_error
+                primary_error.add_note(
+                    "Managed process descriptor cleanup raised a secondary exception"
+                )
 
 
 def managed_process_argument(arguments: Sequence[str]) -> str | None:

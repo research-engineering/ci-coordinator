@@ -8,7 +8,7 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from pathlib import Path
 from types import FrameType
@@ -828,7 +828,25 @@ def test_native_managed_handle_acceptance_latches_first_signal(
 
 
 @pytest.mark.parametrize(
-    "cut", ["construct", "register", "register-term", "register-close", "close"]
+    "cut",
+    [
+        "construct",
+        "register",
+        "register-term",
+        "register-close",
+        "close",
+        "ambient-positive",
+        "ambient-close",
+        "ambient-close-interrupt",
+        "ambient-register-close",
+        "register-drain-close",
+        "handler-drain-close",
+        "lifecycle-close",
+        "lifecycle-close-interrupt",
+        "unmanaged-ambient-positive",
+        "unmanaged-ambient-close",
+        "unmanaged-ambient-close-interrupt",
+    ],
 )
 def test_native_managed_capture_setup_and_close_preserve_primary_and_drain(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cut: str
@@ -858,16 +876,31 @@ def test_native_interactive_exit_flush_reaches_the_existing_callback(
 def _native_capture_cut(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, cut: str, interactive: bool
 ) -> None:
+    unmanaged = cut.startswith("unmanaged-")
+    cut = cut.removeprefix("unmanaged-")
     identity = dependency_identity_fixture(tmp_path)
     ready = tmp_path / "child-ready"
-    positive = cut in {"positive", "close", "caught-close-term"}
+    positive = cut in {
+        "positive",
+        "close",
+        "caught-close-term",
+        "ambient-close",
+        "ambient-close-interrupt",
+        "ambient-positive",
+    }
     source = f"from pathlib import Path\nimport time\nPath({str(ready)!r}).touch()\n" + (
         "print('accepted')\n" if positive else "time.sleep(60)\n"
     )
     children: list[subprocess.Popen[bytes]] = []
     cancellation = KeyboardInterrupt("first owned TERM")
     first = cancellation if "term" in cut and cut != "exit-term" else ValueError("setup cut")
-    secondary = RuntimeError("secondary close cut")
+    secondary: BaseException = RuntimeError("secondary close cut")
+    if cut in {"ambient-close-interrupt", "lifecycle-close-interrupt"}:
+        secondary = KeyboardInterrupt("capture close interrupted")
+    lifecycle = OSError("lifecycle cut")
+    drain_error = RuntimeError("drain cut")
+    close_attempts: list[str] = []
+    capture_closing = False
     original_popen = subprocess.Popen
     original_selector = selectors.DefaultSelector
     signal_times: list[float] = []
@@ -933,7 +966,16 @@ def _native_capture_cut(
         if cut == "register-term":
             signal_now()
             pytest.fail("ordinary work did not interrupt")
-        if cut in {"register", "register-close", "exit-error", "exit-term"}:
+        if cut in {"handler-drain-close", "lifecycle-close", "lifecycle-close-interrupt"}:
+            raise lifecycle
+        if cut in {
+            "register",
+            "register-close",
+            "exit-error",
+            "exit-term",
+            "ambient-register-close",
+            "register-drain-close",
+        }:
             raise first
 
     def accepted(*args: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
@@ -946,6 +988,20 @@ def _native_capture_cut(
             time.sleep(0.01)
         if cut == "accept-term":
             signal_now()
+        for name in ("stdin", "stdout", "stderr"):
+            stream = getattr(child, name)
+            if stream is not None:
+
+                def close_stream(
+                    close: Callable[[], None] = stream.close, label: str = name
+                ) -> None:
+                    close()
+                    if capture_closing:
+                        close_attempts.append(label)
+                        if cut.startswith("ambient-") and cut != "ambient-positive":
+                            raise RuntimeError("later stream close cut")
+
+                monkeypatch.setattr(stream, "close", close_stream)
         if interactive:
             poll = child.poll
 
@@ -967,10 +1023,23 @@ def _native_capture_cut(
             return register(*args, **kwargs)
 
         def close_cut() -> None:
+            nonlocal capture_closing
+            capture_closing = True
+            close_attempts.append("selector")
             close()
             if cut == "caught-close-term":
                 signal_now()
-            if cut in {"register-close", "close"}:
+            if cut in {
+                "register-close",
+                "close",
+                "ambient-close",
+                "ambient-close-interrupt",
+                "ambient-register-close",
+                "register-drain-close",
+                "handler-drain-close",
+                "lifecycle-close",
+                "lifecycle-close-interrupt",
+            }:
                 raise secondary
 
         monkeypatch.setattr(instance, "register", register_cut)
@@ -980,6 +1049,15 @@ def _native_capture_cut(
     monkeypatch.setattr(subprocess, "Popen", accepted)
     monkeypatch.setattr(selectors, "DefaultSelector", selector)
     monkeypatch.setattr(diagram_process, "KeyboardInterrupt", lambda: cancellation, raising=False)
+    stop = bounded_process._stop_interactive
+
+    def drain_cut(*args: Any, **kwargs: Any) -> bounded_process.InteractiveResult:
+        result = stop(*args, **kwargs)
+        assert result.process_group_quiescent
+        raise drain_error
+
+    if cut in {"register-drain-close", "handler-drain-close"}:
+        monkeypatch.setattr(bounded_process, "_stop_interactive", drain_cut)
     try:
         with managed_entry_context(identity) as (context, _writer, _descriptor):
             with borrow_managed_process(context, interrupt=True) as scope:
@@ -1001,14 +1079,21 @@ def _native_capture_cut(
                             timeout_seconds=5,
                             on_interrupt=observe,
                         ).returncode
-                    return spawn(
+                    result = spawn(
                         sys.executable,
                         ("-c", source),
                         cwd=tmp_path,
+                        input_text="",
                         max_buffer=4096,
                         timeout_seconds=5,
-                    ).status
+                    )
+                    if cut == "lifecycle-close":
+                        assert result.error is not None and result.failure_kind == "lifecycle"
+                        assert result.process_group_quiescent
+                    return result.status
 
+                if unmanaged:
+                    monkeypatch.setattr(bounded_process, "current_process_scope", lambda: None)
                 sys.setprofile(exit_cut)
                 try:
                     if cut == "positive":
@@ -1020,8 +1105,29 @@ def _native_capture_cut(
                             with pytest.raises(KeyboardInterrupt) as caught_cancel:
                                 invoke()
                             assert caught_cancel.value is cancellation
+                    elif cut.startswith("ambient-"):
+                        ambient = ValueError("ambient already-handled error")
+                        try:
+                            raise ambient
+                        except ValueError:
+                            expected = first if cut == "ambient-register-close" else secondary
+                            if cut == "ambient-positive":
+                                assert invoke() == 0
+                            else:
+                                with pytest.raises(type(expected)) as caught:
+                                    invoke()
+                                assert caught.value is expected
+                            assert not getattr(ambient, "__notes__", [])
+                    elif cut == "lifecycle-close":
+                        assert invoke() is None
                     else:
-                        expected = secondary if cut == "close" else first
+                        expected = (
+                            drain_error
+                            if cut == "handler-drain-close"
+                            else secondary
+                            if cut in {"close", "lifecycle-close-interrupt"}
+                            else first
+                        )
                         with pytest.raises(type(expected)) as caught:
                             invoke()
                         assert caught.value is expected
@@ -1034,6 +1140,11 @@ def _native_capture_cut(
                 assert diagram_process._DEFERRED_INTERRUPT.get() is pending_before
                 assert diagram_process._INTERRUPTIBLE.get() is mode_before
                 assert sys.getprofile() is previous_profile
+                if cut.startswith("ambient-") or cut in {
+                    "register-drain-close",
+                    "handler-drain-close",
+                }:
+                    assert close_attempts == ["selector", "stdin", "stdout", "stderr"]
                 if interactive and cut != "positive":
                     assert len(callbacks) == 1
                     assert callbacks[0][1] is first
