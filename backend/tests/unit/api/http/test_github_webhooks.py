@@ -21,15 +21,22 @@ from ci_coordinator.api.http.webhook_ingress import (
     WebhookPreparationOffered,
 )
 from ci_coordinator.github_ingestion import (
+    DeliveryClaimed,
+    DeliveryIdempotencyResult,
+    DurableWorkflowObservation,
     ExactShaRange,
     IngestionRejection,
     PingDelivery,
     PushSeed,
     SeedIngestion,
+    load_bundled_profile,
 )
+from ci_coordinator.github_ingestion.ports import PreparedDeliveryClaim
 from ci_coordinator.github_ingestion.provenance import GitHubRepository, WebhookProvenance
+from ci_coordinator.github_ingestion.seeds import DynamicCiSeed
 from ci_coordinator.identity_admission import RejectedIdentity, TrustedWebhook
-from ci_coordinator.kernel import sha256_hex
+from ci_coordinator.kernel import FixedClock, sha256_hex
+from ci_coordinator.runtime.webhook_admission import ProcessWebhookAdmission
 
 NOW = datetime(2026, 7, 14, 12, 0, tzinfo=UTC)
 SECRET = "webhook-test-secret"
@@ -231,6 +238,68 @@ def test_domain_rejection_is_redacted_to_a_stable_transport_error() -> None:
     assert "body-secret" not in response.text
     assert "domain-secret" not in response.text
     assert signature not in response.text
+
+
+@pytest.mark.parametrize(
+    ("number", "valid_signature", "expected_status", "expected_claims"),
+    [
+        (b"1.25", True, 200, 1),
+        (b"1e9999999999999999999", True, 400, 0),
+        (b"1e-9999999999999999999", True, 400, 0),
+        (b"1e9999999999999999999", False, 401, 0),
+    ],
+)
+def test_numeric_admission_crosses_the_real_worker_and_http_boundaries(
+    number: bytes, valid_signature: bool, expected_status: int, expected_claims: int
+) -> None:
+    claims: list[PreparedDeliveryClaim] = []
+    offers: list[object] = []
+
+    class Store:
+        async def commit(
+            self, key: PreparedDeliveryClaim, observation: DurableWorkflowObservation | None
+        ) -> DeliveryIdempotencyResult:
+            assert observation is None
+            claims.append(key)
+            return DeliveryClaimed(key.key)
+
+    def offer(seed: DynamicCiSeed) -> bool:
+        offers.append(seed)
+        return True
+
+    app = create_app(
+        HttpRouteDependencies(
+            webhook=GitHubWebhookRouteDependencies(
+                webhook_ingress=ProcessWebhookAdmission(
+                    secret=SECRET,
+                    profile=load_bundled_profile(),
+                    ingestion_store=Store(),
+                    clock=FixedClock(NOW),
+                    offer_preparation=offer,
+                )
+            )
+        )
+    )
+    body = b'{"zen":"bounded","hook_id":7,"hook":{"id":7},"unused":' + number + b"}"
+    headers = [
+        (name, "ping" if name == "x-github-event" else value)
+        for name, value in signed_headers(body)
+    ]
+    if not valid_signature:
+        headers[-1] = ("x-hub-signature-256", f"sha256={'0' * 64}")
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post("/webhooks/github", content=body, headers=headers)
+    assert response.status_code == expected_status
+    if expected_status != 200:
+        assert response.json() == {
+            "ok": False,
+            "error": "invalid signature" if expected_status == 401 else "invalid webhook",
+        }
+    else:
+        assert response.json()["ignored"] is True
+        assert claims[0].key.body_sha256 == sha256_hex(body)
+    assert len(claims) == expected_claims
+    assert offers == []
 
 
 def test_unexpected_ingress_failure_uses_the_generic_internal_error_contract() -> None:

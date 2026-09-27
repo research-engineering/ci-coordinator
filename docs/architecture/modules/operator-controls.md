@@ -96,6 +96,15 @@ the existing FullCI policy and rejects selected persistence under the same scope
 lock. This does not change `applies_at`, durable timestamps, audit bytes or replay;
 force commands expose an expiry, not a scheduled start time.
 
+Repository omission controls are selected by latest durable audit sequence,
+without first excluding future application times. Decode the retained row and
+validate an enable's exact disable predecessor before projecting current state.
+If that latest disable or enable is later than the reader instant, knowledge is
+unavailable; it is neither absence nor permission to reuse an older projection.
+At equal application times the audit sequence remains decisive. Scope locks,
+original timestamps, exact replay and audit bytes are unchanged. A local clock
+behind a committed control must not restore selected execution authority.
+
 ## 5. Policy Rollback Boundary
 
 Config rollback is not an override command. It is owned by `config_epochs` and

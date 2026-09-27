@@ -227,7 +227,7 @@ class PostgresOperatorOverrideRepository:
             force = await self._load_active_force(scope, subject_id, now)
             if isinstance(force, OverrideLookupUnavailable):
                 return force
-            control = await self._load_latest_omission_control(scope, now)
+            control = await self._load_latest_omission_control(scope)
             disable = None
             if control is not None:
                 if control.override.command.kind == "disable_omission":
@@ -236,6 +236,8 @@ class PostgresOperatorOverrideRepository:
                     await self._assert_valid_enable_transition(scope, control)
                 else:
                     raise PersistenceInvariantViolation("stored omission control kind is invalid")
+                if control.override.applied_at > now:
+                    return OverrideLookupUnavailable()
             return ActiveOverrideRecords(force_full_ci=force, disable_dynamic=disable)
         except asyncio.CancelledError:
             self._mark_rollback_required()
@@ -262,10 +264,7 @@ class PostgresOperatorOverrideRepository:
         kind = override.command.kind
         if kind == "force_full_ci":
             return True
-        latest = await self._load_latest_omission_control(
-            override.command.scope,
-            None,
-        )
+        latest = await self._load_latest_omission_control(override.command.scope)
         if latest is not None and override.applied_at < latest.override.applied_at:
             return False
         if kind == "disable_omission":
@@ -320,7 +319,6 @@ class PostgresOperatorOverrideRepository:
     async def _load_latest_omission_control(
         self,
         scope: RepositoryScope,
-        at: datetime | None,
     ) -> _SequencedOverride | None:
         statement = (
             select(operator_overrides, audit_events.c.sequence.label("_audit_sequence"))
@@ -338,8 +336,6 @@ class PostgresOperatorOverrideRepository:
             .order_by(audit_events.c.sequence.desc())
             .limit(1)
         )
-        if at is not None:
-            statement = statement.where(operator_overrides.c.applied_at <= at)
         row = await self._connection.execute(statement)
         mapping = row.mappings().one_or_none()
         return None if mapping is None else _sequenced_override(dict(mapping))

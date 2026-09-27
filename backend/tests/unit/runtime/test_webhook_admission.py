@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from hashlib import sha256
 
@@ -27,6 +27,7 @@ from ci_coordinator.github_ingestion import (
 )
 from ci_coordinator.github_ingestion.ports import PreparedDeliveryClaim
 from ci_coordinator.github_ingestion.seeds import DynamicCiSeed
+from ci_coordinator.identity_admission import RejectedIdentity
 from ci_coordinator.kernel import FixedClock
 from ci_coordinator.runtime.webhook_admission import (
     ProcessWebhookAdmission,
@@ -67,6 +68,22 @@ def test_combined_worker_preserves_identity_and_prepares_no_durable_effect() -> 
     assert isinstance(prepared, PreparedWebhookIngestion)
     assert prepared.provenance.delivery_id == "delivery-1"
     assert prepared.provenance.event_name == "push"
+
+
+def test_signature_rejection_precedes_numeric_payload_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail(*_: object, **__: object) -> object:
+        raise AssertionError("unauthenticated bytes must not reach payload parsing")
+
+    monkeypatch.setattr(
+        "ci_coordinator.runtime.webhook_admission.prepare_trusted_webhook_ingestion", fail
+    )
+    command = replace(webhook_command(), raw_body=b'{"value":1e9999999999999999999}')
+    result = _prepare_webhook_in_worker(
+        command.headers, command.raw_body, SECRET, NOW, load_bundled_profile()
+    )
+    assert isinstance(result, RejectedIdentity)
 
 
 @pytest.mark.parametrize("event_name", ("push", "ping"))

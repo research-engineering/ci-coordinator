@@ -4,7 +4,7 @@ import json
 import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Literal, Self
 
 from ci_coordinator.github_ingestion.payload_limits import WebhookPayloadLimits
@@ -70,7 +70,7 @@ def parse_json_object(raw_body: bytes, limits: WebhookPayloadLimits) -> FrozenJs
             parse_float=Decimal,
             parse_constant=_reject_json_constant,
         )
-    except (json.JSONDecodeError, RecursionError, ValueError) as error:
+    except (json.JSONDecodeError, RecursionError, ValueError, InvalidOperation) as error:
         raise JsonPayloadError("invalid_json") from error
 
     frozen = _FreezeState(limits).freeze(parsed, depth=1)
