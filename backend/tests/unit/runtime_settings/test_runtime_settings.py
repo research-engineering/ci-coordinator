@@ -911,6 +911,87 @@ def test_direct_settings_construction_cannot_bypass_plan_ttl_bound() -> None:
         replace(admitted, plan_ttl_seconds=301)
 
 
+@pytest.mark.parametrize("enforcing", [False, True])
+@pytest.mark.parametrize(
+    ("identity_enabled", "reused_field"),
+    [
+        (False, "CI_COORDINATOR_WEBHOOK_SECRET"),
+        (True, "CI_COORDINATOR_WEBHOOK_SECRET"),
+        (True, "CI_COORDINATOR_CONTROL_PLANE_SESSION_KEY"),
+    ],
+)
+def test_break_glass_reuse_rejects_mapping_and_direct_construction(
+    enforcing: bool, identity_enabled: bool, reused_field: str
+) -> None:
+    mapping = _enforcing_mapping() if enforcing else _non_enforcing_mapping()
+    if identity_enabled:
+        mapping.update(_control_plane_identity_mapping("https://ci.example.test"))
+    baseline = admit_runtime_settings(mapping)
+    assert isinstance(baseline, (NonEnforcingRuntimeSettings, EnforcingRuntimeSettings))
+    token_field = "CI_COORDINATOR_BREAK_GLASS_BEARER_TOKEN"
+    reused = mapping[reused_field]
+    mapping[token_field] = reused
+
+    rejected = admit_runtime_settings(mapping)
+    assert rejected == RuntimeSettingsRejection("invalid_setting_value", token_field)
+    with pytest.raises(ValueError, match="break-glass bearer must be distinct") as failure:
+        replace(baseline, break_glass_bearer_token=SecretValue(reused))
+    assert reused not in str(failure.value)
+    assert reused not in repr(rejected)
+
+    mapping[token_field] = "distinct-break-glass-control-" + "z" * 32
+    accepted = admit_runtime_settings(mapping)
+    assert isinstance(accepted, type(baseline))
+    direct = replace(baseline, break_glass_bearer_token=SecretValue(mapping[token_field]))
+    assert accepted == direct
+    assert accepted.control_plane_identity == baseline.control_plane_identity
+    assert redacted_settings_projection(accepted) == redacted_settings_projection(baseline)
+    assert mapping[token_field] not in repr(accepted)
+
+
+@pytest.mark.parametrize("identity_enabled", [False, True])
+def test_existing_metrics_reuse_rejection_precedes_new_break_glass_pairs(
+    identity_enabled: bool,
+) -> None:
+    mapping = _non_enforcing_mapping()
+    if identity_enabled:
+        mapping.update(_control_plane_identity_mapping("https://ci.example.test"))
+    baseline = admit_runtime_settings(mapping)
+    assert isinstance(baseline, NonEnforcingRuntimeSettings)
+    reused = mapping["CI_COORDINATOR_WEBHOOK_SECRET"]
+    mapping["CI_COORDINATOR_BREAK_GLASS_BEARER_TOKEN"] = reused
+    mapping["CI_COORDINATOR_METRICS_BEARER_TOKEN"] = reused
+
+    assert admit_runtime_settings(mapping) == RuntimeSettingsRejection(
+        "invalid_setting_value", "CI_COORDINATOR_METRICS_BEARER_TOKEN"
+    )
+    with pytest.raises(ValueError, match="metrics bearer token must be distinct"):
+        replace(
+            baseline,
+            break_glass_bearer_token=SecretValue(reused),
+            metrics_bearer_token=SecretValue(reused),
+        )
+
+
+def test_existing_control_plane_secret_guard_precedes_cross_role_rejection() -> None:
+    mapping = _non_enforcing_mapping()
+    mapping.update(_control_plane_identity_mapping("https://ci.example.test"))
+    baseline = admit_runtime_settings(mapping)
+    assert isinstance(baseline, NonEnforcingRuntimeSettings)
+    identity = baseline.control_plane_identity
+    assert identity is not None
+    mapping["CI_COORDINATOR_BREAK_GLASS_BEARER_TOKEN"] = mapping["CI_COORDINATOR_WEBHOOK_SECRET"]
+    mapping["CI_COORDINATOR_KEYCLOAK_BROWSER_CLIENT_SECRET"] = mapping[
+        "CI_COORDINATOR_CONTROL_PLANE_SESSION_KEY"
+    ]
+
+    assert admit_runtime_settings(mapping) == RuntimeSettingsRejection(
+        "invalid_setting_value", "CI_COORDINATOR_CONTROL_PLANE_SESSION_KEY"
+    )
+    with pytest.raises(ValueError, match="control-plane credentials must be pairwise distinct"):
+        replace(identity, browser_client_secret=identity.session_key)
+
+
 def _non_enforcing_mapping() -> dict[str, str]:
     return {
         "CI_COORDINATOR_RUNTIME_MODE": "non_enforcing",

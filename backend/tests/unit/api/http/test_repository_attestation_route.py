@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from http.cookies import SimpleCookie
 from typing import cast
 from urllib.parse import parse_qs, urlsplit
 
@@ -36,7 +37,7 @@ from ci_coordinator.control_plane_identity import KeycloakHumanPrincipal
 from ci_coordinator.proposal_review import ProposalReviewCommand
 
 _PUBLIC_ORIGIN = "https://ci.example.test"
-_TRANSACTION_COOKIE = "__Secure-ci_coordinator_review"
+_TRANSACTION_COOKIE = "__Host-ci_coordinator_reviewer_transaction"
 _PRINCIPAL = human_principal()
 _BODY = {
     "schemaVersion": "ci-repository-attestation-start/v2",
@@ -137,7 +138,7 @@ def test_start_binds_exact_actor_scope_proposal_and_active_pointer() -> None:
             f"{_TRANSACTION_COOKIE}=sealed-review",
             "HttpOnly",
             "Max-Age=300",
-            f"Path={REPOSITORY_ATTESTATION_CALLBACK_PATH}",
+            "Path=/",
             "SameSite=lax",
             "Secure",
         )
@@ -300,6 +301,82 @@ def test_callback_projects_retained_review_identity_and_clears_transaction() -> 
     assert "Max-Age=0" in response.headers["set-cookie"]
 
 
+@pytest.mark.parametrize("secure", [False, True])
+def test_reviewer_cookie_set_and_delete_preserve_the_same_exact_scope(secure: bool) -> None:
+    service = _AttestationService()
+    client = _client(service, secure_cookies=secure)
+    name = _TRANSACTION_COOKIE if secure else "ci_coordinator_dev_reviewer_transaction"
+    path = "/" if secure else REPOSITORY_ATTESTATION_CALLBACK_PATH
+    started = client.post(
+        REPOSITORY_ATTESTATION_START_PATH, json=_BODY, headers=_mutation_headers()
+    )
+    issued = SimpleCookie()
+    issued.load(started.headers["set-cookie"])
+    assert set(issued) == {name}
+    value = issued[name]
+    assert (value["path"], bool(value["secure"]), bool(value["httponly"])) == (
+        path,
+        secure,
+        True,
+    )
+    assert (value["domain"], value["samesite"], value["max-age"]) == ("", "lax", "300")
+
+    completed = client.get(
+        REPOSITORY_ATTESTATION_CALLBACK_PATH,
+        params={"code": "provider-code", "state": "s" * 43},
+        follow_redirects=False,
+    )
+    assert completed.status_code == 303
+    assert len(completed.headers.get_list("set-cookie")) == 1
+    deleted = SimpleCookie()
+    deleted.load(completed.headers["set-cookie"])
+    assert set(deleted) == {name}
+    assert deleted[name]["max-age"] == "0"
+    for attribute in ("path", "domain", "secure", "httponly", "samesite"):
+        assert deleted[name][attribute] == value[attribute]
+
+
+@pytest.mark.parametrize(
+    ("cookie", "status_code"),
+    [
+        ("__Secure-ci_coordinator_reviewer_transaction=sealed-review", 400),
+        ("__Host-ci_coordinator_reviewer_transaction=sealed-review", 303),
+        (
+            "__Secure-ci_coordinator_reviewer_transaction=legacy; "
+            "__Host-ci_coordinator_reviewer_transaction=sealed-review",
+            303,
+        ),
+        (
+            "__Host-ci_coordinator_reviewer_transaction=sealed-review; "
+            "__Host-ci_coordinator_reviewer_transaction=sealed-review",
+            400,
+        ),
+        ("ci_coordinator_dev_reviewer_transaction=sealed-review", 400),
+    ],
+)
+def test_reviewer_callback_reads_only_one_current_cookie(cookie: str, status_code: int) -> None:
+    service = _AttestationService()
+    response = _client(service).get(
+        REPOSITORY_ATTESTATION_CALLBACK_PATH,
+        params={"code": "provider-code", "state": "s" * 43},
+        headers={"Cookie": cookie},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == status_code
+    assert service.calls == (
+        [("complete", _PRINCIPAL, "sealed-review", "s" * 43, "provider-code")]
+        if status_code == 303
+        else []
+    )
+    assert len(response.headers.get_list("set-cookie")) == 1
+    deleted = SimpleCookie()
+    deleted.load(response.headers["set-cookie"])
+    assert set(deleted) == {_TRANSACTION_COOKIE}
+    assert deleted[_TRANSACTION_COOKIE]["path"] == "/"
+    assert deleted[_TRANSACTION_COOKIE]["max-age"] == "0"
+
+
 @pytest.mark.parametrize(
     ("callback", "status_code", "error"),
     [
@@ -417,18 +494,21 @@ def _client(
     | InvalidCredential
     | AuthenticationDependencyUnavailable = (_PRINCIPAL),
     mutation_admitted: bool = True,
+    secure_cookies: bool = True,
 ) -> TestClient:
     dependencies = RepositoryAttestationRouteDependencies(
         authenticator=StaticControlPlaneAuthenticator(authentication),
         role_admission=StaticRoleAdmission(),
         mutation_admission=StaticMutationAdmission(mutation_admitted),
         service=cast(RepositoryAttestationUseCase, service),
-        transaction_cookie_name=_TRANSACTION_COOKIE,
-        secure_cookies=True,
+        transaction_cookie_name=(
+            _TRANSACTION_COOKIE if secure_cookies else "ci_coordinator_dev_reviewer_transaction"
+        ),
+        secure_cookies=secure_cookies,
     )
     return TestClient(
         create_app(HttpRouteDependencies(repository_attestation=dependencies)),
-        base_url=_PUBLIC_ORIGIN,
+        base_url=_PUBLIC_ORIGIN if secure_cookies else "http://localhost:8080",
     )
 
 

@@ -91,6 +91,33 @@ def test_login_start_normalizes_aware_expiry_to_utc() -> None:
     assert start.expires_at.tzinfo is UTC
 
 
+def test_retained_session_survives_service_recomposition_with_unchanged_keys_and_profile() -> None:
+    provider = _Provider()
+    sessions = _Sessions()
+    before = _service(provider=provider, sessions=sessions)
+    started = before.start_login()
+    assert isinstance(started, BrowserLoginStart)
+    completed = asyncio.run(
+        before.complete_login(
+            code="valid-original-code",
+            state=provider.state,
+            transaction_cookie=started.transaction_cookie,
+            previous_session_handle=None,
+        )
+    )
+    assert isinstance(completed, BrowserLoginCompleted)
+    retained = dict(sessions.records)
+    after_provider = _Provider()
+    after = _service(provider=after_provider, sessions=sessions)
+
+    restored = asyncio.run(after.authenticate(completed.principal.session_handle))
+
+    assert restored == completed.principal
+    assert sessions.records == retained
+    assert after_provider.exchanges == []
+    assert after.csrf_token(completed.principal) == before.csrf_token(completed.principal)
+
+
 def test_malformed_unicode_code_is_rejected_before_provider_exchange() -> None:
     provider = _Provider()
     service = _service(provider=provider)

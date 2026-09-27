@@ -212,6 +212,24 @@ File mounts do not protect secrets from a privileged host operator. Do not
 print file contents, commit them, or bake them into the image. Rotation requires
 restarting the service; these files are startup inputs, not a hot-reload API.
 
+Connected startup rejects a break-glass bearer equal to the webhook secret or
+the canonical encoded control-plane session key. Existing metrics and
+control-plane secret separation still applies. Before upgrading a deployment
+with either reused value, provision a distinct break-glass bearer through the
+deployment secret owner. Rotating that bearer is sufficient; do not rotate the
+session key just for this check, because its existing rotation policy invalidates
+sessions and pending transactions. Equality checks do not certify entropy.
+
+When upgrading to [host-isolated browser transactions](../features/browser-credential-isolation.md),
+drain authentication ingress, replace every old serving replica, and only then
+restore ingress. Interrupted login or GitHub verification must be explicitly
+restarted. Old production transaction cookies are no longer read and expire
+within their existing lifetime; no automatic command retry or second-cookie
+cleanup is performed. Keep existing session keys and profile settings to retain
+current durable sessions. Completed review receipts, exact retained-operation
+replay and audit are unchanged. A mixed old/new replica set does not establish
+the new browser-isolation guarantee.
+
 The example publishes only to host loopback for a host-local ingress proxy.
 Do not use `--publish 3000:3000`: Docker's
 [default publication](https://docs.docker.com/engine/network/port-publishing/)

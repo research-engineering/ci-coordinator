@@ -152,6 +152,7 @@ services:
       CI: "true"
       BUSINESS_FIXTURE_FILE: /fixture/browser.json
       BUSINESS_EVIDENCE_DIR: /evidence
+      NODE_EXTRA_CA_CERTS: /fixture/ca.pem
     volumes:
       - ${BUSINESS_FIXTURE}/ca.pem:/fixture/ca.pem:ro
       - ${BUSINESS_FIXTURE}/browser.json:/fixture/browser.json:ro

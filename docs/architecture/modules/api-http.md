@@ -358,6 +358,17 @@ submitted operation and proposal before redirecting to GitHub; callback
 consumes the exact transaction once, so a concurrent loser cannot relabel or
 duplicate the retained review.
 
+For secure production transaction cookies, both route setters and the two
+callback cleanup policies use Path=/, the current settings-owned `__Host-`
+name, Secure, HttpOnly, SameSite=Lax and no Domain. Development HTTP retains
+its own names and callback-specific paths. Cleanup is attached at outer response
+start, including classified errors, overload, deadline and redacted failures;
+it is not limited to successful router returns. One cookie per callback
+route/method remains sufficient. Old production transaction names are not read
+or separately erased: interrupted attempts restart and expire naturally. The
+session cookie and all current V2/legacy-completed operation contracts remain
+unchanged. See [browser credential isolation](../../features/browser-credential-isolation.md).
+
 Login start and callback each own an independent finite process-local token
 bucket and return `429` with `Retry-After` without queueing when exhausted.
 This bounds one process contribution; the ingress owner still owns source-wide

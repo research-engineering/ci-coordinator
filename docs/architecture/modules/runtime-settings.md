@@ -206,6 +206,15 @@ emergency credential languages. The authenticator compares only fixed-length
 SHA-256 digests after admission. The metrics bearer uses its separate
 header-safe URL-token alphabet and cannot reuse any configured credential
 secret or authenticate a non-metrics operation.
+Connected construction additionally rejects exact break-glass text equal to
+the webhook secret, or to the canonical encoded session key when control-plane
+identity is enabled. Mapping admission applies the same finite predicate and
+returns `invalid_setting_value` for `CI_COORDINATOR_BREAK_GLASS_BEARER_TOKEN`;
+direct construction raises a fixed value-free error. Existing metrics and
+three-control-plane-secret distinctness checks retain their precedence.
+No optional profile is made mandatory and no other secret-equivalence relation
+is inferred. Reused deployments must provision a distinct break-glass value
+before startup; session-key rotation is not required by this policy.
 These deterministic floors are work-factor proxies only: byte length does not
 prove randomness, entropy, custody, rotation, or ingress rate limiting. Every
 process string must encode as valid UTF-8. Workflow-reference

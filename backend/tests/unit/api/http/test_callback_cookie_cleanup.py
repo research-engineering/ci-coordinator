@@ -25,7 +25,7 @@ _CLEANUP = ResponseCookieCleanupPolicy(
     path=_CALLBACK_PATH,
     methods=frozenset({"GET"}),
     name=_COOKIE_NAME,
-    cookie_path=_CALLBACK_PATH,
+    cookie_path="/",
     secure=True,
     httponly=True,
     samesite="lax",
@@ -97,4 +97,4 @@ def _assert_one_cleanup(headers: _HeaderCollection) -> None:
     values = [value for value in headers.get_list("set-cookie") if value.startswith(_COOKIE_NAME)]
     assert len(values) == 1
     assert "Max-Age=0" in values[0]
-    assert f"Path={_CALLBACK_PATH}" in values[0]
+    assert "Path=/;" in values[0]

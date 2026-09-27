@@ -33,6 +33,39 @@ def test_configured_control_plane_profile_is_admitted_without_exposing_secrets()
 
 
 @pytest.mark.parametrize(
+    ("origin", "session", "login", "reviewer", "secure"),
+    [
+        (
+            "https://ci.example.test",
+            "__Host-ci_coordinator_session",
+            "__Host-ci_coordinator_oidc_transaction",
+            "__Host-ci_coordinator_reviewer_transaction",
+            True,
+        ),
+        (
+            "http://localhost:8080",
+            "ci_coordinator_dev_session",
+            "ci_coordinator_dev_oidc_transaction",
+            "ci_coordinator_dev_reviewer_transaction",
+            False,
+        ),
+    ],
+)
+def test_transaction_names_preserve_explicit_origin_and_session_policy(
+    origin: str, session: str, login: str, reviewer: str, secure: bool
+) -> None:
+    mapping = _identity_mapping()
+    mapping["CI_COORDINATOR_PUBLIC_ORIGIN"] = origin
+    result = admit_control_plane_identity_settings(mapping)
+
+    assert isinstance(result, ControlPlaneIdentitySettings)
+    assert result.session_cookie_name == session
+    assert result.transaction_cookie_name == login
+    assert result.reviewer_transaction_cookie_name == reviewer
+    assert result.secure_cookies is secure
+
+
+@pytest.mark.parametrize(
     "issuer",
     [
         "https://identity.example.test",
