@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -43,6 +45,7 @@ EXPECTED_SUCCESS_STDOUT = (
     '  "operatorUiBundle": "admitted",\n'
     '  "pythonVersion": "Python 3.13.15",\n'
     '  "runtimeUserId": "10001",\n'
+    '  "runtimeBuildTools": "absent",\n'
     '  "nonClaims": [\n'
     '    "This smoke proves one local disabled-mode Python image build, startup, '
     "liveness response, admitted operator UI bundle, and self-contained "
@@ -59,6 +62,10 @@ EXPECTED_SUCCESS_STDOUT = (
 
 EXPECTED_STDERR = {
     "success": "",
+    "runtime_build_tool_present": (
+        "container log stdout\ncontainer log stderr\n"
+        "runtime build-tool absence failed: runtime contains build tools\n"
+    ),
     "build_failure": "Python runtime container image build failed: build failed on stdout\n",
     "startup_failure": "Python runtime container startup failed: startup failed\n",
     "unhealthy_cleanup_failure": (
@@ -187,6 +194,7 @@ def _normalize(invocations: tuple[Invocation, ...]) -> tuple[Invocation, ...]:
     "scenario",
     [
         "success",
+        "runtime_build_tool_present",
         "build_failure",
         "startup_failure",
         "unhealthy_cleanup_failure",
@@ -267,6 +275,16 @@ def test_python_entrypoint_preserves_docker_and_http_argv(tmp_path: Path) -> Non
         "'20260926_0016_retire_pending_review_authority.py', "
         "'20260926_0017_explicit_review_renewal.py']"
     )
+    build_tools_check = (
+        "import importlib.metadata,shutil; "
+        "forbidden={'setuptools','debugpy','pytest','ruff','mypy','agentic-proofkit'}; "
+        "installed={item.metadata['Name'].lower().replace('_','-') "
+        "for item in importlib.metadata.distributions()}; "
+        "assert not forbidden.intersection(installed); "
+        "assert all(shutil.which(name) is None for name in "
+        "('uv','uvx','node','npm','npx','corepack','pnpm','pytest','ruff','mypy',"
+        "'debugpy','agentic-proofkit','proofkit'))"
+    )
     expected_args = (
         ("build", "--pull", "--file", "Dockerfile", "--tag", image, "."),
         (
@@ -298,6 +316,7 @@ def test_python_entrypoint_preserves_docker_and_http_argv(tmp_path: Path) -> Non
         ("exec", container, "alembic", "--help"),
         ("exec", container, "alembic", "heads"),
         ("exec", container, "python", "-c", migration_artifact_check),
+        ("exec", container, "python", "-c", build_tools_check),
         ("rm", "--force", container),
         ("image", "rm", "--force", image),
     )
@@ -307,3 +326,69 @@ def test_python_entrypoint_preserves_docker_and_http_argv(tmp_path: Path) -> Non
     assert result.process.stdout == EXPECTED_SUCCESS_STDOUT
     assert result.process.stderr == ""
     assert result.process.returncode == 0
+
+
+def test_old_smoke_keeps_its_own_profile_without_qualification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts import build_input_witness, container_runtime_smoke
+
+    calls: list[object] = []
+
+    def independent(profile: object) -> bool:
+        calls.append(profile)
+        return True
+
+    def unexpected(root: Path) -> None:
+        pytest.fail("qualification has a separate command and budget")
+
+    monkeypatch.setattr(build_input_witness, "qualify_build_inputs", unexpected)
+    monkeypatch.setattr(container_runtime_smoke, "run_container_smoke", independent)
+    assert container_runtime_smoke.main() == 0
+    assert calls == [container_runtime_smoke._PROFILE]
+
+
+@pytest.mark.parametrize(
+    ("distribution", "executable"),
+    [(None, None)]
+    + [
+        (name, None)
+        for name in ("setuptools", "debugpy", "pytest", "ruff", "mypy", "agentic-proofkit")
+    ]
+    + [
+        (None, name)
+        for name in (
+            "uv",
+            "uvx",
+            "node",
+            "npm",
+            "npx",
+            "corepack",
+            "pnpm",
+            "pytest",
+            "ruff",
+            "mypy",
+            "debugpy",
+            "agentic-proofkit",
+            "proofkit",
+        )
+    ],
+)
+def test_actual_runtime_absence_program_has_independent_tool_negatives(
+    monkeypatch: pytest.MonkeyPatch, distribution: str | None, executable: str | None
+) -> None:
+    from scripts.container_runtime_smoke import _RUNTIME_BUILD_TOOLS_CHECK
+
+    class Distribution:
+        def __init__(self) -> None:
+            self.metadata = {"Name": distribution or "ci-coordinator-backend"}
+
+    monkeypatch.setattr(importlib.metadata, "distributions", lambda: [Distribution()])
+    monkeypatch.setattr(
+        shutil, "which", lambda name: "/fixture/tool" if name == executable else None
+    )
+    if distribution is None and executable is None:
+        exec(_RUNTIME_BUILD_TOOLS_CHECK, {})  # noqa: S102 - exact owned native inspection program
+    else:
+        with pytest.raises(AssertionError):
+            exec(_RUNTIME_BUILD_TOOLS_CHECK, {})  # noqa: S102 - same program, one changed input

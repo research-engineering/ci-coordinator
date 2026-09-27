@@ -17,3 +17,11 @@ frontend/dist
 frontend/node_modules
 ci-coordinator-store.json
 *.log
+**/.env
+**/.env.*
+**/.DS_Store
+frontend/**/*.tsbuildinfo
+frontend/test-results
+frontend/playwright-report
+frontend/.stryker-tmp
+frontend/reports/mutation

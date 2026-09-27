@@ -107,6 +107,9 @@ def main() -> int:
         if scenario == "migration_artifact_failure" and "alembic.ini" in source:
             sys.stderr.write("  migration artifact missing  \n")
             return 24
+        if scenario == "runtime_build_tool_present" and "importlib.metadata" in source:
+            sys.stderr.write("  runtime contains build tools  \n")
+            return 26
         return 0
 
     sys.stderr.write(f"unexpected fake Docker argv: {args!r}\n")

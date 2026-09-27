@@ -39,10 +39,10 @@ cached workflow snapshot.
 | Native owner                                                   | Relationship checked                                                                                               |
 |----------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|
 | `mise.toml`, `mise.lock`                                       | Literal Python/Node/uv/pnpm patch versions; one matching locked version and selector per tool                      |
-| Root and frontend `package.json`                               | Node/pnpm engines match mise; root packageManager and any frontend override match pnpm                             |
+| Root and frontend `package.json`                               | Node/pnpm engines match mise; root packageManager has the exact pnpm version plus native sha512 pin; any frontend override equals that full spec |
 | `backend/pyproject.toml`, `backend/uv.lock`                    | Exact Python requirement matches mise; mypy/Ruff target the corresponding minor line                               |
 | Canonical and packaged `python-runtime-profile.v1.json`        | Current single admitted patch, requirement, container version and static minor target match                        |
-| Root, backend-development and frontend-development Dockerfiles | Every recognized Python/Node/uv image and Corepack pnpm preparation agrees; required declarations cannot disappear |
+| Root, backend-development, frontend-development and connected-browser Dockerfiles | Every recognized Python/Node/uv image and full Corepack pnpm preparation spec agrees; required declarations cannot disappear |
 | `.devcontainer/Dockerfile`, `devcontainer.json`                | MISE_VERSION and any build override equal the repository's mise minimum; the checked Dockerfile remains selected   |
 | `.github/workflows/*.yml` and `*.yaml`                         | Direct setup-python/setup-node/setup-uv/pnpm action inputs match, including newly added jobs/files                 |
 
@@ -184,10 +184,36 @@ The September 2026 supported runtime selection is **Python 3.13.15** and
 Docker `python` ignores versions `>=3.14`; Docker `node` and npm `@types/node`
 ignore versions `>=25` if version PRs are later re-enabled. Other dependencies
 use the latest compatible stable release, with compatibility exceptions owned
-by their native manifests. Node 24.21.0 includes Corepack 0.36.0; both Node
-image recipes retain that exact Corepack pin before preparing pnpm.
+by their native manifests. The selected Node source vendors Corepack 0.36.0;
+all three Node image recipes require those exact bundled executable versions
+before preparing pnpm. Missing or wrong carrier capabilities fail the build;
+there is no npm-global Corepack reinstall fallback. Source declarations alone
+do not qualify the actual digest-addressed carrier.
 The [runtime consolidation decision](../decisions/lts-dependency-consolidation.md)
 owns this support-line selection and its revision conditions.
+
+The root `packageManager` is `pnpm@<version>+sha512.<128 lowercase hex>`.
+Bind a replacement pin to complete official archive bytes and publisher
+integrity/signature evidence, then update the three early prepare literals in
+the same change. Keep plain version engines/mise and frozen dependency locks
+separate from this archive identity. Each stage creates a new `COREPACK_HOME`
+with atomic `mkdir`, without `-p`; never delete/adopt a prior manager cache or
+mount a writable cache there. The existing pnpm content store remains separate.
+
+The separate GitHub build-input command exercises the actual Corepack carrier,
+correct/wrong expected hashes for the original archive, native fresh-home/cache
+controls, and Docker context exclusions with required-resource positives.
+Run `python3 -m scripts.build_input_witness` independently of
+`python3 -m scripts.container_runtime_smoke` in the same owned container job.
+Qualification reserves cleanup/termination inside its 570s internal total and
+has its own 600s catalog timeout; it cannot borrow the old smoke's 600s budget.
+The old smoke retains its image build and finite forbidden-tool checks.
+See [build input admission](../features/build-input-admission.md).
+No signed same-version tamper, arbitrary hostile-cache or byte-identical image
+claim follows. Pinned uv's full-lock isolated-build hash strategy is a source
+counterguard to the missing-verification allegation; retain the existing frozen
+project-build positive without adding redundant constraints or a new custom
+backend-index/tampering suite.
 
 The procedure above owns manual coordinated updates; disabling proposals does
 not make dependency freshness automatic. Review new advisories promptly and

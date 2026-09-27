@@ -19,9 +19,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import TextIO, cast
 
-from ruamel.yaml import YAML
-from ruamel.yaml.error import YAMLError
-
 _TOOLS = ("python", "node", "uv", "pnpm", "gitleaks")
 _GITLEAKS_PLATFORMS = {
     "linux-arm64": "linux_arm64",
@@ -30,6 +27,7 @@ _GITLEAKS_PLATFORMS = {
 }
 _SCANNER_SOURCE = ".github/actions/secret-scan/scanner.py"
 _EXACT_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+_PNPM_SPEC = re.compile(r"pnpm@([0-9]+\.[0-9]+\.[0-9]+)\+sha512\.[0-9a-f]{128}")
 _SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
 _PROFILES = (
     "docs/specs/ci-coordinator-runtime/python-runtime-profile.v1.json",
@@ -39,6 +37,7 @@ _DOCKER_TOOLS = {
     "Dockerfile": {"python", "node", "uv", "pnpm"},
     "docker/development/backend.Dockerfile": {"python", "uv"},
     "frontend/Dockerfile.dev": {"node", "pnpm"},
+    "docker/ci/connected-browser.Dockerfile": {"node", "pnpm"},
     ".devcontainer/Dockerfile": {"mise"},
 }
 _SETUP_ACTIONS = {
@@ -111,6 +110,8 @@ class _Sources:
         if path.endswith(".json"):
             return json.loads(source, object_pairs_hook=_unique_object, parse_constant=_nonfinite)
         if path.endswith((".yml", ".yaml")):
+            from ruamel.yaml import YAML
+
             return YAML(typ="safe").load(source)
         return tomllib.loads(source)
 
@@ -152,7 +153,9 @@ def _version(report: ToolchainReport, path: str, selector: str, value: object) -
     return value
 
 
-def _manifest(report: ToolchainReport, path: str, document: object) -> None:
+def _manifest(
+    report: ToolchainReport, path: str, document: object, manager_spec: str | None
+) -> str | None:
     tools = report.tools
     if path == "mise.lock":
         for tool in _TOOLS:
@@ -169,10 +172,22 @@ def _manifest(report: ToolchainReport, path: str, document: object) -> None:
     elif path in ("package.json", "frontend/package.json"):
         for tool in ("node", "pnpm"):
             report.expect(path, f"engines.{tool}", _at(document, "engines", tool), tools[tool])
-        if path == "package.json" or _at(document, "packageManager") is not None:
-            report.expect(
-                path, "packageManager", _at(document, "packageManager"), f"pnpm@{tools['pnpm']}"
-            )
+        value = _at(document, "packageManager")
+        if path == "package.json":
+            match = _PNPM_SPEC.fullmatch(value) if isinstance(value, str) else None
+            if match is None:
+                report.reject(
+                    path,
+                    "packageManager",
+                    "invalid_manager_spec",
+                    "expected pnpm@major.minor.patch+sha512.<128 lowercase hex>",
+                )
+                manager_spec = None
+            else:
+                report.expect(path, "packageManager.version", match.group(1), tools["pnpm"])
+                manager_spec = cast(str, value)
+        elif value is not None:
+            report.expect(path, "packageManager", value, manager_spec)
     elif path in _PROFILES:
         # The current runtime owner admits exactly one CPython patch line.
         # A future multi-runtime profile needs an explicit compatibility decision.
@@ -217,6 +232,7 @@ def _manifest(report: ToolchainReport, path: str, document: object) -> None:
         features = _at(document, "features")
         if features is not None:
             report.expect(path, "features", features, {})
+    return manager_spec
 
 
 def _gitleaks_lock(report: ToolchainReport, row: object) -> None:
@@ -325,7 +341,7 @@ def _image(report: ToolchainReport, path: str, line: int, reference: str) -> str
     return tool
 
 
-def _dockerfile(report: ToolchainReport, path: str, source: str) -> None:
+def _dockerfile(report: ToolchainReport, path: str, source: str, manager_spec: str | None) -> None:
     seen: set[str] = set()
     stages: set[str] = set()
     stage_count = 0
@@ -361,9 +377,7 @@ def _dockerfile(report: ToolchainReport, path: str, source: str) -> None:
                 if word != "corepack" or tokens[index + 1 : index + 2] != ["prepare"]:
                     continue
                 pin = tokens[index + 2 : index + 3]
-                report.expect(
-                    path, f"line {line} corepack.prepare", pin, [f"pnpm@{report.tools['pnpm']}"]
-                )
+                report.expect(path, f"line {line} corepack.prepare", pin, [manager_spec])
                 seen.add("pnpm")
         if reference is not None:
             tool = _image(report, path, line, reference)
@@ -402,6 +416,8 @@ def _workflow(report: ToolchainReport, path: str, document: object) -> None:
 
 def check_toolchain(repo_root: Path) -> ToolchainReport:
     """Return all observed drift; never install, execute tools or contact a provider."""
+    from ruamel.yaml.error import YAMLError
+
     report = ToolchainReport()
     sources = _Sources(repo_root, report)
     try:
@@ -433,16 +449,17 @@ def check_toolchain(repo_root: Path) -> ToolchainReport:
     if not workflows:
         report.reject(".github/workflows", "files", "missing_declaration", "no workflows found")
     workflow_paths = tuple(path.relative_to(repo_root).as_posix() for path in workflows)
+    manager_spec: str | None = None
     for path in (*manifests, _SCANNER_SOURCE, *_DOCKER_TOOLS, *workflow_paths):
         try:
             if path == _SCANNER_SOURCE:
                 _scanner_version(report, sources.text(path))
             elif path in _DOCKER_TOOLS:
-                _dockerfile(report, path, sources.text(path))
+                _dockerfile(report, path, sources.text(path), manager_spec)
             elif path in workflow_paths:
                 _workflow(report, path, sources.document(path))
             else:
-                _manifest(report, path, sources.document(path))
+                manager_spec = _manifest(report, path, sources.document(path), manager_spec)
         except (OSError, ValueError, YAMLError) as error:
             report.reject(path, "file", "invalid_source", str(error))
     sources.unchanged()

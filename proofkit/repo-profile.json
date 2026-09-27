@@ -222,6 +222,18 @@
       "allowedArgv": [
         "backend/.venv/bin/python",
         "-m",
+        "scripts.build_input_witness"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.build-inputs",
+      "kind": "exact_argv",
+      "networkPolicy": "external",
+      "parallelGroup": "build"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
         "scripts.container_runtime_smoke"
       ],
       "credentialClass": "none",
