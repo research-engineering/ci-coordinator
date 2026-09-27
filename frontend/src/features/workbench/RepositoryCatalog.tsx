@@ -31,6 +31,7 @@ export function RepositoryCatalog({ itemLimit, onSelect }: RepositoryCatalogProp
   const installations = useInstallationCatalog(organizationPage);
   const catalog = installations.state.kind === "settled" ? installations.state.result : undefined;
   const available = catalog?.kind === "ready" ? catalog.catalog.installations : EMPTY_INSTALLATIONS;
+  const hasActive = available.some((item) => item.state === "active");
   const [installationId, setInstallationId] = useState<number>();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
@@ -272,9 +273,11 @@ export function RepositoryCatalog({ itemLimit, onSelect }: RepositoryCatalogProp
                   : "No authorized organizations"
               }
             />
-          ) : installationId === undefined ? (
+          ) : !hasActive ? (
             <CatalogMessage icon={AlertTriangle} title="No active organizations" />
-          ) : repositories.state.kind === "loading" ? (
+          ) : activeInstallationId === undefined ||
+            repositories.state.kind === "idle" ||
+            repositories.state.kind === "loading" ? (
             <LoadingState label="Loading repositories" />
           ) : repositoryPage === undefined ? (
             <CatalogFailure

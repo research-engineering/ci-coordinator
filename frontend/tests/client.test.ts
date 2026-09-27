@@ -24,6 +24,7 @@ import {
   workbenchFixture,
   workflowDiscoveryFixture,
 } from "./fixture";
+import numericResponse from "./workbenchNumericResponse.json?raw";
 
 const scope = { installationId: 1, limit: 10, repositoryId: 1 } as const;
 const activationCommand = {
@@ -43,6 +44,58 @@ const attestationCommand = {
 const csrfToken = "c".repeat(43);
 
 afterEach(() => vi.unstubAllGlobals());
+
+test("admits the exact synthetic fractional response emitted by the backend DTO/ASGI witness", async () => {
+  expect(numericResponse.endsWith("\n")).toBe(true);
+  expect(numericResponse.trimEnd()).not.toContain("\n");
+  const fetch = vi.fn(
+    async () =>
+      new Response(numericResponse, {
+        headers: { "content-type": "application/json" },
+      }),
+  );
+  vi.stubGlobal("fetch", fetch);
+  const result = await fetchWorkbenchSnapshot({ installationId: 1, repositoryId: 2, limit: 7 });
+  expect(result).toMatchObject({
+    kind: "ready",
+    snapshot: {
+      ledgerRevision: 1,
+      scope: { installationId: 1, repositoryId: 2 },
+      auditEvents: [
+        {
+          sequence: 1,
+          auditEventId: "audit_f052745ce41ffdd6b9fba64a4835a1a8",
+          payload: { fraction: 0.5, nested: [-0.25, { weight: 1.5 }] },
+          payloadHash: "2ef414fdab8cdf4548c0f901f5891ad1321f14828a222140f4454d25131a065a",
+          eventHash: "f052745ce41ffdd6b9fba64a4835a1a85befda5a43f3a8fd670d5dd0e8c3f9ab",
+        },
+      ],
+      replay: { status: "valid", snapshotRevision: 1, verifiedRevision: 1 },
+    },
+  });
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  ["unsafe payload", '"fraction":0.5', '"fraction":9007199254740992'],
+  ["fractional sequence", '"sequence":1', '"sequence":1.5'],
+  ["fractional revision", '"ledgerRevision":1', '"ledgerRevision":1.5'],
+  ["foreign scope", '"repositoryId":2', '"repositoryId":3'],
+] as const)("the numeric wire bridge still rejects %s", async (_label, before, after) => {
+  expect(numericResponse).toContain(before);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(numericResponse.replace(before, after), {
+          headers: { "content-type": "application/json" },
+        }),
+    ),
+  );
+  await expect(
+    fetchWorkbenchSnapshot({ installationId: 1, repositoryId: 2, limit: 7 }),
+  ).resolves.toEqual({ kind: "invalid-response" });
+});
 
 describe("control-plane identity, repository attestation, and activation clients", () => {
   test("admits a bounded Keycloak session and exact GitHub authorization URL", async () => {

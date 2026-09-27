@@ -183,7 +183,8 @@ function isBoundedJsonValue(value: unknown): value is components["schemas"]["Jso
       continue;
     }
     if (typeof candidate === "number") {
-      if (!Number.isFinite(candidate) || !Number.isSafeInteger(candidate)) return false;
+      if (!Number.isFinite(candidate) || Math.abs(candidate) > Number.MAX_SAFE_INTEGER)
+        return false;
       continue;
     }
     if (Array.isArray(candidate)) {

@@ -13,6 +13,7 @@ import {
   retentionSelectionSchema,
 } from "../../api/ciEconomics/archiveRetentionSchema";
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
+import { formatDateTime } from "../../domain/format";
 
 type State =
   | { readonly kind: "idle" }
@@ -118,6 +119,14 @@ export function ArchiveRetention({
               : "Retention change confirmed. Permanent statistics are preserved.",
         });
         onChanged(result.value);
+      } else if (
+        review.kind === "review" &&
+        (result.kind === "unauthenticated" || result.kind === "forbidden")
+      ) {
+        setState({
+          kind: "rejected",
+          message: "The retention request was denied. No retention change was admitted.",
+        });
       } else setState({ ...review, kind: "uncertain" });
     } catch {
       if (!active.signal.aborted) setState({ ...review, kind: "uncertain" });
@@ -144,9 +153,21 @@ export function ArchiveRetention({
         <dt>Detail content</dt>
         <dd>{detail.content.replaceAll("_", " ")}</dd>
         <dt>First detail import</dt>
-        <dd>{detail.firstImportedAt ?? "Not imported"}</dd>
+        <dd>
+          {detail.firstImportedAt === null ? (
+            "Not imported"
+          ) : (
+            <time dateTime={detail.firstImportedAt}>{formatDateTime(detail.firstImportedAt)}</time>
+          )}
+        </dd>
         <dt>Expiry</dt>
-        <dd>{detail.expiresAt ?? "No finite expiry"}</dd>
+        <dd>
+          {detail.expiresAt === null ? (
+            "No finite expiry"
+          ) : (
+            <time dateTime={detail.expiresAt}>{formatDateTime(detail.expiresAt)}</time>
+          )}
+        </dd>
       </dl>
       <p>
         Permanent run and job statistics are unaffected. Deleted details cannot be restored by
@@ -192,7 +213,15 @@ export function ArchiveRetention({
             {state.preview.preview.effects.map((effect) => (
               <li key={`${effect.key.workflowRunId}:${effect.key.runAttempt}`}>
                 Run #{effect.key.workflowRunId} / {effect.key.runAttempt}: {effect.before.state} to{" "}
-                {effect.after.state}; expiry {effect.after.expiresAt ?? "none"}.
+                {effect.after.state}; expiry{" "}
+                {effect.after.expiresAt === null ? (
+                  "none"
+                ) : (
+                  <time dateTime={effect.after.expiresAt}>
+                    {formatDateTime(effect.after.expiresAt)}
+                  </time>
+                )}
+                .
               </li>
             ))}
           </ul>

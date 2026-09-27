@@ -40,5 +40,11 @@
         "organizeImports": "on"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["tests/workbenchNumericResponse.json"],
+      "formatter": { "enabled": false }
+    }
+  ]
 }

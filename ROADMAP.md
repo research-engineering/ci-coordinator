@@ -122,6 +122,7 @@ the complete audit parents:
 | [#40](https://github.com/research-engineering/ci-coordinator/pull/40) | Explicit fresh review and selected-receipt activation use coordinated v2 requests while preserving completed legacy replay; pending-only fenced migration, captured result revisions and bounded outcome metrics retain their separate authorities. |
 | [#41](https://github.com/research-engineering/ci-coordinator/pull/41) | Slowdown baselines use the first seven complete days and preserve later unknown intervals; weighted comparisons, historical events and independent forecast admission remain unchanged. |
 | [#42](https://github.com/research-engineering/ci-coordinator/pull/42) | GitHub credentials are narrowed to the admitted operation and repository, with distinct inventory and organization-runner grants; cache identity and measurement-recipient trust remain explicit. Live effective grants and measured cold-path costs are not implied. |
+| [#43](https://github.com/research-engineering/ci-coordinator/pull/43) | Browser transaction cookies use secure host-only ownership, and settings reject collisions between the admitted credential roles. Exact-head native checks cover the controlled sibling-domain counterexample; deployment and arbitrary-browser guarantees remain separate. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -134,8 +135,8 @@ and production omission authority are still distinct.
 All 471 original audit IDs now have initial source-bound dispositions in the
 external register, preserving every scoped refutation, policy and unknown.
 Initial adjudication is not confirmation, repair or native qualification.
-The next prepared audit batch isolates browser transaction cookies and finite
-credential roles through existing settings and HTTP owners.
+The next prepared audit batch preserves truthful frontend outcomes, catalog
+loading and the shared bounded numeric response contract.
 Phase-exact managed installation and transitive process ownership retain their
 independent lifecycle proof, including the isolated consumer-lab process path.
 Truthful frontend outcomes and retained unsuccessful HTTP-close outcomes are

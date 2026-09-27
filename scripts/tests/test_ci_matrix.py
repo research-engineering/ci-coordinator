@@ -245,6 +245,46 @@ def test_python_cli_override_cannot_inherit_root_membership(
         ("assist", "includes", ["tests/**"]),
         ("assist", "enabled", False),
         ("root", "overrides", [{"includes": ["**"], "linter": {"enabled": False}}]),
+        ("root", "overrides", []),
+        ("root", "overrides", None),
+        ("root", "overrides", [{"includes": ["tests/**"], "formatter": {"enabled": False}}]),
+        (
+            "root",
+            "overrides",
+            [{"includes": ["tests/other.json"], "formatter": {"enabled": False}}],
+        ),
+        (
+            "root",
+            "overrides",
+            [{"includes": ["tests/workbenchNumericResponse.json"], "formatter": {"enabled": 0}}],
+        ),
+        (
+            "root",
+            "overrides",
+            [{"includes": ["tests/workbenchNumericResponse.json"], "formatter": {"enabled": True}}],
+        ),
+        (
+            "root",
+            "overrides",
+            [
+                {
+                    "includes": ["tests/workbenchNumericResponse.json"],
+                    "formatter": {"enabled": False},
+                    "linter": {"enabled": False},
+                }
+            ],
+        ),
+        (
+            "root",
+            "overrides",
+            [
+                {
+                    "includes": ["tests/workbenchNumericResponse.json"],
+                    "formatter": {"enabled": False},
+                },
+                {"includes": ["tests/other.json"], "formatter": {"enabled": False}},
+            ],
+        ),
         ("root", "extends", ["./other.json"]),
         ("root", "vcs", {"enabled": True, "useIgnoreFile": True}),
         ("root", "javascript", {"linter": {"enabled": False}}),

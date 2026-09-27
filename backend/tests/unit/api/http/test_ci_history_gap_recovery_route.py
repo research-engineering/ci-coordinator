@@ -11,15 +11,57 @@ from ci_coordinator.api.http.routers.ci_history import (
     HISTORY_GAP_REPAIR_PATH,
     MAX_HISTORY_BODY_BYTES,
 )
-from ci_coordinator.app.ci_history_administration import CiHistoryAdministrationUseCase
+from ci_coordinator.app.ci_history_administration import (
+    CiHistoryAdministrationService,
+    CiHistoryAdministrationUseCase,
+)
+from ci_coordinator.ci_economics.history_administration import HistoryAdministrationStore
 from ci_coordinator.ci_economics.history_gap_recovery import (
     HistoryGapRepairInterval,
     HistoryGapRepairReceipt,
     HistoryGapRepairResult,
     RepairHistoryGaps,
 )
+from ci_coordinator.control_plane_identity import CONTROL_PLANE_ROLES
 
 BODY = gap_command().request.model_dump(mode="json")
+
+
+@pytest.mark.parametrize("denial", ["role", "integrity", "scope"])
+def test_first_gap_refusal_precedes_target_store_with_rest_valid_command(denial: str) -> None:
+    command = RepairHistoryGaps.from_request(
+        gap_command().request, actor=human_principal().actor_id
+    )
+    authorizer = AsyncMock()
+    authorizer.allows_scope.return_value = denial != "scope"
+    store = AsyncMock(spec=HistoryAdministrationStore)
+    store.repair_history_gaps.return_value = HistoryGapRepairResult(
+        outcome="committed",
+        operationId=command.operation_id,
+        receipt=HistoryGapRepairReceipt(
+            request=command.request,
+            intervals=(
+                HistoryGapRepairInterval(workflowRunId=303, fromAttempt=1, throughAttempt=1),
+            ),
+        ),
+    )
+    service = CiHistoryAdministrationService(authorizer=authorizer, store=store)
+    use_case = AsyncMock(spec=CiHistoryAdministrationUseCase, wraps=service)
+    with TestClient(
+        _app(
+            use_case,
+            integrity=denial != "integrity",
+            roles=frozenset({"audit"}) if denial == "role" else CONTROL_PLANE_ROLES,
+        )
+    ) as client:
+        denied = client.post(HISTORY_GAP_REPAIR_PATH, json=BODY)
+    assert (denied.status_code, denied.json()) == (403, {"ok": False, "error": "forbidden"})
+    assert not store.mock_calls
+    authorizer.allows_scope.return_value = True
+    with TestClient(_app(use_case)) as client:
+        accepted = client.post(HISTORY_GAP_REPAIR_PATH, json=BODY)
+    assert accepted.status_code == 200 and accepted.json()["outcome"] == "committed"
+    store.repair_history_gaps.assert_awaited_once_with(command)
 
 
 @pytest.mark.parametrize("outcome", ["committed", "replayed"])

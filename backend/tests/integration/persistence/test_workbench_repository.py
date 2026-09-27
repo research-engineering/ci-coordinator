@@ -11,7 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 
 import ci_coordinator.persistence.compatibility_fence as fence_module
 import ci_coordinator.persistence.workbench_repository as workbench_module
-from ci_coordinator.audit_replay import verify_audit_event_integrity
+from ci_coordinator.audit_replay import (
+    AuditAppendAppended,
+    AuditAppendDuplicate,
+    AuditEventInput,
+    prepare_audit_event,
+    verify_audit_event_integrity,
+)
 from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.config_epochs import (
     ConfigEpochActivationApplied,
@@ -30,6 +36,7 @@ from ci_coordinator.persistence import (
     PostgresConfigEpochUnitOfWork,
     PostgresIngressIssuanceUnitOfWork,
     PostgresShadowReconciliationUnitOfWork,
+    PostgresUnitOfWork,
     PostgresWorkbenchRepository,
     TransactionalReconciliationStore,
 )
@@ -82,6 +89,57 @@ pytestmark = pytest.mark.persistence
 NOW = datetime(2026, 7, 17, 12, 0, tzinfo=UTC)
 PRIMARY_SCOPE = RepositoryScope(100, 200)
 OTHER_SCOPE = RepositoryScope(100, 201)
+
+
+def test_fractional_audit_payload_survives_append_replay_and_scoped_workbench_read(
+    runtime_postgres_database_url: str,
+) -> None:
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        prepared = prepare_audit_event(
+            AuditEventInput(
+                idempotency_key="numeric-response-1",
+                installation_id=1,
+                repository_id=2,
+                subject_type="observation",
+                subject_id="numeric-observation",
+                event_type="numeric-payload/v1",
+                created_at="2026-07-17T12:00:00.000Z",
+                actor="operator:example",
+                payload={"fraction": 0.5, "nested": [-0.25, {"weight": 1.5}]},
+            )
+        )
+        try:
+            async with PostgresUnitOfWork(engine) as transaction:
+                appended = await transaction.audit_events.append(prepared)
+                assert isinstance(appended, AuditAppendAppended)
+                assert verify_audit_event_integrity(appended.record) is None
+                await transaction.commit()
+            repository = PostgresWorkbenchRepository(engine)
+            before = await repository.load(RepositoryScope(1, 2), limit=7)
+            assert before.ledger_revision == 1 and len(before.audit_events) == 1
+            event = before.audit_events[0]
+            assert event.payload == {"fraction": 0.5, "nested": [-0.25, {"weight": 1.5}]}
+            assert event.event_hash == (
+                "f052745ce41ffdd6b9fba64a4835a1a85befda5a43f3a8fd670d5dd0e8c3f9ab"
+            )
+            assert event.payload_hash == (
+                "2ef414fdab8cdf4548c0f901f5891ad1321f14828a222140f4454d25131a065a"
+            )
+            async with PostgresUnitOfWork(engine) as transaction:
+                replayed = await transaction.audit_events.append(prepared)
+                assert isinstance(replayed, AuditAppendDuplicate)
+                assert replayed.record == appended.record
+                await transaction.commit()
+            after = await repository.load(RepositoryScope(1, 2), limit=7)
+            assert after.ledger_revision == before.ledger_revision
+            assert after.audit_events == before.audit_events
+            foreign = await repository.load(RepositoryScope(1, 3), limit=7)
+            assert foreign.ledger_revision == 1 and foreign.audit_events == ()
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
 
 
 @pytest.mark.parametrize("limit", [1, 10, MAX_WORKBENCH_SECTION_ITEMS])

@@ -317,7 +317,15 @@ def frontend_inputs(root: Path, paths: tuple[str, ...]) -> set[str]:
     biome = json.loads(_text(root, "frontend/biome.json"))
     package = json.loads(_text(root, "frontend/package.json"))
     if (
-        set(biome) != {"$schema", "files", "formatter", "linter", "assist"}
+        set(biome) != {"$schema", "files", "formatter", "linter", "assist", "overrides"}
+        or biome["overrides"]
+        != [
+            {
+                "includes": ["tests/workbenchNumericResponse.json"],
+                "formatter": {"enabled": False},
+            }
+        ]
+        or biome["overrides"][0]["formatter"]["enabled"] is not False
         or tuple(biome["files"]["includes"]) != _BIOME_INCLUDES
         or set(biome["files"]) != {"includes"}
         or set(biome["formatter"]) != {"enabled", "indentStyle", "lineWidth"}
