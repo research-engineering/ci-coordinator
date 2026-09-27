@@ -1069,3 +1069,137 @@ def _resources(
         background,
         additional_resources=additional_resources,
     )
+
+
+@pytest.mark.parametrize("phase", ["prepare", "first_round"])
+@pytest.mark.parametrize("suppress_cancel", [False, True])
+def test_readiness_activation_cannot_survive_interrupted_startup(
+    phase: str, suppress_cancel: bool
+) -> None:
+    async def scenario() -> None:
+        events: list[str] = []
+        entered, cancelled, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+        async def block() -> None:
+            entered.set()
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                if not suppress_cancel:
+                    raise
+                await release.wait()
+
+        class Prepared(_Closeable):
+            async def prepare(self) -> None:
+                await super().prepare()
+                if phase == "prepare":
+                    await block()
+
+        class Background(_Background):
+            async def start(self) -> None:
+                await super().start()
+                if phase == "first_round":
+                    await block()
+
+        class Readiness:
+            def activate(self) -> None:
+                events.append("activate")
+
+            def stop(self) -> None:
+                events.append("revoke")
+
+            async def drain(self) -> None:
+                events.append("drain")
+
+        resources = _resources(
+            events, Background(events), additional_resources=(Prepared(events, "prepare"),)
+        )
+        resources.bind_readiness(Readiness())
+
+        async def lifespan() -> None:
+            async with resources.lifespan(FastAPI()):
+                events.append("serve")
+
+        startup = asyncio.create_task(lifespan())
+        await entered.wait()
+        closing = asyncio.create_task(resources.aclose())
+        await cancelled.wait()
+        assert events.count("revoke") == 1 and "activate" not in events
+        if suppress_cancel:
+            assert not closing.done() and "drain" not in events
+        release.set()
+        await closing
+        with pytest.raises(RuntimeError, match="startup was interrupted"):
+            await startup
+        assert "activate" not in events and "serve" not in events
+        assert events.index("revoke") < events.index("drain") < events.index("github")
+        assert not resources.lifecycle_ready
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("start", [False, True])
+def test_one_readiness_binding_activates_synchronously_and_drains_before_teardown(
+    start: bool,
+) -> None:
+    async def scenario() -> None:
+        events: list[str] = []
+        resources = _resources(events, _Background(events))
+
+        class Readiness:
+            def activate(self) -> None:
+                assert resources.lifecycle_ready
+                events.append("activate")
+
+            def stop(self) -> None:
+                assert not resources.lifecycle_ready
+                events.append("revoke")
+
+            async def drain(self) -> None:
+                events.append("drain")
+
+        participant = Readiness()
+        resources.bind_readiness(participant)
+        with pytest.raises(RuntimeError, match="bound once"):
+            resources.bind_readiness(participant)
+        if start:
+            async with resources.lifespan(FastAPI()):
+                assert events == ["background-start", "activate"]
+        else:
+            await resources.aclose()
+        await resources.aclose()
+        assert events.count("activate") == int(start)
+        assert events.count("revoke") == events.count("drain") == 1
+        assert events.index("drain") < events.index("github")
+        with pytest.raises(RuntimeError, match="bound once"):
+            resources.bind_readiness(participant)
+
+    asyncio.run(scenario())
+
+
+def test_failed_readiness_drain_cannot_fall_through_to_external_cleanup() -> None:
+    async def scenario() -> None:
+        events: list[str] = []
+        resources = _resources(events, _Background(events))
+
+        class Readiness:
+            def activate(self) -> None:
+                pass
+
+            def stop(self) -> None:
+                pass
+
+            async def drain(self) -> None:
+                events.append("drain")
+                raise RuntimeError("private close canary")
+
+        resources.bind_readiness(Readiness())
+        for _ in range(2):
+            with pytest.raises(RuntimeError, match="runtime resource cleanup failed") as captured:
+                await resources.aclose()
+            assert "private" not in "".join(traceback.format_exception(captured.value))
+            assert resources.is_open and not resources.lifecycle_ready
+        assert events == ["drain", "drain"]
+
+    asyncio.run(scenario())

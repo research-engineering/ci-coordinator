@@ -688,6 +688,14 @@ class RuntimeMetrics:
             self._record_instrumentation_failure("dependency_readiness")
             return
 
+    def dependency_unresolved(self, dependency: str) -> None:
+        if not _admitted_dependency(dependency):
+            return
+        try:
+            self._dependency_ready.remove(dependency)
+        except Exception:
+            self._record_instrumentation_failure("dependency_readiness")
+
     def background_health(self, health: BackgroundHealth) -> None:
         try:
             self._background_healthy.set(int(health.ready))

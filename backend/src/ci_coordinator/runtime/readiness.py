@@ -25,6 +25,12 @@ class RuntimeAvailabilityProbe(Protocol):
 class DatabaseStatusProbe(Protocol):
     async def check(self) -> DatabaseReadiness: ...
 
+    def activate(self) -> None: ...
+
+    def stop(self) -> None: ...
+
+    async def drain(self) -> None: ...
+
 
 class RuntimeReadiness:
     def __init__(
@@ -52,121 +58,192 @@ class RuntimeReadiness:
         self._diagnostics = diagnostics
         self._inflight: asyncio.Task[ReadinessStatus] | None = None
         self._active_waiters = 0
+        self._names = ("database", *names)
+        self._facts: list[bool | None] = []
+        self._active = False
+        self._stopped = False
+        self._resources.bind_readiness(self)
+
+    def activate(self) -> None:
+        if self._stopped:
+            raise RuntimeError("runtime readiness cannot be restarted")
+        self._database_probe.activate()
+        self._active = True
+
+    def stop(self) -> None:
+        if self._stopped:
+            return
+        self._active = False
+        self._stopped = True
+        self._database_probe.stop()
+        if self._inflight is not None and not self._inflight.done():
+            self._inflight.cancel()
+        self._inactive_status(publish=True)
+
+    async def drain(self) -> None:
+        self.stop()
+        task = self._inflight
+        cancellation: asyncio.CancelledError | None = None
+        if task is not None:
+            while not task.done():
+                try:
+                    await asyncio.wait({task})
+                except asyncio.CancelledError as error:
+                    cancellation = cancellation or error
+            if not task.cancelled():
+                task.exception()
+        try:
+            await self._database_probe.drain()
+        except BaseException:
+            if cancellation is None:
+                raise
+            cancellation.add_note("database readiness drain also failed")
+        if cancellation is not None:
+            raise cancellation
 
     async def __call__(self) -> ReadinessStatus:
+        if not self._active:
+            return self._inactive_status()
         if self._active_waiters >= MAXIMUM_CONCURRENT_READINESS_WAITERS:
-            return self._unavailable_status("readiness_admission")
+            return assess_readiness((DependencyReadiness("readiness_admission", False, True),))
         self._active_waiters += 1
         try:
             task = self._inflight
             if task is None or task.done():
-                task = asyncio.create_task(self._evaluate())
+                self._facts = [None] * len(self._names)
+                deadline = asyncio.get_running_loop().time() + self._timeout_ms / 1_000
+                task = asyncio.create_task(self._evaluate(self._facts, deadline))
                 self._inflight = task
             try:
                 async with asyncio.timeout(self._timeout_ms / 1_000):
-                    return await asyncio.shield(task)
+                    status = await asyncio.shield(task)
+                    return status if self._active else self._inactive_status()
             except TimeoutError:
-                return self._async_dependencies_unavailable()
+                if not self._active:
+                    return self._inactive_status()
+                if task.done():
+                    return task.result()
+                return self._project(self._facts)
         finally:
             self._active_waiters -= 1
 
-    async def _evaluate(self) -> ReadinessStatus:
-        availability = await asyncio.gather(
-            self._database_available(),
-            *(self._probe_available(name, probe) for name, probe in self._required_probes),
-        )
-        database_available = availability[0]
+    async def _evaluate(self, facts: list[bool | None], deadline: float) -> ReadinessStatus:
+        async with asyncio.TaskGroup() as group:
+            tasks = [group.create_task(self._database_available(facts, deadline))]
+            tasks.extend(
+                group.create_task(self._probe_available(index, probe, facts, deadline))
+                for index, (_name, probe) in enumerate(self._required_probes, start=1)
+            )
+            await asyncio.gather(*tasks)
+        if not self._active or self._facts is not facts:
+            return self._inactive_status()
+        return self._project(facts)
+
+    def _project(self, facts: list[bool | None]) -> ReadinessStatus:
+        if not self._active or facts is not self._facts:
+            return self._inactive_status()
         background = self._resources.background_health()
         if self._metrics is not None:
             self._metrics.background_health(background)
-        probed_dependencies = tuple(
-            DependencyReadiness(name, available, True)
-            for (name, _probe), available in zip(
-                self._required_probes,
-                availability[1:],
-                strict=True,
-            )
-        )
         dependencies = (
             DependencyReadiness(
                 "runtime_resources",
                 self._resources.lifecycle_ready,
                 True,
             ),
-            DependencyReadiness("database", database_available, True),
             DependencyReadiness("background_reconciliation", background.ready, True),
-            *probed_dependencies,
+            *(
+                DependencyReadiness(name, available is True, True)
+                for name, available in zip(self._names, facts, strict=True)
+            ),
         )
         status = assess_readiness(dependencies)
-        self._observe(status, dependencies)
+        self._observe(
+            status,
+            dependencies,
+            unresolved=tuple(
+                name for name, value in zip(self._names, facts, strict=True) if value is None
+            ),
+        )
         return status
 
     async def _probe_available(
         self,
-        _name: str,
+        index: int,
         probe: RuntimeAvailabilityProbe,
-    ) -> bool:
+        facts: list[bool | None],
+        deadline: float,
+    ) -> None:
+        timeout = asyncio.timeout_at(deadline)
         try:
-            async with asyncio.timeout(self._timeout_ms / 1_000):
-                return await probe.probe() is True
-        except TimeoutError:
-            return False
+            async with timeout:
+                available = await probe.probe() is True
         except Exception as error:
+            if isinstance(error, TimeoutError) and timeout.expired():
+                return
             if self._diagnostics is not None:
                 self._diagnostics.unexpected_failure("readiness_dependency", error)
-            return False
+            available = False
+        if self._active and self._facts is facts and asyncio.get_running_loop().time() < deadline:
+            facts[index] = available
 
-    async def _database_available(self) -> bool:
+    async def _database_available(self, facts: list[bool | None], deadline: float) -> None:
+        timeout = asyncio.timeout_at(deadline)
         try:
-            async with asyncio.timeout(self._timeout_ms / 1_000):
+            async with timeout:
                 database = await self._database_probe.check()
-        except TimeoutError:
-            return False
+                available = database.ready
         except Exception as error:
+            if isinstance(error, TimeoutError) and timeout.expired():
+                return
             if self._diagnostics is not None:
                 self._diagnostics.unexpected_failure("readiness_database", error)
-            return False
-        return database.ready
+            available = False
+        if self._active and self._facts is facts and asyncio.get_running_loop().time() < deadline:
+            facts[0] = available
 
-    def _async_dependencies_unavailable(self) -> ReadinessStatus:
+    def _inactive_status(self, *, publish: bool = False) -> ReadinessStatus:
         background = self._resources.background_health()
-        if self._metrics is not None:
+        if publish and self._metrics is not None:
             self._metrics.background_health(background)
         dependencies = (
             DependencyReadiness(
                 "runtime_resources",
-                self._resources.lifecycle_ready,
+                False,
                 True,
             ),
-            DependencyReadiness("database", False, True),
             DependencyReadiness(
                 "background_reconciliation",
                 background.ready,
                 True,
             ),
-            *(DependencyReadiness(name, False, True) for name, _probe in self._required_probes),
         )
         status = assess_readiness(dependencies)
-        self._observe(status, dependencies)
-        return status
-
-    def _unavailable_status(self, dependency_name: str) -> ReadinessStatus:
-        dependencies = (DependencyReadiness(dependency_name, False, True),)
-        status = assess_readiness(dependencies)
-        self._observe(status, dependencies)
+        if publish:
+            self._observe(
+                status,
+                dependencies,
+                unresolved=("database", *(name for name, _ in self._required_probes)),
+            )
         return status
 
     def _observe(
         self,
         status: ReadinessStatus,
         dependencies: tuple[DependencyReadiness, ...],
+        *,
+        unresolved: tuple[str, ...] = (),
     ) -> None:
         if self._metrics is None:
             return
+        for name in unresolved:
+            self._metrics.dependency_unresolved(name)
         for dependency in dependencies:
             if dependency.available:
                 self._metrics.dependency_ready(dependency.name)
         self._metrics.readiness(
             ready=status.ready,
-            unavailable_dependencies=status.unavailable_dependencies,
+            unavailable_dependencies=tuple(
+                name for name in status.unavailable_dependencies if name not in unresolved
+            ),
         )
