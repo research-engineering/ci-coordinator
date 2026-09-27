@@ -42,6 +42,8 @@ No shared mutation hook, cache, parser, router or framework is introduced.
    The vector is compact response bytes followed by exactly one LF. It is not
    a provider capture. A separate PostgreSQL witness uses sanctioned append,
    commit, exact replay and scoped workbench read, without a fixture SQL bypass.
+   Each append prepares a fresh single-use input from identical event data;
+   replay never reuses a consumed prepared object.
 5. Root integrates only missing proof relations and qualifies final bytes in
    GitHub; independent review precedes publication.
 

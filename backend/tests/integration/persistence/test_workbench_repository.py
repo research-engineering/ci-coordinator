@@ -96,19 +96,18 @@ def test_fractional_audit_payload_survives_append_replay_and_scoped_workbench_re
 ) -> None:
     async def scenario() -> None:
         engine = create_postgres_engine(runtime_postgres_database_url)
-        prepared = prepare_audit_event(
-            AuditEventInput(
-                idempotency_key="numeric-response-1",
-                installation_id=1,
-                repository_id=2,
-                subject_type="observation",
-                subject_id="numeric-observation",
-                event_type="numeric-payload/v1",
-                created_at="2026-07-17T12:00:00.000Z",
-                actor="operator:example",
-                payload={"fraction": 0.5, "nested": [-0.25, {"weight": 1.5}]},
-            )
+        event_input = AuditEventInput(
+            idempotency_key="numeric-response-1",
+            installation_id=1,
+            repository_id=2,
+            subject_type="observation",
+            subject_id="numeric-observation",
+            event_type="numeric-payload/v1",
+            created_at="2026-07-17T12:00:00.000Z",
+            actor="operator:example",
+            payload={"fraction": 0.5, "nested": [-0.25, {"weight": 1.5}]},
         )
+        prepared = prepare_audit_event(event_input)
         try:
             async with PostgresUnitOfWork(engine) as transaction:
                 appended = await transaction.audit_events.append(prepared)
@@ -126,8 +125,11 @@ def test_fractional_audit_payload_survives_append_replay_and_scoped_workbench_re
             assert event.payload_hash == (
                 "2ef414fdab8cdf4548c0f901f5891ad1321f14828a222140f4454d25131a065a"
             )
+            retry_prepared = prepare_audit_event(event_input)
+            assert retry_prepared is not prepared
+            assert retry_prepared.input_hash == prepared.input_hash
             async with PostgresUnitOfWork(engine) as transaction:
-                replayed = await transaction.audit_events.append(prepared)
+                replayed = await transaction.audit_events.append(retry_prepared)
                 assert isinstance(replayed, AuditAppendDuplicate)
                 assert replayed.record == appended.record
                 await transaction.commit()
