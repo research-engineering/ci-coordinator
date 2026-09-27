@@ -155,6 +155,8 @@ def assert_lifetime_running() -> None:
         scope.stop_requested()
         or (scope.deadline is not None and time.monotonic() >= scope.deadline)
     ):
+        if isinstance(scope, _SourceCleanupScope):
+            raise ConsumerLabBootstrapError("owned source cleanup allowance exhausted")
         raise LifetimeCancelled(getattr(scope, "signum", 0))
 
 
@@ -294,25 +296,34 @@ def received_lifetime(payload: str) -> Iterator[_ReceivedLifetime]:
     if parent is not None:
         raise ValueError("exec receiver cannot replace an active borrowed scope")
     previous = {number: signal.getsignal(number) for number in (signal.SIGINT, signal.SIGTERM)}
+    primary: BaseException | None = None
     try:
         for number in previous:
             signal.signal(number, scope.signal)
         with borrowed_lifetime(scope):
             assert_lifetime_running()
             yield scope
+    except BaseException as error:
+        primary = error
+        raise
     finally:
-        primary = sys.exception()
-        close_error: OSError | None = None
+        close_error: BaseException | None = None
         for number, handler in previous.items():
-            signal.signal(number, handler)
+            try:
+                signal.signal(number, handler)
+            except BaseException as error:
+                if close_error is None:
+                    close_error = error
         for descriptor in (scope.reader, *scope.inherited_fds):
             try:
                 os.close(descriptor)
-            except OSError as error:
-                if primary is None and close_error is None:
+            except BaseException as error:
+                if close_error is None:
                     close_error = error
         if close_error is not None:
-            raise close_error
+            if primary is None:
+                raise close_error
+            primary.add_note("consumer lab lifetime cleanup raised a secondary exception")
 
 
 def managed_lifetime_entrypoint(main: Callable[[], int]) -> int:
@@ -844,6 +855,7 @@ def _capture_bounded(
     process: subprocess.Popen[bytes] | None = None
     selector: selectors.BaseSelector | None = None
     completed = False
+    primary: BaseException | None = None
     with _defer_cancellation() if scope is not None else nullcontext():
         try:
             process = subprocess.Popen(  # noqa: S603
@@ -905,10 +917,14 @@ def _capture_bounded(
                 )
                 completed = True
         except (OSError, subprocess.TimeoutExpired) as error:
-            raise ConsumerLabBootstrapError("bounded Git inspection failed") from error
+            primary = ConsumerLabBootstrapError("bounded Git inspection failed")
+            raise primary from error
+        except BaseException as error:
+            primary = error
+            raise
         finally:
             if process is not None:
-                primary = sys.exception()
+                cleanup_primary = primary
                 try:
                     try:
                         if not completed:
@@ -916,8 +932,12 @@ def _capture_bounded(
                                 _kill_process_group(process)
                             elif not _drain_managed(process, schedule):
                                 raise ConsumerLabBootstrapError("owned group drain unobserved")
+                    except BaseException as error:
+                        if cleanup_primary is None:
+                            cleanup_primary = error
+                        raise
                     finally:
-                        _close_capture(process, selector)
+                        _close_capture(process, selector, cleanup_primary)
                 except BaseException:
                     if primary is None:
                         raise
@@ -930,9 +950,10 @@ def _capture_bounded(
 
 
 def _close_capture(
-    process: subprocess.Popen[bytes], selector: selectors.BaseSelector | None
+    process: subprocess.Popen[bytes],
+    selector: selectors.BaseSelector | None,
+    primary: BaseException | None,
 ) -> None:
-    primary = sys.exception()
     failure: BaseException | None = None
     for resource in (selector, process.stdin, process.stdout, process.stderr):
         if resource is not None:
@@ -941,6 +962,8 @@ def _close_capture(
             except BaseException as error:
                 if failure is None:
                     failure = error
+                else:
+                    failure.add_note("Another consumer lab pipe close raised a secondary exception")
     if failure is not None:
         if primary is None:
             raise failure
@@ -1048,10 +1071,13 @@ def _owned_source_directory() -> Iterator[str]:
     assert_lifetime_running()
     root = Path(mkdtemp(prefix="ci-consumer-lab-source-")).resolve()
     identity = root.stat()
+    primary: BaseException | None = None
     try:
         yield str(root)
+    except BaseException as error:
+        primary = error
+        raise
     finally:
-        primary = sys.exception()
         try:
             scope = _SourceCleanupScope(parent, root, (identity.st_dev, identity.st_ino))
             with borrowed_lifetime(scope):
@@ -1066,6 +1092,8 @@ def _owned_source_directory() -> Iterator[str]:
                 raise ConsumerLabBootstrapError("owned source directory remains")
         except BaseException as error:
             if primary is None:
+                if not isinstance(error, Exception):
+                    raise
                 raise ConsumerLabBootstrapError("owned source cleanup incomplete") from error
             primary.add_note("bootstrap owned source cleanup incomplete")
 

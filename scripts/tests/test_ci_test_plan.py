@@ -19,6 +19,7 @@ from scripts.ci_test_plan import (
     artifact_bytes,
     build_plan,
     plan_digest,
+    workflow_inventory,
     write_artifact,
 )
 from scripts.ci_test_plan import (
@@ -438,6 +439,41 @@ def test_native_runner_preserves_backend_execution_and_config_import_paths(
         assert report.phases == ()
     else:
         assert admit_outcomes(report) == {expected_id: "passed"}
+
+
+@pytest.mark.parametrize("job", [{"steps": []}, []])
+def test_workflow_job_shape_uses_the_existing_input_error_algebra(
+    tmp_path: Path, job: object
+) -> None:
+    directory = tmp_path / ".github/workflows"
+    directory.mkdir(parents=True)
+    path = directory / "check.yml"
+    path.write_text(json.dumps({"jobs": {"build": job}}), encoding="utf-8")
+    if isinstance(job, dict):
+        assert workflow_inventory(tmp_path)[".github/workflows/check.yml"][0]["jobId"] == "build"
+    else:
+        with pytest.raises(ValueError, match=r"^workflow job must be an object$"):
+            workflow_inventory(tmp_path)
+
+
+def test_workflow_inventory_refusal_is_reported_without_an_uncaught_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    directory = tmp_path / ".github/workflows"
+    directory.mkdir(parents=True)
+    (directory / "check.yml").write_text("jobs: {build: []}\n", encoding="utf-8")
+
+    def create_plan(_path: Path, _diagnostics: Path) -> None:
+        workflow_inventory(tmp_path)
+
+    monkeypatch.setattr(execution, "create_plan", create_plan)
+    monkeypatch.setattr(
+        sys, "argv", ["ci-test", "plan", "--plan", "unused", "--diagnostics", "unused"]
+    )
+    assert execution.main() == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err == "workflow job must be an object\n"
 
 
 def test_workflow_matrix_and_required_join_match_the_partition_exactly() -> None:

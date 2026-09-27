@@ -417,6 +417,7 @@ def spawn(
     exceptional_drain_attempted = False
 
     process: subprocess.Popen[bytes] | None = None
+    primary_error: BaseException | None = None
     with defer_cancellation() if scope is not None else nullcontext():
         try:
             try:
@@ -605,39 +606,46 @@ def spawn(
 
                 return_code = process.poll() if scope is not None else process.wait()
         except OSError as error:
-            if process is None:
-                return CommandResult(
-                    status=None,
-                    stdout="",
-                    stderr="",
-                    error=_spawn_error(command, error),
-                    failure_kind="spawn",
-                    process_group_quiescent=True,
-                )
-            lifecycle_failure = _spawn_error(command, error)
-            if termination_reason is None:
-                termination_reason = lifecycle_failure
-                failure_kind = "lifecycle"
-            else:
-                termination_reason = (
-                    f"{termination_reason}; secondary lifecycle error: {lifecycle_failure}"
-                )
-            if scope is not None or graceful_seconds > 1:
-                drained = _stop_interactive(
-                    process,
-                    "lifecycle",
-                    graceful_seconds,
-                    _FORCE_KILL_DELAY_SECONDS,
-                    termination=termination,
-                )
-                exceptional_drain_attempted = True
-                return_code = drained.returncode
-            else:
-                _signal_process_group(process.pid, signal.SIGKILL)
-                return_code = _wait_after_kill(process)
+            try:
+                if process is None:
+                    return CommandResult(
+                        status=None,
+                        stdout="",
+                        stderr="",
+                        error=_spawn_error(command, error),
+                        failure_kind="spawn",
+                        process_group_quiescent=True,
+                    )
+                lifecycle_failure = _spawn_error(command, error)
+                if termination_reason is None:
+                    termination_reason = lifecycle_failure
+                    failure_kind = "lifecycle"
+                else:
+                    termination_reason = (
+                        f"{termination_reason}; secondary lifecycle error: {lifecycle_failure}"
+                    )
+                if scope is not None or graceful_seconds > 1:
+                    drained = _stop_interactive(
+                        process,
+                        "lifecycle",
+                        graceful_seconds,
+                        _FORCE_KILL_DELAY_SECONDS,
+                        termination=termination,
+                    )
+                    exceptional_drain_attempted = True
+                    return_code = drained.returncode
+                else:
+                    _signal_process_group(process.pid, signal.SIGKILL)
+                    return_code = _wait_after_kill(process)
+            except BaseException as handler_error:
+                primary_error = handler_error
+                raise
+        except BaseException as error:
+            primary_error = error
+            raise
         finally:
             if process is not None:
-                primary_error = sys.exception()
+                cleanup_primary = primary_error
                 try:
                     try:
                         needs_drain = process.poll() is None or (
@@ -655,10 +663,16 @@ def spawn(
                             else:
                                 _signal_process_group(process.pid, signal.SIGKILL)
                                 _wait_after_kill(process)
+                    except BaseException as error:
+                        if cleanup_primary is None:
+                            cleanup_primary = error
+                        raise
                     finally:
-                        _close_capture(process, selector)
-                except BaseException:
-                    if primary_error is None and termination_reason is None:
+                        _close_capture(process, selector, cleanup_primary)
+                except BaseException as error:
+                    if primary_error is None and (
+                        termination_reason is None or not isinstance(error, Exception)
+                    ):
                         raise
                     if primary_error is not None:
                         primary_error.add_note("Owned process cleanup raised a secondary exception")
@@ -684,9 +698,10 @@ def spawn(
 
 
 def _close_capture(
-    process: subprocess.Popen[bytes], selector: selectors.BaseSelector | None
+    process: subprocess.Popen[bytes],
+    selector: selectors.BaseSelector | None,
+    primary: BaseException | None,
 ) -> None:
-    primary = sys.exception()
     failure: BaseException | None = None
     for resource in (selector, process.stdin, process.stdout, process.stderr):
         if resource is not None:
@@ -695,6 +710,8 @@ def _close_capture(
             except BaseException as error:
                 if failure is None:
                     failure = error
+                else:
+                    failure.add_note("Another owned capture close raised a secondary exception")
     if failure is not None:
         if primary is None:
             raise failure

@@ -668,6 +668,69 @@ def managed_entry_context(identity: InstanceIdentity) -> Iterator[tuple[str, int
                         os.close(item)
 
 
+@pytest.mark.parametrize("outcome", ["normal", "ambient", "primary", "interrupt"])
+@pytest.mark.parametrize("close_interrupt", [False, True])
+def test_borrowed_process_close_preserves_only_escaping_primary_and_closes_all_descriptors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, outcome: str, close_interrupt: bool
+) -> None:
+    identity = dependency_identity_fixture(tmp_path)
+    ancestor = current_process_scope()
+    ancestor_fds = () if ancestor is None else ancestor.inherited_fds
+    handlers = {number: signal.getsignal(number) for number in (signal.SIGINT, signal.SIGTERM)}
+    primary = (
+        KeyboardInterrupt("body cancellation")
+        if outcome == "interrupt"
+        else ValueError("body error")
+    )
+    first = (
+        KeyboardInterrupt("close cancellation") if close_interrupt else OSError("first close error")
+    )
+    attempts: list[int] = []
+    borrows: list[environment.ManagedProcessBorrow] = []
+    with managed_entry_context(identity) as (context, writer, inherited):
+        payload = json.loads(context)
+        descriptors = (payload["stopFd"], inherited)
+        close = os.close
+
+        def close_cut(descriptor: int) -> None:
+            close(descriptor)
+            if descriptor in descriptors:
+                attempts.append(descriptor)
+                raise first if descriptor == descriptors[0] else OSError("later close error")
+
+        def invoke() -> None:
+            with environment.borrow_managed_process(context) as borrow:
+                borrows.append(borrow)
+                if outcome in {"primary", "interrupt"}:
+                    raise primary
+
+        expected = primary if outcome in {"primary", "interrupt"} else first
+        with monkeypatch.context() as patch:
+            patch.setattr(os, "close", close_cut)
+            if outcome == "ambient":
+                ambient = ValueError("already-handled borrow caller error")
+                try:
+                    raise ambient
+                except ValueError:
+                    with pytest.raises(type(expected)) as caught:
+                        invoke()
+                    assert caught.value is expected
+                    assert not getattr(ambient, "__notes__", [])
+            else:
+                with pytest.raises(type(expected)) as caught:
+                    invoke()
+                assert caught.value is expected
+        assert attempts == list(descriptors)
+        assert len(borrows) == 1 and not borrows[0]._active
+        assert current_process_scope() is ancestor
+        assert {number: signal.getsignal(number) for number in handlers} == handlers
+        for descriptor in descriptors:
+            with pytest.raises(OSError):
+                os.fstat(descriptor)
+        for descriptor in (writer, *ancestor_fds):
+            os.fstat(descriptor)
+
+
 @pytest.mark.parametrize("status", [0, 7])
 def test_managed_entry_preserves_return_and_restores_its_terminal_context(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int

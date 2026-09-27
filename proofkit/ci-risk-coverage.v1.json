@@ -2777,7 +2777,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "20c634e30c48a4aaa9eed25b8a1298c542ca09b833f0aa5e4ef9a181aab2081e"
+          "sourceSha256": "e6fc21506bab51416f20fce036c92fc34ce83e0670e3d8624402cf16ae36ece2"
         },
         {
           "requirementId": "REQ-CI-PROOFKIT-008",
@@ -2793,7 +2793,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "20c634e30c48a4aaa9eed25b8a1298c542ca09b833f0aa5e4ef9a181aab2081e"
+          "sourceSha256": "e6fc21506bab51416f20fce036c92fc34ce83e0670e3d8624402cf16ae36ece2"
         }
       ]
     },
@@ -3036,7 +3036,7 @@
     "scripts/ci_business_witness/runner.py": "620de68cf5642baac79c7e95e5d6df26bf7454911fad7b8f5684fb9cc4ae3ec4",
     "scripts/ci_business_witness/storage.py": "db6e1c48130249869f068f7bffe251807b1eef072467761122b90b8de2ba1b8c",
     "scripts/ci_test_execution.py": "b8e85f8a8ff8142b4039adde46c7238f17834a03b8dd75c21da30ba241339328",
-    "scripts/ci_test_plan.py": "14b58acbc84b8c12675a18018a4efe6a76d9ba118e527fe08547c07fd3ee8076",
+    "scripts/ci_test_plan.py": "b54bb7922cf848e0c1412782978055f3f250bdc64c013c0ea86028f53007aa6f",
     "scripts/ci_test_report.py": "88765ae21a14c5bf55c4e238fb24e4dd8f556863564a18d7674591edaf82cad8",
     "scripts/python_coverage_diagnostics.py": "57809eb1c9b06eee294948c99b2d752e48d8d913accbfe11c05b618ad5b77f99",
     "scripts/python_witness.py": "ddee421bc4de8ef621e300e7afc63d46d11041c8988084aa54f38bd8a3aa61f8"

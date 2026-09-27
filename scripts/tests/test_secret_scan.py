@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
+import signal
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, TypedDict, cast
@@ -482,6 +485,62 @@ def test_packaged_entrypoint_runs_in_foreign_repository_without_coordinator_scri
     assert result.status == 0
     assert json.loads(result.stdout)["scope"] == "tree-only"
     assert not (root / "scripts").exists()
+
+
+@pytest.mark.parametrize("case", ["clean", "residual", "timeout", "interrupt", "cleanup-failure"])
+def test_packaged_process_failure_preserves_safe_reason_after_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    monkeypatch.setitem(sys.modules, "scanner", scanner)
+    spec = importlib.util.spec_from_file_location(
+        "secret_scan_runtime_witness", secret_scan.ACTION_ROOT / "runtime.py"
+    )
+    assert spec is not None and spec.loader is not None
+    runtime = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runtime)
+    waits: list[int] = []
+    signals: list[tuple[int, int]] = []
+
+    class Process:
+        pid = 12345
+
+        def wait(self, *, timeout: int) -> int:
+            waits.append(timeout)
+            if len(waits) == 1:
+                if case == "timeout":
+                    raise subprocess.TimeoutExpired("fixture", timeout)
+                if case == "interrupt":
+                    raise KeyboardInterrupt
+            elif case == "cleanup-failure":
+                raise OSError("cleanup did not complete")
+            return 0
+
+    def killpg(pid: int, number: int) -> None:
+        signals.append((pid, number))
+        if case == "clean":
+            raise ProcessLookupError
+
+    monkeypatch.setattr(runtime.subprocess, "Popen", lambda *args, **kwargs: Process())
+    monkeypatch.setattr(runtime.os, "killpg", killpg)
+    if case == "clean":
+        assert runtime.run(["fixture"], tmp_path, {}, 1024, 30) == (0, b"")
+        assert waits == [30]
+    elif case == "cleanup-failure":
+        with pytest.raises(OSError, match="cleanup did not complete"):
+            runtime.run(["fixture"], tmp_path, {}, 1024, 30)
+        assert waits == [30, 5]
+    else:
+        with pytest.raises(scanner.ScanError) as caught:
+            runtime.run(["fixture"], tmp_path, {}, 1024, 30)
+        assert caught.value.stage == "process"
+        assert caught.value.code == (
+            "residual_process" if case == "residual" else "incomplete_process"
+        )
+        assert waits == [30, 5]
+    expected_signals = [] if case in {"timeout", "interrupt"} else [(Process.pid, 0)]
+    if case != "clean":
+        expected_signals.append((Process.pid, signal.SIGKILL))
+    assert signals == expected_signals
 
 
 def test_cli_output_never_contains_secret_bytes(tmp_path: Path, binary: Path) -> None:

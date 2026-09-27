@@ -249,7 +249,7 @@ def workflow_inventory(root: Path) -> dict[str, list[dict[str, object]]]:
         rows: list[dict[str, object]] = []
         for identity, job in sorted(value["jobs"].items()):
             if not isinstance(job, dict):
-                raise TypeError("workflow job must be an object")
+                raise ValueError("workflow job must be an object")
             rows.append(
                 {
                     "jobId": identity,
