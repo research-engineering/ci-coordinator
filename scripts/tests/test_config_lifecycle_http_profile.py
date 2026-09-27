@@ -29,9 +29,21 @@ _LEGACY_ACTIVATION = {"$ref": "#/components/schemas/ConfigEpochActivationBody"}
 _CURRENT_ACTIVATION = {"$ref": "#/components/schemas/ExplicitConfigEpochActivationBody"}
 
 
-def test_repository_profile_is_exact_and_matches_openapi() -> None:
+@pytest.fixture(scope="module")
+def openapi_seed() -> bytes:
+    return rendered_contract()
+
+
+@pytest.fixture
+def openapi_document(openapi_seed: bytes) -> dict[str, object]:
+    return cast(dict[str, object], json.loads(openapi_seed))
+
+
+def test_repository_profile_is_exact_and_matches_openapi(
+    openapi_document: dict[str, object],
+) -> None:
     profile = load_config_lifecycle_http_profile()
-    document = cast(dict[str, object], json.loads(rendered_contract()))
+    document = openapi_document
 
     assert profile.maximum_contract_identity_bytes == 4_096
     assert profile.maximum_json_safe_integer == 9_007_199_254_740_991
@@ -44,8 +56,10 @@ def test_repository_profile_is_exact_and_matches_openapi() -> None:
     assert_config_lifecycle_openapi(document, profile)
 
 
-def test_activation_union_preserves_both_versions_independent_of_order() -> None:
-    document = cast(dict[str, object], json.loads(rendered_contract()))
+def test_activation_union_preserves_both_versions_independent_of_order(
+    openapi_document: dict[str, object],
+) -> None:
+    document = openapi_document
     _replace(document, _ACTIVATION_REQUEST, {"anyOf": [_CURRENT_ACTIVATION, _LEGACY_ACTIVATION]})
 
     assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
@@ -63,8 +77,10 @@ def test_activation_union_preserves_both_versions_independent_of_order() -> None
         {"anyOf": [_LEGACY_ACTIVATION, _CURRENT_ACTIVATION], "nullable": True},
     ],
 )
-def test_activation_projection_rejects_widened_or_incomplete_union(schema: object) -> None:
-    document = cast(dict[str, object], json.loads(rendered_contract()))
+def test_activation_projection_rejects_widened_or_incomplete_union(
+    schema: object, openapi_document: dict[str, object]
+) -> None:
+    document = openapi_document
     _replace(document, _ACTIVATION_REQUEST, schema)
 
     with pytest.raises(ValueError, match="activation request"):
@@ -106,9 +122,12 @@ def test_activation_projection_rejects_widened_or_incomplete_union(schema: objec
     ],
 )
 def test_activation_projection_rejects_version_or_selector_drift(
-    schema_name: str, path: MutationPath, replacement: object
+    schema_name: str,
+    path: MutationPath,
+    replacement: object,
+    openapi_document: dict[str, object],
 ) -> None:
-    document = cast(dict[str, object], json.loads(rendered_contract()))
+    document = openapi_document
     _replace(document, ("components", "schemas", schema_name, *path), replacement)
 
     with pytest.raises(ValueError, match="activation request"):
@@ -124,9 +143,9 @@ def test_activation_projection_rejects_version_or_selector_drift(
     ],
 )
 def test_activation_projection_requires_version_and_current_selector(
-    schema_name: str, field: str
+    schema_name: str, field: str, openapi_document: dict[str, object]
 ) -> None:
-    document = cast(dict[str, object], json.loads(rendered_contract()))
+    document = openapi_document
     schemas = cast(
         dict[str, dict[str, object]], cast(dict[str, object], document["components"])["schemas"]
     )
@@ -136,8 +155,10 @@ def test_activation_projection_requires_version_and_current_selector(
         assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
 
 
-def test_activation_projection_requires_request_body() -> None:
-    document = cast(dict[str, object], json.loads(rendered_contract()))
+def test_activation_projection_requires_request_body(
+    openapi_document: dict[str, object],
+) -> None:
+    document = openapi_document
     _replace(document, (*_ACTIVATION_REQUEST[:4], "required"), False)
 
     with pytest.raises(ValueError, match="activation request"):
@@ -340,17 +361,20 @@ def test_openapi_projection_rejects_authority_drift(
     path: MutationPath,
     replacement: object,
     diagnostic: str,
+    openapi_document: dict[str, object],
 ) -> None:
-    document = cast(dict[str, object], json.loads(rendered_contract()))
+    document = openapi_document
     _replace(document, path, replacement)
 
     with pytest.raises(ValueError, match=diagnostic):
         assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
 
 
-def test_openapi_projection_rejects_deleted_and_extra_config_routes() -> None:
+def test_openapi_projection_rejects_deleted_and_extra_config_routes(
+    openapi_document: dict[str, object],
+) -> None:
     profile = load_config_lifecycle_http_profile()
-    original = cast(dict[str, object], json.loads(rendered_contract()))
+    original = openapi_document
     paths = cast(dict[str, object], original["paths"])
 
     deleted = copy.deepcopy(original)
@@ -402,3 +426,24 @@ def test_leaf_mutation_policy_preserves_order_types_and_empty_arrays() -> None:
         (("nested", 0, "flag"), bool, False),
         (("nested", 1), int, 3),
     ]
+
+
+@pytest.mark.parametrize("copy_number", [0, 1], ids=["first-copy", "second-copy"])
+def test_openapi_preparation_keeps_case_mutations_isolated(
+    openapi_seed: bytes, openapi_document: dict[str, object], copy_number: int
+) -> None:
+    assert isinstance(openapi_seed, bytes)
+    reference = json.loads(openapi_seed)
+    assert openapi_document == reference
+
+    schemas = cast(
+        dict[str, dict[str, object]],
+        cast(dict[str, object], openapi_document["components"])["schemas"],
+    )
+    cast(list[str], schemas["ConfigEpochActivationBody"]["required"]).append(
+        f"isolated-copy-{copy_number}"
+    )
+    del cast(dict[str, object], openapi_document["paths"])["/api/v1/config/validations"]
+
+    assert openapi_document != reference
+    assert json.loads(openapi_seed) == reference

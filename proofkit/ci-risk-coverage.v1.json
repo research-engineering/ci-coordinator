@@ -378,7 +378,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "cb62c80cd74b6f8c10ac680ab71f2126f02a2baf9a3c21132d430ad552c08c82"
+          "sourceSha256": "e4aefa54040c67d7a0834e81bf118c934667411a5dcfdadd5575922068dcf00e"
         },
         {
           "requirementId": "REQ-CI-UI-004",
