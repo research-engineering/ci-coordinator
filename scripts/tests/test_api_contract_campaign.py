@@ -87,7 +87,14 @@ def test_campaign_preserves_failure_and_bounded_synthetic_evidence(
     calls: list[tuple[str, ...]] = []
 
     def spawn(_command: str, arguments: Sequence[str], **options: object) -> CommandResult:
-        calls.append(tuple(arguments))
+        from scripts.dev_environment.environment import managed_process_argument
+
+        public = tuple(arguments)
+        if managed_process_argument(arguments) is not None:
+            assert public[-4:-2] == ("-p", "scripts.python_coverage_diagnostics")
+            public = public[:-4]
+            assert options["inherited_fds"]
+        calls.append(public)
         assert options["cwd"] == tmp_path / "backend"
         assert options["timeout_seconds"] == budget
         assert options["max_buffer"] == 1024 * 1024

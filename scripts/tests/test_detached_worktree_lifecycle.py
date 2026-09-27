@@ -5,24 +5,30 @@ import json
 import os
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
 import time
 from collections.abc import Callable
-from contextlib import suppress
+from contextlib import ExitStack, suppress
 from pathlib import Path
 from typing import Final, cast
 
 import pytest
 import scripts.mutation.detached_worktree_lifecycle as lifecycle_module
 from scripts.bounded_git import BoundedGitResult
-from scripts.bounded_process import SUPPORTED_PLATFORMS, CommandResult
+from scripts.bounded_process import SUPPORTED_PLATFORMS, CommandResult, current_process_scope, spawn
+from scripts.dev_environment.environment import borrow_managed_process, managed_process_invocation
 from scripts.mutation.detached_worktree_lifecycle import (
     DEFAULT_MAX_BUFFER_BYTES,
     DEFAULT_TIMEOUT_MS,
     DetachedWorktreeLifecycle,
     UnsupportedPlatformError,
+)
+from scripts.tests.test_dev_environment_dependencies import (
+    dependency_identity_fixture,
+    managed_entry_context,
 )
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[2]
@@ -37,6 +43,141 @@ def _required_executable(name: str) -> str:
 
 GIT: Final = _required_executable("git")
 
+
+@pytest.mark.parametrize("listed_status,expected", [(0, False), (1, True)])
+def test_unscoped_failed_remove_and_list_preserve_residual_registration(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    listed_status: int,
+    expected: bool,
+) -> None:
+    owner = DetachedWorktreeLifecycle(repo_root=tmp_path, temp_prefix="legacy-cleanup-")
+    worktree = owner.worktree
+    worktree.mkdir()
+    owner.worktree_registration_attempted = True
+    calls: list[tuple[str, ...]] = []
+
+    def cleanup_git(arguments: tuple[str, ...]) -> CommandResult:
+        calls.append(arguments)
+        if arguments[:2] == ("worktree", "remove"):
+            return CommandResult(1, "", "remove failed")
+        if arguments == ("worktree", "prune"):
+            return CommandResult(0, "", "")
+        assert arguments == ("worktree", "list", "--porcelain")
+        return CommandResult(listed_status, "", "")
+
+    monkeypatch.setattr(owner, "_cleanup_git", cleanup_git)
+    result = owner._perform_cleanup()
+    assert calls == [
+        ("worktree", "remove", "--force", str(worktree)),
+        ("worktree", "prune"),
+        ("worktree", "list", "--porcelain"),
+    ]
+    assert result.to_report() == {
+        "state": "failed",
+        "worktreeRemoval": "failed",
+        "removalExitCode": 1,
+        "pruneExitCode": 0,
+        "residualRegistration": expected,
+        "output": "remove failed",
+    }
+
+
+@pytest.mark.parametrize("mode", ["positive", "expired", "nested", "residual"])
+def test_native_owned_cleanup_uses_one_remaining_parent_allowance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    identity = dependency_identity_fixture(tmp_path)
+    _initialize_repository(identity.repo_root)
+    owners = [
+        DetachedWorktreeLifecycle(repo_root=identity.repo_root, temp_prefix="owned-stop-cut-")
+        for _ in range(2 if mode == "nested" else 1)
+    ]
+    outer = current_process_scope()
+    primary = RuntimeError("original caller failure")
+    results = []
+    try:
+        revision = owners[0].git(("rev-parse", "HEAD")).stdout.strip()
+        for owner in owners:
+            owner.add_detached_worktree(revision)
+        if mode == "residual":
+            (owners[0].temp_root / "keep.txt").write_text("owned residual")
+        original = owners[0]._perform_cleanup
+
+        def guarded(
+            scope: lifecycle_module._GitCleanupScope | None = None,
+        ) -> lifecycle_module.CleanupResult:
+            assert scope is not None and current_process_scope() is scope
+            if mode != "expired":
+                valid_arguments = ("worktree", "remove", "--force", str(owners[0].worktree))
+                for command, arguments, cwd in (
+                    (sys.executable, valid_arguments, identity.repo_root),
+                    (GIT, ("status",), identity.repo_root),
+                    (GIT, valid_arguments, tmp_path),
+                ):
+                    with pytest.raises(ValueError, match="outside owned Git cleanup"):
+                        spawn(command, arguments, cwd=cwd, max_buffer=4096, timeout_seconds=30)
+            return original(scope)
+
+        monkeypatch.setattr(owners[0], "_perform_cleanup", guarded)
+        with managed_entry_context(identity) as (context, writer, descriptor):
+            with borrow_managed_process(context) as parent:
+                cut = time.monotonic() - 1 if mode == "expired" else time.monotonic() + 3
+                os.write(writer, struct.pack("!4sd", b"CF1:", cut))
+                assert parent.cancellation_deadline == cut and parent.stop_requested()
+                for index, owner in enumerate(owners):
+                    if index:
+                        while time.monotonic() < cut:
+                            time.sleep(0.01)
+                    with pytest.raises(RuntimeError) as caught:
+                        try:
+                            raise primary
+                        finally:
+                            results.append(owner.cleanup())
+                    assert caught.value is primary
+                    assert current_process_scope() is parent
+                    assert parent.cancellation_deadline == cut
+                    os.fstat(descriptor)
+                    assert owner.cleanup() is results[-1]
+            assert current_process_scope() is outer
+        observed = _run(
+            [GIT, "-C", str(identity.repo_root), "worktree", "list", "--porcelain"]
+        ).stdout
+        for index, (owner, result) in enumerate(zip(owners, results, strict=True)):
+            expired = mode == "expired" or index > 0
+            assert result.state == ("failed" if expired or mode == "residual" else "passed"), result
+            if expired:
+                assert result.residual_registration is None
+                assert f"worktree {owner.worktree}" in observed.splitlines()
+                assert owner.worktree.exists()
+            else:
+                assert result.worktree_removal == "removed"
+                assert f"worktree {owner.worktree}" not in observed.splitlines()
+                if mode == "residual":
+                    assert result.residual_registration is False
+                    assert (owner.temp_root / "keep.txt").read_text() == "owned residual"
+                else:
+                    assert not owner.temp_root.exists()
+    finally:
+        for owner in owners:
+            temporary = owner._temp_root
+            if temporary is not None:
+                worktree = temporary / "worktree"
+                if worktree.exists():
+                    _run(
+                        [
+                            GIT,
+                            "-C",
+                            str(identity.repo_root),
+                            "worktree",
+                            "remove",
+                            "--force",
+                            str(worktree),
+                        ]
+                    )
+                shutil.rmtree(temporary, ignore_errors=True)
+
+
 PROBE_COMMAND_SOURCE: Final = """
 import json
 import os
@@ -45,11 +186,34 @@ import subprocess
 import sys
 import time
 
+descriptors = tuple(map(int, sys.argv[1:]))
+try:
+    for descriptor in descriptors:
+        os.fstat(descriptor)
+except OSError:
+    Path(os.environ["PROBE_MARKER"]).with_suffix(".lease").write_text(
+        json.dumps({"pid": None, "retained": False, "count": len(descriptors)})
+    )
+    Path(os.environ["PROBE_MARKER"]).write_text(json.dumps({
+        "commandPid": os.getpid(), "grandchildPid": None,
+        "tempRoot": os.environ["PROBE_TEMP_ROOT"], "worktree": os.environ["PROBE_WORKTREE"],
+    }))
+    raise SystemExit(1)
+grandchild_code = (
+    "import json, os, sys, time\\nfrom pathlib import Path\\n"
+    "fds = tuple(map(int, sys.argv[1:])); retained = True\\n"
+    "try:\\n    for descriptor in fds: os.fstat(descriptor)\\n"
+    "except OSError: retained = False\\n"
+    "Path(os.environ['PROBE_MARKER']).with_suffix('.lease').write_text("
+    "json.dumps({'pid': os.getpid(), 'retained': retained, 'count': len(fds)}))\\n"
+    "time.sleep(60)\\n"
+)
 grandchild = subprocess.Popen(
-    [sys.executable, "-c", "import time; time.sleep(60)"],
+    [sys.executable, "-c", grandchild_code, *sys.argv[1:]],
     stdin=subprocess.DEVNULL,
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
+    pass_fds=descriptors,
 )
 Path(os.environ["PROBE_MARKER"]).write_text(
     json.dumps(
@@ -78,39 +242,43 @@ from pathlib import Path
 
 sys.path.insert(0, {str(REPO_ROOT)!r})
 from scripts.mutation.detached_worktree_lifecycle import DetachedWorktreeLifecycle
+from scripts.bounded_process import current_process_scope
+from scripts.dev_environment.environment import managed_process_entrypoint
 
-repo_root = Path(sys.argv[1])
-marker_path = Path(sys.argv[2])
-lifecycle = DetachedWorktreeLifecycle(
-    repo_root=repo_root,
-    temp_prefix="mutation-lifecycle-probe-worker-",
-)
-lifecycle.install_signal_handlers()
-cleanup = None
-try:
-    revision = lifecycle.git(("rev-parse", "HEAD")).stdout.strip()
-    lifecycle.add_detached_worktree(revision)
-    lifecycle.run(
-        sys.executable,
-        ("-c", {PROBE_COMMAND_SOURCE!r}),
-        env={{
-            **dict(__import__("os").environ),
-            "PROBE_MARKER": str(marker_path),
-            "PROBE_TEMP_ROOT": str(lifecycle.temp_root),
-            "PROBE_WORKTREE": str(lifecycle.worktree),
-        }},
+def main():
+    repo_root = Path(sys.argv[1])
+    marker_path = Path(sys.argv[2])
+    lifecycle = DetachedWorktreeLifecycle(
+        repo_root=repo_root, temp_prefix="mutation-lifecycle-probe-worker-",
     )
-    lifecycle.assert_running()
-    raise RuntimeError("probe command exited before receiving a signal")
-except RuntimeError:
-    if lifecycle.received_signal is None:
-        raise
-finally:
-    cleanup = lifecycle.cleanup()
-
-if lifecycle.cleanup() != cleanup:
-    raise RuntimeError("cleanup result changed across repeated calls")
-lifecycle.rethrow_signal_if_needed()
+    lifecycle.install_signal_handlers()
+    cleanup = None
+    scope = current_process_scope()
+    descriptors = () if scope is None else scope.inherited_fds
+    try:
+        revision = lifecycle.git(("rev-parse", "HEAD")).stdout.strip()
+        lifecycle.add_detached_worktree(revision)
+        lifecycle.run(
+            sys.executable, ("-c", {PROBE_COMMAND_SOURCE!r}, *map(str, descriptors)),
+            env={{
+                **dict(__import__("os").environ),
+                "PROBE_MARKER": str(marker_path),
+                "PROBE_TEMP_ROOT": str(lifecycle.temp_root),
+                "PROBE_WORKTREE": str(lifecycle.worktree),
+            }},
+        )
+        lifecycle.assert_running()
+        raise RuntimeError("probe command exited before receiving a signal")
+    except RuntimeError:
+        if lifecycle.received_signal is None:
+            raise
+    finally:
+        cleanup = lifecycle.cleanup()
+    if lifecycle.cleanup() != cleanup:
+        raise RuntimeError("cleanup result changed across repeated calls")
+    lifecycle.rethrow_signal_if_needed()
+    return 0
+raise SystemExit(managed_process_entrypoint(main))
 """
 
 
@@ -203,22 +371,53 @@ def _kill_if_running(pid: int) -> None:
 
 
 @pytest.mark.parametrize("received_signal", [signal.SIGINT, signal.SIGTERM])
-def test_signal_propagates_after_cleanup(tmp_path: Path, received_signal: signal.Signals) -> None:
+@pytest.mark.parametrize("managed", [False, True], ids=["ambient", "explicit-managed"])
+def test_signal_propagates_after_cleanup(
+    tmp_path: Path, received_signal: signal.Signals, managed: bool
+) -> None:
     repo_root = tmp_path / "repo"
     marker_path = tmp_path / "ready.json"
     _initialize_repository(repo_root)
+    lifetime = ExitStack()
+    if managed:
+        lease_root = tmp_path / "lease"
+        lease_root.mkdir()
+        identity = dependency_identity_fixture(lease_root)
+        context, _writer, _descriptor = lifetime.enter_context(managed_entry_context(identity))
+        lifetime.enter_context(borrow_managed_process(context))
+    invocation = lifetime.enter_context(
+        managed_process_invocation(
+            ("-c", WORKER_SOURCE, str(repo_root), str(marker_path)),
+            timeout_seconds=None,
+            graceful_seconds=10,
+        )
+    )
     worker = subprocess.Popen(
-        [sys.executable, "-c", WORKER_SOURCE, str(repo_root), str(marker_path)],
+        [sys.executable, *invocation.arguments],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
+        pass_fds=invocation.inherited_fds,
     )
     marker: dict[str, object] = {}
     try:
+        ready_by = time.monotonic() + 10
         marker = _read_json_when_ready(marker_path, 10)
+        retained = _read_json_when_ready(
+            marker_path.with_suffix(".lease"), max(0, ready_by - time.monotonic())
+        )
+        assert retained == {
+            "pid": marker["grandchildPid"],
+            "retained": True,
+            "count": len(invocation.inherited_fds)
+            - (1 if invocation.cancellation_fd is not None else 0),
+        }
+        stop_by = time.monotonic() + 10
+        if invocation.cancellation_fd is not None:
+            os.write(invocation.cancellation_fd, struct.pack("!4sd", b"CF1:", stop_by))
         worker.send_signal(received_signal)
-        _stdout, stderr = worker.communicate(timeout=10)
+        _stdout, stderr = worker.communicate(timeout=max(0, stop_by - time.monotonic()))
         assert worker.returncode == -received_signal.value, stderr
 
         command_pid = _marker_int(marker, "commandPid")
@@ -232,6 +431,10 @@ def test_signal_propagates_after_cleanup(tmp_path: Path, received_signal: signal
         registered = _run([GIT, "-C", str(repo_root), "worktree", "list", "--porcelain"])
         assert f"worktree {worktree}" not in registered.stdout.split("\n")
     finally:
+        owned_group = marker.get("commandPid")
+        if isinstance(owned_group, int):
+            with suppress(ProcessLookupError):
+                os.killpg(owned_group, signal.SIGKILL)
         if worker.poll() is None:
             worker.kill()
             worker.wait(timeout=5)
@@ -239,6 +442,7 @@ def test_signal_propagates_after_cleanup(tmp_path: Path, received_signal: signal
             value = marker.get(key)
             if isinstance(value, int):
                 _kill_if_running(value)
+        lifetime.close()
 
 
 def test_timeout_force_kills_stubborn_process_group(tmp_path: Path) -> None:
@@ -254,9 +458,11 @@ def test_timeout_force_kills_stubborn_process_group(tmp_path: Path) -> None:
     try:
         revision = lifecycle.git(("rev-parse", "HEAD")).stdout.strip()
         lifecycle.add_detached_worktree(revision)
+        scope = current_process_scope()
+        descriptors = () if scope is None else scope.inherited_fds
         execution = lifecycle.run(
             sys.executable,
-            ("-c", STUBBORN_PROBE_COMMAND_SOURCE),
+            ("-c", STUBBORN_PROBE_COMMAND_SOURCE, *map(str, descriptors)),
             env={
                 **os.environ,
                 "PROBE_MARKER": str(marker_path),
@@ -301,14 +507,17 @@ child = subprocess.Popen(
     stdin=subprocess.DEVNULL,
     stdout=subprocess.DEVNULL,
     stderr=subprocess.DEVNULL,
+    pass_fds=tuple(map(int, sys.argv[2:])),
 )
 Path(sys.argv[1]).write_text(str(child.pid), encoding="utf-8")
 """
     descendant_pid = 0
     try:
+        scope = current_process_scope()
+        descriptors = () if scope is None else scope.inherited_fds
         execution = lifecycle.run(
             sys.executable,
-            ("-c", command, str(marker_path)),
+            ("-c", command, str(marker_path), *map(str, descriptors)),
             timeout_ms=5_000,
         )
         assert execution.status is None
@@ -376,9 +585,18 @@ def test_cleanup_prunes_after_worktree_remove_failure(tmp_path: Path) -> None:
     assert cleanup.state == "failed"
     assert cleanup.worktree_removal == "failed"
     assert cleanup.removal_exit_code == 128
-    assert cleanup.prune_exit_code == 0
-    assert cleanup.residual_registration is False
-    assert not lifecycle.temp_root.exists()
+    if current_process_scope() is None:
+        assert cleanup.prune_exit_code == 0
+        assert cleanup.residual_registration is False
+        assert not lifecycle.temp_root.exists()
+    else:
+        assert cleanup.prune_exit_code is None
+        assert cleanup.residual_registration is None
+        assert lifecycle.temp_root.exists()
+        legacy = lifecycle._perform_cleanup()
+        assert legacy.state == "failed" and legacy.prune_exit_code == 0
+        assert legacy.residual_registration is False
+        assert not lifecycle.temp_root.exists()
     assert lifecycle.cleanup() == cleanup
 
 
@@ -533,6 +751,11 @@ def test_cleanup_converts_an_ordinary_cleanup_exception_to_a_stable_failure(
         raise OSError("injected cleanup failure")
 
     monkeypatch.setattr(lifecycle_module, "_remove_path", fail_removal)
+    monkeypatch.setattr(
+        lifecycle_module._GitCleanupScope,
+        "remove",
+        lambda _self, path: fail_removal(path),
+    )
 
     try:
         cleanup = lifecycle.cleanup()

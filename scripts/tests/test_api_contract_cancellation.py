@@ -7,12 +7,16 @@ import signal
 import subprocess
 import sys
 import time
-from contextlib import suppress
+from contextlib import ExitStack, suppress
 from pathlib import Path
 
 import pytest
 from scripts.dev_environment.diagnostics import Reason
-from scripts.dev_environment.environment import EnvironmentError, dependency_lease
+from scripts.dev_environment.environment import (
+    EnvironmentError,
+    dependency_lease,
+    managed_process_invocation,
+)
 from scripts.tests.test_dev_environment_dependencies import dependency_identity_fixture
 
 _SOURCE_ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +24,7 @@ _DISPATCHER = """
 import os, sys
 from pathlib import Path
 from scripts.dev_environment import task
+from scripts.dev_environment.environment import managed_process_entrypoint
 
 original_command = task._command
 def command(identity, task_name, arguments, output_format):
@@ -28,10 +33,10 @@ def command(identity, task_name, arguments, output_format):
 
 task.admit_dependencies = lambda identity, scope: None
 task._command = command
-raise SystemExit(task.run(
+raise SystemExit(managed_process_entrypoint(lambda: task.run(
     ['test:api'], repo_root=Path(sys.argv[1]), state_home=Path(sys.argv[2]),
     stdout=sys.stdout, stderr=sys.stderr,
-))
+)))
 """
 _CHILD = """
 import json, os, signal, sys, time
@@ -39,39 +44,43 @@ from pathlib import Path
 
 sys.path.insert(0, os.environ['TEST_API_SOURCE_ROOT'])
 from scripts.dev_environment.diagnostics import Reason
-from scripts.dev_environment.environment import EnvironmentError, dependency_lease
+from scripts.dev_environment.environment import (
+    EnvironmentError, dependency_lease, managed_process_entrypoint,
+)
 from scripts.dev_environment.identity import derive_instance_identity
 
-root = Path.cwd().parent
-identity = derive_instance_identity(root)
-def stop(number, frame):
-    try:
-        with dependency_lease(identity, exclusive=True):
-            retained = False
-    except EnvironmentError as error:
-        retained = error.reason == Reason.PREPARATION_IN_PROGRESS
-    (root / 'child-term.json').write_text(json.dumps({'leaseRetained': retained}))
-    print('controlled termination', flush=True)
-    if os.environ['TEST_API_CHILD_MODE'] == 'graceful':
-        raise SystemExit(0)
+def main():
+    root = Path.cwd().parent
+    identity = derive_instance_identity(root)
+    def stop(number, frame):
+        try:
+            with dependency_lease(identity, exclusive=True):
+                retained = False
+        except EnvironmentError as error:
+            retained = error.reason == Reason.PREPARATION_IN_PROGRESS
+        (root / 'child-term.json').write_text(json.dumps({'leaseRetained': retained}))
+        print('controlled termination', flush=True)
+        if os.environ['TEST_API_CHILD_MODE'] == 'graceful':
+            raise SystemExit(0)
 
-signal.signal(signal.SIGTERM, stop)
-print('controlled stdout', flush=True)
-print('controlled stderr', file=sys.stderr, flush=True)
-failures = Path(os.environ['CI_COORDINATOR_API_ARTIFACTS'])
-failures.mkdir()
-(failures / 'example.json').write_text('{"retained": true}\\n')
-ready = root / 'child-ready.json'
-pending = root / 'child-ready.tmp'
-pending.write_text(json.dumps({
-    'child': os.getpid(), 'campaign': os.getppid(),
-    'childSession': os.getsid(0), 'campaignSession': os.getsid(os.getppid()),
-}))
-pending.replace(ready)
-deadline = time.monotonic() + 20
-while time.monotonic() < deadline:
-    time.sleep(0.02)
-raise SystemExit(99)
+    signal.signal(signal.SIGTERM, stop)
+    print('controlled stdout', flush=True)
+    print('controlled stderr', file=sys.stderr, flush=True)
+    failures = Path(os.environ['CI_COORDINATOR_API_ARTIFACTS'])
+    failures.mkdir()
+    (failures / 'example.json').write_text('{"retained": true}\\n')
+    ready = root / 'child-ready.json'
+    pending = root / 'child-ready.tmp'
+    pending.write_text(json.dumps({
+        'child': os.getpid(), 'campaign': os.getppid(),
+        'childSession': os.getsid(0), 'campaignSession': os.getsid(os.getppid()),
+    }))
+    pending.replace(ready)
+    deadline = time.monotonic() + 20
+    while time.monotonic() < deadline:
+        time.sleep(0.02)
+    return 99
+raise SystemExit(managed_process_entrypoint(main))
 """
 
 
@@ -105,14 +114,22 @@ def test_developer_cancellation_reaps_nested_campaign_child_before_releasing_lea
     stdout_path, stderr_path = root / "dispatcher.stdout", root / "dispatcher.stderr"
     child_pid: int | None = None
     campaign_pid: int | None = None
-    with stdout_path.open("w") as stdout, stderr_path.open("w") as stderr:
+    with stdout_path.open("w") as stdout, stderr_path.open("w") as stderr, ExitStack() as lifetime:
+        invocation = lifetime.enter_context(
+            managed_process_invocation(
+                ("-c", _DISPATCHER, str(root), str(identity.state_home)),
+                timeout_seconds=None,
+                graceful_seconds=30,
+            )
+        )
         process = subprocess.Popen(
-            [sys.executable, "-c", _DISPATCHER, str(root), str(identity.state_home)],
+            [sys.executable, *invocation.arguments],
             cwd=_SOURCE_ROOT,
             env=environment,
             start_new_session=True,
             stdout=stdout,
             stderr=stderr,
+            pass_fds=invocation.inherited_fds,
         )
         try:
             ready = root / "child-ready.json"

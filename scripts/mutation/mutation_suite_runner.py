@@ -18,6 +18,15 @@ from scripts.mutation.detached_worktree_lifecycle import (
     CleanupResult,
     DetachedWorktreeLifecycle,
 )
+from scripts.mutation.mutation_evidence import (
+    EVIDENCE_ROOT,
+    MANIFEST_PATH,
+    MUTANT_IDS,
+    EvidenceCapture,
+    Phase,
+    allocate_capture,
+    capture_phase,
+)
 from scripts.mutation.mutation_manifest import (
     Mutant,
     MutationCommand,
@@ -43,9 +52,16 @@ SHARED_AUTHORITY_RELATIVE_PATHS: Final = (
     "scripts/__init__.py",
     "scripts/bounded_git.py",
     "scripts/bounded_process.py",
+    "scripts/dev_environment/__init__.py",
+    "scripts/dev_environment/diagnostics.py",
+    "scripts/dev_environment/environment.py",
+    "scripts/dev_environment/identity.py",
+    "scripts/dev_environment/private_files.py",
+    "scripts/diagram_process.py",
     "scripts/mutation/__init__.py",
     "scripts/mutation/detached_worktree_lifecycle.py",
     "scripts/mutation/mutation_manifest.py",
+    "scripts/mutation/mutation_evidence.py",
     "scripts/mutation/mutation_suite_runner.py",
     "scripts/mutation/pytest_report.py",
     "scripts/mutation/vitest_report.py",
@@ -67,6 +83,7 @@ class MutationSuiteConfig:
     report_id: str
     temp_prefix: str
     authority_relative_paths: tuple[str, ...] = ()
+    retain_pytest_evidence: bool = False
 
 
 class ExecutionClassificationInput(TypedDict):
@@ -81,6 +98,7 @@ class WitnessExecution(ExecutionClassificationInput):
     outputDigest: str
     timedOut: bool
     executionError: NotRequired[str]
+    retainedEvidence: NotRequired[dict[str, object]]
 
 
 class Classification(TypedDict):
@@ -105,6 +123,7 @@ def run_mutation_suite(
     manifest_bytes: bytes | None = None
     run_error: str | None = None
     source_revision: str | None = None
+    capture: EvidenceCapture | None = None
 
     try:
         lifecycle.install_signal_handlers()
@@ -115,12 +134,20 @@ def run_mutation_suite(
         manifest_bytes = manifest_path.read_bytes()
         manifest = decode_mutation_manifest(manifest_bytes)
         assert_manifest_applicable(manifest, source_root=lifecycle.worktree)
+        if config.retain_pytest_evidence:
+            if (
+                config.manifest_relative_path != MANIFEST_PATH
+                or tuple(manifest["expectedMutantIds"]) != MUTANT_IDS
+                or any(not is_pytest_command(row["command"]) for row in manifest["mutants"])
+            ):
+                raise ValueError("retained evidence requires the exact managed lifecycle suite")
+            capture = allocate_capture(root, source_revision, _digest(manifest_bytes))
         for relative_path in config.dependencies:
             _link_dependency(root, lifecycle.worktree, relative_path)
 
         for mutant in manifest["mutants"]:
             lifecycle.assert_running()
-            results.append(_run_mutant(lifecycle, manifest, mutant))
+            results.append(_run_mutant(lifecycle, manifest, mutant, capture=capture))
     except Exception as error:
         run_error = str(error)
     finally:
@@ -136,6 +163,7 @@ def run_mutation_suite(
     survived_count = sum(result["status"] == "survived" for result in results)
     invalid_count = sum(result["status"] == "invalid" for result in results)
     expected_killed = manifest["expectedKilled"] if manifest is not None else 0
+    retention = _retention_summary(results, capture) if config.retain_pytest_evidence else None
     state = (
         "passed"
         if run_error is None
@@ -143,6 +171,7 @@ def run_mutation_suite(
         and killed_count == expected_killed
         and survived_count == 0
         and invalid_count == 0
+        and (retention is None or retention["state"] == "complete")
         else "failed"
     )
 
@@ -168,7 +197,48 @@ def run_mutation_suite(
     }
     if run_error:
         report["runError"] = run_error
+    if retention is not None:
+        report["retainedEvidence"] = retention
     return report
+
+
+def _retention_summary(
+    results: list[MutationResult], capture: EvidenceCapture | None
+) -> dict[str, object]:
+    captured: set[tuple[str, str]] = set()
+    valid = capture is not None
+    for result in results:
+        baseline = result.get("baseline")
+        for phase, evidence in (
+            ("baseline", baseline.get("retainedEvidence") if isinstance(baseline, dict) else None),
+            ("mutant", result.get("retainedEvidence")),
+        ):
+            mutant_id = result.get("id")
+            if (
+                isinstance(mutant_id, str)
+                and mutant_id in MUTANT_IDS
+                and isinstance(evidence, dict)
+                and evidence.get("state") == "captured"
+                and evidence.get("mutantId") == mutant_id
+                and evidence.get("phase") == phase
+                and capture is not None
+                and evidence.get("invocationId") == capture.invocation_id
+                and evidence.get("sourceRevision") == capture.source_revision
+                and evidence.get("manifestDigest") == capture.manifest_digest
+                and (mutant_id, phase) not in captured
+            ):
+                captured.add((mutant_id, phase))
+            else:
+                valid = False
+    expected = {(mutant_id, phase) for mutant_id in MUTANT_IDS for phase in ("baseline", "mutant")}
+    return {
+        "state": "complete" if valid and captured == expected else "unqualified",
+        "root": EVIDENCE_ROOT.as_posix(),
+        "invocationId": capture.invocation_id if capture is not None else None,
+        "invocationPath": capture.relative_directory.as_posix() if capture is not None else None,
+        "expectedPhases": len(expected),
+        "capturedPhases": len(captured),
+    }
 
 
 def write_mutation_report(report: MutationReport) -> None:
@@ -257,6 +327,8 @@ def _run_mutant(
     lifecycle: DetachedWorktreeLifecycle,
     manifest: MutationManifest,
     mutant: Mutant,
+    *,
+    capture: EvidenceCapture | None = None,
 ) -> MutationResult:
     target_path = lifecycle.worktree / mutant["file"]
     source = target_path.read_text(encoding="utf-8")
@@ -275,7 +347,15 @@ def _run_mutant(
             "reason": f"expected one mutation target, found {occurrence_count}",
         }
 
-    baseline = _execute_witness(lifecycle, manifest, mutant)
+    baseline = _execute_witness(
+        lifecycle,
+        manifest,
+        mutant,
+        capture=capture,
+        source_digest=_digest(source),
+        patch_digest=patch_digest,
+        phase="baseline",
+    )
     if not _baseline_is_valid(mutant, baseline):
         return {
             "id": mutant["id"],
@@ -293,7 +373,15 @@ def _run_mutant(
             source.replace(mutant["original"], mutant["replacement"], 1),
             encoding="utf-8",
         )
-        execution = _execute_witness(lifecycle, manifest, mutant)
+        execution = _execute_witness(
+            lifecycle,
+            manifest,
+            mutant,
+            capture=capture,
+            source_digest=_digest(source.replace(mutant["original"], mutant["replacement"], 1)),
+            patch_digest=patch_digest,
+            phase="mutant",
+        )
     finally:
         if target_path.exists():
             target_path.write_text(source, encoding="utf-8")
@@ -321,6 +409,8 @@ def _run_mutant(
         result["vitestEvidence"] = execution["vitestEvidence"]
     if "pytestEvidence" in execution:
         result["pytestEvidence"] = execution["pytestEvidence"]
+    if "retainedEvidence" in execution:
+        result["retainedEvidence"] = execution["retainedEvidence"]
     return result
 
 
@@ -330,6 +420,10 @@ def _execute_witness(
     mutant: Mutant,
     *,
     monotonic_ns: MonotonicClock = time.monotonic_ns,
+    capture: EvidenceCapture | None = None,
+    source_digest: str = "",
+    patch_digest: str = "",
+    phase: Phase = "baseline",
 ) -> WitnessExecution:
     started_at_ns = monotonic_ns()
     environment = _witness_environment(mutant)
@@ -361,6 +455,22 @@ def _execute_witness(
         result["vitestEvidence"] = read_vitest_evidence(lifecycle.worktree)
     if is_pytest_command(mutant["command"]):
         result["pytestEvidence"] = read_pytest_evidence(lifecycle.worktree)
+    if capture is not None:
+        report = result.get("pytestEvidence")
+        result["retainedEvidence"] = capture_phase(
+            capture,
+            worktree=lifecycle.worktree,
+            mutant_id=mutant["id"],
+            phase=phase,
+            source_file=mutant["file"],
+            source_digest=source_digest,
+            patch_digest=patch_digest,
+            command=mutant["command"],
+            report_digest=report.get("reportDigest") if report else None,
+            stdout=execution.stdout,
+            stderr=execution.stderr,
+            exit_code=execution.status,
+        )
     return result
 
 

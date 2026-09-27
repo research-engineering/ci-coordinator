@@ -26,6 +26,13 @@ def descendant_timeout_probe(
     child_pid: int | None = None
     group_id: int | None = None
     observed = False
+    descriptors: tuple[int, ...] = ()
+    scope = None
+    if module.__name__ == "ci_coordinator.consumer_contract_lab.process":
+        scope = module.current_lifetime()
+        if scope is not None:
+            descriptors = scope.inherited_fds
+    identities = [(fd, os.fstat(fd).st_dev, os.fstat(fd).st_ino) for fd in descriptors]
     # A short private path also fits Darwin's UNIX-domain socket path limit.
     with (
         TemporaryDirectory(prefix="ci-t-", dir="/tmp") as directory,
@@ -36,15 +43,21 @@ def descendant_timeout_probe(
         listener.bind(address)
         listener.listen(1)
         child = (
-            "import os,socket; "
+            "import os,socket\nretained=True\n"
+            f"expected={identities!r}\n"
+            "try:\n    for fd,device,inode in expected:\n"
+            "        actual=os.fstat(fd)\n"
+            "        retained=retained and (actual.st_dev,actual.st_ino)==(device,inode)\n"
+            "except OSError: retained=False\n"
             "s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); s.settimeout(30); "
             f"s.connect({address!r}); "
-            "s.sendall(f'{os.getpid()}:{os.getpgrp()}\\n'.encode()); "
+            "s.sendall(f'{os.getpid()}:{os.getpgrp()}:{int(retained)}\\n'.encode()); "
             "s.recv(1); s.sendall(b'A'); s.recv(1)"
         )
         parent = (
             "import subprocess,sys,time; "
-            f"subprocess.Popen([sys.executable,'-c',{child!r}]); time.sleep(30)"
+            f"subprocess.Popen([sys.executable,'-c',{child!r}],pass_fds={descriptors!r}); "
+            "time.sleep(30)"
         )
 
         def register_after_ready(
@@ -53,17 +66,36 @@ def descendant_timeout_probe(
             nonlocal channel, child_pid, group_id
             if channel is None:
                 deadline = time.monotonic() + 5
-                channel, _ = listener.accept()
+                if scope is None:
+                    channel, _ = listener.accept()
+                else:
+                    while channel is None:
+                        module.assert_lifetime_running()
+                        remaining = deadline - time.monotonic()
+                        assert remaining > 0, "descendant setup deadline"
+                        listener.settimeout(min(0.02, remaining))
+                        try:
+                            channel, _ = listener.accept()
+                        except TimeoutError:
+                            continue
                 data = bytearray()
                 while not data.endswith(b"\n"):
+                    if scope is not None:
+                        module.assert_lifetime_running()
                     remaining = deadline - time.monotonic()
                     assert remaining > 0, "descendant setup deadline"
-                    channel.settimeout(remaining)
-                    part = channel.recv(1)
+                    channel.settimeout(remaining if scope is None else min(0.02, remaining))
+                    try:
+                        part = channel.recv(1)
+                    except TimeoutError:
+                        if scope is None:
+                            raise
+                        continue
                     assert part and len(data) < 64, "invalid descendant handshake"
                     data.extend(part)
                 channel.settimeout(5)
-                child_pid, group_id = map(int, data.decode().strip().split(":"))
+                child_pid, group_id, retained = map(int, data.decode().strip().split(":"))
+                assert retained == 1, "controlled descendant lost an inherited lease"
                 assert child_pid > 0 and group_id > 0 and group_id != os.getpgrp()
                 assert os.getpgid(child_pid) == group_id
                 # Hold the child across hard-stop; elapsed time cannot release this barrier.

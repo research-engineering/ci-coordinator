@@ -758,4 +758,6 @@ def _string_array(value: object, context: str) -> list[str]:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from scripts.dev_environment.environment import managed_process_entrypoint
+
+    raise SystemExit(managed_process_entrypoint(main))

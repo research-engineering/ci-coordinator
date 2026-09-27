@@ -4,6 +4,7 @@ import json
 import os
 import sys
 from collections.abc import Mapping, Sequence
+from contextlib import ExitStack
 from dataclasses import asdict
 from pathlib import Path
 from typing import TextIO, cast
@@ -17,10 +18,15 @@ from scripts.dev_environment.diagnostics import (
     write_json,
 )
 from scripts.dev_environment.environment import (
+    MANAGED_PROCESS_ARGUMENT,
     DependencyScope,
     EnvironmentError,
     admit_dependencies,
+    current_managed_process,
     dependency_lease,
+    managed_dependency_context,
+    managed_process_invocation,
+    managed_task_process_scope,
     prepare_dependencies,
 )
 from scripts.dev_environment.identity import InstanceIdentity, derive_instance_identity
@@ -31,6 +37,12 @@ from scripts.dev_environment.lifecycle import (
     sigterm_guard,
 )
 from scripts.dev_environment.watch_session import CancelResult, cancel_watch
+from scripts.diagram_process import DiagramCancellation, cancellation_signals
+from scripts.quality_plan import (
+    MANAGED_DEPENDENCY_ARGUMENT,
+    QualityPlanUsageError,
+    select_quality_plan,
+)
 
 _INSTALL_SCOPES: dict[str, tuple[DependencyScope, ...]] = {
     "install": ("backend", "frontend"),
@@ -67,20 +79,44 @@ def run(
     output_format: OutputFormat = "json"
     task_name = "task"
     cancellation: CancelResult | None = None
+    managed_cancellation: DiagramCancellation | None = None
     try:
         if not argv or argv[0] not in _KNOWN_TASKS:
             raise EnvironmentError(Reason.INVALID_ARGUMENT)
         task_name = argv[0]
         arguments = list(argv[1:])
         output_format, arguments = _extract_format(arguments)
+        if any(
+            value == private or value.startswith(private + "=")
+            for value in arguments
+            for private in (MANAGED_PROCESS_ARGUMENT, MANAGED_DEPENDENCY_ARGUMENT)
+        ):
+            raise EnvironmentError(Reason.INVALID_ARGUMENT)
         stop_watch = "--stop-watch" in arguments
         if stop_watch:
             if task_name not in {"dev:down", "dev:reset"} or arguments != ["--stop-watch"]:
                 raise EnvironmentError(Reason.INVALID_ARGUMENT)
             arguments = []
+        selection = None
+        if task_name in _QUALITY_TASKS:
+            quality_arguments = (
+                *(["portable"] if task_name == "check:portable" else []),
+                *arguments,
+            )
+            try:
+                selection = select_quality_plan(quality_arguments, repo_root)
+            except QualityPlanUsageError as error:
+                raise EnvironmentError(Reason.INVALID_ARGUMENT) from error
+            except (OSError, RuntimeError, TypeError, ValueError) as error:
+                stderr.write(str(error) + "\n")
+                return 1
         source = os.environ if environment is None else environment
         identity = derive_instance_identity(repo_root, state_home=state_home, environment=source)
-        with sigterm_guard():
+        with ExitStack() as signal_scope:
+            if selection is None:
+                signal_scope.enter_context(sigterm_guard())
+            else:
+                managed_cancellation = signal_scope.enter_context(cancellation_signals())
             if task_name in _INSTALL_SCOPES:
                 if arguments:
                     raise EnvironmentError(Reason.INVALID_ARGUMENT)
@@ -98,10 +134,18 @@ def run(
             child_environment = _child_environment(identity, source)
             if task_name == "dev:doctor":
                 return _doctor(identity, arguments, output_format, child_environment)
-            with dependency_lease(identity) as descriptor:
+            with dependency_lease(
+                identity, exclusive=selection is not None and bool(selection.write_scopes)
+            ) as descriptor:
                 for scope in _scopes(task_name):
                     admit_dependencies(identity, scope)
                 command, child_arguments = _command(identity, task_name, arguments, output_format)
+                if selection is not None:
+                    child_arguments = (
+                        *child_arguments,
+                        MANAGED_DEPENDENCY_ARGUMENT,
+                        managed_dependency_context(identity, descriptor, selection.sha256),
+                    )
                 if cancellation is not None:
                     return _after_cancellation(
                         command,
@@ -115,16 +159,68 @@ def run(
                         stdout,
                         stderr,
                     )
-                result = run_interactive(
-                    command,
-                    child_arguments,
-                    cwd=identity.repo_root,
-                    env=child_environment,
-                    inherited_fds=(descriptor,),
-                    timeout_seconds=None,
-                    graceful_seconds=420 if task_name == "dev:debug-backend" else 30,
+                if task_name in _API_TASKS and current_managed_process() is not None:
+                    with managed_process_invocation(
+                        child_arguments, timeout_seconds=None, graceful_seconds=30
+                    ) as invocation:
+                        result = run_interactive(
+                            command,
+                            invocation.arguments,
+                            cwd=identity.repo_root,
+                            env=child_environment,
+                            inherited_fds=tuple(
+                                dict.fromkeys((descriptor, *invocation.inherited_fds))
+                            ),
+                            timeout_seconds=None,
+                            graceful_seconds=30,
+                            cancellation_fd=invocation.cancellation_fd,
+                        )
+                elif selection is None:
+                    result = run_interactive(
+                        command,
+                        child_arguments,
+                        cwd=identity.repo_root,
+                        env=child_environment,
+                        inherited_fds=(descriptor,),
+                        timeout_seconds=None,
+                        graceful_seconds=420 if task_name == "dev:debug-backend" else 30,
+                    )
+                else:
+                    if managed_cancellation is None:
+                        raise EnvironmentError(Reason.INVALID_STATE)
+                    with (
+                        managed_task_process_scope(
+                            identity, descriptor, selection.sha256, managed_cancellation
+                        ),
+                        managed_process_invocation(
+                            child_arguments, timeout_seconds=None, graceful_seconds=30
+                        ) as invocation,
+                    ):
+                        result = run_interactive(
+                            command,
+                            invocation.arguments,
+                            cwd=identity.repo_root,
+                            env=child_environment,
+                            inherited_fds=tuple(
+                                dict.fromkeys((descriptor, *invocation.inherited_fds))
+                            ),
+                            timeout_seconds=None,
+                            graceful_seconds=30,
+                            stop_requested=(
+                                None
+                                if managed_cancellation is None
+                                else managed_cancellation.requested
+                            ),
+                            cancellation_fd=invocation.cancellation_fd,
+                        )
+                if managed_cancellation is not None and managed_cancellation.requested():
+                    return managed_cancellation.exit_code(1)
+                status = _completed_status(result)
+                return (
+                    status
+                    if managed_cancellation is None
+                    else managed_cancellation.exit_code(status)
                 )
-                return _completed_status(result)
     except (EnvironmentError, OperationBusy, OperationBlocked, OSError, ValueError) as error:
         reason = _reason(error)
         if cancellation is not None:

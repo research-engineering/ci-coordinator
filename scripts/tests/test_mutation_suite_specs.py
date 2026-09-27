@@ -122,6 +122,14 @@ def test_suite_configuration_is_a_canonical_data_table() -> None:
             "prefix": "ci-python-http-admission-mutation-",
             "policy": InventoryPolicy.HTTP_ADMISSION,
         },
+        "python-managed-lifecycle": {
+            "command": "mutation.python-managed-lifecycle",
+            "dependencies": ("backend/.venv",),
+            "manifest": "fixtures/conformance/v1/python-managed-lifecycle-mutants.v1.json",
+            "report": "ci-coordinator.python-managed-lifecycle-mutation",
+            "prefix": "ci-python-managed-lifecycle-mutation-",
+            "policy": InventoryPolicy.NONE,
+        },
         "python-plan-identity": {
             "command": "mutation.python-plan-identity",
             "dependencies": ("backend/.venv",),
@@ -159,6 +167,242 @@ def test_suite_configuration_is_a_canonical_data_table() -> None:
         "proofkit/quality-plan.v1.json",
         "proofkit/witness-plan-input.json",
     )
+
+
+def test_managed_lifecycle_manifest_has_exactly_nine_causal_witnesses() -> None:
+    spec = SUITES["python-managed-lifecycle"]
+    manifest = decode_mutation_manifest(
+        (REPO_ROOT / spec.config.manifest_relative_path).read_bytes()
+    )
+    expected = [
+        [
+            "leaf-fd",
+            "backend/src/ci_coordinator/consumer_contract_lab/process.py",
+            "omit-leaf-descriptors",
+            "pass_fds=descriptors,",
+            "pass_fds=(),",
+            "managed-lifecycle.leaf-fd",
+            ["REQ-CI-RUNTIME-028"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_native_managed_leaf_retains_exact_lease_identity",
+            ],
+        ],
+        [
+            "image-fd",
+            "backend/src/ci_coordinator/consumer_contract_lab/bootstrap.py",
+            "omit-image-descriptors",
+            "pass_fds=invocation.inherited_fds,",
+            "pass_fds=(),",
+            "managed-lifecycle.image-fd",
+            ["REQ-CI-RUNTIME-028"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_native_managed_cli_preserves_stable_receipt",
+            ],
+        ],
+        [
+            "historical-gate",
+            "backend/src/ci_coordinator/consumer_contract_lab/bootstrap.py",
+            "bypass-managed-image-admission",
+            "        _require_lifetime_receiver(package_root)",
+            "        pass",
+            "managed-lifecycle.historical-gate",
+            ["REQ-CI-RUNTIME-028"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_native_managed_historical_image_rejects_before_module_execution",
+            ],
+        ],
+        [
+            "stop-bound",
+            "backend/src/ci_coordinator/consumer_contract_lab/bootstrap.py",
+            "ignore-first-force-deadline",
+            "for value in (self.limit, self.scope.deadline, self.scope.cancellation_deadline)",
+            "for value in (self.limit, self.scope.deadline, None)",
+            "managed-lifecycle.stop-bound",
+            ["REQ-CI-RUNTIME-028"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_first_stop_frame_is_not_a_renewable_or_multicast_grant",
+            ],
+        ],
+        [
+            "fresh-channel",
+            "backend/src/ci_coordinator/consumer_contract_lab/bootstrap.py",
+            "reuse-stop-channel",
+            "    reader, writer = os.pipe()",
+            "    reader, writer = os.pipe()\n    if isinstance(scope, _ReceivedLifetime):\n"
+            "        os.close(reader)\n        reader = os.dup(scope.reader)",
+            "managed-lifecycle.fresh-channel",
+            ["REQ-CI-RUNTIME-028"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_native_bootstrap_image_leaf_channels_and_owned_drain[release]",
+            ],
+        ],
+        [
+            "scope-restore",
+            "backend/src/ci_coordinator/consumer_contract_lab/bootstrap.py",
+            "skip-scope-restoration",
+            "        _LIFETIME.reset(token)",
+            "        pass",
+            "managed-lifecycle.scope-restore",
+            ["REQ-CI-RUNTIME-028"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_native_lifetime_entry_preserves_primary_outcome_and_restores_scope",
+            ],
+        ],
+        [
+            "cleanup-cut",
+            "backend/src/ci_coordinator/consumer_contract_lab/process.py",
+            "renew-cleanup-allowance",
+            "        self._ceiling = min(limits) if limits else 0.0",
+            "        self._ceiling = time.monotonic() + 30",
+            "managed-lifecycle.cleanup-cut",
+            ["REQ-CI-RUNTIME-028"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_native_owned_lab_cleanup_has_no_later_recursive_finalizer",
+            ],
+        ],
+        [
+            "empty-only",
+            "scripts/mutation/detached_worktree_lifecycle.py",
+            "recurse-on-wrapper-residual",
+            "            path.rmdir()",
+            "            _remove_path(path)",
+            "managed-lifecycle.empty-only",
+            ["REQ-CI-PROOFKIT-008"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "--rootdir=.",
+                "scripts/tests/test_detached_worktree_lifecycle.py::test_native_owned_cleanup_uses_one_remaining_parent_allowance[residual]",
+            ],
+        ],
+        [
+            "quiescence-fact",
+            "backend/src/ci_coordinator/consumer_contract_lab/process.py",
+            "fabricate-quiescence",
+            "        quiescent,\n    )",
+            "        True,\n    )",
+            "managed-lifecycle.quiescence-fact",
+            ["REQ-CI-RUNTIME-028"],
+            [
+                "backend/.venv/bin/python",
+                "-m",
+                "pytest",
+                "-c",
+                "backend/pyproject.toml",
+                "-q",
+                "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_native_unobserved_group_is_never_a_success_receipt",
+            ],
+        ],
+    ]
+    assert manifest["expectedKilled"] == 9
+    assert manifest["expectedMutantIds"] == [
+        "leaf-fd",
+        "image-fd",
+        "historical-gate",
+        "stop-bound",
+        "fresh-channel",
+        "scope-restore",
+        "cleanup-cut",
+        "empty-only",
+        "quiescence-fact",
+    ]
+    assert [
+        [
+            row["id"],
+            row["file"],
+            row["operator"],
+            row["original"],
+            row["replacement"],
+            row["witnessId"],
+            row["requirementIds"],
+            row["command"],
+        ]
+        for row in manifest["mutants"]
+    ] == expected
+    assert all(
+        row["environment"] == {"PYTHONDONTWRITEBYTECODE": "1", "PYTHONPATH": "backend/src"}
+        for row in manifest["mutants"]
+    )
+    assert manifest["timeoutMs"] == 300000 and manifest["outerTimeoutMs"] == 5460000
+    quality = load_quality_plan()
+    assert quality.commands[spec.command_id].timeout_ms == 5460000
+    assert quality.branch_head_command_ids.count(spec.command_id) == 1
+    assert {name for name, row in SUITES.items() if row.config.retain_pytest_evidence} == {
+        "python-managed-lifecycle"
+    }
+    assert spec.inventory_policy is InventoryPolicy.NONE
+
+
+def test_managed_evidence_has_pinned_prerequisite_and_finite_native_artifact() -> None:
+    workflow = YAML(typ="safe").load(REPO_ROOT / ".github/workflows/python-persistence.yml")
+    job = workflow["jobs"]["persistence-mutation"]
+    steps = job["steps"]
+    node = next(
+        step for step in steps if step["name"] == "Set up Node for managed lifecycle witnesses"
+    )
+    run = next(step for step in steps if step["name"] == "Run governed mutation witnesses")
+    artifact = next(
+        step for step in steps if step["name"] == "Retain managed lifecycle mutation evidence"
+    )
+    assert steps.index(node) < steps.index(run) < steps.index(artifact)
+    assert node["if"] == "matrix.suite == 'python-managed-lifecycle'"
+    assert node["uses"] == "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020"
+    assert node["with"] == {"node-version": "24.21.0"}
+    assert artifact["if"] == "always() && matrix.suite == 'python-managed-lifecycle'"
+    assert artifact["uses"] == "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    assert artifact["with"] == {
+        "name": "managed-lifecycle-mutations",
+        "path": ".ci-native/mutations/python-managed-lifecycle",
+        "include-hidden-files": True,
+        "if-no-files-found": "error",
+        "retention-days": 7,
+    }
 
 
 def test_plan_identity_manifest_has_exactly_eight_causal_witnesses() -> None:

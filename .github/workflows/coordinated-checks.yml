@@ -572,6 +572,7 @@ jobs:
         - python-capacity-evidence
         - python-http-admission
         - python-plan-identity
+        - python-managed-lifecycle
         - python-persistence
         - audit-persistence-byte-limits
         - python-database-compatibility
@@ -594,10 +595,24 @@ jobs:
         version: 0.12.17
     - name: Install dependencies
       run: "python3 -m scripts.python_witness lock-check\npython3 -m scripts.python_witness install-check\n"
+    - name: Set up Node for managed lifecycle witnesses
+      if: matrix.suite == 'python-managed-lifecycle'
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      with:
+        node-version: 24.21.0
     - name: Run governed mutation witnesses
       env:
         SUITE_NAME: ${{ matrix.suite }}
       run: backend/.venv/bin/python -m scripts.mutation.mutation_suite_specs "$SUITE_NAME"
+    - name: Retain managed lifecycle mutation evidence
+      if: always() && matrix.suite == 'python-managed-lifecycle'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      with:
+        name: managed-lifecycle-mutations
+        path: .ci-native/mutations/python-managed-lifecycle
+        include-hidden-files: true
+        if-no-files-found: error
+        retention-days: 7
     if: ${{ always() && needs['repository-quality'].result == 'success' && (needs.plan.result != 'success' || needs.plan.outputs.plan_valid != 'true' || needs.plan.outputs.fallback != 'false' || contains(fromJSON(needs.plan.outputs.selected_jobs || '[]'), 'persistence-mutation')) }}
     env:
       PROOFKIT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || (github.event_name == 'workflow_dispatch' && inputs.proof_scope == 'range' && inputs.proofkit_base_sha) || '' }}
@@ -747,7 +762,7 @@ jobs:
     - name: Check generated target artifacts
       run: backend/.venv/bin/python -m ci_coordinator.target_artifacts.cli check --source fixtures/target-repository/.ci-coordinator/target-artifacts-source.v1.json --output-directory fixtures/target-repository/.ci-coordinator
     - name: Run branch-head and mutation harness self-tests
-      run: "backend/.venv/bin/python -m pytest -q \\\n  scripts/tests/test_proofkit_branch_head.py \\\n  scripts/tests/test_quality_plan.py \\\n  scripts/tests/test_detached_worktree_lifecycle.py \\\n  scripts/tests/test_mutation_manifest.py \\\n  scripts/tests/test_mutation_suite_runner.py \\\n  scripts/tests/test_mutation_suite_specs.py\n"
+      run: "backend/.venv/bin/python -m pytest -q \\\n  scripts/tests/test_proofkit_branch_head.py \\\n  scripts/tests/test_quality_plan.py \\\n  scripts/tests/test_detached_worktree_lifecycle.py \\\n  scripts/tests/test_mutation_manifest.py \\\n  scripts/tests/test_mutation_suite_runner.py \\\n  scripts/tests/test_mutation_evidence.py \\\n  scripts/tests/test_mutation_suite_specs.py\n"
     - name: Preflight mutation manifest applicability
       run: backend/.venv/bin/python -m scripts.mutation.mutation_suite_specs preflight
     - name: Run repository and Python quality witnesses

@@ -13,7 +13,8 @@ from pathlib import Path
 from typing import Final, cast
 
 import pytest
-from scripts.bounded_process import CommandResult
+from scripts.bounded_process import CommandResult, spawn
+from scripts.dev_environment.environment import managed_process_invocation
 from scripts.mutation.detached_worktree_lifecycle import DetachedWorktreeLifecycle
 from scripts.mutation.mutation_manifest import (
     Mutant,
@@ -31,6 +32,15 @@ from scripts.mutation.mutation_suite_specs import (
 )
 
 SOURCE_ROOT: Final = Path(__file__).resolve().parents[2]
+_RECEIVER_SUPPORT = (
+    "scripts/dev_environment/__init__.py",
+    "scripts/dev_environment/diagnostics.py",
+    "scripts/dev_environment/environment.py",
+    "scripts/dev_environment/identity.py",
+    "scripts/dev_environment/private_files.py",
+    "scripts/diagram_process.py",
+    "scripts/proofkit_common.py",
+)
 
 
 def _required_executable(name: str) -> str:
@@ -166,7 +176,7 @@ def _initialize_repository(
     include_static_invalid: bool = True,
 ) -> MutationManifest:
     mutation_dir = root / "scripts" / "mutation"
-    for relative_path in SHARED_AUTHORITY_RELATIVE_PATHS:
+    for relative_path in (*SHARED_AUTHORITY_RELATIVE_PATHS, *_RECEIVER_SUPPORT):
         target = root / relative_path
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(SOURCE_ROOT / relative_path, target)
@@ -178,10 +188,14 @@ def _initialize_repository(
     probe_authority_paths = (
         "scripts/mutation/probe.py",
         *EXECUTION_ENVELOPE_AUTHORITY_RELATIVE_PATHS,
+        *_RECEIVER_SUPPORT,
         "manifest.json",
     )
     (mutation_dir / "probe.py").write_text(
-        f"""from scripts.mutation.mutation_suite_runner import (
+        f"""from pathlib import Path
+from scripts.dev_environment.environment import managed_process_entrypoint
+import scripts.mutation.mutation_suite_runner as runner
+from scripts.mutation.mutation_suite_runner import (
     MutationSuiteConfig,
     run_mutation_suite_main,
 )
@@ -193,7 +207,9 @@ config = MutationSuiteConfig(
     temp_prefix="mutation-runner-probe-",
     authority_relative_paths={probe_authority_paths!r},
 )
-raise SystemExit(run_mutation_suite_main(config))
+expected_runner = Path(__file__).with_name("mutation_suite_runner.py").resolve()
+assert Path(runner.__file__).resolve() == expected_runner
+raise SystemExit(managed_process_entrypoint(lambda: run_mutation_suite_main(config)))
 """,
         encoding="utf-8",
     )
@@ -303,11 +319,32 @@ raise SystemExit(5)
 def _execute_suite(
     root: Path,
 ) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
-    execution = _run(
+    with managed_process_invocation(
+        ("-m", "scripts.mutation.probe"),
+        timeout_seconds=20,
+        graceful_seconds=1,
+    ) as invocation:
+        result = spawn(
+            sys.executable,
+            invocation.arguments,
+            cwd=root,
+            max_buffer=2_097_152,
+            timeout_seconds=20,
+            inherited_fds=invocation.inherited_fds,
+            cancellation_fd=invocation.cancellation_fd,
+            env={
+                **os.environ,
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "MUTATION_AMBIENT_SENTINEL": "must-not-cross",
+            },
+        )
+    assert result.error is None, result
+    assert result.status is not None
+    execution = subprocess.CompletedProcess(
         [sys.executable, "-m", "scripts.mutation.probe"],
-        cwd=root,
-        check=False,
-        environment={"MUTATION_AMBIENT_SENTINEL": "must-not-cross"},
+        result.status,
+        result.stdout,
+        result.stderr,
     )
     parsed = cast(object, json.loads(execution.stdout))
     assert isinstance(parsed, dict), execution.stderr
@@ -488,6 +525,20 @@ def test_mutation_authority_is_closed_over_first_party_imports() -> None:
             if (SOURCE_ROOT / package_path).is_file() and package_path not in authority:
                 missing.add(package_path)
     assert missing == set()
+
+
+def test_fixture_receiver_imports_are_closed_over_copied_sources() -> None:
+    paths = {*SHARED_AUTHORITY_RELATIVE_PATHS, *_RECEIVER_SUPPORT}
+    for path in _RECEIVER_SUPPORT:
+        for node in ast.walk(ast.parse((SOURCE_ROOT / path).read_bytes())):
+            for module in _imported_modules(node):
+                if module.startswith("scripts."):
+                    for candidate in (
+                        module.replace(".", "/") + ".py",
+                        module.replace(".", "/") + "/__init__.py",
+                    ):
+                        if (SOURCE_ROOT / candidate).exists():
+                            assert candidate in paths, candidate
 
 
 @pytest.mark.parametrize(

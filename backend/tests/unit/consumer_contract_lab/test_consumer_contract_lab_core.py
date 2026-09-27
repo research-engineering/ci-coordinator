@@ -3,11 +3,17 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import selectors
+import shutil
+import signal
+import struct
 import subprocess
 import sys
+import threading
 import time
+from contextlib import suppress
 from pathlib import Path
-from typing import cast
+from typing import IO, cast
 
 import pytest
 from consumer_contract_lab_support import WORKFLOW_PATH, dynamic_policy
@@ -15,6 +21,7 @@ from jsonschema import Draft202012Validator
 from package_b_support import PLAN_REQUEST_WORKFLOW_REF
 from process_timeout_support import descendant_timeout_probe
 
+from ci_coordinator.consumer_contract_lab import bootstrap as consumer_bootstrap
 from ci_coordinator.consumer_contract_lab import node_runtime
 from ci_coordinator.consumer_contract_lab import process as consumer_process
 from ci_coordinator.consumer_contract_lab.bootstrap import (
@@ -52,7 +59,7 @@ from ci_coordinator.consumer_contract_lab.node_runtime import (
     ConsumerControlError,
     execute_consumer_controls,
 )
-from ci_coordinator.consumer_contract_lab.process import run_bounded
+from ci_coordinator.consumer_contract_lab.process import LifetimeScope, run_bounded
 from ci_coordinator.consumer_contract_lab.runner import ConsumerLabReceipt
 from ci_coordinator.consumer_contract_lab.source_epoch import PreparedConsumerContract
 from ci_coordinator.execution_orchestration import (
@@ -69,6 +76,174 @@ from ci_coordinator.target_artifacts.requester import render_plan_requester
 
 _ROOT = Path(__file__).resolve().parents[4]
 _FIXTURE = _ROOT / "fixtures/native-target-repository"
+
+
+def test_native_managed_leaf_retains_exact_lease_identity(
+    managed_consumer_lifetime: tuple[LifetimeScope, int, int],
+    tmp_path: Path,
+) -> None:
+    scope, _, _ = managed_consumer_lifetime
+    descriptors = scope.inherited_fds
+    expected = [[fd, os.fstat(fd).st_dev, os.fstat(fd).st_ino] for fd in descriptors]
+    result = run_bounded(
+        sys.executable,
+        (
+            "-I",
+            "-S",
+            "-c",
+            "import json,os,sys\nrows=[]\n"
+            "try:\n    for value in sys.argv[1:]:\n"
+            "        fd=int(value); info=os.fstat(fd); rows.append([fd,info.st_dev,info.st_ino])\n"
+            "except OSError: pass\nprint(json.dumps(rows))\n",
+            *map(str, descriptors),
+        ),
+        cwd=tmp_path,
+        max_output_bytes=65_536,
+        timeout_seconds=10,
+        env={},
+    )
+    assert result.status == 0 and result.error is None, result
+    assert json.loads(result.stdout) == expected and expected
+    assert result.process_group_quiescent is True
+    assert consumer_process.current_lifetime() is scope
+    for descriptor in descriptors:
+        os.fstat(descriptor)
+
+
+def test_native_unobserved_group_is_never_a_success_receipt(
+    managed_consumer_lifetime: tuple[LifetimeScope, int, int],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    command = ("-I", "-S", "-c", "raise SystemExit(0)")
+    deadline = time.monotonic() + 2
+    positive = run_bounded(
+        sys.executable,
+        command,
+        cwd=tmp_path,
+        max_output_bytes=4096,
+        timeout_seconds=5,
+        execution_deadline=deadline,
+        env={},
+    )
+    assert positive.status == 0 and positive.process_group_quiescent is True, positive
+    monkeypatch.setattr(consumer_process, "_group_alive", lambda _group, **_kwargs: True)
+    unavailable = run_bounded(
+        sys.executable,
+        command,
+        cwd=tmp_path,
+        max_output_bytes=4096,
+        timeout_seconds=5,
+        execution_deadline=deadline,
+        env={},
+    )
+    assert unavailable.status is None and unavailable.error is not None
+    assert unavailable.process_group_quiescent is False
+
+
+def test_native_managed_leaf_cancellation_drains_before_return(
+    managed_consumer_lifetime: tuple[LifetimeScope, int, int],
+    tmp_path: Path,
+) -> None:
+    scope, writer, _ = managed_consumer_lifetime
+    marker = tmp_path / "leaf.json"
+    expected = [(fd, os.fstat(fd).st_dev, os.fstat(fd).st_ino) for fd in scope.inherited_fds]
+    code = (
+        "import json,os,signal,sys,time\nfrom pathlib import Path\n"
+        "signal.signal(signal.SIGTERM,signal.SIG_IGN)\n"
+        f"expected={expected!r}\nretained=True\n"
+        "try:\n    for fd,device,inode in expected:\n"
+        "        actual=os.fstat(fd)\n"
+        "        retained = retained and (actual.st_dev,actual.st_ino)==(device,inode)\n"
+        "except OSError: retained=False\n"
+        f"marker=Path({str(marker)!r}); temporary=marker.with_suffix('.tmp')\n"
+        "temporary.write_text(json.dumps({'pid':os.getpid(),'retained':retained}))\n"
+        "temporary.replace(marker)\n"
+        "while True: time.sleep(1)\n"
+    )
+    observations: list[dict[str, object]] = []
+    failures: list[BaseException] = []
+
+    def request_stop() -> None:
+        try:
+            deadline = time.monotonic() + 5
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            observation = json.loads(marker.read_bytes())
+            observations.append(observation)
+            os.write(writer, struct.pack("!4sd", b"CF1:", time.monotonic() + 1))
+        except BaseException as error:
+            failures.append(error)
+
+    sender = threading.Thread(target=request_stop)
+    sender.start()
+    try:
+        with pytest.raises(consumer_process.LifetimeCancelled):
+            run_bounded(
+                sys.executable,
+                ("-I", "-S", "-c", code),
+                cwd=tmp_path,
+                max_output_bytes=4096,
+                timeout_seconds=10,
+                env={},
+            )
+        sender.join(timeout=6)
+        assert not sender.is_alive() and not failures, failures
+        assert len(observations) == 1 and observations[0]["retained"] is True
+        pid = observations[0]["pid"]
+        assert type(pid) is int
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+        assert consumer_process.current_lifetime() is scope
+        for descriptor in scope.inherited_fds:
+            os.fstat(descriptor)
+    finally:
+        sender.join(timeout=6)
+        if observations:
+            pid = observations[0]["pid"]
+            if type(pid) is int:
+                with suppress(ProcessLookupError):
+                    os.killpg(pid, signal.SIGKILL)
+
+
+@pytest.mark.parametrize("expired", [False, True])
+@pytest.mark.parametrize("owner", ["bootstrap", "process"])
+def test_native_owned_lab_cleanup_has_no_later_recursive_finalizer(
+    managed_consumer_lifetime: tuple[LifetimeScope, int, int],
+    expired: bool,
+    owner: str,
+) -> None:
+    scope, writer, _ = managed_consumer_lifetime
+    root: Path | None = None
+    context = (
+        consumer_bootstrap._owned_source_directory()
+        if owner == "bootstrap"
+        else consumer_process.owned_temporary_directory(prefix="lab-owned-cut-")
+    )
+    failure = (
+        consumer_bootstrap.ConsumerLabBootstrapError
+        if owner == "bootstrap"
+        else consumer_process.ConsumerLabCleanupError
+    )
+    try:
+        if expired:
+            with (
+                pytest.raises(failure),
+                context as temporary,
+            ):
+                root = Path(temporary)
+                (root / "retained.txt").write_text("owned data")
+                os.write(writer, struct.pack("!4sd", b"CF1:", time.monotonic() - 1))
+            assert root is not None and (root / "retained.txt").read_text() == "owned data"
+        else:
+            with context as temporary:
+                root = Path(temporary)
+                (root / "removed.txt").write_text("owned data")
+            assert not root.exists()
+        assert consumer_process.current_lifetime() is scope
+    finally:
+        if root is not None:
+            shutil.rmtree(root, ignore_errors=True)
 
 
 def _profile(
@@ -581,7 +756,10 @@ def test_bounded_process_terminates_descendants_on_timeout(
         assert survived() is parent_only
 
 
-def test_bounded_process_deadline_closes_detached_inherited_pipes(tmp_path: Path) -> None:
+def test_bounded_process_deadline_closes_detached_inherited_pipes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     detached = "import time;time.sleep(0.3)"
     parent = (
         "import subprocess,sys;"
@@ -589,18 +767,88 @@ def test_bounded_process_deadline_closes_detached_inherited_pipes(tmp_path: Path
     )
     started = time.monotonic()
 
-    result = run_bounded(
-        sys.executable,
-        ("-c", parent),
-        cwd=tmp_path,
-        max_output_bytes=1_024,
-        timeout_seconds=0.05,
-        env={"PATH": os.environ["PATH"], "PYTHONDONTWRITEBYTECODE": "1"},
-    )
+    environment = {"PATH": os.environ["PATH"], "PYTHONDONTWRITEBYTECODE": "1"}
+    if consumer_process.current_lifetime() is None:
+        result = run_bounded(
+            sys.executable,
+            ("-c", parent),
+            cwd=tmp_path,
+            max_output_bytes=1_024,
+            timeout_seconds=0.05,
+            env=environment,
+        )
+    else:
+        from scripts.bounded_process import _is_process_group_alive
+
+        pid_path = tmp_path / "detached-pid"
+        register = consumer_process._register_read_pipe
+
+        def register_after_ready(
+            selector: selectors.BaseSelector,
+            stream: IO[bytes] | None,
+            sink: bytearray,
+        ) -> None:
+            until = time.monotonic() + 5
+            while not pid_path.exists() and time.monotonic() < until:
+                consumer_process.assert_lifetime_running()
+                time.sleep(0.01)
+            assert pid_path.exists(), "detached receiver did not establish its positive baseline"
+            register(selector, stream, sink)
+
+        monkeypatch.setattr(consumer_process, "_register_read_pipe", register_after_ready)
+        controlled = (
+            "import os,time\nfrom pathlib import Path\n"
+            "from ci_coordinator.consumer_contract_lab.process import ("
+            "managed_lifetime_entrypoint,assert_lifetime_running)\n"
+            "def main():\n"
+            f"    Path({str(pid_path)!r}).write_text(str(os.getpid()))\n"
+            "    until=time.monotonic()+0.3\n"
+            "    while time.monotonic()<until:\n"
+            "        assert_lifetime_running(); time.sleep(0.01)\n"
+            "    return 0\n"
+            "raise SystemExit(managed_lifetime_entrypoint(main))\n"
+        )
+        with consumer_process.lifetime_invocation(("-c", controlled), timeout_seconds=3) as child:
+            parent = (
+                "import subprocess,sys;"
+                f"subprocess.Popen([sys.executable,*{child.arguments!r}],"
+                f"start_new_session=True,pass_fds={child.inherited_fds!r})"
+            )
+            try:
+                result = run_bounded(
+                    sys.executable,
+                    ("-c", parent),
+                    cwd=tmp_path,
+                    max_output_bytes=1_024,
+                    timeout_seconds=0.05,
+                    env={**environment, "PYTHONPATH": str(_ROOT / "backend/src")},
+                    inherited_fds=child.inherited_fds,
+                    cancellation_fd=child.cancellation_fd,
+                    execution_deadline=child.deadline,
+                )
+                assert pid_path.exists(), result
+                pid = int(pid_path.read_text())
+                while _is_process_group_alive(pid) and time.monotonic() < child.deadline:
+                    time.sleep(0.01)
+                assert not _is_process_group_alive(pid), "owned detached receiver was not drained"
+            finally:
+                if pid_path.exists():
+                    pid = int(pid_path.read_text())
+                    if _is_process_group_alive(pid):
+                        with suppress(ProcessLookupError):
+                            os.killpg(pid, signal.SIGKILL)
 
     assert result.status is None
     assert result.error == "process timeout"
     assert time.monotonic() - started < 3
+
+
+def test_managed_detached_pipe_fixture_has_an_independent_receiver(
+    tmp_path: Path,
+    managed_consumer_lifetime: tuple[LifetimeScope, int, int],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    test_bounded_process_deadline_closes_detached_inherited_pipes(tmp_path, monkeypatch)
 
 
 def _contract(

@@ -57,4 +57,10 @@ def read(root: Path, relative: Path, maximum: int) -> bytes:
 
 
 if __name__ == "__main__":
-    raise SystemExit(scanner.main(run, read, default_root=ACTION_ROOT.parents[2]))
+    from scripts.dev_environment.environment import managed_process_entrypoint
+
+    raise SystemExit(
+        managed_process_entrypoint(
+            lambda: scanner.main(run, read, default_root=ACTION_ROOT.parents[2])
+        )
+    )

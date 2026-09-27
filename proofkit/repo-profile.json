@@ -591,6 +591,19 @@
         "backend/.venv/bin/python",
         "-m",
         "scripts.mutation.mutation_suite_specs",
+        "python-managed-lifecycle"
+      ],
+      "credentialClass": "none",
+      "id": "ci-coordinator.command.mutation-python-managed-lifecycle",
+      "kind": "exact_argv",
+      "networkPolicy": "none",
+      "parallelGroup": "test"
+    },
+    {
+      "allowedArgv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.mutation.mutation_suite_specs",
         "python-persistence"
       ],
       "credentialClass": "none",
@@ -960,7 +973,22 @@
         "scripts/tests/test_python_import_boundary_policy.py::test_consumer_contract_lab_has_no_provider_or_production_runtime_edge",
         "scripts/tests/test_python_import_boundary_policy.py::test_consumer_contract_lab_os_capability_is_owned_by_exact_files",
         "scripts/tests/test_python_import_boundary_policy.py::test_offline_node_selection_does_not_grant_environment_authority_to_siblings",
-        "scripts/tests/test_python_import_boundary_policy.py::test_rule_catalog_preserves_source_order"
+        "scripts/tests/test_python_import_boundary_policy.py::test_rule_catalog_preserves_source_order",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_native_capture_acceptance_setup_and_close_keep_owned_drain",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_lifetime_decoders_reject_each_operand_after_a_valid_positive",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_first_stop_frame_is_not_a_renewable_or_multicast_grant",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_native_lifetime_entry_preserves_primary_outcome_and_restores_scope",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_bootstrap_receiver_admission_is_conditional_on_managed_scope",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_admission.py::test_public_bootstrap_entry_preserves_argv_terminal_and_enclosing_scope",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_native_managed_leaf_retains_exact_lease_identity",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_native_unobserved_group_is_never_a_success_receipt",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_native_managed_leaf_cancellation_drains_before_return",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_native_owned_lab_cleanup_has_no_later_recursive_finalizer",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_core.py::test_managed_detached_pipe_fixture_has_an_independent_receiver",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_native_managed_cli_preserves_stable_receipt",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_native_managed_historical_image_rejects_before_module_execution",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_native_managed_bootstrap_never_imports_unchecked_process_bytes",
+        "backend/tests/unit/consumer_contract_lab/test_consumer_contract_lab_end_to_end.py::test_native_bootstrap_image_leaf_channels_and_owned_drain"
       ],
       "credentialClass": "none",
       "id": "ci-coordinator.command.runtime028-test",

@@ -12,6 +12,7 @@ from typing import Final, Literal, Never
 
 from scripts.bounded_process import spawn
 from scripts.dependency_hygiene import admit_backend_source_roots, run_import_linter
+from scripts.dev_environment.environment import current_managed_process, managed_process_invocation
 from scripts.python_coverage_policy import (
     changed_paths_for_coverage,
     evaluate_coverage_report,
@@ -264,14 +265,33 @@ class PythonWitness:
                 },
             )
         process_environment = {**self._environment, **(environment or {})}
-        result = spawn(
-            str(self._venv_python),
-            ("-m", module_name, *arguments),
-            cwd=self._backend_root,
-            env=process_environment,
-            max_buffer=64 * 1024 * 1024,
-            timeout_seconds=timeout_seconds,
-        )
+        if module_name == "pytest" and current_managed_process() is not None:
+            with managed_process_invocation(
+                ("-m", module_name, *arguments),
+                timeout_seconds=timeout_seconds,
+                graceful_seconds=3,
+                pytest_participant=True,
+            ) as invocation:
+                result = spawn(
+                    str(self._venv_python),
+                    invocation.arguments,
+                    cwd=self._backend_root,
+                    env=process_environment,
+                    max_buffer=64 * 1024 * 1024,
+                    timeout_seconds=timeout_seconds,
+                    inherited_fds=invocation.inherited_fds,
+                    graceful_seconds=3,
+                    cancellation_fd=invocation.cancellation_fd,
+                )
+        else:
+            result = spawn(
+                str(self._venv_python),
+                ("-m", module_name, *arguments),
+                cwd=self._backend_root,
+                env=process_environment,
+                max_buffer=64 * 1024 * 1024,
+                timeout_seconds=timeout_seconds,
+            )
         sys.stdout.write(result.stdout)
         sys.stderr.write(result.stderr)
         if result.error is not None:
@@ -498,4 +518,6 @@ BASE_NON_CLAIMS = (
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    from scripts.dev_environment.environment import managed_process_entrypoint
+
+    raise SystemExit(managed_process_entrypoint(main))

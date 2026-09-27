@@ -101,7 +101,10 @@
         "docker/runtime/security/*.c",
         "docker/runtime/security/*.patch"
       ],
-      "commandIds": ["container.smoke", "workflow.lint"],
+      "commandIds": [
+        "container.smoke",
+        "workflow.lint"
+      ],
       "predicate": "Exact runtime acquisition locks, builder recipes and native probes are consumed by the image build; CVE and release admission remain separate witnesses."
     },
     {
@@ -422,6 +425,12 @@
       "commandId": "mutation.frontend-safety-kernels",
       "executionOwner": "proofkit/witness-plan-input.json#mutation.frontend-safety-kernels",
       "purpose": "Run the repository-owned mutation.frontend-safety-kernels predicate with its declared environment, timeout and failure contract.",
+      "kind": "native"
+    },
+    {
+      "commandId": "mutation.python-managed-lifecycle",
+      "executionOwner": "proofkit/witness-plan-input.json#mutation.python-managed-lifecycle",
+      "purpose": "Run the repository-owned mutation.python-managed-lifecycle predicate with its declared environment, timeout and failure contract.",
       "kind": "native"
     },
     {

@@ -33,6 +33,12 @@ portable projection retain their existing meaning. Verification does not repair
 an environment. An edited lockfile requires explicit preparation; a running
 managed dependency user makes preparation fail promptly instead of racing it.
 
+The full check includes its existing frozen dependency installers and therefore
+excludes other managed dependency users for that invocation. Portable checks do
+not install and may share an admitted environment. If an installer fails or is
+interrupted, explicitly prepare the affected scope again. A later lint or test
+failure does not by itself make a completed installation stale.
+
 `status` keeps endpoint values as strings and omits unavailable endpoints. It
 reports stopped one-shot services and their exit codes. Exit zero means a complete
 observation; `dev:smoke` owns readiness. Partial or changing observations return
@@ -47,6 +53,13 @@ to reconnect; it does not silently switch identities. A headless `dev:open` prin
 the admitted URL so it can be opened manually.
 
 ## Edit And Reconcile
+
+Managed checks retain dependency leases through their controlled participant
+lifetime. A selected exact consumer-lab image without the private lifetime
+receiver is rejected under a managed check; this is not a fallback to unmanaged
+execution. The [managed lifetime design](../features/managed-check-lifetime.md)
+and [qualification plan](../features/managed-check-lifetime-implementation-plan.md)
+describe the bounded stop, cleanup and historical-compatibility limits.
 
 ### Check Frontend Promises Before Publication
 

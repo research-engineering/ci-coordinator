@@ -1,18 +1,28 @@
 from __future__ import annotations
 
+import json
+import math
 import os
 import re
+import stat
+import time
 from collections.abc import Mapping, Sequence
+from contextlib import ExitStack
 from pathlib import Path
 
 import pytest
 from scripts.bounded_git import capture_git_text
-from scripts.bounded_process import CommandResult
+from scripts.bounded_process import CommandResult, current_process_scope
 from scripts.command_sequence import Command, run_commands
 from scripts.dependency_audit import commands as dependency_audit_commands
+from scripts.dev_environment import environment
 from scripts.python_witness import PythonWitness
 from scripts.quality_plan import load_quality_plan, project_command_environment
 from scripts.repository_json import JsonAdmissionError, admit_json, tracked_json_paths
+from scripts.tests.test_dev_environment_dependencies import (
+    dependency_identity_fixture,
+    managed_entry_context,
+)
 from scripts.workflow_lint import commands as workflow_lint_commands
 from scripts.workflow_lint import shell_source_paths
 
@@ -178,16 +188,21 @@ def test_typecheck_witness_includes_runtime_scripts(
     ]
 
 
+@pytest.mark.parametrize("managed", [False, True])
 def test_coverage_witness_preserves_complete_selection_and_process_bound(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    managed: bool,
 ) -> None:
-    backend_root = tmp_path / "backend"
+    identity = dependency_identity_fixture(tmp_path)
+    backend_root = identity.repo_root / "backend"
     venv_python = backend_root / ".venv" / "bin" / "python"
     venv_python.parent.mkdir(parents=True)
     venv_python.touch()
     (backend_root / "pyproject.toml").touch()
     observed: dict[str, object] = {}
+    invocations: list[tuple[str, ...]] = []
+    loader = ("-p", "scripts.python_coverage_diagnostics")
     coverage = load_quality_plan().commands["python.coverage"]
     assert coverage.argv[:3] == (
         "backend/.venv/bin/python",
@@ -201,8 +216,50 @@ def test_coverage_witness_preserves_complete_selection_and_process_bound(
         args: Sequence[str],
         **kwargs: object,
     ) -> CommandResult:
-        observed.update(command=command, args=tuple(args), **kwargs)
-        return CommandResult(status=0, stdout="", stderr="")
+        raw_args = tuple(args)
+        invocations.append(raw_args)
+        assert kwargs["cwd"] == backend_root
+        assert kwargs["max_buffer"] == 64 * 1024 * 1024
+        if managed:
+            assert raw_args[-2] == "--managed-process-context"
+            public_args = raw_args[:-2]
+            if len(invocations) > 1:
+                assert public_args[-2:] == loader
+                public_args = public_args[:-2]
+            assert sum(raw_args[index : index + 2] == loader for index in range(len(raw_args))) == 1
+            payload = json.loads(raw_args[-1])
+            assert set(payload) == {"version", "deadline", "stopFd", "stopGrace", "leases"}
+            assert type(payload["version"]) is int and payload["version"] == 1
+            assert payload["stopGrace"] == 3
+            scope = environment.current_managed_process()
+            assert scope is not None
+            deadline = payload["deadline"]
+            assert type(deadline) in {int, float} and math.isfinite(deadline)
+            assert scope.deadline is not None
+            assert time.monotonic() < deadline <= scope.deadline
+            stop_fd = payload["stopFd"]
+            assert type(stop_fd) is int
+            assert kwargs["inherited_fds"] == (*scope.inherited_fds, stop_fd)
+            assert kwargs["graceful_seconds"] == 3
+            writer = kwargs["cancellation_fd"]
+            assert type(writer) is int
+            assert writer not in (*scope.inherited_fds, stop_fd)
+            read_stat, write_stat = os.fstat(stop_fd), os.fstat(writer)
+            assert stat.S_ISFIFO(read_stat.st_mode) and stat.S_ISFIFO(write_stat.st_mode)
+            assert (read_stat.st_dev, read_stat.st_ino) == (write_stat.st_dev, write_stat.st_ino)
+            assert not os.get_blocking(stop_fd) and not os.get_blocking(writer)
+            assert isinstance(payload["leases"], list)
+            assert tuple(lease["fd"] for lease in payload["leases"]) == scope.inherited_fds
+            assert payload["leases"][-1]["root"] == str(identity.repo_root)
+            assert payload["leases"][-1]["selectionSha256"] == "a" * 64
+            for descriptor in scope.inherited_fds:
+                assert stat.S_ISREG(os.fstat(descriptor).st_mode)
+        else:
+            assert "--managed-process-context" not in raw_args
+            assert not {"inherited_fds", "cancellation_fd", "graceful_seconds"}.intersection(kwargs)
+            public_args = raw_args
+        observed.update(command=command, args=raw_args, public_args=public_args, **kwargs)
+        return CommandResult(status=0, stdout="", stderr="", process_group_quiescent=True)
 
     monkeypatch.setattr("scripts.python_witness.spawn", bounded_spawn)
     monkeypatch.setattr(
@@ -221,56 +278,67 @@ def test_coverage_witness_preserves_complete_selection_and_process_bound(
         environment=project_command_environment(coverage, {"PATH": "/bin", "CI": "true"}),
         mode=coverage.argv[3],
         python_executable="python3",
-        repo_root=tmp_path,
+        repo_root=identity.repo_root,
     )
 
-    witness.run()
+    before = current_process_scope()
+    with ExitStack() as lifetime:
+        if managed:
+            context, _stop, _descriptor = lifetime.enter_context(managed_entry_context(identity))
+            lifetime.enter_context(environment.borrow_managed_process(context))
+        else:
+            lifetime.enter_context(monkeypatch.context()).setattr(
+                "scripts.python_witness.current_managed_process", lambda: None
+            )
+        witness.run()
 
-    assert observed["command"] == str(venv_python)
-    args = observed["args"]
-    assert isinstance(args, tuple)
-    assert args[:4] == ("-m", "pytest", "-p", "scripts.python_coverage_diagnostics")
-    assert args[4:6] == ("--cov=ci_coordinator", "--cov-branch")
-    assert args[6].startswith("--cov-report=json:")
-    assert args[7:] == (
-        "--cov-report=term-missing",
-        "--tb=short",
-        "--maxfail=1",
-        "--durations=0",
-        "--durations-min=0",
-        "tests",
-        "../scripts/tests",
-        "../scripts/conformance/audit_persistence_byte_contract_test.py",
-    )
-    assert observed["timeout_seconds"] == 2_400.0
-    assert coverage.timeout_ms == 2_460_000
+        assert observed["command"] == str(venv_python)
+        args = observed["public_args"]
+        assert isinstance(args, tuple)
+        assert args[:4] == ("-m", "pytest", "-p", "scripts.python_coverage_diagnostics")
+        assert args[4:6] == ("--cov=ci_coordinator", "--cov-branch")
+        assert args[6].startswith("--cov-report=json:")
+        assert args[7:] == (
+            "--cov-report=term-missing",
+            "--tb=short",
+            "--maxfail=1",
+            "--durations=0",
+            "--durations-min=0",
+            "tests",
+            "../scripts/tests",
+            "../scripts/conformance/audit_persistence_byte_contract_test.py",
+        )
+        assert observed["timeout_seconds"] == 2_400.0
+        assert coverage.timeout_ms == 2_460_000
 
-    witness.run_persistence_test()
+        witness.run_persistence_test()
 
-    assert observed["args"] == (
-        "-m",
-        "pytest",
-        "-m",
-        "persistence",
-        "tests/integration/persistence",
-    )
-    assert observed["timeout_seconds"] == 600.0
+        assert observed["public_args"] == (
+            "-m",
+            "pytest",
+            "-m",
+            "persistence",
+            "tests/integration/persistence",
+        )
+        assert observed["timeout_seconds"] == 600.0
 
-    observed = {}
-    witness.run_test()
+        observed = {}
+        witness.run_test()
 
-    assert observed["args"] == (
-        "-m",
-        "pytest",
-        "--durations=25",
-        "-m",
-        "not persistence",
-        "tests",
-        "../scripts/tests",
-        "../scripts/conformance/audit_persistence_byte_contract_test.py",
-    )
-    assert observed["timeout_seconds"] == 1_080.0
-    assert load_quality_plan().commands["python.test"].timeout_ms == 1_140_000
+        assert observed["public_args"] == (
+            "-m",
+            "pytest",
+            "--durations=25",
+            "-m",
+            "not persistence",
+            "tests",
+            "../scripts/tests",
+            "../scripts/conformance/audit_persistence_byte_contract_test.py",
+        )
+        assert observed["timeout_seconds"] == 1_080.0
+        assert load_quality_plan().commands["python.test"].timeout_ms == 1_140_000
+    assert current_process_scope() is before
+    assert len(invocations) == 3
 
 
 def test_dependency_audit_covers_supported_python_and_frontend_locks(
