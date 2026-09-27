@@ -200,28 +200,38 @@ def test_refresh_loop_uses_failure_backoff_then_restores_proactive_cadence(
     assert refresh_attempts == 2
 
 
-def test_close_failure_is_retryable_and_closes_each_owner_exactly_once_after_retry(
+def test_outer_retry_reaches_unattempted_http_after_refresh_owner_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     integration = _integration()
-    attempts = 0
+    http_attempts = 0
 
     async def close_http() -> None:
-        nonlocal attempts
-        attempts += 1
-        if attempts == 1:
-            raise OSError("transient close failure")
+        nonlocal http_attempts
+        http_attempts += 1
 
     monkeypatch.setattr(integration._http, "aclose", close_http)
 
     async def scenario() -> None:
-        with pytest.raises(OSError, match="transient close failure"):
+        refresh_started = asyncio.Event()
+
+        async def failing_refresh() -> None:
+            refresh_started.set()
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                raise OSError("refresh cleanup failed") from None
+
+        integration._refresh_task = asyncio.create_task(failing_refresh())
+        await refresh_started.wait()
+        with pytest.raises(OSError, match="refresh cleanup failed"):
             await integration.aclose()
+        assert http_attempts == 0
         await integration.aclose()
         await integration.aclose()
 
     asyncio.run(scenario())
-    assert attempts == 2
+    assert http_attempts == 1
 
 
 def test_close_caller_cancellation_does_not_cancel_shared_cleanup(

@@ -54,8 +54,11 @@ class HttpxJwksTransport:
         )
         self._timeout_seconds = timeout_seconds
         self._maximum_response_bytes = maximum_response_bytes
+        self._close_task: asyncio.Task[None] | None = None
 
     async def fetch(self) -> JwksFetchResponse | JwksTransportFailure:
+        if self._close_task is not None:
+            return JwksTransportFailure(kind="unavailable", message="JWKS transport is closed")
         try:
             async with asyncio.timeout(self._timeout_seconds):
                 async with self._client.stream(
@@ -88,7 +91,15 @@ class HttpxJwksTransport:
             return JwksTransportFailure(kind="unavailable", message="JWKS fetch is unavailable")
 
     async def aclose(self) -> None:
-        await self._client.aclose()
+        if self._close_task is None:
+            self._close_task = asyncio.create_task(self._client.aclose())
+            self._close_task.add_done_callback(_consume_close_outcome)
+        await asyncio.shield(self._close_task)
+
+
+def _consume_close_outcome(task: asyncio.Task[None]) -> None:
+    if not task.cancelled():
+        task.exception()
 
 
 class GitHubActionsJwksProvider:

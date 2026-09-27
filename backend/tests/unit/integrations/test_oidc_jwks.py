@@ -273,6 +273,76 @@ def test_composition_constants_match_the_machine_owned_jwks_profile() -> None:
     }
 
 
+@pytest.mark.parametrize("fails", [False, True])
+def test_pinned_httpx_repeat_close_does_not_retry_a_partially_closed_transport(fails: bool) -> None:
+    class PartialTransport(httpx.AsyncBaseTransport):
+        def __init__(self) -> None:
+            self.owned = {"A", "B"}
+            self.close_calls = 0
+
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+            assert request.url == GITHUB_ACTIONS_JWKS_URI
+            return httpx.Response(200, content=b"valid-prior-response")
+
+        async def aclose(self) -> None:
+            self.close_calls += 1
+            self.owned.discard("A")
+            if fails and self.close_calls == 1:
+                raise OSError("partial transport close")
+            self.owned.discard("B")
+
+    async def scenario() -> None:
+        transport = PartialTransport()
+        client = httpx.AsyncClient(transport=transport, trust_env=False)
+        response = await client.get(GITHUB_ACTIONS_JWKS_URI)
+        assert response.content == b"valid-prior-response"
+        if fails:
+            with pytest.raises(OSError, match="partial transport close"):
+                await client.aclose()
+        else:
+            await client.aclose()
+        await client.aclose()
+        assert transport.close_calls == 1
+        assert transport.owned == ({"B"} if fails else set())
+        if fails:
+            await transport.aclose()
+            assert transport.owned == set()
+            assert transport.close_calls == 2
+
+    asyncio.run(scenario())
+
+
+def test_jwks_fetch_is_fenced_before_a_scheduled_close_can_reach_httpx() -> None:
+    async def scenario() -> None:
+        calls = 0
+
+        async def handler(_: httpx.Request) -> httpx.Response:
+            nonlocal calls
+            calls += 1
+            return httpx.Response(200, content=b"{}")
+
+        transport = HttpxJwksTransport(
+            timeout_seconds=5, maximum_response_bytes=1024, transport=httpx.MockTransport(handler)
+        )
+        assert not isinstance(await transport.fetch(), JwksTransportFailure)
+        closing = asyncio.create_task(transport.aclose())
+
+        async def fetch_before_lower_close_runs() -> JwksTransportFailure:
+            assert transport._close_task is not None
+            assert transport._client.is_closed is False
+            result = await transport.fetch()
+            assert isinstance(result, JwksTransportFailure)
+            return result
+
+        pending_fetch = asyncio.create_task(fetch_before_lower_close_runs())
+        rejected = await pending_fetch
+        assert rejected.kind == "unavailable"
+        assert calls == 1
+        await closing
+
+    asyncio.run(scenario())
+
+
 def _jwk(key_id: str) -> dict[str, object]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public = RSAAlgorithm.to_jwk(private_key.public_key(), as_dict=True)

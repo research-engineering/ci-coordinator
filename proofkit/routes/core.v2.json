@@ -605,6 +605,7 @@
     ["017","712","712","falsification","backend/tests/unit/identity_admission/test_jwks_provider.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["017","714","714","falsification","backend/tests/unit/identity_admission/test_oidc_verifier.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["017","713","713","falsification","backend/tests/unit/integrations/test_oidc_jwks.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
+    ["017","http-close-core017-composed-falsifiers","http-close-core017-composed-falsifiers","falsification","backend/tests/unit/runtime/test_runtime_resources.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["017","703","703","technical","backend/uv.lock",["proofkit.verify","python.install-check","python.lock-check"],["local-python","local-python-external"]],
     ["017","core017-identity-admission-contract","core017-identity-admission-contract","contract","docs/architecture/modules/identity-admission.md",["proofkit.verify","requirements.admission","selective.plan","text.policy"],["local-python"]],
     ["017","699","699","contract","docs/architecture/modules/jwks-provider.md",["proofkit.verify","requirements.admission","selective.plan","text.policy"],["local-python"]],
