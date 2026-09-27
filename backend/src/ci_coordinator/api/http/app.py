@@ -323,19 +323,21 @@ def create_app(
             PublicRequestLimitMiddleware,
             policies=public_request_limits,
         )
-    if routes.observability is not None:
-        app.add_middleware(
-            HttpRequestObservationMiddleware,
-            metrics=routes.observability.metrics,
-            admitted_routes=tuple(admitted_routes),
-            logger=routes.observability.request_logger,
-        )
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
         UnexpectedErrorMiddleware,
         diagnostics=(None if routes.observability is None else routes.observability.diagnostics),
         cookie_cleanups=_callback_cookie_cleanup_policies(routes),
     )
+    plan_metrics = None if routes.plan is None else routes.plan.runtime_metrics
+    if routes.observability is not None or plan_metrics is not None:
+        app.add_middleware(
+            HttpRequestObservationMiddleware,
+            metrics=None if routes.observability is None else routes.observability.metrics,
+            admitted_routes=tuple(admitted_routes),
+            logger=None if routes.observability is None else routes.observability.request_logger,
+            plan_metrics=plan_metrics,
+        )
     return app
 
 

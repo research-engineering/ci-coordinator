@@ -66,6 +66,14 @@ class _AfterStart(Response):
         raise error from ValueError(PRIVATE)
 
 
+class _AfterStartDeadline(Response):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        await send(
+            {"type": "http.response.start", "status": 200, "headers": [(b"content-length", b"100")]}
+        )
+        await asyncio.Event().wait()
+
+
 class _FailingStream:
     def __init__(self, stream: Any, scenario: str) -> None:
         self._stream = stream
@@ -141,6 +149,7 @@ def _child(case: str, descriptor: int) -> int:
         ),
         lifespan=lifespan,
         include_operator_ui=False,
+        request_timeout_seconds=1,
     )
 
     @app.get("/before")
@@ -152,6 +161,15 @@ def _child(case: str, descriptor: int) -> int:
     async def after() -> Response:
         result["served"].append("after")
         return _AfterStart()
+
+    @app.get("/timeout-before")
+    async def timeout_before() -> Response:
+        await asyncio.Event().wait()
+        raise AssertionError("the request owner must expire")
+
+    @app.get("/timeout-after")
+    async def timeout_after() -> Response:
+        return _AfterStartDeadline()
 
     with socket.socket(fileno=descriptor) as listener, pytest.MonkeyPatch.context() as patch:
         port = listener.getsockname()[1]
@@ -198,7 +216,13 @@ def _child(case: str, descriptor: int) -> int:
                     async with asyncio.timeout(8):
                         while not server.started:  # noqa: ASYNC110 - Uvicorn has no startup event; outer timeout bounds polling.
                             await asyncio.sleep(0.01)
-                        for path in ("/healthz", "/before", "/after"):
+                        for path in (
+                            "/healthz",
+                            "/before",
+                            "/after",
+                            "/timeout-before",
+                            "/timeout-after",
+                        ):
                             response = await _request(port, path)
                             result["responses"].append(response.decode("ascii"))
                         result["malformedResponse"] = (
@@ -295,12 +319,40 @@ def test_actual_entrypoint_projects_native_h11_and_lifespan_failures(
             assert "startup_failed" in reasons and "unclassified_server_event" in reasons
         assert "startup_complete" not in reasons
         return
-    healthy, before, after = receipt["responses"]
+    healthy, before, after, timeout_before, timeout_after = receipt["responses"]
     assert healthy.startswith("HTTP/1.1 200")
     assert before.startswith("HTTP/1.1 500") and '"code":"internal_error"' in before
     assert "cache-control: no-store" in before.lower() and "x-correlation-id:" in before.lower()
     assert after.startswith("HTTP/1.1 200") and after.count("HTTP/1.1") == 1
     assert after.partition("\r\n\r\n")[2] == ""
+    assert timeout_before.startswith("HTTP/1.1 503")
+    assert '{"ok":false,"error":"unavailable"}' in timeout_before
+    assert timeout_after.startswith("HTTP/1.1 200")
+    assert timeout_after.count("HTTP/1.1") == 1
+    assert timeout_after.partition("\r\n\r\n")[2] == ""
+    if sink_fault == "none":
+        for response, status_code, completed, termination in (
+            (healthy, 200, True, "completed"),
+            (before, 500, True, "completed"),
+            (after, 200, False, "exception"),
+            (timeout_before, 503, True, "work_timeout"),
+            (timeout_after, 200, False, "work_timeout"),
+        ):
+            correlation = next(
+                line.split(": ", 1)[1]
+                for line in response.partition("\r\n\r\n")[0].split("\r\n")
+                if line.lower().startswith("x-correlation-id:")
+            )
+            observations = [
+                row
+                for row in rows
+                if row.get("event") == "http_request_completed"
+                and row["correlationId"] == correlation
+            ]
+            assert len(observations) == 1
+            assert observations[0]["statusCode"] == status_code
+            assert observations[0]["responseCompleted"] is completed
+            assert observations[0]["termination"] == termination
     assert receipt["served"] == ["before", "after"]
     assert receipt["malformedResponse"].startswith("HTTP/1.1 400")
     assert receipt["startupFailed"] is False

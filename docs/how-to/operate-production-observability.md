@@ -66,12 +66,34 @@ and admission metrics before deciding whether to remove traffic or restart.
 
 ## Diagnose An Alert
 
+Plan availability classifies issued responses as GOOD and
+`dependency_unavailable`, `issuance_unavailable`, `internal_error`,
+`timed_out` and `response_failed` as BAD. Unattributed `cancelled`
+requests are observed but excluded from both. Display the cancellation count,
+classification coverage and excluded share beside availability. A zero
+denominator is NO_OBSERVATION, never 100%:
+
+```promql
+# Classification coverage; the complement is the cancellation excluded share.
+sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d]))
+/
+sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d]))
+and on()
+sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0
+```
+
+For the excluded share, replace only the numerator with
+`sum(increase(ci_coordinator_plan_requests_total{result="cancelled"}[28d]))`.
+Preserve the positive denominator condition. Scrape gaps, pre-first-scrape
+events, resets, older replicas and instrumentation loss limit these observations;
+they do not describe all ingress or client receipt.
+
 | Alert                                    | First evidence                                                                                          | Required action                                                                                                                                                                               |
 |------------------------------------------|---------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `CIUnsafeOmissionObserved`               | Authenticated workbench shadow result and pair-owned audit event                                        | Keep or return enforcement to FullCI, preserve evidence, and identify the missing obligation or witness.                                                                                      |
 | `CIReplayMismatchObserved`               | Workbench replay status and `ci-coordinator-audit-replay`                                               | Stop rollout expansion, verify the ledger from the last trusted prefix, and treat unresolved integrity as a release blocker.                                                                  |
 | `CIReconciliationTerminalFailure`        | Readiness dependency, reconciliation round counters, and process log correlation                        | Remove the replica from service, preserve logs, restart only after the failure class is understood, and verify another healthy round.                                                         |
-| `CIPlanAvailabilityFastBurn`             | Plan result rates split by `dependency_unavailable` and `issuance_unavailable`                          | Check PostgreSQL, GitHub App/JWKS reachability, signer construction, and issued-plan persistence; FullCI in target workflows remains the fallback.                                            |
+| `CIPlanAvailabilityFastBurn` | The five BAD result rates above, cancellation exclusion and classification coverage | Check dependency, internal-error, owned-timeout and response-failure evidence; FullCI remains the target workflow fallback. |
 | `CIPlanAvailabilitySlowBurn`             | The same result split over 30m and 6h                                                                   | Open a tracked reliability repair before the remaining budget reaches the release threshold.                                                                                                  |
 | `CIPlanLatencyFastBurn`                  | Route histogram and dependency latency                                                                  | Compare request duration with database and GitHub availability; do not increase the timeout until the blocking owner is measured.                                                             |
 | `CICoordinatorNotReady`                  | Generic `/readyz` status, authenticated readiness dependency metrics and correlated private diagnostics | Identify the failing dependency from private evidence before repair; the public response intentionally omits identifiers. Liveness success does not override readiness.                       |
@@ -217,6 +239,13 @@ qualify delivery, acknowledgement and sustained workload separately.
 
 The correlation identity is diagnostic only. Authorization still requires the
 admitted OIDC or operator credential and exact repository scope.
+
+Inspect `responseCompleted` and `termination` before treating an issued-plan
+coordinate as a delivered response. A null `statusCode` means no start send
+returned, not 499/503. An acknowledged 2xx start can still have an incomplete
+body. Only completed issued responses enter success latency; later cleanup
+does not retroactively remove success. An unsent webhook timeout is not a
+fabricated 5xx and need not fire the existing webhook status alert.
 
 ## Close The Incident
 

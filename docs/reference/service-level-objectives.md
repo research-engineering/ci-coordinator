@@ -24,30 +24,47 @@ monthly budget.
 
 Objective: at least 99.9% over a rolling 28-day window.
 
-An eligible request has passed caller syntax and identity policy far enough for
-the service to attempt issuance. The admitted terminal results are:
+An eligible request has passed caller syntax and trusted identity admission
+before issuance, or explicitly returned authentication dependency unavailable.
+Pre-route rejections and other pre-authentication failures are not inferred
+eligible. The observed terminal populations are:
 
 ```text
-eligible = issued or dependency_unavailable or issuance_unavailable
-good = issued
+G = issued
+B = dependency_unavailable or issuance_unavailable or internal_error
+    or timed_out or response_failed
+X = cancelled
+classified = G + B
+observed eligible = G + B + X
 ```
 
-`issued` includes a signed FullCI fallback because it preserves CI safety and
-allows the target workflow to continue. `invalid`, `unauthenticated`,
+`issued` requires an admitted envelope and completed ASGI response, including
+a signed FullCI fallback or duplicate. Durable issuance alone is not success.
+Owned work/response expiry before completion is `timed_out`, even when
+cancellation is suppressed. Other cancellation before completion is
+`cancelled`, separately visible outside GOOD/BAD, not attributed to a client
+or server without evidence. Timely completion is not retroactively failed by
+cleanup. `invalid`, `unauthenticated`,
 `forbidden`, and `conflict` are excluded because they represent caller-policy
 or idempotency conflicts rather than service availability.
 
 ```promql
 sum(increase(ci_coordinator_plan_requests_total{result="issued"}[28d]))
 /
-sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable"}[28d]))
+sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d]))
+and on()
+sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) > 0
 ```
 
-The error budget is 0.1% of eligible requests in the same 28-day window:
-`failed eligible requests <= 0.001 * eligible requests`. This request-based
-ratio does not define unavailable minutes; that conversion would require a
-separate time-based indicator or an admitted traffic model. No eligible
-requests means no availability observation, not demonstrated success.
+The error budget is 0.1% of classified requests in the same 28-day window:
+`B <= 0.001 * (G+B)`. For `G+B+X > 0`, display classification coverage
+`(G+B)/(G+B+X)` and cancellation exclusion `X/(G+B+X)` beside availability.
+These are conditional observations, not universal ingress availability. This
+request-based ratio does not define unavailable minutes; that conversion would
+require a separate time-based indicator or an admitted traffic model. No
+classified requests means no availability observation, including
+cancellation-only traffic, not demonstrated success or 100%. Zero observed
+eligible requests also means no coverage/exclusion observation.
 
 ## 3. Issued-Plan Latency
 
@@ -60,8 +77,11 @@ sum(increase(ci_coordinator_http_request_duration_seconds_bucket{method="POST",r
 sum(increase(ci_coordinator_http_request_duration_seconds_count{method="POST",route="/api/v1/dynamic-ci/plan",status_class="2xx"}[28d]))
 ```
 
-Ten seconds is an explicit bucket below the default 15-second request deadline,
-leaving five seconds for network and target-workflow overhead. Failed requests
+Completion means returned ASGI send, not client receipt. The histogram excludes
+incomplete or timed-out plan responses even if their start status was 2xx.
+Duration ends at completion, not later cleanup. Ten seconds is an explicit
+bucket below the default 15-second request deadline, leaving five seconds for
+network and target-workflow overhead. Failed requests
 belong to availability and are excluded from latency to avoid double counting.
 
 ## 4. Non-Budgetable Safety Signals
@@ -82,8 +102,8 @@ does. The minimum-volume guards prevent division by tiny samples.
 
 | Alert                             | Condition                                                       | Action class      |
 |-----------------------------------|-----------------------------------------------------------------|-------------------|
-| `CIPlanAvailabilityFastBurn`      | 14.4x budget burn over 5m and 1h, at least 20 eligible requests | Page              |
-| `CIPlanAvailabilitySlowBurn`      | 6x budget burn over 30m and 6h, at least 100 eligible requests  | Ticket            |
+| `CIPlanAvailabilityFastBurn`      | 14.4x budget burn over 5m and 1h, at least 20 classified requests | Page              |
+| `CIPlanAvailabilitySlowBurn`      | 6x budget burn over 30m and 6h, at least 100 classified requests  | Ticket            |
 | `CIPlanLatencyFastBurn`           | 14.4x latency budget burn over 5m and 1h, at least 20 successes | Page              |
 | `CIUnsafeOmissionObserved`        | Any unsafe omission in 5m                                       | Safety escalation |
 | `CIReplayMismatchObserved`        | Any replay mismatch in 5m                                       | Safety escalation |

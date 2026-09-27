@@ -2725,3 +2725,211 @@ tests:
       - eval_time: 2m
         alertname: CIReconciliationTerminalFailure
         exp_alerts: *terminal_alert
+
+  - name: internal_error alone supplies every availability operand without cancellation dilution
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="internal_error"}'
+        values: '0+100x430'
+      - series: 'ci_coordinator_plan_requests_total{result="cancelled"}'
+        values: '0+100000x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: timed_out alone supplies every availability operand without cancellation dilution
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="timed_out"}'
+        values: '0+100x430'
+      - series: 'ci_coordinator_plan_requests_total{result="cancelled"}'
+        values: '0+100000x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: response_failed alone supplies every availability operand without cancellation dilution
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="response_failed"}'
+        values: '0+100x430'
+      - series: 'ci_coordinator_plan_requests_total{result="cancelled"}'
+        values: '0+100000x430'
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: *availability_fast_alert
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: *availability_slow_alert
+
+  - name: request observation mixed population has honest availability and coverage
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+90x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="internal_error"}'
+        values: '0+10x430'
+      - series: 'ci_coordinator_plan_requests_total{result="timed_out"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="response_failed"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="cancelled"}'
+        values: '0+100x430'
+    promql_expr_test:
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples:
+          - labels: '{}'
+            value: 0.9
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples:
+          - labels: '{}'
+            value: 0.5
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"cancelled"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples:
+          - labels: '{}'
+            value: 0.5
+
+  - name: request observation cancelled-only population has honest availability and coverage
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="internal_error"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="timed_out"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="response_failed"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="cancelled"}'
+        values: '0+100x430'
+    promql_expr_test:
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"cancelled"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples:
+          - labels: '{}'
+            value: 1
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: request observation zero population has honest availability and coverage
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="internal_error"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="timed_out"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="response_failed"}'
+        values: '0+0x430'
+      - series: 'ci_coordinator_plan_requests_total{result="cancelled"}'
+        values: '0+0x430'
+    promql_expr_test:
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"cancelled"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: request observation absent population has honest availability and coverage
+    interval: 1m
+    promql_expr_test:
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"cancelled"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []
+
+  - name: request observation reset population has honest availability and coverage
+    interval: 1m
+    input_series:
+      - series: 'ci_coordinator_plan_requests_total{result="issued"}'
+        values: '1000+0x5 0+0x425'
+      - series: 'ci_coordinator_plan_requests_total{result="dependency_unavailable"}'
+        values: '1000+0x5 0+0x425'
+      - series: 'ci_coordinator_plan_requests_total{result="issuance_unavailable"}'
+        values: '1000+0x5 0+0x425'
+      - series: 'ci_coordinator_plan_requests_total{result="internal_error"}'
+        values: '1000+0x5 0+0x425'
+      - series: 'ci_coordinator_plan_requests_total{result="timed_out"}'
+        values: '1000+0x5 0+0x425'
+      - series: 'ci_coordinator_plan_requests_total{result="response_failed"}'
+        values: '1000+0x5 0+0x425'
+      - series: 'ci_coordinator_plan_requests_total{result="cancelled"}'
+        values: '1000+0x5 0+0x425'
+    promql_expr_test:
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+      - expr: 'sum(increase(ci_coordinator_plan_requests_total{result=~"cancelled"}[28d])) / sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) and on() sum(increase(ci_coordinator_plan_requests_total{result=~"issued|dependency_unavailable|issuance_unavailable|internal_error|timed_out|response_failed|cancelled"}[28d])) > 0'
+        eval_time: 7h
+        exp_samples: []
+    alert_rule_test:
+      - eval_time: 7h
+        alertname: CIPlanAvailabilityFastBurn
+        exp_alerts: []
+      - eval_time: 7h
+        alertname: CIPlanAvailabilitySlowBurn
+        exp_alerts: []

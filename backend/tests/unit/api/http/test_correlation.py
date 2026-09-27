@@ -1,21 +1,117 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 from io import StringIO
+from typing import cast
 
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from starlette.types import Message
 
+from ci_coordinator.api.http.app import create_app
 from ci_coordinator.api.http.correlation import (
     CorrelationIdMiddleware,
     current_correlation_id,
 )
-from ci_coordinator.api.http.errors import UnexpectedErrorMiddleware
-from ci_coordinator.observability import RuntimeDiagnosticObserver, StructuredEventLogger
+from ci_coordinator.api.http.dependencies import (
+    HttpRouteDependencies,
+    ObservabilityRouteDependencies,
+)
+from ci_coordinator.api.http.errors import ResponseCookieCleanupPolicy, UnexpectedErrorMiddleware
+from ci_coordinator.observability import (
+    ReadinessStatus,
+    RuntimeDiagnosticObserver,
+    RuntimeMetrics,
+    StructuredEventLogger,
+)
 
 _CORRELATION_ID = re.compile(r"^[0-9a-f]{32}$")
+
+
+def test_outer_observation_preserves_actual_error_cookie_and_correlation_owners() -> None:
+    async def scenario() -> None:
+        output = StringIO()
+        logger = logging.Logger("outer-error-observation")
+        logger.addHandler(logging.StreamHandler(output))
+
+        async def ready() -> ReadinessStatus:
+            return ReadinessStatus(True, ())
+
+        app = create_app(
+            HttpRouteDependencies(
+                observability=ObservabilityRouteDependencies(
+                    readiness=ready,
+                    metrics=RuntimeMetrics(),
+                    request_logger=StructuredEventLogger(logger),
+                )
+            ),
+            include_operator_ui=False,
+        )
+        for middleware in app.user_middleware:
+            if cast(object, middleware.cls) is UnexpectedErrorMiddleware:
+                middleware.kwargs["cookie_cleanups"] = (
+                    ResponseCookieCleanupPolicy(
+                        path="/callback",
+                        methods=frozenset({"GET"}),
+                        name="transaction",
+                        cookie_path="/callback",
+                        secure=True,
+                        httponly=True,
+                        samesite="lax",
+                    ),
+                )
+
+        seen: list[str | None] = []
+
+        @app.get("/callback")
+        async def callback() -> None:
+            seen.append(current_correlation_id())
+            raise RuntimeError("private callback")
+
+        sent: list[Message] = []
+
+        async def receive() -> Message:
+            raise AssertionError("callback does not read")
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        assert current_correlation_id() is None
+        await app(
+            {
+                "type": "http",
+                "method": "GET",
+                "path": "/callback",
+                "query_string": b"",
+                "headers": [(b"x-correlation-id", b"caller-controlled")],
+            },
+            receive,
+            send,
+        )
+        assert current_correlation_id() is None
+        assert [message["type"] for message in sent] == [
+            "http.response.start",
+            "http.response.body",
+        ]
+        assert sent[0]["status"] == 500
+        headers = dict(sent[0]["headers"])
+        correlation = headers[b"x-correlation-id"].decode()
+        assert _CORRELATION_ID.fullmatch(correlation)
+        assert seen == [correlation]
+        assert headers[b"cache-control"] == b"no-store"
+        assert b"transaction=" in headers[b"set-cookie"]
+        for flag in (b"Max-Age=0", b"Path=/callback", b"HttpOnly", b"Secure", b"SameSite=lax"):
+            assert flag in headers[b"set-cookie"]
+        record = json.loads(output.getvalue())
+        assert record["correlationId"] == correlation
+        assert record["statusCode"] == 500 and record["responseCompleted"] is True
+        assert b"private callback" not in sent[1]["body"]
+        assert "private callback" not in output.getvalue()
+
+    asyncio.run(scenario())
 
 
 def test_correlation_identity_is_service_owned_and_context_bound() -> None:

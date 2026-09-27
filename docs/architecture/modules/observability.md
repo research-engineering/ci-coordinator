@@ -90,6 +90,11 @@ private diagnostics. Every readiness response is `no-store`, so neither a stale
 ready state nor a stale failure can be reused across dependency transitions.
 `/metrics` uses the content type emitted by
 `prometheus-client`; it is not a product JSON API.
+After exact bearer admission, an ordinary exposition failure returns an empty
+503 with `Cache-Control: no-store` and a redacted `metrics_exposition`
+diagnostic. Cancellation propagates; an authentication rejection never renders
+metrics or diagnoses a collector. A failed optional diagnostic cannot change
+the response.
 
 Connected runtime requires one deployment-owned, header-safe bearer whose value
 cannot reuse any configured credential secret before metric rendering.
@@ -147,6 +152,7 @@ contains:
 ```text
 event, observedAt, service, level,
 correlationId, method, route, statusCode, durationMs
+responseCompleted, termination
 ```
 
 After successful plan issuance it additionally contains:
@@ -158,6 +164,34 @@ issuedPlanRecordId, planId, repositoryId, workflowRunId, runAttempt
 `issuedPlanRecordId` joins to durable issued-plan state and its pair-owned audit
 event. The provider run identity joins to reconciliation subjects. These fields
 are diagnostic coordinates, not authorization evidence.
+
+`http_request_completed` records invocation termination, not client receipt.
+`statusCode` is the status of a successfully returned ASGI response-start
+send, or null if none returned. `responseCompleted` requires a successfully
+returned final body send, or final trailers when declared. `termination` is
+one of `completed`, `work_timeout`, `response_timeout`, `cancelled`,
+`exception`, or `incomplete`. Only the request owner's existing timeout
+handles establish owned expiry; cancellation text and bare downstream
+`TimeoutError` do not. First owned expiry is retained. No 499 or 503 is
+invented, and observation never sends a response.
+
+One outer HTTP observer sees the existing error middleware's actual response.
+The plan route supplies authenticated/typed-result facts without counting a
+terminal result. The observer counts once after completion or failure;
+signed-envelope, fallback and durable diagnostic observations remain at
+issuance. An admitted Issued envelope is not a completed response. Timely
+completion freezes the result and success latency before later cleanup;
+owned expiry before a late completion remains `timed_out`, even if the
+application suppressed cancellation. A failed send preserves the original
+exception and cannot cause issuance to run again.
+
+HTTP counts describe acknowledged starts, not completed successes. Only
+completed `issued` plan responses enter the plan success histogram, using
+duration through final send; other route histograms retain invocation duration.
+HTTP and plan sinks are configured independently, including standalone plan
+applications. Telemetry is lossy, process-local and never authorization.
+The bounded rationale and alternatives are in
+[request outcome observation](../../features/request-outcome-observation.md).
 
 ## 8. Failure Behavior
 

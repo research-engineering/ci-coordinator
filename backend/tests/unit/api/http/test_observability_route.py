@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import re
 from contextlib import nullcontext
 from dataclasses import dataclass, fields, replace
 from http import HTTPMethod
+from io import StringIO
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -15,6 +18,7 @@ from prometheus_support import prometheus_samples
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import BaseRoute, Route
+from starlette.types import Message
 
 from ci_coordinator.api.http.app import create_app
 from ci_coordinator.api.http.dependencies import (
@@ -23,7 +27,12 @@ from ci_coordinator.api.http.dependencies import (
 )
 from ci_coordinator.api.http.metrics_authentication import StaticMetricsBearerAuthenticator
 from ci_coordinator.api.http.routers.ci_economics import CI_ECONOMICS_JOBS_PATH
-from ci_coordinator.observability import ReadinessStatus, RuntimeMetrics, StructuredEventLogger
+from ci_coordinator.observability import (
+    ReadinessStatus,
+    RuntimeDiagnosticObserver,
+    RuntimeMetrics,
+    StructuredEventLogger,
+)
 from ci_coordinator.observability.request_observation import HttpRequestObservationMiddleware
 
 
@@ -38,6 +47,104 @@ class ReadinessUseCase:
 class FailingLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         raise RuntimeError("log sink unavailable")
+
+
+@pytest.mark.parametrize("authorized", [False, True])
+@pytest.mark.parametrize("failed_sink", [False, True])
+def test_exposition_failure_is_redacted_503_only_after_authentication(
+    monkeypatch: pytest.MonkeyPatch,
+    authorized: bool,
+    failed_sink: bool,
+) -> None:
+    metrics = RuntimeMetrics()
+    output = StringIO()
+    logger = logging.Logger("metrics-exposition")
+    logger.addHandler(FailingLogHandler() if failed_sink else logging.StreamHandler(output))
+    diagnostics = RuntimeDiagnosticObserver(StructuredEventLogger(logger))
+    snapshots = 0
+
+    def fail_snapshot() -> None:
+        nonlocal snapshots
+        snapshots += 1
+        error = ValueError("private metrics message")
+        error.add_note("private metrics note")
+        raise error from RuntimeError("private metrics cause")
+
+    monkeypatch.setattr(metrics, "snapshot", fail_snapshot)
+    app = create_app(
+        HttpRouteDependencies(
+            observability=ObservabilityRouteDependencies(
+                readiness=ReadinessUseCase(ReadinessStatus(True, ())),
+                metrics=metrics,
+                diagnostics=diagnostics,
+                metrics_authenticator=StaticMetricsBearerAuthenticator("m" * 32),
+            )
+        )
+    )
+    response = TestClient(app).get(
+        "/metrics",
+        headers={"Authorization": "Bearer " + ("m" if authorized else "n") * 32},
+    )
+    assert response.status_code == (503 if authorized else 401)
+    assert response.content == b""
+    assert response.headers["cache-control"] == "no-store"
+    assert snapshots == int(authorized)
+    if not authorized:
+        assert response.headers["www-authenticate"] == "Bearer"
+    records = [json.loads(line) for line in output.getvalue().splitlines()]
+    assert len(records) == (1 if authorized and not failed_sink else 0)
+    if records:
+        assert records[0]["stage"] == "metrics_exposition"
+        assert records[0]["exceptionType"] == "ValueError"
+        assert records[0]["correlationId"] == response.headers["x-correlation-id"]
+    assert "private metrics" not in output.getvalue()
+
+
+def test_exposition_cancellation_is_not_a_503(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def scenario() -> None:
+        metrics = RuntimeMetrics()
+        calls = 0
+        sent: list[Message] = []
+        cancellation = asyncio.CancelledError("external")
+
+        def cancel_snapshot() -> None:
+            nonlocal calls
+            calls += 1
+            raise cancellation
+
+        monkeypatch.setattr(metrics, "snapshot", cancel_snapshot)
+        app = create_app(
+            HttpRouteDependencies(
+                observability=ObservabilityRouteDependencies(
+                    readiness=ReadinessUseCase(ReadinessStatus(True, ())),
+                    metrics=metrics,
+                    metrics_authenticator=StaticMetricsBearerAuthenticator("m" * 32),
+                )
+            )
+        )
+
+        async def receive() -> Message:
+            raise AssertionError("metrics must not read a request body")
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        with pytest.raises(asyncio.CancelledError) as caught:
+            await app(
+                {
+                    "type": "http",
+                    "method": "GET",
+                    "path": "/metrics",
+                    "query_string": b"",
+                    "headers": [(b"authorization", b"Bearer " + b"m" * 32)],
+                },
+                receive,
+                send,
+            )
+        assert caught.value is cancellation
+        assert calls == 1 and sent == []
+
+    asyncio.run(scenario())
 
 
 def test_liveness_has_no_dependency_precondition() -> None:
@@ -222,7 +329,11 @@ def test_mounted_public_catalog_matches_metrics_and_detects_a_missing_capture(
     omit_product_template: bool,
 ) -> None:
     metrics = RuntimeMetrics()
-    cookie_settings = SimpleNamespace(transaction_cookie_name="fixture", secure_cookies=True)
+    cookie_settings = SimpleNamespace(
+        transaction_cookie_name="fixture",
+        secure_cookies=True,
+        runtime_metrics=None,
+    )
     dependencies = HttpRouteDependencies(
         **{field.name: cast(Any, cookie_settings) for field in fields(HttpRouteDependencies)}
     )

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
+
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse, Response
 
+from ci_coordinator.api.http.correlation import scope_correlation_id
 from ci_coordinator.api.http.dependencies import ObservabilityRouteDependencies
 from ci_coordinator.api.http.model_contracts import ResponseModel
 from ci_coordinator.observability import health
@@ -79,10 +82,20 @@ def build_observability_router(dependencies: ObservabilityRouteDependencies) -> 
                     "WWW-Authenticate": "Bearer",
                 },
             )
-        snapshot = dependencies.metrics.snapshot()
-        return Response(
-            content=snapshot.content,
-            headers={"Cache-Control": "no-store", "Content-Type": snapshot.content_type},
-        )
+        try:
+            snapshot = dependencies.metrics.snapshot()
+            return Response(
+                content=snapshot.content,
+                headers={"Cache-Control": "no-store", "Content-Type": snapshot.content_type},
+            )
+        except Exception as error:
+            if dependencies.diagnostics is not None:
+                with suppress(Exception):
+                    dependencies.diagnostics.unexpected_failure(
+                        "metrics_exposition",
+                        error,
+                        correlation_id=scope_correlation_id(request.scope),
+                    )
+            return Response(status_code=503, content=b"", headers={"Cache-Control": "no-store"})
 
     return router

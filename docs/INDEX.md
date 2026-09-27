@@ -160,6 +160,8 @@ does not by itself make the document obsolete.
 - [Documentation diagram validation plan](features/diagram-validation-plan.md)
 - [History stage telemetry](features/history-stage-telemetry.md)
 - [History stage telemetry implementation](features/history-stage-telemetry-plan.md)
+- [Request outcome observation](features/request-outcome-observation.md)
+- [Request outcome observation acceptance](features/request-outcome-observation-implementation-plan.md)
 - [GitHub runner observation plan](features/github-runner-observation-implementation-plan.md)
 - [Automatic App inventory implementation plan](features/automatic-app-inventory-implementation-plan.md)
 - [Proof-preserving CI efficiency](features/proof-preserving-ci-efficiency.md)
