@@ -87,6 +87,7 @@
       "commandIds": [
         "utility.hadolint",
         "utility.build-checks",
+        "build.inputs",
         "container.smoke",
         "development.stack",
         "devcontainer.verify"
@@ -300,6 +301,12 @@
       "executionOwner": "proofkit/witness-plan-input.json#discovery.mutation-frontend",
       "purpose": "Run the repository-owned discovery.mutation-frontend predicate with its declared environment, timeout and failure contract.",
       "kind": "discovery"
+    },
+    {
+      "commandId": "build.inputs",
+      "executionOwner": "proofkit/witness-plan-input.json#build.inputs",
+      "purpose": "Qualify the pinned Node/Corepack carrier, pnpm content hash, fresh-home boundary and native Docker context on Linux.",
+      "kind": "native"
     },
     {
       "commandId": "container.smoke",

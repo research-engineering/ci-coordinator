@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import cast
 
@@ -165,6 +166,7 @@ def test_standalone_shell_lint_inventory_has_no_unowned_source() -> None:
     [
         ("Dockerfile", "COPY patches ./patches"),
         ("frontend/Dockerfile.dev", "COPY --chown=node:node patches ./patches"),
+        ("docker/ci/connected-browser.Dockerfile", "COPY patches ./patches"),
     ],
 )
 def test_ui_build_copies_dependency_patches_before_frozen_install(
@@ -199,6 +201,33 @@ def test_image_build_executes_the_build_identity_renderer_once() -> None:
 
     assert "python -m ci_coordinator.runtime_settings.build_identity" not in dockerfile
     assert "from ci_coordinator.runtime_settings.build_identity import main; main()" in dockerfile
+
+
+@pytest.mark.parametrize(
+    "path", ["Dockerfile", "frontend/Dockerfile.dev", "docker/ci/connected-browser.Dockerfile"]
+)
+def test_node_recipes_require_bundled_carrier_and_fresh_corepack_home(path: str) -> None:
+    source = _repo_path(path).read_text(encoding="utf-8")
+    spec = json.loads(_repo_path("package.json").read_text(encoding="utf-8"))["packageManager"]
+    assert spec == (
+        "pnpm@12.5.1+sha512."
+        "e3f305bc784a2bc89f5ad3b6138889470fae8d2af5f36b61216ec91c2c3d64089775f"
+        "9de38aac331044ea40f245cb0d5666392dfdf65824e1907ef6a2c62de5f"
+    )
+    guards = (
+        'test "$(node --version)" = v24.21.0',
+        'test "$(corepack --version)" = 0.36.0',
+        'mkdir "$COREPACK_HOME"',
+        "corepack enable",
+        f"corepack prepare {spec} --activate",
+        "pnpm install --frozen-lockfile",
+    )
+    positions = [source.index(guard) for guard in guards]
+    assert positions == sorted(positions)
+    assert "npm install --global" not in source
+    assert 'rm -rf "$COREPACK_HOME"' not in source
+    assert 'mkdir -p "$COREPACK_HOME"' not in source
+    assert not any("target=/opt/corepack" in line for line in source.splitlines())
 
 
 def _yaml_mapping(path: Path) -> dict[str, object]:

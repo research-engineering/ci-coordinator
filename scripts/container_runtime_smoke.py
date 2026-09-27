@@ -43,6 +43,16 @@ _MIGRATION_REVISIONS = (
     "20260926_0017_explicit_review_renewal.py",
 )
 _MIGRATION_HEAD = "20260926_0017 (head)"
+_RUNTIME_BUILD_TOOLS_CHECK = (
+    "import importlib.metadata,shutil; "
+    "forbidden={'setuptools','debugpy','pytest','ruff','mypy','agentic-proofkit'}; "
+    "installed={item.metadata['Name'].lower().replace('_','-') "
+    "for item in importlib.metadata.distributions()}; "
+    "assert not forbidden.intersection(installed); "
+    "assert all(shutil.which(name) is None for name in "
+    "('uv','uvx','node','npm','npx','corepack','pnpm','pytest','ruff','mypy',"
+    "'debugpy','agentic-proofkit','proofkit'))"
+)
 _MIGRATION_ARTIFACT_CHECK = (
     "from pathlib import Path; "
     "root=Path('/app/backend'); "
@@ -116,12 +126,17 @@ def _inspect(context: InspectionContext) -> dict[str, JsonValue]:
         ["exec", context.container, "python", "-c", _MIGRATION_ARTIFACT_CHECK],
         "migration artifact",
     )
+    context.run(
+        ["exec", context.container, "python", "-c", _RUNTIME_BUILD_TOOLS_CHECK],
+        "runtime build-tool absence",
+    )
     return {
         "migrationHead": migration_head,
         "migrationRevisions": list(_MIGRATION_REVISIONS),
         "operatorUiBundle": "admitted",
         "pythonVersion": python_version,
         "runtimeUserId": "10001",
+        "runtimeBuildTools": "absent",
     }
 
 

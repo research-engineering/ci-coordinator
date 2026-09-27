@@ -29,6 +29,7 @@ NATIVE_INPUTS = (
     "Dockerfile",
     "docker/development/backend.Dockerfile",
     "frontend/Dockerfile.dev",
+    "docker/ci/connected-browser.Dockerfile",
     ".devcontainer/Dockerfile",
     ".devcontainer/devcontainer.json",
     ".github/actions/secret-scan/scanner.py",
@@ -115,6 +116,8 @@ def test_only_the_builtin_empty_root_is_exempt_from_image_pins(
         ("docker/development/backend.Dockerfile", "uv"),
         ("frontend/Dockerfile.dev", "node"),
         ("frontend/Dockerfile.dev", "pnpm"),
+        ("docker/ci/connected-browser.Dockerfile", "node"),
+        ("docker/ci/connected-browser.Dockerfile", "pnpm"),
     ],
 )
 def test_one_stale_consumer_is_rejected(repository: Path, path: str, tool: str) -> None:
@@ -308,7 +311,8 @@ def test_external_copy_source_is_checked(repository: Path) -> None:
 
 def test_comments_cannot_supply_missing_corepack_pin(repository: Path) -> None:
     version = _tools(repository)["pnpm"]
-    _replace(repository, "frontend/Dockerfile.dev", f"corepack prepare pnpm@{version}", "true")
+    spec = json.loads((repository / "package.json").read_text())["packageManager"]
+    _replace(repository, "frontend/Dockerfile.dev", f"corepack prepare {spec}", "true")
     path = repository / "frontend/Dockerfile.dev"
     with path.open("a", encoding="utf-8") as output:
         output.write(f"\n# RUN corepack prepare pnpm@{version} --activate\n")
@@ -317,6 +321,55 @@ def test_comments_cannot_supply_missing_corepack_pin(repository: Path) -> None:
 
     assert any(
         issue.selector == "pnpm" and issue.reason == "missing_declaration"
+        for issue in report.issues
+    )
+
+
+@pytest.mark.parametrize(
+    "suffix", ["", "+sha256." + "a" * 64, "+sha512." + "a" * 127, "+sha512." + "G" * 128]
+)
+def test_root_manager_requires_a_complete_native_sha512_spec(repository: Path, suffix: str) -> None:
+    _set_json(repository, "package.json", "packageManager", "pnpm@12.5.1" + suffix)
+
+    report = check_toolchain(repository)
+
+    assert any(
+        issue.path == "package.json" and issue.reason == "invalid_manager_spec"
+        for issue in report.issues
+    )
+
+
+@pytest.mark.parametrize(
+    "path", ["Dockerfile", "frontend/Dockerfile.dev", "docker/ci/connected-browser.Dockerfile"]
+)
+@pytest.mark.parametrize("mutation", ["missing", "different"])
+def test_each_early_prepare_must_match_the_full_owner_hash(
+    repository: Path, path: str, mutation: str
+) -> None:
+    spec = json.loads((repository / "package.json").read_text())["packageManager"]
+    replacement = "pnpm@12.5.1" + ("+sha512." + "0" * 128 if mutation == "different" else "")
+    _replace(repository, path, spec, replacement)
+
+    report = check_toolchain(repository)
+
+    assert any(
+        issue.path == path and "corepack.prepare" in issue.selector and issue.reason == "mismatch"
+        for issue in report.issues
+    )
+
+
+def test_optional_frontend_manager_cannot_override_root_content(repository: Path) -> None:
+    spec = json.loads((repository / "package.json").read_text())["packageManager"]
+    _set_json(repository, "frontend/package.json", "packageManager", spec)
+    assert check_toolchain(repository).state == "passed"
+    _set_json(
+        repository, "frontend/package.json", "packageManager", "pnpm@12.5.1+sha512." + "0" * 128
+    )
+
+    report = check_toolchain(repository)
+
+    assert any(
+        issue.path == "frontend/package.json" and issue.selector == "packageManager"
         for issue in report.issues
     )
 

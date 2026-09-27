@@ -10,29 +10,29 @@
   },
   {
     "file": "frontend/Dockerfile.dev",
-    "line": 14,
+    "line": 18,
     "code": "DL3066",
     "level": "info",
     "source": "USER node",
     "reason": "The digest-pinned official Node image defines the node account. This build-stage USER is resolved inside that image, not by a host bind-mount account lookup.",
-    "sha256": "eb6cb85650deeb4f08358726773cccd735a164a0a3a0f7e12a7b1ae6a07d7100"
-  },
-  {
-    "file": "frontend/Dockerfile.dev",
-    "line": 16,
-    "code": "DL3066",
-    "level": "info",
-    "source": "USER root",
-    "reason": "The standard root account is needed for the following ownership-preserving COPY operations; the final USER returns to node in the same pinned official image.",
-    "sha256": "eb6cb85650deeb4f08358726773cccd735a164a0a3a0f7e12a7b1ae6a07d7100"
+    "sha256": "042e8b3f1af49738698083769f6907f6d5ac728812931726c61c2f8d10c5e2d1"
   },
   {
     "file": "frontend/Dockerfile.dev",
     "line": 20,
     "code": "DL3066",
     "level": "info",
+    "source": "USER root",
+    "reason": "The standard root account is needed for the following ownership-preserving COPY operations; the final USER returns to node in the same pinned official image.",
+    "sha256": "042e8b3f1af49738698083769f6907f6d5ac728812931726c61c2f8d10c5e2d1"
+  },
+  {
+    "file": "frontend/Dockerfile.dev",
+    "line": 24,
+    "code": "DL3066",
+    "level": "info",
     "source": "USER node",
     "reason": "The digest-pinned official Node image defines node. The development runtime uses that image account and does not resolve an arbitrary host user name.",
-    "sha256": "eb6cb85650deeb4f08358726773cccd735a164a0a3a0f7e12a7b1ae6a07d7100"
+    "sha256": "042e8b3f1af49738698083769f6907f6d5ac728812931726c61c2f8d10c5e2d1"
   }
 ]

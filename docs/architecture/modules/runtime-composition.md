@@ -248,6 +248,24 @@ CLI, and verifies the exact packaged revision inventory. It does not migrate a
 production database or prove a registry digest, signature, platform rollout,
 or backup policy.
 
+A separate bounded build-input command qualifies the actual
+pinned Node/Corepack bootstrap, the pnpm owner hash with a cold wrong-hash
+negative, the fresh-home boundary against an actual installed cache, and the
+native Docker context with synthetic excluded markers and required-source byte
+positives. Existing Node images, Python/uv pins and isolated frozen build steps
+remain unchanged. The independent final-image smoke rejects the finite named
+distribution/executable set: setuptools, debugpy, pytest, Ruff, mypy, Proofkit,
+uv and the Node/npm/Corepack/pnpm toolchain.
+See [build input admission](../../features/build-input-admission.md).
+Source counterguards for uv are not adversarial native qualification; this
+witness does not implement a package installer, trust registry or general
+reproducibility/secret scanner. The standalone qualification has a 570s internal
+total under a separate 600s catalog budget; it does not consume container.smoke's
+existing 600s. Work reserves 60s for Docker/host cleanup and child termination.
+Late completion or uncertain cleanup cannot produce a qualification receipt;
+the first failure or cancellation remains primary. The CI command catalog owns
+independent wiring in the same 25-minute job. No absolute OS-kill guarantee is implied.
+
 ## 6. Failure Algebra
 
 ```text

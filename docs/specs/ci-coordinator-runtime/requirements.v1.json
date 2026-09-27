@@ -218,7 +218,7 @@
     {
       "requirementId": "REQ-CI-RUNTIME-010",
       "ownerId": "ci-coordinator.runtime",
-      "invariant": "Every owned Python, npm, GitHub Actions, and container dependency change remains exact-lock or digest reproducible, every Python dependency change routes a current vulnerability audit, every dependency diff receives pull-request dependency review when provider evidence is available, and repository-owned update automation has no merge authority and cannot bypass compatibility witnesses.",
+      "invariant": "Every owned Python, npm, GitHub Actions, and container dependency change remains exact-lock or digest reproducible, every Python dependency change routes a current vulnerability audit, every dependency diff receives pull-request dependency review when provider evidence is available, and repository-owned update automation has no merge authority and cannot bypass compatibility witnesses. Owned Node build recipes require the pinned bundled carrier and pnpm content digest in a fresh owned home, with independent native hash/cache controls and Docker context exclusion and required-input byte witnesses.",
       "claimLevel": "blocking",
       "riskClass": "high",
       "proofBindingRefs": ["proofkit/requirement-bindings.json"],

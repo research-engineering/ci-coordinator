@@ -157,7 +157,7 @@
         ]
       }
     ],
-    "maxTimeoutMs": 37936000,
+    "maxTimeoutMs": 38536000,
     "nonCacheableCredentialClasses": [],
     "parallelGroups": [
       "build",
@@ -363,6 +363,37 @@
       "parallelGroup": "test",
       "schemaVersion": 1,
       "timeoutMs": 260000
+    },
+    {
+      "argv": [
+        "backend/.venv/bin/python",
+        "-m",
+        "scripts.build_input_witness"
+      ],
+      "cachePolicy": "write-local",
+      "credentialClass": "none",
+      "cwd": ".",
+      "environment": {
+        "allowlist": [
+          "PATH"
+        ],
+        "classes": [
+          "local-python-container-external"
+        ],
+        "inherit": "allowlist"
+      },
+      "exitCodePolicy": {
+        "kind": "zero",
+        "successCodes": [
+          0
+        ]
+      },
+      "expectedArtifacts": [],
+      "id": "build.inputs",
+      "networkPolicy": "external",
+      "parallelGroup": "build",
+      "schemaVersion": 1,
+      "timeoutMs": 600000
     },
     {
       "argv": [
@@ -1757,7 +1788,7 @@
       "networkPolicy": "external",
       "parallelGroup": "quality",
       "schemaVersion": 1,
-      "timeoutMs": 37936000
+      "timeoutMs": 38536000
     },
     {
       "argv": [

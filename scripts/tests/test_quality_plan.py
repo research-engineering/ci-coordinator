@@ -524,7 +524,7 @@ def test_branch_head_covers_every_non_subsumed_witness_command() -> None:
         "runtime027.test",
         "runtime028.test",
     }
-    assert {"dependency.audit", "container.smoke", "development.stack"} <= selected
+    assert {"build.inputs", "dependency.audit", "container.smoke", "development.stack"} <= selected
     assert {
         "python.coverage",
         "python.import-boundary",
@@ -535,6 +535,26 @@ def test_branch_head_covers_every_non_subsumed_witness_command() -> None:
     assert runtime028.argv[:2] == ("backend/.venv/bin/pytest", "-q")
     assert all(
         path.startswith(("backend/tests/", "scripts/tests/")) for path in runtime028.argv[2:]
+    )
+
+
+def test_build_inputs_has_an_independent_branch_head_envelope() -> None:
+    plan = load_quality_plan()
+    aggregate = [command.command_id for command in plan.branch_head_commands()]
+
+    assert aggregate.count("build.inputs") == 1
+    assert aggregate[aggregate.index("container.smoke") - 1] == "build.inputs"
+    assert "build.inputs" not in plan.local_command_ids
+    assert "build.inputs" not in plan.portable_command_ids
+    assert plan.commands["build.inputs"].timeout_ms == 600_000
+    assert plan.commands["container.smoke"].timeout_ms == 600_000
+    assert plan.commands["mutation.python-managed-lifecycle"].timeout_ms == 5_460_000
+    assert plan.orchestration_reserve_ms == 420_000
+    assert plan.commands["quality.branch-head"].timeout_ms == 38_536_000
+    assert (
+        sum(command.timeout_ms for command in plan.branch_head_commands())
+        + plan.orchestration_reserve_ms
+        == plan.commands["quality.branch-head"].timeout_ms
     )
 
 
