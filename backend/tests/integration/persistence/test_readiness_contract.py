@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from time import monotonic
 from types import TracebackType
 
@@ -545,6 +547,15 @@ def test_real_connection_exit_cuts_preserve_prefix_and_return_checkout(
     boundary: str,
     cut: str,
 ) -> None:
+    _exercise_connection_exit_cut(runtime_postgres_database_url, monkeypatch, boundary, cut)
+
+
+def _exercise_connection_exit_cut(
+    runtime_postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str,
+    cut: str,
+) -> None:
     async def scenario() -> None:
         engine = create_postgres_engine(runtime_postgres_database_url)
         entered, release = asyncio.Event(), asyncio.Event()
@@ -585,7 +596,8 @@ def test_real_connection_exit_cuts_preserve_prefix_and_return_checkout(
             async with asyncio.timeout(10):
                 await entered.wait()
                 worker = probe._inflight
-                assert worker is not None and not worker.done()
+                assert worker is not None
+                assert not worker.done(), "readiness worker settled before connection close"
                 assert not probe._verified and observed == []
                 if cut == "waiter_cancel":
                     waiter.cancel()
@@ -609,9 +621,30 @@ def test_real_connection_exit_cuts_preserve_prefix_and_return_checkout(
         finally:
             release.set()
             await probe.drain()
+            if probe._connection_finalizer is not None:
+                await probe._connection_finalizer
             await engine.dispose()
 
     asyncio.run(scenario())
+
+
+def test_connection_exit_oracle_rejects_an_unjoined_finalizer(
+    runtime_postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    @asynccontextmanager
+    async def unjoined_connection(probe: DatabaseReadinessProbe) -> AsyncIterator[AsyncConnection]:
+        connection = await probe._engine.connect()
+        try:
+            yield connection
+        finally:
+            probe._connection_finalizer = asyncio.create_task(connection.close())
+
+    monkeypatch.setattr(DatabaseReadinessProbe, "_connect", unjoined_connection)
+    with pytest.raises(AssertionError, match="readiness worker settled before connection close"):
+        _exercise_connection_exit_cut(
+            runtime_postgres_database_url, monkeypatch, "connection", "none"
+        )
 
 
 @pytest.mark.parametrize("failed_close", [False, True])
