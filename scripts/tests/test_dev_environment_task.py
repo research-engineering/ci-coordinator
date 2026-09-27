@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import errno
+import hashlib
 import io
 import json
 import os
@@ -960,6 +961,22 @@ def test_full_install_requires_an_executable_exact_scanner_before_dependency_pre
 
     assert result.error is None
     assert (result.status == 0) is (mode == "matching")
+
+
+def test_bootstrap_copies_exact_task_import_dependencies(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    manifest = bootstrap_witness._copy_inputs(_SOURCE_ROOT, project)
+
+    for relative in (
+        "scripts/diagram_process.py",
+        "scripts/quality_plan.py",
+        "scripts/proofkit_common.py",
+    ):
+        assert relative in manifest
+        expected = (_SOURCE_ROOT / relative).read_bytes()
+        assert (project / relative).read_bytes() == expected
+        assert manifest[relative] == hashlib.sha256(expected).hexdigest()
 
 
 @pytest.mark.parametrize("provider_failure", [True, False])

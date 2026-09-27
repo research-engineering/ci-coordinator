@@ -126,7 +126,6 @@ def prepared_quality_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         "python.lint",
     ]
     plan["portableCommandIds"] = ["python.test"]
-    plan["branchHeadAdditionalCommandIds"] = []
     (target / "quality-plan.v1.json").write_text(json.dumps(plan))
     return identity
 

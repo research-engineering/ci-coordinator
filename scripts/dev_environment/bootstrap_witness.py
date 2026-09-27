@@ -147,6 +147,9 @@ def _copy_inputs(source: Path, destination: Path) -> dict[str, str]:
             "backend/uv.lock",
             "scripts/__init__.py",
             "scripts/bounded_process.py",
+            "scripts/diagram_process.py",
+            "scripts/quality_plan.py",
+            "scripts/proofkit_common.py",
         )
     ]
     for relative in ("backend/src", "scripts/dev_environment"):
