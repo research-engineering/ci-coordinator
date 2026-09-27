@@ -23,6 +23,14 @@ class RuntimeBackgroundService(Protocol):
     async def stop(self) -> bool: ...
 
 
+class RuntimeReadinessLifetime(Protocol):
+    def activate(self) -> None: ...
+
+    def stop(self) -> None: ...
+
+    async def drain(self) -> None: ...
+
+
 @runtime_checkable
 class RuntimeAsyncResource(Protocol):
     async def prepare(self) -> None: ...
@@ -63,6 +71,7 @@ class RuntimeResources:
     shutdown_timeout_seconds: float = 30.0
     additional_resources: tuple[RuntimeAsyncResource, ...] = ()
     _startup_task: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
+    _readiness: RuntimeReadinessLifetime | None = field(default=None, init=False, repr=False)
     _close_task: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
     _cleanup_task: asyncio.Task[None] | None = field(default=None, init=False, repr=False)
     _cleanup_deadline_reached: bool = field(default=False, init=False, repr=False)
@@ -105,6 +114,11 @@ class RuntimeResources:
     def lifecycle_ready(self) -> bool:
         return self._lifecycle_state is _LifecycleState.ACTIVE
 
+    def bind_readiness(self, readiness: RuntimeReadinessLifetime) -> None:
+        if self._lifecycle_state is not _LifecycleState.CONSTRUCTED or self._readiness is not None:
+            raise RuntimeError("runtime readiness must be bound once before startup")
+        self._readiness = readiness
+
     def background_health(self) -> BackgroundHealth:
         if self._lifecycle_state is _LifecycleState.STARTING:
             return BackgroundHealth(BackgroundHealthState.STARTING)
@@ -137,10 +151,12 @@ class RuntimeResources:
                 if self._lifecycle_state is not _LifecycleState.STARTING:
                     raise RuntimeError("runtime resource startup was interrupted") from None
                 raise
-            if self._startup_task is startup:
-                self._startup_task = None
             self._require_startup_authority()
             self._lifecycle_state = _LifecycleState.ACTIVE
+            if self._readiness is not None:
+                self._readiness.activate()
+            if self._startup_task is startup:
+                self._startup_task = None
             yield
         except BaseException as error:
             primary_failure = error
@@ -179,6 +195,8 @@ class RuntimeResources:
         finalizer = self._close_task
         if finalizer is None:
             self._lifecycle_state = _LifecycleState.STOPPING
+            if self._readiness is not None:
+                self._readiness.stop()
             finalizer = asyncio.create_task(self._close_with_deadline())
             self._close_task = finalizer
         cancellation: asyncio.CancelledError | None = None
@@ -258,6 +276,9 @@ class RuntimeResources:
     async def _close_all(self) -> None:
         await self._quiesce_startup()
         self._raise_if_cleanup_deadline_reached()
+        if self._readiness is not None:
+            await self._readiness.drain()
+            self._raise_if_cleanup_deadline_reached()
         if self.background is not None and self._background_start_attempted:
             try:
                 drained = await self.background.stop()

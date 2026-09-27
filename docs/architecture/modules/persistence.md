@@ -343,6 +343,24 @@ checkpoint; ordinary progress and transient unavailability retain the verified
 prefix according to the probe's failure algebra. The stateless
 `check_database_readiness` entry point always starts with complete verification.
 
+Each wave captures one monotonic deadline before migration metadata or profile
+loading. Checkpoint advancement and corruption invalidation require the current
+live worker, its unchanged input checkpoint, and successful transaction exit and
+connection cleanup before that deadline. An explicit post-work clock comparison
+also rejects synchronous overrun before the timeout callback runs. It does not
+preempt synchronous decoding or establish an event-loop latency bound.
+
+The probe retains and joins one task for public connection close, including
+cancellation during close. No replacement operation starts while that worker
+or finalizer remains pending. Query failure followed by clean close remains
+retryable; an unsuccessful close is retained and cannot become successful drain
+through a repeated no-op. Managed probes begin closed, activate with their
+runtime lifetime and permanently reject new admission after stop. Standalone
+construction and the stateless helper retain their existing admission behavior.
+The 4096-row work unit remains unchanged pending separate native cost admission;
+smaller batches, capacity, worst-case latency and autonomous progress are not
+qualified by this lifecycle contract.
+
 This induction relies on the capability-attested immutability and restricted
 runtime principal between checks. It does not detect a privileged external
 actor that disables those controls, rewrites an old row, and restores the same

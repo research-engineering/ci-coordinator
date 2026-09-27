@@ -605,6 +605,7 @@ def _compose_connected_dependencies(
             engine,
             bundled_alembic_config_path(),
             timeout_ms=settings.request_timeout_seconds * 1_000,
+            managed=True,
         )
         workbench_repository = PostgresWorkbenchRepository(engine)
         workflow_reader = GitHubWorkflowSnapshotReader(github)

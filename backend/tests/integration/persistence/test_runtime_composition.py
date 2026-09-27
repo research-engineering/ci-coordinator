@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextlib import nullcontext
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -16,6 +17,7 @@ from cryptography.hazmat.primitives.serialization import (
     PrivateFormat,
 )
 from fastapi.testclient import TestClient
+from httpx2 import ASGITransport, AsyncClient
 from jwt.algorithms import RSAAlgorithm
 from production_admission_support import (
     ARTIFACT_DIGEST,
@@ -26,6 +28,7 @@ from production_admission_support import (
     make_production_admission_fixture,
 )
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
 from ci_coordinator.api.http.control_plane_authentication import (
     BreakGlassBearerAuthenticator,
@@ -45,6 +48,7 @@ from ci_coordinator.integrations.github.provider_inventory import GitHubProvider
 from ci_coordinator.integrations.github.repository_membership import GitHubRepositoryAccess
 from ci_coordinator.integrations.keycloak import KeycloakIntegration
 from ci_coordinator.kernel import SystemClock
+from ci_coordinator.persistence import DatabaseReadinessProbe
 from ci_coordinator.persistence.connection import create_postgres_engine
 from ci_coordinator.persistence.schema import (
     production_admission_authorities,
@@ -66,6 +70,7 @@ from ci_coordinator.runtime.application import (
     compose_runtime_application,
 )
 from ci_coordinator.runtime.control_plane_composition import ControlPlaneRuntimeDependencies
+from ci_coordinator.runtime.readiness import RuntimeReadiness
 from ci_coordinator.runtime_settings import (
     BuildIdentity,
     EnforcingRuntimeSettings,
@@ -85,6 +90,149 @@ GITHUB_REVIEWER_CLIENT_ID = "Iv1SyntheticClient01"
 _WORKFLOW_REF = "example/ci/.github/workflows/dynamic-ci.yml@refs/heads/master"
 _JOB_WORKFLOW_REF = "example/ci/.github/workflows/reusable-ci.yml@refs/heads/master"
 _MACHINE_TOKEN = "a" * 32
+
+
+@pytest.mark.parametrize("cut", ["survivor", "stop", "deadline"])
+def test_composed_workbench_and_readyz_share_managed_connection_lifetime(
+    runtime_postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    cut: str,
+) -> None:
+    jwks = _AvailableJwksProvider(_key_set(rsa.generate_private_key(65537, 2048)))
+    monkeypatch.setattr(runtime_composition, "GitHubActionsJwksProvider", lambda _, **__: jwks)
+    monkeypatch.setattr(
+        runtime_composition,
+        "compose_control_plane_runtime_dependencies",
+        lambda **_: _control_plane_dependencies(),
+    )
+    app, resources = runtime_composition.compose_non_enforcing_dependencies(
+        _settings(runtime_postgres_database_url, control_plane_identity=True)
+    )
+    readiness = cast(RuntimeReadiness, resources._readiness)
+    database = cast(DatabaseReadinessProbe, readiness._database_probe)
+    original_close, original_dispose = AsyncConnection.close, AsyncEngine.dispose
+    original_check = DatabaseReadinessProbe.check
+
+    async def scenario() -> None:
+        entered, release = asyncio.Event(), asyncio.Event()
+        joined = asyncio.Event()
+        events: list[str] = []
+        closes = 0
+        checks = 0
+
+        async def check(probe: DatabaseReadinessProbe) -> object:
+            nonlocal checks
+            if probe is database and probe._active:
+                checks += 1
+                if checks == 2:
+                    joined.set()
+            return await original_check(probe)
+
+        async def close(connection: AsyncConnection) -> None:
+            nonlocal closes
+            if asyncio.current_task() is database._connection_finalizer:
+                closes += 1
+                entered.set()
+                await release.wait()
+                await original_close(connection)
+                assert connection.closed
+                events.append("readiness-checkin")
+            else:
+                await original_close(connection)
+
+        async def dispose(engine: AsyncEngine, close: bool = True) -> None:
+            if engine is resources.engine:
+                events.append("dispose")
+            await original_dispose(engine, close=close)
+
+        monkeypatch.setattr(AsyncConnection, "close", close)
+        monkeypatch.setattr(AsyncEngine, "dispose", dispose)
+        monkeypatch.setattr(DatabaseReadinessProbe, "check", check)
+        assert (await database.check()).reason == "readiness_stopped"
+        with (
+            pytest.raises(RuntimeError, match="exceeded its deadline")
+            if cut == "deadline"
+            else nullcontext()
+        ):
+            async with (
+                resources.lifespan(app),
+                AsyncClient(
+                    transport=ASGITransport(app=app), base_url="https://example.test"
+                ) as client,
+            ):
+                workbench = asyncio.create_task(
+                    client.get(
+                        "/api/v1/workbench/repositories/1001/2002",
+                        headers={"authorization": f"Bearer {_MACHINE_TOKEN}"},
+                    )
+                )
+                try:
+                    async with asyncio.timeout(10):
+                        await entered.wait()
+                        worker = database._inflight
+                        assert worker is not None and not worker.done()
+                        if cut == "survivor":
+                            ready = asyncio.create_task(client.get("/readyz"))
+                            await joined.wait()
+                            assert database._inflight is worker
+                            workbench.cancel()
+                            with pytest.raises(asyncio.CancelledError):
+                                await workbench
+                            release.set()
+                            response = await ready
+                            assert response.status_code == 200
+                            assert response.json() == {"ok": True, "status": "ready"}
+                            assert response.headers["cache-control"] == "no-store"
+                            assert closes == 1
+                            snapshot = await client.get(
+                                "/api/v1/workbench/repositories/1001/2002",
+                                headers={"authorization": f"Bearer {_MACHINE_TOKEN}"},
+                            )
+                            assert snapshot.status_code == 200
+                            replay = snapshot.json()["replay"]
+                            assert replay["status"] == "valid"
+                            assert replay["verifiedRevision"] >= replay["snapshotRevision"]
+                        else:
+                            if cut == "deadline":
+                                resources.shutdown_timeout_seconds = 0.05
+                            closing = asyncio.create_task(resources.aclose())
+                            await asyncio.sleep(0)
+                            assert (await database.check()).reason == "readiness_stopped"
+                            response = await client.get("/readyz")
+                            assert response.status_code == 503
+                            assert response.headers["cache-control"] == "no-store"
+                            if cut == "deadline":
+                                with pytest.raises(RuntimeError, match="exceeded its deadline"):
+                                    await closing
+                                assert resources.cleanup_pending
+                            else:
+                                assert not closing.done()
+                            assert not worker.done() and events == [] and closes == 1
+                            release.set()
+                            await asyncio.gather(workbench, return_exceptions=True)
+                            if cut == "stop":
+                                await closing
+                                assert events == ["readiness-checkin", "dispose"]
+                            else:
+                                cleanup = resources._cleanup_task
+                                if cleanup is not None:
+                                    await asyncio.gather(cleanup, return_exceptions=True)
+                                assert events == ["readiness-checkin"]
+                                with pytest.raises(RuntimeError, match="exceeded its deadline"):
+                                    await resources.aclose()
+                finally:
+                    release.set()
+                    await asyncio.gather(workbench, return_exceptions=True)
+        if cut == "deadline":
+            if resources.background is not None:
+                assert await resources.background.stop()
+            for resource in resources.additional_resources:
+                await resource.aclose()
+            await resources.github.aclose()
+            await resources.jwks.aclose()
+            await original_dispose(resources.engine)
+
+    asyncio.run(scenario())
 
 
 class _AvailableJwksProvider:

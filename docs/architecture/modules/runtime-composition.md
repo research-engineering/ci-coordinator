@@ -129,10 +129,28 @@ Readiness samples background health after its asynchronous dependency probes,
 which defines one final-observation linearization point. Periodic cadence begins
 after terminal completion, not after a round is merely started.
 
+While resources are constructed, composition binds exactly one readiness
+lifetime participant to the same managed database probe used by the authorized
+workbench. After preparation and first reconciliation, startup rechecks its
+authority, activates resources and the probe synchronously, and yields without
+another suspension. Close revokes readiness admission and publication before
+its first await. It joins startup, the runtime wave and its direct probe
+children, then the database worker and retained public connection finalizer,
+before background drain or external resource closure. A failed connection close
+blocks this mandatory barrier, including repeated cleanup attempts.
+
+Readiness retains one demand-driven wave with at most eight runtime waiters and
+sixteen database waiters. Cancelling an individual waiter leaves shared work
+alive; shutdown cancels and joins it. A waiter rechecks lifetime after shielding.
+Completed dependency facts are distinct from unresolved slots; overload and
+caller cancellation do not create dependency observations. No sampler, response
+cache, zero-demand freshness or restart guarantee is introduced.
+
 The admitted shutdown timeout partitions the server's graceful drain, runtime
 cleanup and orchestration reserve. With an admitted total of 30 seconds, these
 are 15, 14 and 1 seconds respectively. Background drain receives 7 seconds
-inside the 14-second cleanup partition, followed by GitHub transport close,
+inside the original 14-second cleanup partition, after the readiness barrier
+and followed by GitHub transport close,
 JWKS close and engine disposal within that same cleanup deadline. A
 deadline breach is terminal and redacted; the deployment may then terminate the
 process. The reconciliation drain receives half of the cleanup partition,

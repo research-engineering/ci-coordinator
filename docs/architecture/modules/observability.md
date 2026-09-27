@@ -88,6 +88,18 @@ runtime path is unavailable, but its public body exposes only `ready` or
 `not_ready`. Exact dependency classes remain bounded internal metric labels and
 private diagnostics. Every readiness response is `no-store`, so neither a stale
 ready state nor a stale failure can be reused across dependency transitions.
+
+Runtime waves project completed true facts as one and completed false facts as
+zero. A still-unresolved dependency removes only its named gauge child; it is
+not a dependency failure and cannot reuse an earlier ready sample as current
+evidence. Missing required facts still make the overall response not ready.
+Only the current live wave can publish partial or final facts, with background
+health sampled after probes. Overload and caller cancellation publish no sample.
+Stop can publish lifecycle unavailability, but not fabricated database or
+provider failures; obsolete completions cannot overwrite a later observation.
+Late database-only prefix progress does not refresh an expired runtime sample.
+This is demand-driven observation, not a freshness or zero-traffic guarantee.
+
 `/metrics` uses the content type emitted by
 `prometheus-client`; it is not a product JSON API.
 After exact bearer admission, an ordinary exposition failure returns an empty
@@ -200,6 +212,7 @@ The bounded rationale and alternatives are in
 | Metric update fails                  | Preserve the product outcome; omit only that observation.                                                                         |
 | Metric exposition fails              | Return 503; never fabricate a successful empty registry.                                                                          |
 | Required dependency unavailable      | Readiness false and dependency gauge zero.                                                                                        |
+| Required dependency unresolved       | Readiness false; remove only its named dependency sample.                                                                         |
 | Structured logging fails             | Preserve the product outcome; no raw fallback print.                                                                              |
 | Secret-like field reaches logger     | Recursively replace the value with `[REDACTED]`.                                                                                  |
 | Final record exceeds its byte budget | Replace deterministic largest caller fields with `[RECORD_LIMIT]`, consider `event` last, and record `record_limit` sanitization. |

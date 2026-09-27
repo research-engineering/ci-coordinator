@@ -418,6 +418,47 @@ def test_readiness_fails_closed_for_unavailable_required_dependency() -> None:
     assert status.unavailable_dependencies == ("database",)
 
 
+@pytest.mark.parametrize("prior", [False, True])
+def test_unresolved_readiness_removes_only_its_named_sample(prior: bool) -> None:
+    metrics = RuntimeMetrics()
+    metrics.dependency_ready("oidc_jwks")
+    metrics.plan_request("issued")
+    if prior:
+        metrics.dependency_ready("database")
+    else:
+        metrics.readiness(ready=False, unavailable_dependencies=("database",))
+    before = prometheus_samples(metrics)
+    metrics.dependency_unresolved("database")
+    metrics.dependency_unresolved("database")
+    after = prometheus_samples(metrics)
+    removed = ("ci_coordinator_dependency_ready", (("dependency", "database"),))
+    assert removed not in after
+    assert {
+        key: value
+        for key, value in before.items()
+        if key != removed and key[0].startswith("ci_coordinator_")
+    } == {key: value for key, value in after.items() if key[0].startswith("ci_coordinator_")}
+
+
+def test_unresolved_metric_failure_is_contained(monkeypatch: pytest.MonkeyPatch) -> None:
+    metrics = RuntimeMetrics()
+
+    def fail_remove(*_: str) -> None:
+        raise RuntimeError("private metric canary")
+
+    monkeypatch.setattr(metrics._dependency_ready, "remove", fail_remove)
+    metrics.dependency_unresolved("database")
+    assert (
+        prometheus_samples(metrics)[
+            (
+                "ci_coordinator_instrumentation_failures_total",
+                (("surface", "dependency_readiness"),),
+            )
+        ]
+        == 1
+    )
+
+
 @pytest.mark.parametrize("reason", ("deterministic_plan_mismatch", "omission_proof_mismatch"))
 def test_deterministic_verifier_reasons_keep_their_bounded_metric_identity(reason: str) -> None:
     metrics = RuntimeMetrics()

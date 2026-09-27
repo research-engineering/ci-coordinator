@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from time import monotonic
+from types import TracebackType
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.engine import RowMapping
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncTransaction
 
 import ci_coordinator.persistence.readiness as readiness_module
 from ci_coordinator.audit_replay import (
@@ -22,7 +24,7 @@ from ci_coordinator.persistence import (
 )
 from ci_coordinator.persistence.connection import create_postgres_engine
 
-from .conftest import ALEMBIC_CONFIG_PATH
+from .conftest import ALEMBIC_CONFIG_PATH, RUNTIME_ROLE
 
 pytestmark = pytest.mark.persistence
 
@@ -426,6 +428,276 @@ def test_readiness_replay_progresses_in_bounded_batches(
             assert second.ready
         finally:
             await runtime_engine.dispose()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "canonical",
+        "gap",
+        "predecessor",
+        "payload_hash",
+        "input_hash",
+        "event_hash",
+        "head_rollback",
+        "head_hash",
+        "maximum",
+    ],
+)
+def test_incremental_prefix_rejects_independent_ledger_corruption(
+    postgres_database_url: str,
+    runtime_postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    corruption: str,
+) -> None:
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        migration = create_postgres_engine(postgres_database_url)
+        records: list[AuditEventRecord] = []
+        try:
+            for index in range(3):
+                async with PostgresUnitOfWork(engine) as unit:
+                    appended = await unit.audit_events.append(
+                        prepare_audit_event(_event_input(f"prefix-{index}"))
+                    )
+                    assert isinstance(appended, AuditAppendAppended)
+                    records.append(appended.record)
+                    await unit.commit()
+            monkeypatch.setattr(readiness_module, "READINESS_AUDIT_BATCH_SIZE", 1)
+            probe = DatabaseReadinessProbe(engine, ALEMBIC_CONFIG_PATH)
+            first = await probe.check()
+            assert first.reason == "audit_verification_in_progress"
+            assert first.verified_revision == 1
+            assert probe._last_record == records[0]
+            statements = {
+                "canonical": (
+                    "UPDATE ci_coordinator.audit_events SET payload_canonical_json = :bad_json "
+                    "WHERE sequence = 2"
+                ),
+                "gap": "UPDATE ci_coordinator.audit_events SET sequence = 4 WHERE sequence = 2",
+                "predecessor": (
+                    "UPDATE ci_coordinator.audit_events SET previous_event_hash = :first_hash "
+                    "WHERE sequence = 3"
+                ),
+                "payload_hash": (
+                    "UPDATE ci_coordinator.audit_events SET payload_hash = :bad_hash "
+                    "WHERE sequence = 2"
+                ),
+                "input_hash": (
+                    "UPDATE ci_coordinator.audit_events SET input_hash = :bad_hash "
+                    "WHERE sequence = 2"
+                ),
+                "event_hash": (
+                    "WITH changed AS (UPDATE ci_coordinator.audit_events SET event_hash = "
+                    ":bad_hash WHERE sequence = 3 RETURNING event_hash) "
+                    "UPDATE ci_coordinator.audit_ledger_head "
+                    "SET last_event_hash = (SELECT event_hash FROM changed)"
+                ),
+                "head_rollback": (
+                    "UPDATE ci_coordinator.audit_ledger_head SET revision = 0, "
+                    "last_sequence = NULL, last_event_hash = NULL"
+                ),
+                "head_hash": (
+                    "UPDATE ci_coordinator.audit_ledger_head SET last_event_hash = :first_hash"
+                ),
+                "maximum": (
+                    "UPDATE ci_coordinator.audit_ledger_head SET revision = 2, "
+                    "last_sequence = 2, last_event_hash = :second_hash"
+                ),
+            }
+            async with migration.begin() as connection:
+                await connection.execute(
+                    text(statements[corruption]),
+                    {
+                        "bad_json": b'{ "value":1}',
+                        "bad_hash": bytes(32),
+                        "first_hash": bytes.fromhex(records[0].event_hash),
+                        "second_hash": bytes.fromhex(records[1].event_hash),
+                    },
+                )
+            monkeypatch.setattr(readiness_module, "READINESS_AUDIT_BATCH_SIZE", 4)
+            result = await probe.check()
+            assert not result.ready and result.verified_revision is None
+            assert result.reason in {
+                "audit_chain_invalid",
+                "audit_head_invalid",
+                "store_unavailable_or_invalid",
+            }
+            if result.reason == "store_unavailable_or_invalid":
+                assert probe._last_record == records[0]
+            else:
+                assert probe._last_record is None and not probe._verified
+            await probe.drain()
+        finally:
+            await engine.dispose()
+            await migration.dispose()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("boundary", ["transaction", "connection"])
+@pytest.mark.parametrize("cut", ["none", "waiter_cancel", "deadline", "stop"])
+def test_real_connection_exit_cuts_preserve_prefix_and_return_checkout(
+    runtime_postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    boundary: str,
+    cut: str,
+) -> None:
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        entered, release = asyncio.Event(), asyncio.Event()
+        observed: list[str] = []
+        original_close = AsyncConnection.close
+        original_exit = AsyncTransaction.__aexit__
+        probe = DatabaseReadinessProbe(engine, ALEMBIC_CONFIG_PATH, timeout_ms=5_000)
+        retained: list[AsyncConnection] = []
+
+        def checkin(_connection: object, _record: object) -> None:
+            observed.append("checkin")
+
+        event.listen(engine.sync_engine, "checkin", checkin)
+
+        async def close(connection: AsyncConnection) -> None:
+            retained.append(connection)
+            if boundary == "connection":
+                entered.set()
+                await release.wait()
+            await original_close(connection)
+            observed.append("closed")
+
+        async def transaction_exit(
+            transaction: AsyncTransaction,
+            error_type: type[BaseException] | None,
+            error: BaseException | None,
+            traceback: TracebackType | None,
+        ) -> None:
+            if boundary == "transaction":
+                entered.set()
+                await release.wait()
+            await original_exit(transaction, error_type, error, traceback)
+
+        try:
+            monkeypatch.setattr(AsyncConnection, "close", close)
+            monkeypatch.setattr(AsyncTransaction, "__aexit__", transaction_exit)
+            waiter = asyncio.create_task(probe.check())
+            async with asyncio.timeout(10):
+                await entered.wait()
+                worker = probe._inflight
+                assert worker is not None and not worker.done()
+                assert not probe._verified and observed == []
+                if cut == "waiter_cancel":
+                    waiter.cancel()
+                    with pytest.raises(asyncio.CancelledError):
+                        await waiter
+                elif cut == "deadline":
+                    assert (await waiter).reason == "readiness_timeout"
+                elif cut == "stop":
+                    probe.stop()
+                await asyncio.sleep(0)
+                if boundary == "connection":
+                    assert not worker.done() and observed == []
+                    assert probe._connection_finalizer is not None
+                    assert not probe._connection_finalizer.done()
+                release.set()
+                await asyncio.gather(worker, waiter, return_exceptions=True)
+                assert retained and all(connection.closed for connection in retained)
+                assert observed == ["checkin", "closed"]
+                assert probe._verified is (cut in {"none", "waiter_cancel"})
+                await probe.drain()
+        finally:
+            release.set()
+            await probe.drain()
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("failed_close", [False, True])
+def test_real_query_failure_does_not_hide_failed_close(
+    runtime_postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    failed_close: bool,
+) -> None:
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        original_close = AsyncConnection.close
+        original_loader = readiness_module._load_head_row
+        retained: list[AsyncConnection] = []
+        probe = DatabaseReadinessProbe(engine, ALEMBIC_CONFIG_PATH)
+
+        async def fail_query(connection: AsyncConnection, **_: bool) -> RowMapping | None:
+            retained.append(connection)
+            raise SQLAlchemyError("private query canary")
+
+        async def close(connection: AsyncConnection) -> None:
+            if failed_close:
+                raise SQLAlchemyError("private close canary")
+            await original_close(connection)
+
+        monkeypatch.setattr(readiness_module, "_load_head_row", fail_query)
+        monkeypatch.setattr(AsyncConnection, "close", close)
+        try:
+            first = await probe.check()
+            assert first.reason == "store_unavailable_or_invalid"
+            monkeypatch.setattr(readiness_module, "_load_head_row", original_loader)
+            second = await probe.check()
+            assert second.ready is (not failed_close)
+            assert retained[0].closed is (not failed_close)
+            if failed_close:
+                assert second == first
+                for _ in range(2):
+                    with pytest.raises(RuntimeError, match="database readiness cleanup failed"):
+                        await probe.drain()
+            else:
+                await probe.drain()
+        finally:
+            for connection in retained:
+                await original_close(connection)
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("drift", ["schema", "acl"])
+def test_warm_probe_rechecks_current_database_admission(
+    postgres_database_url: str,
+    runtime_postgres_database_url: str,
+    drift: str,
+) -> None:
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        migration = create_postgres_engine(postgres_database_url)
+        probe = DatabaseReadinessProbe(engine, ALEMBIC_CONFIG_PATH)
+        mutation, restore = (
+            (
+                "ALTER TABLE ci_coordinator.audit_events ALTER COLUMN created_at TYPE varchar(1)",
+                "ALTER TABLE ci_coordinator.audit_events ALTER COLUMN created_at TYPE varchar(24)",
+            )
+            if drift == "schema"
+            else (
+                f"REVOKE SELECT ON ci_coordinator.audit_events FROM {RUNTIME_ROLE}",
+                f"GRANT SELECT ON ci_coordinator.audit_events TO {RUNTIME_ROLE}",
+            )
+        )
+        try:
+            assert (await probe.check()).ready
+            assert probe._verified
+            async with migration.begin() as connection:
+                await connection.execute(text(mutation))
+            result = await probe.check()
+            assert not result.ready
+            assert result.reason == "database_capability_unavailable"
+            async with migration.begin() as connection:
+                await connection.execute(text(restore))
+            assert (await probe.check()).ready
+        finally:
+            async with migration.begin() as connection:
+                await connection.execute(text(restore))
+            await probe.drain()
+            await engine.dispose()
+            await migration.dispose()
 
     asyncio.run(scenario())
 
