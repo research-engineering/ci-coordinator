@@ -95,6 +95,9 @@ def test_native_capture_acceptance_setup_and_close_keep_owned_drain(
     image_source = tmp_path / "image"
     package = image_source / "ci_coordinator"
     if owner == "image-entry":
+        monkeypatch.setenv(
+            "COVERAGE_PROCESS_START", str(Path(__file__).resolve().parents[3] / "pyproject.toml")
+        )
         lab = package / "consumer_contract_lab"
         lab.mkdir(parents=True)
         (package / "__init__.py").write_text("")
