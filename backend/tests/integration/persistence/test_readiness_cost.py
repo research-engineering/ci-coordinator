@@ -36,10 +36,7 @@ from ci_coordinator.persistence.readiness import DatabaseReadiness, DatabaseRead
 
 from . import _readiness_cost_worker as worker
 from ._readiness_cost_worker import (
-    BATCHES,
-    CASES,
     FRAME,
-    MODES,
     VALID_CASES,
     Case,
     Cell,
@@ -60,24 +57,26 @@ class Pilot:
         self.final_deadline = self.started + 360
         self.path = path
         self.cells = [
-            Cell.model_validate({"case": case, "batch": batch, "mode": mode})
-            for case in CASES
-            for batch in BATCHES
-            for mode in MODES
+            Cell(case="wide", batch=1, mode="memory"),
+            Cell(case="syntax", batch=1, mode="timing"),
+            Cell(case="syntax", batch=1, mode="memory"),
+            Cell(case="depth", batch=1, mode="timing"),
+            Cell(case="depth", batch=1, mode="memory"),
         ]
         self.setup: dict[str, dict[str, int | str | bool]] = {}
         self.save()
 
     def save(self) -> None:
-        assert len(self.cells) == 48
+        assert len(self.cells) == 5
         assert {(cell.case, cell.batch, cell.mode) for cell in self.cells} == {
-            (case, batch, mode)
-            for case in ("small", "scalar", "combined", "wide", "syntax", "depth")
-            for batch in (1, 4, 16, 4096)
-            for mode in ("timing", "memory")
+            ("wide", 1, "memory"),
+            ("syntax", 1, "timing"),
+            ("syntax", 1, "memory"),
+            ("depth", 1, "timing"),
+            ("depth", 1, "memory"),
         }
         report = {
-            "schemaVersion": "readiness-cost-diagnostic/v1",
+            "schemaVersion": "readiness-b1-gaps-diagnostic/v1",
             "status": "observed",
             "completeness": "complete"
             if all(cell.complete for cell in self.cells)
@@ -93,7 +92,7 @@ class Pilot:
             "postgresImage": POSTGRES_IMAGE,
             "lockSha256": hashlib.sha256((ROOT / "backend/uv.lock").read_bytes()).hexdigest(),
             "setup": self.setup,
-            "expectedCellCount": 48,
+            "expectedCellCount": 5,
             "cellCounts": {
                 status: sum(cell.status == status for cell in self.cells)
                 for status in ("NOT_MEASURED", "observed", "censored", "failed")
@@ -343,7 +342,7 @@ def run_cell(pilot: Pilot, cell: Cell, url: str, hashes: list[str]) -> Cell:
     return final
 
 
-@pytest.mark.parametrize("case", CASES)
+@pytest.mark.parametrize("case", ["wide", "syntax", "depth"])
 def test_readiness_cost_diagnostic(
     case: Case,
     runtime_postgres_database_url: str,
@@ -385,25 +384,19 @@ def test_readiness_cost_diagnostic(
         cost_pilot.setup[case]["elapsedNs"] = time.monotonic_ns() - started
         cost_pilot.save()
     cost_pilot.setup[case] = {"outcome": "committed32", "elapsedNs": time.monotonic_ns() - started}
-    offset = CASES.index(case) % 4
-    order = (*BATCHES[offset:], *BATCHES[:offset])
     try:
-        for mode in MODES:
-            for batch in order:
-                cell = next(item for item in cells if item.batch == batch and item.mode == mode)
-                index = cost_pilot.cells.index(cell)
-                try:
-                    measured = run_cell(cost_pilot, cell, runtime_postgres_database_url, hashes)
-                except Exception:
-                    cell.status, cell.detail = "failed", "observation_contract_contradiction"
-                    cost_pilot.save()
-                    pytest.fail(
-                        "readiness-cost observation contradicted its contract", pytrace=False
-                    )
-                cost_pilot.cells[index] = measured
+        for cell in cells:
+            index = cost_pilot.cells.index(cell)
+            try:
+                measured = run_cell(cost_pilot, cell, runtime_postgres_database_url, hashes)
+            except Exception:
+                cell.status, cell.detail = "failed", "observation_contract_contradiction"
                 cost_pilot.save()
-                if measured.status == "failed":
-                    pytest.fail("readiness-cost reached a functional contradiction", pytrace=False)
+                pytest.fail("readiness-cost observation contradicted its contract", pytrace=False)
+            cost_pilot.cells[index] = measured
+            cost_pilot.save()
+            if measured.status == "failed":
+                pytest.fail("readiness-cost reached a functional contradiction", pytrace=False)
     finally:
         for item in cost_pilot.cells:
             if item.case == case and item.detail == "campaign_not_started":
@@ -563,27 +556,28 @@ def test_cost_seed_error_controls(
     monkeypatch.setattr(AsyncEngine, "connect", connect)
     monkeypatch.setattr(sys.modules[__name__], "seed", selected_seed)
     monkeypatch.setattr(sys.modules[__name__], "spawn", no_launch)
+    # Keep the real small-seed fault while targeting both cells of one declared journey.
     if unavailable:
         test_readiness_cost_diagnostic(
-            "small", runtime_postgres_database_url, postgres_database_url, pilot
+            "syntax", runtime_postgres_database_url, postgres_database_url, pilot
         )
     else:
         with pytest.raises(pytest.fail.Exception, match="public seed failed"):
             test_readiness_cost_diagnostic(
-                "small", runtime_postgres_database_url, postgres_database_url, pilot
+                "syntax", runtime_postgres_database_url, postgres_database_url, pilot
             )
     assert reached == (
         ["connect", "public-wrapper"] if fault in {"operational", "assertion"} else ["typed-error"]
     )
     report = json.loads(pilot.path.read_text())
-    selected = [cell for cell in report["cells"] if cell["case"] == "small"]
-    assert len(selected) == 8
+    selected = [cell for cell in report["cells"] if cell["case"] == "syntax"]
+    assert len(selected) == 2
     assert {cell["status"] for cell in selected} == (
         {"NOT_MEASURED"} if unavailable else {"failed"}
     )
     assert all(cell["waves"] == [] and cell["complete"] is False for cell in report["cells"])
     assert report["functionalOrHarnessFailure"] is (not unavailable)
-    assert report["expectedCellCount"] == 48 and report["completeness"] == "incomplete"
+    assert report["expectedCellCount"] == 5 and report["completeness"] == "incomplete"
 
 
 @pytest.mark.parametrize(
@@ -805,19 +799,22 @@ def test_cost_final_owned_observation_controls(
 def test_cost_literal_phase_and_population_controls(fault: str, tmp_path: Path) -> None:
     pilot = Pilot(tmp_path / "cost.json")
     initial = json.loads(pilot.path.read_text())
+    assert initial["schemaVersion"] == "readiness-b1-gaps-diagnostic/v1"
+    assert len(initial["cells"]) == initial["expectedCellCount"] == 5
     assert {(item["case"], item["batch"], item["mode"]) for item in initial["cells"]} == {
-        (shape, batch, mode)
-        for shape in ("small", "scalar", "combined", "wide", "syntax", "depth")
-        for batch in (1, 4, 16, 4096)
-        for mode in ("timing", "memory")
+        ("wide", 1, "memory"),
+        ("syntax", 1, "timing"),
+        ("syntax", 1, "memory"),
+        ("depth", 1, "timing"),
+        ("depth", 1, "memory"),
     }
     if fault == "population":
         original = pilot.cells[-1]
         pilot.cells[-1] = original.model_copy(update={"batch": 2})
-        assert len(pilot.cells) == len({(c.case, c.batch, c.mode) for c in pilot.cells}) == 48
+        assert len(pilot.cells) == len({(c.case, c.batch, c.mode) for c in pilot.cells}) == 5
         with pytest.raises(AssertionError):
             pilot.save()
-        assert json.loads(pilot.path.read_text())["expectedCellCount"] == 48
+        assert json.loads(pilot.path.read_text())["expectedCellCount"] == 5
         return
     recovery, hashes = _literal_wave("small")
     warm = recovery.model_copy(
