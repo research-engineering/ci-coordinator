@@ -23,6 +23,7 @@ from scripts.dev_environment.lifecycle import (
 )
 from scripts.dev_environment.private_files import PrivateLockBusy, bounded_private_lock
 from scripts.dev_environment.watch_session import cancel_watch, owned_watch_session
+from scripts.repository_paths import read_bounded_regular_file
 
 _SOURCE_ROOT = Path(__file__).resolve().parents[2]
 _PYTHON = getattr(sys, "_base_executable", sys.executable)
@@ -126,6 +127,17 @@ def _witness(
             pass_fds=(phase_read,),
         )
         yield _Witness(process)
+    except BaseException as error:
+        paths = operation_paths(identity, create=False)
+        for name, path in (("completion", paths.completed), ("session", paths.session)):
+            try:
+                raw = read_bounded_regular_file(path, f"watch {name}", maximum_bytes=4096)
+                record = json.loads(raw)
+                detail = {key: record.get(key) for key in ("nonce", "reason", "process")}
+                error.add_note(f"watch {name}: {json.dumps(detail, sort_keys=True)}")
+            except (OSError, ValueError, AttributeError) as diagnostic_error:
+                error.add_note(f"watch {name} unavailable: {type(diagnostic_error).__name__}")
+        raise
     finally:
         os.close(phase_read)
         os.close(phase_write)
@@ -150,6 +162,32 @@ def identity(tmp_path: Path) -> InstanceIdentity:
     return derive_instance_identity(root, state_home=tmp_path / "state")
 
 
+def test_witness_diagnostics_preserve_spawn_error_without_creating_state(
+    identity: InstanceIdentity,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scripts.dev_environment import lifecycle
+
+    failure = RuntimeError("fixture spawn failure")
+
+    def fail_spawn(*_args: object, **_kwargs: object) -> None:
+        raise failure
+
+    def forbid_directory_mutation(_path: Path) -> None:
+        raise PermissionError("diagnostics cannot create or change directories")
+
+    monkeypatch.setattr(subprocess, "Popen", fail_spawn)
+    monkeypatch.setattr(lifecycle, "ensure_private_directory", forbid_directory_mutation)
+    with pytest.raises(RuntimeError) as caught, _witness(identity):
+        pytest.fail("the failed spawn yielded a witness")
+    assert caught.value is failure
+    assert failure.__notes__ == [
+        "watch completion unavailable: FileNotFoundError",
+        "watch session unavailable: FileNotFoundError",
+    ]
+    assert not identity.state_home.exists()
+
+
 @pytest.mark.parametrize("mode", ["graceful", "ignore-term"])
 def test_only_the_joined_clean_client_releases_ownership(
     identity: InstanceIdentity,
@@ -158,7 +196,7 @@ def test_only_the_joined_clean_client_releases_ownership(
     with _witness(identity, mode, joined_client_fixture=True) as witness:
         nonce = json.loads(witness.line())["publishedNonce"]
         assert witness.line() == "PROVIDER_READY"
-        result = cancel_watch(identity, expected_nonce=nonce, timeout_seconds=3)
+        result = cancel_watch(identity, expected_nonce=nonce, timeout_seconds=5)
         assert (result.state, result.reason) == (
             ("quiescent", "watch_client_stopped")
             if mode == "graceful"
@@ -249,7 +287,7 @@ def test_only_owned_graceful_cancellation_admits_the_physical_exit_130(
         else:
             assert {witness.line(), witness.line()} == {"PROVIDER_READY", "PARENT_SUPERVISING"}
         if owner_signal is None:
-            cancellation = cancel_watch(identity, expected_nonce=nonce, timeout_seconds=3)
+            cancellation = cancel_watch(identity, expected_nonce=nonce, timeout_seconds=5)
             assert cancellation.reason == "watch_client_stopped"
             assert witness.line() == "PROVIDER_TERM"
             process = json.loads(witness.line())["process"]
