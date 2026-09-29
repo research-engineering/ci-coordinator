@@ -11,6 +11,7 @@ WORKFLOW_PATH = REPO_ROOT / ".github/workflows/release-artifact.yml"
 CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
 SETUP_PYTHON = "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
 SETUP_UV = "astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4"
+SETUP_QEMU = "docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1"
 SETUP_BUILDX = "docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069"
 LOGIN = "docker/login-action@dbcb813823bdd20940b903addbd779551569679f"
 BUILD_PUSH = "docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc"
@@ -148,6 +149,7 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
         CHECKOUT,
         SETUP_PYTHON,
         SETUP_UV,
+        SETUP_QEMU,
         SETUP_BUILDX,
         LOGIN,
         BUILD_PUSH,
@@ -166,8 +168,14 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
     }
     assert steps[1]["with"] == {"python-version": "3.13.15"}
     assert steps[2]["with"] == {"enable-cache": False, "version": "0.12.17"}
-    assert cast(dict[str, object], steps[3]["with"])["cache-binary"] is False
-    build_inputs = cast(dict[str, object], steps[5]["with"])
+    assert steps[3]["with"] == {
+        "image": "tonistiigi/binfmt@sha256:"
+        "400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0",
+        "platforms": "amd64",
+        "cache-image": False,
+    }
+    assert cast(dict[str, object], steps[4]["with"])["cache-binary"] is False
+    build_inputs = cast(dict[str, object], steps[6]["with"])
     assert build_inputs["platforms"] == "linux/amd64"
     assert build_inputs["provenance"] == "mode=max,version=v1"
     assert build_inputs["pull"] is True
@@ -189,28 +197,28 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
         ),
         "repair_evidence_sha256": "${{ steps.vulnerability.outputs.repair_evidence_sha256 }}",
     }
-    grype_download = cast(str, steps[6]["run"])
+    grype_download = cast(str, steps[7]["run"])
     for required in (
         "GRYPE_RELEASE_SHA256",
         "sha256sum --check --strict",
     ):
         assert required in grype_download
-    assert steps[6]["env"] == {
+    assert steps[7]["env"] == {
         "GRYPE_VERSION": "0.119.0",
         "GRYPE_RELEASE_URL": (
             "https://github.com/anchore/grype/releases/download/v0.119.0/"
-            "grype_0.119.0_linux_amd64.tar.gz"
+            "grype_0.119.0_linux_arm64.tar.gz"
         ),
         "GRYPE_RELEASE_SHA256": (
-            "3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b"
+            "29f0ec7c549ddb0e2b6a0ca714851f7399438afc399b80c12808e065edc9a8f8"
         ),
     }
 
-    assert steps[7]["name"] == "Provision the independent locked predicate validator"
-    assert steps[8]["name"] == "Collect exact runtime repair evidence"
-    assert "scripts.release_repair_evidence" in cast(str, steps[8]["run"])
-    assert steps[9]["name"] == "Admit final-image vulnerability evidence"
-    vulnerability = cast(str, steps[9]["run"])
+    assert steps[8]["name"] == "Provision the independent locked predicate validator"
+    assert steps[9]["name"] == "Collect exact runtime repair evidence"
+    assert "scripts.release_repair_evidence" in cast(str, steps[9]["run"])
+    assert steps[10]["name"] == "Admit final-image vulnerability evidence"
+    vulnerability = cast(str, steps[10]["run"])
     for required in (
         "--manifest-inspection",
         "--from registry",
@@ -236,7 +244,7 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
     for forbidden in ("--only-fixed", "--only-notfixed", "--ignore", "--vex", "--exclude", "--db-"):
         assert forbidden not in vulnerability
 
-    upload = steps[10]
+    upload = steps[11]
     assert upload["uses"] == UPLOAD_ARTIFACT
     upload_with = cast(dict[str, object], upload["with"])
     assert upload_with["retention-days"] == 7
@@ -244,18 +252,18 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
     assert upload_with["if-no-files-found"] == "error"
     assert upload_with["path"] == "${{ runner.temp }}/release-vulnerability-evidence.json"
 
-    provisioning = cast(str, steps[7]["run"])
+    provisioning = cast(str, steps[8]["run"])
     assert "uv sync" in provisioning
     assert "--frozen" in provisioning
     assert "--no-dev" in provisioning
     assert "--no-install-project" in provisioning
 
-    assert steps[11]["uses"] == UPLOAD_ARTIFACT
+    assert steps[12]["uses"] == UPLOAD_ARTIFACT
     assert (
-        cast(dict[str, object], steps[11]["with"])["path"]
+        cast(dict[str, object], steps[12]["with"])["path"]
         == "${{ runner.temp }}/release-runtime-repairs.json"
     )
-    predicate_validation = cast(str, steps[12]["run"])
+    predicate_validation = cast(str, steps[13]["run"])
     for required in (
         "{{json .Provenance.SLSA}}",
         "{{json .SBOM.SPDX}}",
@@ -333,8 +341,8 @@ def test_attestation_job_has_no_checkout_and_never_executes_the_image() -> None:
     }
 
     inspection = cast(str, steps[4]["run"])
-    assert "docker pull" in inspection
-    assert "docker create" in inspection
+    assert 'docker pull --platform linux/amd64 "${artifact}"' in inspection
+    assert 'docker create --platform linux/amd64 "${artifact}"' in inspection
     assert "docker cp" in inspection
     assert "docker run" not in inspection
     assert "cmp" in inspection

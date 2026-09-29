@@ -133,7 +133,7 @@
               }
             },
             "builderPlatform": {
-              "const": "linux/amd64"
+              "enum": ["linux/amd64", "linux/arm64"]
             }
           }
         },

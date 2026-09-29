@@ -35,7 +35,7 @@ def test_trusted_plan_request_workflow_has_one_bounded_oidc_authority() -> None:
     request = jobs["request"]
     assert type(request) is dict
     assert request["permissions"] == {"id-token": "write"}
-    assert request["runs-on"] == "ubuntu-24.04"
+    assert request["runs-on"] == "ubuntu-26.04-arm"
     assert request["timeout-minutes"] == 2
     assert set(request["outputs"]) == _OUTPUTS
     assert len(request["steps"]) == 1

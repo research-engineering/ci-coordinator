@@ -41,7 +41,7 @@ def main() -> int:
     with TemporaryDirectory(prefix="ci-go-input-witness-") as directory:
         root = Path(directory)
         version = UtilityCommand(
-            ("go", "version"), root, "version", r"go version go1\.27\.1 linux/amd64"
+            ("go", "version"), root, "version", r"go version go1\.27\.1 linux/(?:amd64|arm64)"
         )
         admit_output(version, _output(version, environment))
         for name, source in _CASES:

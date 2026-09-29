@@ -64,7 +64,17 @@ _MIGRATION_ARTIFACT_CHECK = (
 
 
 def _build_args(image: str) -> tuple[str, ...]:
-    return ("build", "--pull", "--file", "Dockerfile", "--tag", image, ".")
+    return (
+        "build",
+        "--platform",
+        "linux/amd64",
+        "--pull",
+        "--file",
+        "Dockerfile",
+        "--tag",
+        image,
+        ".",
+    )
 
 
 def _run_args(context: ContainerRunContext) -> tuple[str, ...]:

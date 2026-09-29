@@ -281,6 +281,28 @@ def test_every_go_check_plans_native_selection_before_analysis(
     )
 
 
+@pytest.mark.parametrize(
+    ("version", "admitted"),
+    [
+        ("go version go1.27.1 linux/amd64", True),
+        ("go version go1.27.1 linux/arm64", True),
+        ("go version go1.27.0 linux/arm64", False),
+        ("go version go1.27.1 darwin/arm64", False),
+        ("go version go1.27.1 linux/riscv64", False),
+    ],
+)
+def test_go_host_architecture_does_not_change_the_owned_target(
+    repository: Path, version: str, admitted: bool
+) -> None:
+    command = checks.commands(repository, "gofmt")[0]
+    if admitted:
+        checks.admit_output(command, version + "\n")
+    else:
+        with pytest.raises(ValueError, match="version"):
+            checks.admit_output(command, version + "\n")
+    assert checks.project_environment({"PATH": "/usr/bin"})["GOARCH"] == "amd64"
+
+
 def _go_package(root: Path, **updates: object) -> dict[str, object]:
     return {
         "Dir": str(root),

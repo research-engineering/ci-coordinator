@@ -116,6 +116,23 @@ def test_predicate_admission_accepts_exact_profiles_and_hashes_exact_bytes(
 
 
 @pytest.mark.parametrize(
+    ("builder", "admitted"),
+    [("linux/amd64", True), ("linux/arm64", True), ("linux/riscv64", False), ("", False)],
+)
+def test_builder_platform_is_admitted_separately_from_target_dependencies(
+    tmp_path: Path, builder: str, admitted: bool
+) -> None:
+    provenance = _provenance()
+    definition = cast(dict[str, object], provenance["buildDefinition"])
+    cast(dict[str, object], definition["internalParameters"])["builderPlatform"] = builder
+    if admitted:
+        _admit(tmp_path, provenance=provenance)
+    else:
+        with pytest.raises(PredicateAdmissionError, match="builderPlatform"):
+            _admit(tmp_path, provenance=provenance)
+
+
+@pytest.mark.parametrize(
     "mutate",
     [
         pytest.param(

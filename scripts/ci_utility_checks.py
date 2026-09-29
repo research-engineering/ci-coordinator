@@ -231,7 +231,7 @@ def commands(root: Path, check_id: str) -> tuple[UtilityCommand, ...]:
         )
     modules = go_modules(root, names)
     prefix = (
-        _version(root, "go", ("version",), r"go version go1\.27\.1 linux/amd64"),
+        _version(root, "go", ("version",), r"go version go1\.27\.1 linux/(?:amd64|arm64)"),
         *(
             UtilityCommand(
                 (

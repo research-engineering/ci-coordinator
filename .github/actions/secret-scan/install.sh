@@ -7,6 +7,7 @@ mkdir -m 700 -- "$destination"
 destination=$(cd -- "$destination" && pwd)
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) platform=linux_x64 ;;
+  Linux-aarch64) platform=linux_arm64 ;;
   Darwin-arm64) platform=darwin_arm64 ;;
   *) printf '%s\n' 'Unsupported secret scanner platform' >&2; exit 2 ;;
 esac

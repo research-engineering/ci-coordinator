@@ -474,6 +474,7 @@
     {"requirementId":"REQ-CI-RUNTIME-010","witnessPath":".dockerignore","requiredCommandIds":["build.inputs","proofkit.verify","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-010","witnessPath":"Dockerfile","requiredCommandIds":["build.inputs","container.smoke","proofkit.verify","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-010","witnessPath":"docker/ci/connected-browser.Dockerfile","requiredCommandIds":["build.inputs","proofkit.verify","selective.plan","text.policy"]},
+    {"requirementId":"REQ-CI-RUNTIME-010","witnessPath":"docs/features/arm-ci-runner-migration.md","requiredCommandIds":["documentation.graph","proofkit.verify","requirements.admission","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-010","witnessPath":"docs/features/build-input-admission.md","requiredCommandIds":["documentation.graph","proofkit.verify","requirements.admission","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-010","witnessPath":"frontend/Dockerfile.dev","requiredCommandIds":["build.inputs","proofkit.verify","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-010","witnessPath":"package.json","requiredCommandIds":["build.inputs","proofkit.verify","repository.json","selective.plan","text.policy"]},

@@ -60,7 +60,7 @@ jobs:
 
   container-runtime-smoke:
     name: Container runtime smoke
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 25
     steps:
       - name: Check out source
@@ -71,6 +71,12 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13.15"
+      - name: Enable the pinned amd64 emulator
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: amd64
+          cache-image: false
       - name: Qualify build inputs
         timeout-minutes: 10
         run: python3 -m scripts.build_input_witness
@@ -87,7 +93,7 @@ jobs:
 
   provider-dependency-review:
     name: Provider dependency review
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 5
     steps:
       - name: Check out source
@@ -103,7 +109,7 @@ jobs:
 
   repository-quality:
     name: Repository quality
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 35
     steps:
       - name: Check out source
@@ -204,7 +210,7 @@ jobs:
 
   native-test-plan:
     name: Native test collection and scheduling
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     steps:
       - name: Check out source
@@ -259,7 +265,7 @@ jobs:
   native-test-shards:
     name: Native tests (${{ matrix.shard }})
     needs: [native-test-plan]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -345,7 +351,7 @@ jobs:
   postgres-witness:
     name: Complete native population and aggregate coverage
     needs: [native-test-plan, native-test-shards]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     steps:
       - name: Check out source
@@ -403,7 +409,7 @@ jobs:
     name: Same-head serial qualification
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.serial_qualification }}
     needs: [native-test-plan, native-test-shards]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 75
     steps:
       - name: Check out source
@@ -493,7 +499,7 @@ jobs:
           - audit-persistence-byte-limits
           - python-database-compatibility
           - audit-json-resource-limits
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 258
     steps:
       - name: Check out source
@@ -534,7 +540,7 @@ jobs:
 
   operator-workbench:
     name: Operator workbench
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 40
     steps:
       - name: Check out source
@@ -632,7 +638,7 @@ jobs:
 
   connected-administrator:
     name: Authenticated administrator business effect
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 45
     permissions:
       contents: read
@@ -656,6 +662,12 @@ jobs:
         run: |
           python3 -m scripts.python_witness lock-check
           python3 -m scripts.python_witness install-check
+      - name: Enable the pinned amd64 emulator
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: amd64
+          cache-image: false
       - name: Prove authenticated persistent effect and replay
         id: administrator
         timeout-minutes: 35
@@ -672,7 +684,7 @@ jobs:
 
   connected-development-stack:
     name: Connected development stack (${{ matrix.compose }})
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -680,10 +692,10 @@ jobs:
         include:
           - compose: minimum
             compose-version: "2.39.4"
-            compose-sha256: "7af95166a730b87e172d4fc9aefea8725d3c6c7327d59149267b452114ddb7d4"
+            compose-sha256: "49082844b87f03cdcd5f5bbef1ba8c9c897b7a2dfb80cea18d61ec8ca6117e0c"
           - compose: current
             compose-version: "5.5.1"
-            compose-sha256: "db1889184726840f75c4f9c001048430d4f25b3be3cb084d3ddd762bc0aed576"
+            compose-sha256: "732e3a84c1a0f67256ce80bc2598a24546b10ca05f9faa97efceb1171ece2ef7"
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -709,7 +721,7 @@ jobs:
         run: |
           mkdir -p "$HOME/.docker/cli-plugins"
           curl --fail --silent --show-error --location \
-            "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-x86_64" \
+            "https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-aarch64" \
             --output "$RUNNER_TEMP/docker-compose"
           echo "$COMPOSE_SHA256  $RUNNER_TEMP/docker-compose" | sha256sum --check --strict
           install -m 0755 "$RUNNER_TEMP/docker-compose" "$HOME/.docker/cli-plugins/docker-compose"
@@ -738,7 +750,7 @@ jobs:
 
   developer-bootstrap:
     name: Minimal developer bootstrap
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 20
     steps:
       - name: Check out source
@@ -752,9 +764,9 @@ jobs:
       - name: Install the pinned mise binary
         run: |
           curl --fail --silent --show-error --location \
-            https://github.com/jdx/mise/releases/download/v2026.9.11/mise-v2026.9.11-linux-x64 \
+            https://github.com/jdx/mise/releases/download/v2026.9.11/mise-v2026.9.11-linux-arm64 \
             --output "$RUNNER_TEMP/mise"
-          echo "6e39ee1ffa926a1f64814efbf1d26c3f617255e2a6ba6152e3c8a5135fa5a35f  $RUNNER_TEMP/mise" | sha256sum --check --strict
+          echo "80ad6e9589d3c4483fd67a4a97f07e28330964dde64ca8cad15d5cb56134a54d  $RUNNER_TEMP/mise" | sha256sum --check --strict
           chmod 0755 "$RUNNER_TEMP/mise"
       - name: Verify sparse-host backend preparation
         run: python -m scripts.dev_environment.bootstrap_witness --mise "$RUNNER_TEMP/mise"
@@ -792,7 +804,7 @@ jobs:
 
   developer-container:
     name: Least-privilege developer container
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 40
     steps:
       - name: Check out source
@@ -829,7 +841,7 @@ jobs:
 
   utility-config:
     name: Configuration contracts
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     permissions:
       contents: read
@@ -864,7 +876,7 @@ jobs:
 
   utility-docker:
     name: Dockerfile contracts
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 25
     permissions:
       contents: read
@@ -900,10 +912,10 @@ jobs:
           set -euo pipefail
           mkdir -p "$UTILITY_BIN"
           curl --fail --location --silent --show-error \
-            https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-x86_64 \
+            https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-linux-arm64 \
             --output "$UTILITY_BIN/hadolint"
           printf '%s  %s\n' \
-            c7187db94eeeeca956519a6af171adc31453941a1e777961f6e680f697c8c507 \
+            f6198ef8090f404dbb771abfee086eb8c48ac177f30da7fd3510aca35b344b5d \
             "$UTILITY_BIN/hadolint" | sha256sum --check --strict
           chmod 0755 "$UTILITY_BIN/hadolint"
           printf '%s\n' "$UTILITY_BIN" >> "$GITHUB_PATH"
@@ -921,7 +933,7 @@ jobs:
 
   utility-go-static:
     name: Go static analysis
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 25
     permissions:
       contents: read
@@ -976,7 +988,7 @@ jobs:
 
   utility-go-vulnerabilities:
     name: Go vulnerabilities
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     permissions:
       contents: read
@@ -1029,7 +1041,7 @@ jobs:
 
   utility-spelling:
     name: Repository spelling
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     permissions:
       contents: read
@@ -1086,7 +1098,7 @@ jobs:
       - utility-go-static
       - utility-go-vulnerabilities
       - utility-spelling
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 2
     permissions: {}
     steps:

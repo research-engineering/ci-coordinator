@@ -21,7 +21,7 @@ concurrency:
 jobs:
   qualify:
     name: Qualify exact runtime candidate
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
     env:
       IMAGE: ci-coordinator:runtime-candidate
@@ -32,6 +32,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Enable the pinned amd64 emulator
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: amd64
+          cache-image: false
       - name: Set up pinned builder
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
@@ -255,9 +261,9 @@ jobs:
           root="${RUNNER_TEMP}/qualification"
           test -s "${root}/image.json"
           curl --fail --location --proto '=https' --tlsv1.2 --max-time 120 \
-            https://github.com/anchore/grype/releases/download/v0.119.0/grype_0.119.0_linux_amd64.tar.gz \
+            https://github.com/anchore/grype/releases/download/v0.119.0/grype_0.119.0_linux_arm64.tar.gz \
             --output "${root}/grype.tar.gz"
-          printf '%s  %s\n' 3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b \
+          printf '%s  %s\n' 29f0ec7c549ddb0e2b6a0ca714851f7399438afc399b80c12808e065edc9a8f8 \
             "${root}/grype.tar.gz" | sha256sum --check --strict
           tar -xf "${root}/grype.tar.gz" -C "${root}" grype
           jq -n --arg cache "${root}/db" '{

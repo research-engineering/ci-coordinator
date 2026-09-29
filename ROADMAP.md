@@ -5,6 +5,10 @@ Status: sole task, priority and readiness register
 Consolidated: 2026-09-23 against source `beb1abf8faa36c6629d82b7dbb8cee6b2a2b6015`.
 This is a documentation/conservation checkpoint, not fresh runtime qualification.
 
+Delivery checkpoint: 2026-09-27 after squash merge of PR #53, master `e3a25881`.
+Work resumed on 2026-09-30 at the user's request. The first delivery follows the
+ARM runner priority below; release artifacts and deployment need their own evidence.
+
 ## Authority And Use
 
 This file is the complete current work queue. A task has one stable `CI-` ID,
@@ -68,7 +72,28 @@ context, not additional queues or competing batch definitions.
 
 ### Immediate Execution Order
 
-Start with CI-001 and the minimum own-CI path. Pull forward the confirmed
+First priority, requested on 2026-09-28: CI-001/CI-006 move the repository's
+jobs to `ubuntu-26.04-arm`, subject to preserving their required observations.
+Inventory every direct, reusable and derived workflow job; replace architecture-
+specific executables with integrity-pinned ARM builds and qualify actions,
+Python wheels, containers, browsers, caches and existing proof-tool contracts.
+Keep cache and timing evidence partitioned by OS/architecture. Runner architecture
+does not silently change the published `linux/amd64` artifact contract: explicitly
+admit and test any cross-build or output-platform change before release.
+The existing Apple Silicon developer-lifecycle job in both full and coordinated
+workflows cannot prove macOS behavior after replacement with Linux. Resolve that
+coverage requirement explicitly before claiming an all-jobs migration; do not
+drop the test or silently retain an undocumented exception. Compare the same
+test population and compatible cache conditions on current x64 and proposed ARM
+hosts, including setup, queue and end-to-end time. Large speedups are a hypothesis,
+not an acceptance fact. No larger-runner provisioning or paid usage is authorized
+by this standard-runner request. This priority precedes the next readiness-cost
+batch and requires no deployment server. The
+[runner migration contract](docs/features/arm-ci-runner-migration.md) preserves
+the explicit macOS witness, amd64 runtime output and independent checks; the
+first native comparison decides actual costs before claiming an improvement.
+
+Then continue the minimum own-CI path. Pull forward the confirmed
 workflow grammar CI-017, custom-epoch review CI-018 and plan TTL CI-055 only
 where the exercised path requires them. Read-only observation does not wait
 for every configuration, analytics or optional UI feature.
@@ -130,6 +155,12 @@ the complete audit parents:
 | [#45](https://github.com/research-engineering/ci-coordinator/pull/45) | HTTP clients retain their first unsuccessful close outcome instead of accepting a later no-op as successful cleanup. Independent waiter cancellation, eligible outer retries and the original shutdown bound remain; native qualification does not establish physical release under arbitrary failure. The initial macOS fixture failure and its bounded correction remain retained. |
 | [#46](https://github.com/research-engineering/ci-coordinator/pull/46) | Plan availability reflects the observed terminal response, separately from durable issuance. Owned deadlines and unattributed cancellation remain distinct; excluded policy populations stay excluded under later send failure. Authenticated metrics failure returns unavailable, and shutdown recipes preserve their declared grace. Autonomous readiness, client delivery and live SLO attainment remain separate. |
 | [#47](https://github.com/research-engineering/ci-coordinator/pull/47) | Managed checks conserve installation phases, dependency leases and bounded participant cleanup, including the exact-image consumer path. Native qualification is scoped; later ambient-exception cleanup counterexamples remain open under CI-054. |
+| [#48](https://github.com/research-engineering/ci-coordinator/pull/48) | Latest durable omission-control evidence is read before classifying future application time; unrepresentable webhook numbers reach the existing typed rejection. Timestamp authority, historical replay and accepted finite decimals are unchanged. |
+| [#49](https://github.com/research-engineering/ci-coordinator/pull/49) | Cleanup preserves the actually escaping primary exception, residual-process diagnostics retain their cause, and malformed workflow input reaches the owned CLI refusal. The three conserved scanner-derived findings are scoped-qualified, not the complete scan population. |
+| [#50](https://github.com/research-engineering/ci-coordinator/pull/50) | OpenAPI fixtures reuse immutable source bytes while each caller receives a fresh parsed object. Existing behavior and independent alias controls are qualified; measured fixture savings do not close total CI cost or prove CPU savings. |
+| [#51](https://github.com/research-engineering/ci-coordinator/pull/51) | Python signed-envelope admission binds the expected key ID, canonical signature and exact integer-time/target conjunction. Native crypto and cross-language vectors qualify this boundary, not every verifier or external trust profile. |
+| [#52](https://github.com/research-engineering/ci-coordinator/pull/52) | Package-manager identity, integrity, bounded cold-cache ownership and runtime build inputs are admitted together. Fresh evidence requalifies the dated runtime repair policy; artifact publication and deployment remain separate. |
+| [#53](https://github.com/research-engineering/ci-coordinator/pull/53) | Readiness workers, publication authority and physical finalizers belong to the application lifetime and original deadline. Completed facts remain distinct from unresolved facts; real PostgreSQL exit-cut controls include an independently checked no-join counterexample. Numeric batch size, CPU/RSS and large-ledger recovery cost remain open. |
 
 CI-054 remains open with every original source alias, partial disposition,
 refutation and unknown conserved in the external evidence register. Baseline
@@ -142,20 +173,30 @@ and production omission authority are still distinct.
 All 471 original audit IDs now have initial source-bound dispositions in the
 external register, preserving every scoped refutation, policy and unknown.
 Initial adjudication is not confirmation, repair or native qualification.
-The next admission repair reads the latest durable omission control before
-classifying future application time and rejects unrepresentable webhook numeric
-tokens through the existing typed input boundary. Independent review and exact
-native qualification remain required; no change to timestamp authority, audit
-replay or accepted finite decimal representation is intended.
-Ambient-exception cleanup, readiness cost/freshness, build-input admission and
-signed-verifier parity retain their separate scoped repairs. Requalify dated
-runtime-image repairs before their October 5 expiry rather than extending the
-date without evidence. Workflow CPU isolation and measured capacity remain open.
+PRs #48-#53 qualify the bounded admission, cleanup, fixture, verifier, build-input
+and readiness-lifetime scopes above. They do not close their compound audit
+parents or the global batches. After the first-priority ARM runner migration,
+the next source decision is readiness cost:
+retain the measured discovery results, admit a bounded acceptance claim, and
+compare per-wave responsiveness with complete large-ledger recovery before
+changing the numeric default. Do not repeat an exploratory grid or infer
+capacity from the lifetime repair. Resource/provider cancellation, recovery,
+proof-tooling and test economy, operator residuals and final cross-input
+reconciliation remain within their existing CI-054 and product owners.
+The runtime-image repair policy was requalified with fresh evidence through
+2026-10-11 at 17:27:26 UTC. Renew its evidence before expiry, not just its date.
+Workflow CPU isolation and measured capacity remain open.
 Current scanner inputs and disputed simplifications stay in the same CI-054
 register; metric counts neither establish defects nor waive semantic review.
 No prepared scope is qualified merely by this ordering or an earlier green run.
 
-Prepare the authorized environment through CI-002/CI-062; then CI-003 observes
+CI-002 is closed only for published source `91f0254`, not the newer PR #53 runtime.
+The user's new server is not yet available. CI-062 and the live pilot are
+blocked on a new authorized environment, not permission to reuse former
+corporate deployments or credentials. Before deployment, qualify and publish
+the chosen exact-master artifact again; the existing image lacks PR #53.
+Prepare the authorized environment through CI-002/CI-062 and the minimum CI-067
+database admission; then CI-003 observes
 this repository without omission. CI-004 qualifies independent fallback.
 CI-005 measures comparable execution using CI-027/CI-028; CI-006 optimizes the
 measured bottleneck without weakening the independent baseline. Complete the
@@ -182,12 +223,12 @@ State: open; previous private run and deployment receipts do not qualify this so
 
 | ID | Work And Closure | Depends On |
 | --- | --- | --- |
-| CI-001 | **qualify** the current repository execution environment, trusted base/head, native test inventory, required gates and baseline costs. Reobserve hosted/self-hosted runner availability; preserve every required outcome, coverage/mutation floor and secret boundary. No assumed former-account restriction or unapproved runner provisioning. | None |
+| CI-001 | **open** first-priority migration to `ubuntu-26.04-arm` under the [execution order](#immediate-execution-order), including explicit disposition of OS-specific coverage and release-platform contracts. Qualify the current repository execution environment, trusted base/head, native test inventory, required gates and baseline costs. Reobserve hosted/self-hosted runner availability; preserve every required outcome, coverage/mutation floor and secret boundary. No assumed former-account restriction or unapproved runner provisioning. | None |
 | CI-002 | **closed for `91f0254`**: immutable release from exact master and its explicitly dispatched [Full Check](https://github.com/research-engineering/ci-coordinator/actions/runs/36343281328). [Publication](https://github.com/research-engineering/ci-coordinator/actions/runs/36344999018) binds OCI index digest `sha256:460b68f434f7522c5f6c676285e2d48dde50c105dae94930cc7ceec2969c19b6`, provenance, SBOM, registry ownership, signing/attestation and packaged build identity. Runtime repair admission expires on 2026-10-11 at 17:27:26 UTC; requalify later source or evidence epochs. Source or local image is not a published artifact, and publication grants no deployment or omission authority. Image admission does not require unrelated follow-ups or all of CI-054. [Release contract](docs/architecture/cross-cutting/release-artifact-publication.md). | CI-001; applicable required image-admission predicates from CI-060/CI-061 |
 | CI-003 | **qualify** this repository as the first consenting non-enforcing consumer: inventory, discovery, real runs, webhook/durable reread, duplicates, errors and browser login/renewal/logout. Preserve independently runnable FullCI. Use the bounded environment's actual admission; do not wait for unrelated product features or claim production capacity. | CI-001, CI-002, CI-062; CI-017 for affected discovery |
 | CI-004 | **qualify** target-local timeout fallback and stable gate under coordinator outage, unavailable reusable definition, invalid/stale plan, fork context, push/PR/merge-group and cancellation. Explicit failure is distinct from FullCI actually executed; required checks cannot turn missing work green. [Consumer laboratory](docs/features/consumer-contract-laboratory.md). | CI-001; live cases CI-003 |
 | CI-005 | **qualify** paired full/selected or shadow experiments on exact source, runner/cache/profile/run/attempt cohorts. Record elapsed time, coordination overhead, real CPU or explicit estimate, negative savings and uncertainty. Do not inherit former five-minute or CPU-saving claims. | CI-003, CI-004, CI-027, CI-028; custom activation CI-018/CI-055 |
-| CI-006 | **open** measured own-CI cost reduction: PostgreSQL preparation/query/cleanup, duplicated coverage runs, fixture lifetime, shards, mutation, Compose, Dev Container, browsers and tool startup. Preserve collected tests and independent oracles; five minutes per job is a design objective, not permission to omit work. [Efficiency contract](docs/features/proof-preserving-ci-efficiency.md). | CI-001; compare before/after, with CI-057 for complete coverage claim |
+| CI-006 | **open** measure the first-priority ARM migration against the current x64 baseline without assuming an architecture speedup. Continue measured own-CI cost reduction: PostgreSQL preparation/query/cleanup, duplicated coverage runs, fixture lifetime, shards, mutation, Compose, Dev Container, browsers and tool startup. Preserve collected tests and independent oracles; five minutes per job is a design objective, not permission to omit work. [Efficiency contract](docs/features/proof-preserving-ci-efficiency.md). | CI-001; compare before/after, with CI-057 for complete coverage claim |
 
 CI-001 qualification checkpoint (2026-09-23): hosted jobs execute in the new
 private repository; no self-hosted runners are registered. The recovered PR's
@@ -239,9 +280,9 @@ the ordinary shards remained independent. On `0ed8dec`, an explicitly
 dispatched [exact-master Full Check](https://github.com/research-engineering/ci-coordinator/actions/runs/35957325576)
 passed. These receipts qualify that bounded source cohort, not every future
 source epoch or a causal CPU-saving claim. CI-006 remains open for measured
-proof-preserving cost reduction. CI-002 still requires the immutable package,
-its attestation and its visibility/ownership admission; passing source CI is
-not a published image.
+proof-preserving cost reduction. That historical source-only checkpoint did not
+close CI-002. The current task row records the later immutable publication for
+`91f0254`; neither receipt qualifies a different image or a deployment.
 
 CI-006 lifecycle follow-up keeps the full test population and existing command
 ceilings while repairing cooperative Dev Container cleanup, bounded failure

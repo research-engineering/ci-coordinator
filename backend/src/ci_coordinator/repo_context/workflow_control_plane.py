@@ -159,11 +159,7 @@ def admitted_control_job_projection_hashes(
         plan_job_id=plan_job_id,
         fallback_job_id=fallback_job_id,
     )
-    invocation_hash = control_job_projection_hash(_invocation_job(), workflow={})
-    plan_hash = control_job_projection_hash(plan, workflow={})
-    gate_hash = control_job_projection_hash(gate, workflow={})
-    if invocation_hash is None or plan_hash is None or gate_hash is None:
-        raise RuntimeError("generated control-plane projection is invalid")
+    invocation = _invocation_job()
     draft_policies = (False, True) if "pull_request" in dynamic_events else (False,)
     candidates: list[tuple[str, str, str, str]] = []
     for exclude_draft_pull_requests in draft_policies:
@@ -176,7 +172,15 @@ def admitted_control_job_projection_hashes(
         request_hash = control_job_projection_hash(plan_request, workflow={})
         if request_hash is None:
             raise RuntimeError("generated control-plane projection is invalid")
-        candidates.append((invocation_hash, request_hash, plan_hash, gate_hash))
+        for runner in ("ubuntu-24.04", "ubuntu-26.04-arm"):
+            for job in (invocation, plan, gate):
+                job["runs-on"] = runner
+            invocation_hash = control_job_projection_hash(invocation, workflow={})
+            plan_hash = control_job_projection_hash(plan, workflow={})
+            gate_hash = control_job_projection_hash(gate, workflow={})
+            if invocation_hash is None or plan_hash is None or gate_hash is None:
+                raise RuntimeError("generated control-plane projection is invalid")
+            candidates.append((invocation_hash, request_hash, plan_hash, gate_hash))
     return tuple(candidates)
 
 
