@@ -27,6 +27,9 @@ from scripts.release_repair_admission import (
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_ARCHIVE_BYTES = 64 * 1024 * 1024
+MAX_IMAGE_ARCHIVE_BYTES = 512 * 1024 * 1024
+MAX_IMAGE_JSON_BYTES = 1024 * 1024
+MAX_IMAGE_ARCHIVE_MEMBERS = 64
 BUILD_IDENTITY = "/app/backend/src/ci_coordinator/runtime_settings/resources/build-identity.v1.json"
 CONTAINER_TMPFS = "/tmp:rw,noexec,nosuid,size=32m"  # noqa: S108 -- isolated container tmpfs
 
@@ -64,7 +67,112 @@ def archive_file(archive: bytes, basename: str) -> bytes:
             content = source.read()
         if stream.next() is not None:
             raise ValueError("repair archive requires one file")
-        return content
+    return content
+
+
+def image_config_digest(archive: Path, image: dict[str, object]) -> str:
+    if not 0 < archive.stat().st_size <= MAX_IMAGE_ARCHIVE_BYTES:
+        raise ValueError("image archive exceeds bound")
+    with tarfile.open(archive, mode="r:") as bundle:
+        members: dict[str, tarfile.TarInfo] = {}
+        for member in bundle:
+            if len(members) >= MAX_IMAGE_ARCHIVE_MEMBERS or member.name in members:
+                raise ValueError("image archive member identity")
+            members[member.name] = member
+
+        def read_json(name: str, output_name: str) -> tuple[bytes, object]:
+            member = members.get(name)
+            if (
+                member is None
+                or member.type not in (tarfile.REGTYPE, tarfile.AREGTYPE)
+                or not 0 < member.size <= MAX_IMAGE_JSON_BYTES
+            ):
+                raise ValueError("image archive JSON identity")
+            content = bundle.extractfile(member)
+            if content is None:
+                raise ValueError("image archive JSON unavailable")
+            with content:
+                raw = content.read(MAX_IMAGE_JSON_BYTES + 1)
+            if len(raw) != member.size:
+                raise ValueError("image archive JSON length")
+            output = archive.parent / output_name
+            output.write_bytes(raw)
+            return _load_strict_json(output, label="image-identity", maximum=MAX_IMAGE_JSON_BYTES)
+
+        _, manifest = read_json("manifest.json", "image-save-manifest.json")
+        if (
+            not isinstance(manifest, list)
+            or len(manifest) != 1
+            or not isinstance(manifest[0], dict)
+        ):
+            raise ValueError("image archive requires one image")
+        config_path = manifest[0].get("Config")
+        if (
+            not isinstance(config_path, str)
+            or re.fullmatch(r"(?:[0-9a-f]{64}\.json|blobs/sha256/[0-9a-f]{64})", config_path)
+            is None
+        ):
+            raise ValueError("image archive config reference")
+        raw, config = read_json(config_path, "image-original-config.json")
+        digest = hashlib.sha256(raw).hexdigest()
+        if Path(config_path).name.removesuffix(".json") != digest:
+            raise ValueError("image config content digest")
+        if (
+            not isinstance(config, dict)
+            or config.get("architecture") != "amd64"
+            or config.get("os") != "linux"
+        ):
+            raise ValueError("image config platform")
+        rootfs = config.get("rootfs")
+        observed_rootfs = image.get("RootFS")
+        if (
+            not isinstance(rootfs, dict)
+            or rootfs.get("type") != "layers"
+            or not isinstance(observed_rootfs, dict)
+            or observed_rootfs.get("Type") != "layers"
+            or not isinstance(rootfs.get("diff_ids"), list)
+            or not rootfs["diff_ids"]
+            or rootfs.get("diff_ids") != observed_rootfs.get("Layers")
+        ):
+            raise ValueError("image config filesystem")
+        config_id = "sha256:" + digest
+        selector = image.get("Id")
+        if not isinstance(selector, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", selector) is None:
+            raise ValueError("image selector identity")
+        if selector != config_id:
+            raw_manifest, selected = read_json(
+                "blobs/sha256/" + selector[7:], "image-selected-manifest.json"
+            )
+            if (
+                "sha256:" + hashlib.sha256(raw_manifest).hexdigest() != selector
+                or not isinstance(selected, dict)
+                or type(selected.get("schemaVersion")) is not int
+                or selected.get("schemaVersion") != 2
+                or selected.get("mediaType")
+                not in {
+                    "application/vnd.oci.image.manifest.v1+json",
+                    "application/vnd.docker.distribution.manifest.v2+json",
+                }
+                or not isinstance(selected.get("config"), dict)
+                or selected["config"].get("digest") != config_id
+            ):
+                raise ValueError("image manifest config binding")
+    return config_id
+
+
+def docker_image_config_digest(image: dict[str, object], *, subject: str) -> str:
+    selector = image.get("Id")
+    if not isinstance(selector, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", selector) is None:
+        raise ValueError("image selector identity")
+    if subject != selector and (
+        re.fullmatch(re.escape(IMAGE) + r"@sha256:[0-9a-f]{64}", subject) is None
+        or image.get("RepoDigests") != [subject]
+    ):
+        raise ValueError("image operation subject identity")
+    with tempfile.TemporaryDirectory(prefix="image-identity-") as directory:
+        archive = Path(directory) / "image.tar"
+        command("image", "save", "--platform", "linux/amd64", "--output", str(archive), subject)
+        return image_config_digest(archive, image)
 
 
 def copied_file(container: str, path: str) -> bytes:
@@ -86,7 +194,7 @@ def cleanup(label: str) -> None:
 def collect(*, subject: str, source_commit: str, policy_path: Path) -> RepairEvidence:
     registry = re.fullmatch(re.escape(IMAGE) + r"@sha256:[0-9a-f]{64}", subject) is not None
     if not registry and re.fullmatch(r"sha256:[0-9a-f]{64}", subject) is None:
-        raise ValueError("repair subject must be an exact registry or local config digest")
+        raise ValueError("repair subject must be an exact registry or immutable Docker digest")
     if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
         raise ValueError("repair source commit")
     policy_hash, policy = read_policy(policy_path, ROOT)
@@ -95,7 +203,7 @@ def collect(*, subject: str, source_commit: str, policy_path: Path) -> RepairEvi
     try:
         if registry:
             command("pull", "--platform", "linux/amd64", subject, timeout=180)
-        inspected = json.loads(command("image", "inspect", subject))
+        inspected = json.loads(command("image", "inspect", "--platform", "linux/amd64", subject))
         if not isinstance(inspected, list) or len(inspected) != 1:
             raise ValueError("repair image observation")
         image = inspected[0]
@@ -108,9 +216,12 @@ def collect(*, subject: str, source_commit: str, policy_path: Path) -> RepairEvi
             registry and image["RepoDigests"] != [subject]
         ):
             raise ValueError("repair image subject observation")
-        # Use the observed config identity for all later Docker operations.
+        config_id = docker_image_config_digest(image, subject=subject)
+        # Docker selectors and canonical config digests belong to different namespaces.
         command(
             "create",
+            "--platform",
+            "linux/amd64",
             "--name",
             identifier,
             "--label",
@@ -122,7 +233,7 @@ def collect(*, subject: str, source_commit: str, policy_path: Path) -> RepairEvi
             "10001:10001",
             "--entrypoint",
             "/usr/local/bin/python3.13",
-            image_id,
+            subject,
         )
         installed = {
             path: hashlib.sha256(copied_file(identifier, path)).hexdigest()
@@ -171,6 +282,8 @@ def collect(*, subject: str, source_commit: str, policy_path: Path) -> RepairEvi
                 try:
                     output = command(
                         "run",
+                        "--platform",
+                        "linux/amd64",
                         "--name",
                         name,
                         "--label",
@@ -198,7 +311,7 @@ def collect(*, subject: str, source_commit: str, policy_path: Path) -> RepairEvi
                         f"type=bind,source={directory},target=/native,readonly",
                         "--entrypoint",
                         entrypoint,
-                        image_id,
+                        subject,
                         *arguments,
                         timeout=45,
                     )
@@ -215,7 +328,7 @@ def collect(*, subject: str, source_commit: str, policy_path: Path) -> RepairEvi
                 "schemaVersion": "ci-coordinator.runtime-repair-evidence/v1",
                 "sourceKind": "registry" if registry else "local",
                 "subject": subject,
-                "imageId": image_id,
+                "imageId": config_id,
                 "repoDigests": image.get("RepoDigests") or [],
                 "runtimeLayer": image["RootFS"]["Layers"][0],
                 "sourceCommit": source_commit,

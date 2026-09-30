@@ -57,6 +57,19 @@ Linux builder platforms separately from the protected amd64 output.
 The attestation job selects the amd64 child explicitly without executing it
 or installing privileged emulation in its signing environment.
 
+Docker's immutable selector may identify a manifest, while scanner `imageID`
+identifies original configuration bytes. Observe the canonical config digest
+through the same selected amd64 image's bounded Docker-save archive, without
+extracting it or reserializing its config. Bind the referenced config hash,
+platform and filesystem to inspect; a manifest selector also requires its
+original OCI blob hash and exact config reference. Preserve the physical Docker
+selector separately. Registry operations retain the exact index-addressed
+subject with explicit amd64 selection: a downloaded child blob need not have a
+resolvable Docker image record. Repair evidence keeps its existing config-digest meaning;
+local scan admission also binds the exact caller input and platform. This
+works across the two store representations without accepting arbitrary digest
+aliases or assuming a synthetic local scan manifest equals the registry one.
+
 The image remains subject to the same repair, scanner, TLS, migration, runtime,
 shutdown, layer-reuse and release identity checks. Cross-build and execution
 may be slower. A successful ARM-hosted test cannot establish native amd64

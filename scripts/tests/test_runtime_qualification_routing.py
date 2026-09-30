@@ -141,7 +141,7 @@ def test_exploratory_base_comparison_has_no_obsolete_branch_trigger() -> None:
         (ROOT / ".github/workflows/runtime-base-comparison.yml").read_text()
     )
     assert workflow["on"] == {"workflow_dispatch": {}}
-    assert workflow["permissions"] == {}
+    assert workflow["permissions"] == {"contents": "read"}
 
 
 @pytest.mark.parametrize(

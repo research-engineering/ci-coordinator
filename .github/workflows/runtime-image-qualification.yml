@@ -58,6 +58,7 @@ jobs:
             scripts/tests/test_ci_matrix.py \
             scripts/tests/test_ci_business_migration.py \
             scripts/tests/test_release_repair_admission.py \
+            scripts/tests/test_image_config_identity.py \
             scripts/tests/test_release_vulnerability_admission.py \
             scripts/tests/test_release_artifact_workflow.py \
             scripts/tests/test_release_artifact_shell_execution.py \
@@ -88,7 +89,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${RUNNER_TEMP}/qualification"
-          docker image inspect "${IMAGE}" --format '{{json .}}' \
+          docker image inspect --platform linux/amd64 "${IMAGE}" --format '{{json .}}' \
             | jq '{Id,Size,Architecture,Os,RootFS}' \
             > "${RUNNER_TEMP}/qualification/image.json"
           printf 'built=true\n' >> "${GITHUB_OUTPUT}"
@@ -112,7 +113,8 @@ jobs:
           ], check=True, timeout=180)
           elapsed = time.perf_counter_ns() - start
           warm_id = subprocess.check_output([
-              "docker", "image", "inspect", "ci-coordinator:runtime-warm", "--format", "{{.Id}}"
+              "docker", "image", "inspect", "--platform", "linux/amd64",
+              "ci-coordinator:runtime-warm", "--format", "{{.Id}}"
           ], text=True).strip()
           assert warm_id == json.loads((root / "image.json").read_text())["Id"]
           (root / "build-timing.json").write_text(json.dumps({
@@ -281,8 +283,9 @@ jobs:
           scan db update
           scan db status --output json > "${root}/db-before.json"
           image_id="$(jq -r .Id "${root}/image.json")"
+          config_id="$(jq -r .imageId "${root}/repair-evidence.json")"
           set +e
-          scan "${image_id}" --from docker --scope squashed --output json > "${root}/scan.json"
+          scan "${image_id}" --from docker --platform linux/amd64 --scope squashed --output json > "${root}/scan.json"
           code=$?
           set -e
           printf 'Raw scanner exit status: %s\n' "${code}"
@@ -299,15 +302,17 @@ jobs:
           grep -Fq 'owner-invalid-presenter' "${root}/invalid-presenter.log"
           test "${code}" -eq 0
           test "$(wc -c < "${root}/scan.json")" -le 16777216
-          jq -c --arg id "${image_id}" --slurpfile db "${root}/db-before.json" \
-            '{imageBound:(.source.target.imageID == $id),databaseBound:(.descriptor.db.status == $db[0]),
+          jq -c --arg id "${config_id}" --arg input "${image_id}" --slurpfile db "${root}/db-before.json" \
+            '{imageBound:(.source.target.imageID == $id),inputBound:(.source.target.userInput == $input),databaseBound:(.descriptor.db.status == $db[0]),
               databaseValid:($db[0].valid == true),matchesArray:(.matches|type=="array"),
               distroBound:(.distro.name == "ubuntu" and .distro.version == "26.04"),
               scannerBound:(.descriptor.name == "grype" and .descriptor.version == "0.119.0"),
               thresholdEmpty:(.descriptor.configuration["fail-on-severity"] == ""),
               suppressionsAbsent:(.ignoredMatches|length==0)}' "${root}/scan.json"
-          jq -e --arg id "${image_id}" --slurpfile db "${root}/db-before.json" \
-            '.source.target.imageID == $id and .descriptor.db.status == $db[0]
+          jq -e --arg id "${config_id}" --arg input "${image_id}" --slurpfile db "${root}/db-before.json" \
+            '.source.target.imageID == $id and .source.target.userInput == $input
+             and .source.target.architecture == "amd64" and .source.target.os == "linux"
+             and .descriptor.db.status == $db[0]
              and $db[0].valid == true and (.matches|type=="array")
              and .distro.name == "ubuntu" and .distro.version == "26.04"
              and .descriptor.name == "grype" and .descriptor.version == "0.119.0"
@@ -337,6 +342,7 @@ jobs:
           validate_observations(policy=policy, policy_sha256=digest, evidence=proof, observed=datetime.now(UTC))
           report = json.loads((root / "vulnerabilities.json").read_bytes())
           assert proof.sourceKind == "local" and proof.imageId == report["imageId"]
+          assert proof.subject == json.loads((root / "image.json").read_bytes())["Id"]
           for match in report["matches"]:
               assert match["severity"] in {"Negligible", "Low", "Medium", "High", "Critical"}
               if match["severity"] in {"High", "Critical"}:
