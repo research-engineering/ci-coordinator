@@ -116,6 +116,7 @@ does not by itself make the document obsolete.
 - [Runtime admission cost](features/runtime-admission-cost.md)
 - [Runtime base qualification and security repairs](features/runtime-base-qualification.md)
 - [Build input admission](features/build-input-admission.md)
+- [ARM CI runner migration](features/arm-ci-runner-migration.md)
 - [Assurance audit hardening and finding dispositions](features/assurance-audit-hardening.md)
 - [Assurance audit hardening implementation plan](features/assurance-audit-hardening-plan.md)
 - [Current-source audit validation and repair recipe](features/current-source-audit-validation.md)

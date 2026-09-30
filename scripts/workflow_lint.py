@@ -7,6 +7,7 @@ from pathlib import Path
 from scripts.command_sequence import Command, run_commands
 
 ACTIONLINT_VERSION = "1.7.12"
+ACTIONLINT_CONFIGURATION = ".github/actionlint.yaml"
 WORKFLOW_DIRECTORIES = (
     ".github/workflows",
     "fixtures/native-target-repository/.github/workflows",
@@ -35,6 +36,10 @@ _DOLLAR_ROOT_FALSE_POSITIVE = (
 def commands(repo_root: Path) -> tuple[Command, ...]:
     image = f"ci-coordinator-actionlint:{ACTIONLINT_VERSION}"
     workflows = workflow_paths(repo_root)
+    configuration = repo_root / ACTIONLINT_CONFIGURATION
+    _reject_symlink_components(repo_root, configuration)
+    if not configuration.is_file():
+        raise ValueError("actionlint configuration is not a regular file")
     for source, _dialect in SHELL_SOURCES:
         path = repo_root / source
         _reject_symlink_components(repo_root, path)
@@ -75,6 +80,8 @@ def commands(repo_root: Path) -> tuple[Command, ...]:
                 *container,
                 image,
                 "-color",
+                "-config-file",
+                ACTIONLINT_CONFIGURATION,
                 "-ignore",
                 _DOLLAR_ROOT_FALSE_POSITIVE,
                 "--",

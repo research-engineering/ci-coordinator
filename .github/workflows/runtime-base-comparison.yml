@@ -3,7 +3,8 @@ name: Runtime Base Comparison
 on:
   workflow_dispatch: {}
 
-permissions: {}
+permissions:
+  contents: read
 
 concurrency:
   group: runtime-base-comparison-${{ github.ref }}
@@ -12,9 +13,26 @@ concurrency:
 jobs:
   compare:
     name: Screen maintained glibc updates without release authority
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 15
     steps:
+      - name: Check out exact comparison source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up locked Python tooling
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          prune-cache: true
+          version: "0.12.17"
+      - name: Provision the image identity observer
+        run: uv sync --project backend --frozen
+      - name: Enable the pinned amd64 emulator
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: amd64
+          cache-image: false
       - name: Set up pinned builder
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
@@ -40,8 +58,18 @@ jobs:
           DOCKERFILE
           docker buildx build --platform linux/amd64 --load --provenance=false \
             --tag ci-coordinator:updated-glibc "${root}/context"
-          docker inspect ci-coordinator:updated-glibc --format '{{json .}}' \
-            | jq '{Id,Size,Architecture,Os}' > "${root}/image.json"
+          docker image inspect --platform linux/amd64 ci-coordinator:updated-glibc --format '{{json .}}' \
+            | jq '{Id,Size,Architecture,Os,RootFS}' > "${root}/image.json"
+          PYTHONPATH=backend/src backend/.venv/bin/python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from scripts.release_repair_evidence import docker_image_config_digest
+          path = Path(os.environ["RUNNER_TEMP"]) / "runtime-bases/image.json"
+          image = json.loads(path.read_bytes())
+          image["configDigest"] = docker_image_config_digest(image, subject=image["Id"])
+          path.write_text(json.dumps(image))
+          PY
           image_id="$(jq -r .Id "${root}/image.json")"
           timeout 30 docker run --rm --network none --read-only --user 65532:65532 \
             --cap-drop ALL --security-opt no-new-privileges --memory 128m --cpus 1 \
@@ -58,16 +86,16 @@ jobs:
           set -euo pipefail
           root="${RUNNER_TEMP}/runtime-bases"
           curl --fail --location --proto '=https' --tlsv1.2 --max-time 120 \
-            https://github.com/anchore/grype/releases/download/v0.119.0/grype_0.119.0_linux_amd64.tar.gz \
+            https://github.com/anchore/grype/releases/download/v0.119.0/grype_0.119.0_linux_arm64.tar.gz \
             --output "${root}/grype.tar.gz"
-          printf '%s  %s\n' 3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b \
+          printf '%s  %s\n' 29f0ec7c549ddb0e2b6a0ca714851f7399438afc399b80c12808e065edc9a8f8 \
             "${root}/grype.tar.gz" | sha256sum --check --strict
           tar -xf "${root}/grype.tar.gz" -C "${root}" grype
           jq -n --arg cache "${root}/db" '{
             db: {"cache-dir":$cache,"auto-update":false,"validate-age":true,
                  "validate-by-hash-on-start":true,"require-update-check":true,
                  "max-allowed-built-age":"24h","update-url":"https://grype.anchore.io/databases/v6/latest.json"},
-            "check-for-app-update":false,"only-fixed":false,"only-notfixed":false,
+            "check-for-app-update":false,"fail-on-severity":"","only-fixed":false,"only-notfixed":false,
             "ignore-wontfix":"","match-upstream-kernel-headers":true,
             ignore:[],exclude:[],"vex-documents":[],"vex-add":[],distro:""
           }' > "${root}/config.json"
@@ -78,18 +106,22 @@ jobs:
           scan db update
           scan db status --output json > "${root}/db-before.json"
           image_id="$(jq -r .Id "${root}/image.json")"
+          config_id="$(jq -r .configDigest "${root}/image.json")"
           set +e
-          scan "${image_id}" --from docker --scope squashed --output json --fail-on high \
+          scan "${image_id}" --from docker --platform linux/amd64 --scope squashed --output json \
             > "${root}/scan.json"
           code=$?
           set -e
-          test "${code}" -eq 0 || test "${code}" -eq 2
+          test "${code}" -eq 0
           test "$(wc -c < "${root}/scan.json")" -le 16777216
-          jq -e --arg image "${image_id}" --slurpfile db "${root}/db-before.json" \
-            '.source.target.imageID == $image and .source.target.architecture == "amd64"
+          jq -e --arg image "${config_id}" --arg input "${image_id}" --slurpfile db "${root}/db-before.json" \
+            '.source.target.imageID == $image and .source.target.userInput == $input
+             and .source.target.architecture == "amd64"
              and .source.target.os == "linux" and .descriptor.db.status == $db[0]
              and $db[0].valid == true and .descriptor.name == "grype"
-             and .descriptor.version == "0.119.0" and (.ignoredMatches|length==0)
+             and .descriptor.version == "0.119.0"
+             and .descriptor.configuration["fail-on-severity"] == ""
+             and (.ignoredMatches|length==0)
              and .distro.name == "ubuntu" and .distro.version == "26.04"' \
             "${root}/scan.json" > /dev/null
           scan db status --output json > "${root}/db-after.json"

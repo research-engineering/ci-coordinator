@@ -264,7 +264,17 @@ class Runner:
     def build(self) -> None:
         self.stage = "build-application"
         self.command(
-            ("build", "--file", "Dockerfile", "--tag", f"{self.project}:app", "."), timeout=900
+            (
+                "build",
+                "--platform",
+                "linux/amd64",
+                "--file",
+                "Dockerfile",
+                "--tag",
+                f"{self.project}:app",
+                ".",
+            ),
+            timeout=900,
         )
         self.stage = "build-browser"
         self.command(

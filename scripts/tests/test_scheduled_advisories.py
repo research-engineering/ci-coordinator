@@ -516,8 +516,6 @@ def _scan_command(directory: Path, exit_code: int) -> dict[str, object]:
             "squashed",
             "--output",
             "json",
-            "--fail-on",
-            "high",
         ),
         CommandResult(exit_code, (directory / "scan.json").read_text(), ""),
         cwd=".",
@@ -579,9 +577,9 @@ def test_repaired_scan_and_scheduled_summary_compose_without_a_status_waiver(
         ].pop("layerID")
     if mutation in {"unknown", "unproved", "layer"}:
         with pytest.raises(VulnerabilityAdmissionError):
-            admit_image_fixture(tmp_path, scan=_scan([finding]), scanner_exit_code=2)
+            admit_image_fixture(tmp_path, scan=_scan([finding]))
     else:
-        admit_image_fixture(tmp_path, scan=_scan([finding]), scanner_exit_code=2)
+        admit_image_fixture(tmp_path, scan=_scan([finding]))
     evidence = tmp_path / "released-image-vulnerabilities.json"
     evidence.write_bytes((tmp_path / "evidence.json").read_bytes())
     commands = [
@@ -603,7 +601,7 @@ def test_repaired_scan_and_scheduled_summary_compose_without_a_status_waiver(
             CommandResult(0, "", ""),
             cwd=".",
         ),
-        _scan_command(tmp_path, 2),
+        _scan_command(tmp_path, 0),
     ]
     observed = receipt()
     observed.update(
@@ -619,7 +617,7 @@ def test_repaired_scan_and_scheduled_summary_compose_without_a_status_waiver(
     elif mutation == "status-exit":
         commands[1]["exitCode"] = 2
     elif mutation == "scan-exit":
-        commands[2]["exitCode"] = 0
+        commands[2]["exitCode"] = 1
     elif mutation == "stdout":
         commands[2]["stdoutSha256"] = "0" * 64
     elif mutation == "argv":

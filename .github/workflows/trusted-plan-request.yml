@@ -42,7 +42,7 @@ permissions: {}
 jobs:
   request:
     name: Request signed dynamic CI plan
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 2
     permissions:
       id-token: write # Mint only the coordinator-audience token in this target-free job.

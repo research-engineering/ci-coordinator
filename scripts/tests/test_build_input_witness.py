@@ -83,12 +83,19 @@ def test_native_job_runs_bounded_build_inputs_before_unchanged_smoke() -> None:
     job = workflow["jobs"]["container-runtime-smoke"]
 
     assert set(job) == {"name", "runs-on", "timeout-minutes", "steps"}
-    assert job["runs-on"] == "ubuntu-24.04"
+    assert job["runs-on"] == "ubuntu-26.04-arm"
     assert job["timeout-minutes"] == 25
     steps = job["steps"]
-    assert len(steps) == 4
+    assert len(steps) == 5
     assert steps[1]["name"] == "Set up Python"
-    assert steps[2:] == [
+    assert steps[2]["uses"] == ("docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1")
+    assert steps[2]["with"] == {
+        "image": "tonistiigi/binfmt@sha256:"
+        "400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0",
+        "platforms": "amd64",
+        "cache-image": False,
+    }
+    assert steps[3:] == [
         {
             "name": "Qualify build inputs",
             "timeout-minutes": 10,

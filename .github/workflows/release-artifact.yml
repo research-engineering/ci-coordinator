@@ -12,7 +12,7 @@ concurrency:
 jobs:
   preflight:
     name: Admit source and Full Check
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     permissions:
       actions: read # Query the exact successful Full Check run.
@@ -108,7 +108,7 @@ jobs:
   build:
     name: Build and publish immutable image
     needs: preflight
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
     permissions:
       contents: read # Check out the admitted source without persisted credentials.
@@ -138,6 +138,12 @@ jobs:
         with:
           enable-cache: false
           version: "0.12.17"
+      - name: Enable the pinned amd64 emulator
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        with:
+          image: tonistiigi/binfmt@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: amd64
+          cache-image: false
       - name: Set up pinned Buildx and BuildKit
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
@@ -174,8 +180,8 @@ jobs:
           tags: ${{ env.IMAGE_NAME }}:run-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Download and verify pinned Grype release
         env:
-          GRYPE_RELEASE_SHA256: 3fa2dc4b924621ab65404cf08d0b8438d896d80ab949c9d5a4ca283c36004c9b
-          GRYPE_RELEASE_URL: https://github.com/anchore/grype/releases/download/v0.119.0/grype_0.119.0_linux_amd64.tar.gz
+          GRYPE_RELEASE_SHA256: 29f0ec7c549ddb0e2b6a0ca714851f7399438afc399b80c12808e065edc9a8f8
+          GRYPE_RELEASE_URL: https://github.com/anchore/grype/releases/download/v0.119.0/grype_0.119.0_linux_arm64.tar.gz
           GRYPE_VERSION: 0.119.0
         run: |
           set -euo pipefail
@@ -243,6 +249,7 @@ jobs:
               "max-allowed-built-age": "24h"
             },
             "check-for-app-update": False,
+            "fail-on-severity": "",
             "only-fixed": False,
             "only-notfixed": False,
             "ignore-wontfix": "",
@@ -275,7 +282,6 @@ jobs:
             --platform linux/amd64 \
             --scope squashed \
             --output json \
-            --fail-on high \
             > "${scan_report}" 2> "${RUNNER_TEMP}/grype-scan.log"
           scanner_exit_code=$?
           set -e
@@ -325,7 +331,7 @@ jobs:
           set -euo pipefail
           [[ "${ARTIFACT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]
           artifact="${IMAGE_NAME}@${ARTIFACT_DIGEST}"
-          docker pull "${artifact}" > /dev/null
+          docker pull --platform linux/amd64 "${artifact}" > /dev/null
           docker buildx imagetools inspect "${artifact}" \
             --format '{{json .Provenance.SLSA}}' \
             > "${RUNNER_TEMP}/provenance.slsa.json"
@@ -341,7 +347,7 @@ jobs:
   attest:
     name: Attest and independently verify image
     needs: [preflight, build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 20
     permissions:
       actions: read # Download the exact build-gate evidence artifact.
@@ -401,9 +407,9 @@ jobs:
           test -f "${repairs}"
           [[ "${REPAIR_EVIDENCE_SHA256}" =~ ^[0-9a-f]{64}$ ]]
           test "$(sha256sum "${repairs}" | cut -d ' ' -f 1)" = "${REPAIR_EVIDENCE_SHA256}"
-          docker pull "${artifact}" > /dev/null
+          docker pull --platform linux/amd64 "${artifact}" > /dev/null
 
-          container_id="$(docker create "${artifact}")"
+          container_id="$(docker create --platform linux/amd64 "${artifact}")"
           cleanup() {
             docker rm --force "${container_id}" > /dev/null 2>&1 || true
           }

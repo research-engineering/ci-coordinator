@@ -271,7 +271,7 @@ def test_cleanup_is_confined_to_the_owned_label(monkeypatch: pytest.MonkeyPatch,
 
 
 @pytest.mark.parametrize(
-    "failure", ["none", "pull", "platform", "config", "create", "copy", "buildx", "run"]
+    "failure", ["none", "pull", "platform", "config", "create", "copy", "buildx", "run", "save"]
 )
 def test_collector_binds_image_files_and_cleans_owned_resources(
     monkeypatch: pytest.MonkeyPatch, failure: str
@@ -279,11 +279,22 @@ def test_collector_binds_image_files_and_cleans_owned_resources(
     calls: list[tuple[str, ...]] = []
     cleanups: list[str] = []
     expected = _expected_witnesses()
+    config_digest = "sha256:" + "e" * 64
+
+    def observe_config(image: dict[str, object], *, subject: str) -> str:
+        assert image["Id"] == IMAGE
+        assert subject == SUBJECT and subject != image["Id"]
+        if failure == "save":
+            raise ValueError("injected save failure")
+        return config_digest
 
     def execute(*args: str, **kwargs: object) -> bytes:
         calls.append(args)
         if args[0] == failure:
             raise ValueError("injected failure")
+        if args[0] in {"create", "run"}:
+            assert args[args.index("--entrypoint") + 2] == SUBJECT
+            assert args[args.index("--platform") + 1] == "linux/amd64"
         if args[:2] == ("image", "inspect"):
             return json.dumps(
                 [
@@ -303,7 +314,6 @@ def test_collector_binds_image_files_and_cleans_owned_resources(
                 if key.endswith(("-before", "-after")):
                     (directory / (key + ".json")).write_text(json.dumps(value))
         if args[0] == "run":
-            assert args[args.index("--entrypoint") + 2] == IMAGE
             assert "none" in args and "--read-only" in args and "10001:10001" in args
             component = (
                 "zlib"
@@ -336,6 +346,7 @@ def test_collector_binds_image_files_and_cleans_owned_resources(
         return b"observed image file"
 
     monkeypatch.setattr(collector, "command", execute)
+    monkeypatch.setattr(collector, "docker_image_config_digest", observe_config)
     monkeypatch.setattr(collector, "copied_file", copy)
     monkeypatch.setattr(collector, "cleanup", cleanups.append)
     if failure == "none":
@@ -344,7 +355,7 @@ def test_collector_binds_image_files_and_cleans_owned_resources(
             source_commit=COMMIT,
             policy_path=ROOT / "docker/runtime/security/repaired-matches.v1.json",
         )
-        assert result.imageId == IMAGE and result.repoDigests == [SUBJECT]
+        assert result.imageId == config_digest and result.repoDigests == [SUBJECT]
         assert result.witnesses == expected
         assert set(result.installedFiles) == INSTALLED_PATHS
         assert {args[0] for args in calls} == {"pull", "image", "create", "buildx", "run"}

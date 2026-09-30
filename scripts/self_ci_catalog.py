@@ -103,8 +103,8 @@ def validation_catalog(
 
 
 def _profile(job_id: str, job: JsonObject) -> ExecutionProfile:
-    runner = job.get("runs-on", "ubuntu-24.04")
-    if runner not in {"ubuntu-24.04", "macos-15"}:
+    runner = job.get("runs-on", "ubuntu-26.04-arm")
+    if runner not in {"ubuntu-26.04-arm", "macos-15"}:
         raise ValueError(f"self CI runner profile is not owned: {job_id}")
     permissions = as_object(job.get("permissions", {"contents": "read"}), "job permissions")
     if permissions not in ({}, {"contents": "read"}, {"id-token": "write"}):

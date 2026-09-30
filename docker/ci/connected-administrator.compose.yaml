@@ -19,6 +19,7 @@ x-runtime-bind: &runtime-bind
 
 x-app: &app
   <<: *runtime
+  platform: linux/amd64
   image: ${BUSINESS_APP_IMAGE}
   networks: [isolated]
   labels:

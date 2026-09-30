@@ -691,7 +691,7 @@ def _vulnerability_environment(tmp_path: Path, failure: str = "") -> dict[str, s
         f"    cat {shlex.quote(str(tmp_path / 'fixture-db.json'))}\n"
         f"    exit {9 if failure == 'status' else 0} ;;\n"
         f'  "{environment["IMAGE_NAME"]}@{ARTIFACT_DIGEST} --from registry '
-        '--platform linux/amd64 --scope squashed --output json --fail-on high")\n'
+        '--platform linux/amd64 --scope squashed --output json")\n'
         f"    cat {shlex.quote(str(tmp_path / 'fixture-scan.json'))}\n"
         f"    exit {9 if failure == 'scan' else 0} ;;\n"
         "  *) exit 64 ;;\n"
@@ -752,7 +752,7 @@ def test_vulnerability_shell_has_clean_environment_explicit_config_and_hash_outp
         "db update",
         "db status --output json",
         f"{environment['IMAGE_NAME']}@{ARTIFACT_DIGEST} --from registry "
-        "--platform linux/amd64 --scope squashed --output json --fail-on high",
+        "--platform linux/amd64 --scope squashed --output json",
     ]
     config = json.loads((tmp_path / "release-grype.json").read_text())
     assert config["db"] == {
@@ -765,6 +765,7 @@ def test_vulnerability_shell_has_clean_environment_explicit_config_and_hash_outp
         "max-allowed-built-age": "24h",
     }
     assert config["match-upstream-kernel-headers"] is True
+    assert config["fail-on-severity"] == ""
     assert config["ignore"] == config["exclude"] == config["vex-documents"] == []
     evidence = (tmp_path / "release-vulnerability-evidence.json").read_bytes()
     assert Path(environment["GITHUB_OUTPUT"]).read_text().splitlines() == [

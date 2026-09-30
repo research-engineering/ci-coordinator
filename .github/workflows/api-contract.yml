@@ -31,7 +31,7 @@ concurrency:
 jobs:
   api-contract:
     name: Isolated API contract campaign
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 7
     steps:
       - name: Check out source

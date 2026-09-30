@@ -109,11 +109,11 @@ def _synthetic_secret() -> str:
     return "ghp_" + "1AZvZqMBtxSjTkERGXMFs97RSbMNZA96opY4"
 
 
-def _public_identifier(digest: str) -> str:
+def _public_identifier(owner: str, digest: str) -> str:
     if digest == _TYPE_DIGEST:
         return "Ed25519" + "PrivateKey"
-    owner = secret_scan.ACTION_ROOT.parents[2] / "proofkit/routes/developer-environment.v2.json"
-    rows = json.loads(owner.read_text(encoding="utf-8"))["bindings"]
+    path = secret_scan.ACTION_ROOT.parents[2] / owner
+    rows = json.loads(path.read_text(encoding="utf-8"))["bindings"]
     matches = {
         row[2] for row in rows if hashlib.sha256(row[2].encode("utf-8")).hexdigest() == digest
     }
@@ -145,15 +145,47 @@ def test_clean_tree_scans_only_git_observed_nonignored_files(tmp_path: Path, bin
     }
 
 
-@pytest.mark.parametrize("path", ["source.txt", "tests/fixture.txt"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "source.txt",
+        "tests/fixture.txt",
+        "proofkit/routes/runtime.v2.json",
+        "foreign/proofkit/routes/runtime.v2.json",
+    ],
+)
 def test_current_tree_secret_is_rejected_without_a_test_exclusion(
     tmp_path: Path, binary: Path, path: str
 ) -> None:
     root, _ = _repository(tmp_path / "source")
     candidate = root / path
-    candidate.parent.mkdir(exist_ok=True)
+    candidate.parent.mkdir(parents=True, exist_ok=True)
     candidate.write_text(_synthetic_secret() + "\n", encoding="utf-8")
     assert _scan(root, binary)["findings"] > 0
+
+
+@pytest.mark.parametrize(
+    "owner", ["proofkit/routes/runtime.v2.json", "foreign/proofkit/routes/runtime.v2.json"]
+)
+def test_default_benign_identifier_does_not_suppress_a_secret_in_its_file(
+    tmp_path: Path, binary: Path, owner: str
+) -> None:
+    root, _ = _repository(tmp_path / "source")
+    identifier = _public_identifier(
+        "proofkit/routes/runtime.v2.json",
+        "122dcef74945e7d17bdb62434eb88fa8b55cd3541d790546e182aa06faefa1d8",
+    )
+    target = root / owner
+    target.parent.mkdir(parents=True)
+    target.write_text(json.dumps({"key": identifier}) + "\n", encoding="utf-8")
+    assert _scan(root, binary)["findings"] == 0
+    target.write_text(
+        json.dumps({"key": identifier, "token": _synthetic_secret()}) + "\n", encoding="utf-8"
+    )
+    result = _scan(root, binary)
+    assert any(
+        item["file"] == owner and item["rule"] == "github-pat" for item in result["locations"]
+    )
 
 
 def test_added_then_deleted_intermediate_secret_is_detected(tmp_path: Path, binary: Path) -> None:
@@ -203,7 +235,9 @@ def test_exact_public_exception_rejects_a_changed_value_in_the_same_owner(
     root, _ = _repository(tmp_path / "source")
     target = root / owner
     target.parent.mkdir(parents=True)
-    target.write_text(json.dumps({"key": _public_identifier(digest)}) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps({"key": _public_identifier(owner, digest)}) + "\n", encoding="utf-8"
+    )
     assert _scan(root, binary)["findings"] == 0
     changed = base64.b64encode(hashlib.sha256(b"unrelated synthetic replacement").digest()).decode()
     target.write_text(json.dumps({"key": changed}) + "\n", encoding="utf-8")
@@ -221,7 +255,9 @@ def test_exact_public_exception_rejects_the_same_value_under_a_foreign_owner(
     relative = Path("foreign") / owner
     target = root / relative
     target.parent.mkdir(parents=True)
-    target.write_text(json.dumps({"key": _public_identifier(digest)}) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps({"key": _public_identifier(owner, digest)}) + "\n", encoding="utf-8"
+    )
     result = _scan(root, binary)
     assert any(
         item["file"] == relative.as_posix() and item["rule"] == "generic-api-key"
@@ -237,7 +273,9 @@ def test_history_projection_prefix_never_acquires_exception_ownership(
     relative = Path("tree/files") / owner
     target = root / relative
     target.parent.mkdir(parents=True)
-    target.write_text(json.dumps({"key": _public_identifier(digest)}) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps({"key": _public_identifier(owner, digest)}) + "\n", encoding="utf-8"
+    )
     _commit(root, "add foreign policy fixture")
     target.unlink()
     head = _commit(root, "remove foreign policy fixture")

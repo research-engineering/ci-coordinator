@@ -14,7 +14,7 @@ concurrency:
 jobs:
   discovery:
     name: Mutation discovery (${{ matrix.profile }})
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 12
     strategy:
       fail-fast: false

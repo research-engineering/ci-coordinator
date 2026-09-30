@@ -701,12 +701,47 @@ def test_requester_projection_does_not_embed_the_workflow_path() -> None:
 
 
 def test_control_projection_candidates_are_complete_non_mixable_tuples() -> None:
-    first, second = _control_projection_hashes(_CONTROL_WORKFLOW_PATH)
+    first, arm_first, second, arm_second = _control_projection_hashes(_CONTROL_WORKFLOW_PATH)
 
     assert len(first) == len(second) == 4
     assert first[1] != second[1]
     assert first[0] == second[0]
     assert first[2:] == second[2:]
+    assert arm_first[1] == first[1]
+    assert arm_second[1] == second[1]
+    assert all(arm_first[index] != first[index] for index in (0, 2, 3))
+    assert (arm_first[0], first[1], *first[2:]) not in (first, arm_first, second, arm_second)
+
+
+@pytest.mark.parametrize("runner", ["ubuntu-24.04", "ubuntu-26.04-arm"])
+def test_inventory_admits_complete_control_plane_runner_profiles(runner: str) -> None:
+    source = _CONTROL_WORKFLOW.read_text(encoding="utf-8")
+    capability = parse_workflow_capability(
+        source.replace("runs-on: ubuntu-24.04", f"runs-on: {runner}").encode(),
+        path=_CONTROL_WORKFLOW_PATH,
+        revision_sha=REVISION,
+    )
+    assert capability is not None
+    assert _admits_native_control_plane(capability)
+
+
+@pytest.mark.parametrize("runner", ["ubuntu-26.04-arm", "ubuntu-26.04", "self-hosted"])
+@pytest.mark.parametrize("job_id", ["ci-invocation", "plan", "full-check-gate"])
+def test_inventory_rejects_mixed_or_unadmitted_control_plane_runners(
+    runner: str, job_id: str
+) -> None:
+    source = _CONTROL_WORKFLOW.read_text(encoding="utf-8")
+    before, separator, selected = source.partition(f"  {job_id}:\n")
+    assert separator
+    capability = parse_workflow_capability(
+        (
+            before + separator + selected.replace("runs-on: ubuntu-24.04", f"runs-on: {runner}", 1)
+        ).encode(),
+        path=_CONTROL_WORKFLOW_PATH,
+        revision_sha=REVISION,
+    )
+    assert capability is not None
+    assert not _admits_native_control_plane(capability)
 
 
 def _control_projection_hashes(workflow_path: str) -> tuple[tuple[str, str, str, str], ...]:

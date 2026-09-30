@@ -18,7 +18,7 @@ jobs:
   packages:
     name: Advisory feeds (${{ matrix.scope }})
     if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -81,7 +81,7 @@ jobs:
   released-image:
     name: Latest released image advisory feed
     if: github.ref == 'refs/heads/master'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 30
     permissions:
       actions: read # Discover the latest successful release workflow run.
@@ -118,12 +118,12 @@ jobs:
           curl --silent --show-error --fail --location --proto '=https' --proto-redir '=https' \
             --tlsv1.2 --max-time 120 --max-filesize 67108864 \
             --output "$archive" \
-            https://github.com/cli/cli/releases/download/v2.101.0/gh_2.101.0_linux_amd64.tar.gz
+            https://github.com/cli/cli/releases/download/v2.101.0/gh_2.101.0_linux_arm64.tar.gz
           printf '%s  %s\n' \
-            9bca2d1c16825f109907a23307628a2f0698fbf99662b73a5cf0b020293072b8 \
+            b57e8063f18862647c9d22727c32e9da1b963f8bf9db648fe123a6975695640f \
             "$archive" | sha256sum --check --strict
-          tar --extract --file "$archive" --directory "$RUNNER_TEMP" gh_2.101.0_linux_amd64/bin/gh
-          printf '%s\n' "$RUNNER_TEMP/gh_2.101.0_linux_amd64/bin" >> "$GITHUB_PATH"
+          tar --extract --file "$archive" --directory "$RUNNER_TEMP" gh_2.101.0_linux_arm64/bin/gh
+          printf '%s\n' "$RUNNER_TEMP/gh_2.101.0_linux_arm64/bin" >> "$GITHUB_PATH"
       - name: Discover, verify and scan the immutable released subject
         env:
           CI_COORDINATOR_RELEASE_REPOSITORY_ID: ${{ vars.CI_COORDINATOR_RELEASE_REPOSITORY_ID }}
@@ -146,7 +146,7 @@ jobs:
     name: Advisory coverage and freshness
     if: always()
     needs: [packages, released-image]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04-arm
     timeout-minutes: 10
     permissions:
       contents: read

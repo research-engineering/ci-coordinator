@@ -286,7 +286,17 @@ def test_python_entrypoint_preserves_docker_and_http_argv(tmp_path: Path) -> Non
         "'debugpy','agentic-proofkit','proofkit'))"
     )
     expected_args = (
-        ("build", "--pull", "--file", "Dockerfile", "--tag", image, "."),
+        (
+            "build",
+            "--platform",
+            "linux/amd64",
+            "--pull",
+            "--file",
+            "Dockerfile",
+            "--tag",
+            image,
+            ".",
+        ),
         (
             "run",
             "--detach",

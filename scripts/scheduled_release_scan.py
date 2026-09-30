@@ -58,7 +58,7 @@ def admit_scan_receipt(root: Path, receipt: dict[str, object], directory: Path) 
     if not isinstance(evidence, dict) or any(
         evidence.get(key) != expected
         for key, expected in (
-            ("schemaVersion", "ci-coordinator.release-vulnerability-gate/v2"),
+            ("schemaVersion", "ci-coordinator.release-vulnerability-gate/v3"),
             ("admission", "accepted"),
             ("policySha256", digest((root / POLICY_PATH).read_bytes())),
             ("subject", {"image": image, "platform": subject["platform"]}),
@@ -98,7 +98,7 @@ def _admit_scan_command(
         or re.fullmatch(r"[0-9a-f]{64}", scan_hash) is None
     ):
         raise ValueError("release-evidence-scan-result")
-    expected_exit = 2 if count else 0
+    expected_exit = 0
     if type(scanner.get("exitCode")) is not int or scanner["exitCode"] != expected_exit:
         raise ValueError("release-evidence-scan-exit")
     expected_arguments = [
@@ -111,8 +111,6 @@ def _admit_scan_command(
         "squashed",
         "--output",
         "json",
-        "--fail-on",
-        "high",
     ]
     scans = 0
     for command in commands:
@@ -121,7 +119,7 @@ def _admit_scan_command(
         argv = command.get("argv")
         if not isinstance(argv, list) or not all(isinstance(arg, str) for arg in argv):
             raise ValueError("release-evidence-scan-arguments")
-        is_scan = len(argv) == 14 and argv[1] == "-c" and argv[3:] == expected_arguments
+        is_scan = len(argv) == 12 and argv[1] == "-c" and argv[3:] == expected_arguments
         if is_scan:
             binary = PurePosixPath(argv[0])
             if (
@@ -298,6 +296,7 @@ def scan_release(root: Path, receipt: dict[str, object], output_directory: Path)
                     "max-allowed-built-age": "24h",
                 },
                 "check-for-app-update": False,
+                "fail-on-severity": "",
                 "only-fixed": False,
                 "only-notfixed": False,
                 "ignore-wontfix": "",
@@ -340,8 +339,6 @@ def scan_release(root: Path, receipt: dict[str, object], output_directory: Path)
                 policy.scope,
                 "--output",
                 "json",
-                "--fail-on",
-                "high",
             ),
             scan_path,
         )

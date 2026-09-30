@@ -41,7 +41,7 @@ def render_workflow(native: NativeSource, control_template: bytes, node_version:
     reason_job = {
         "name": "Native requester rejection contract",
         "needs": [REQUESTER_ID],
-        "runs-on": "ubuntu-24.04",
+        "runs-on": "ubuntu-26.04-arm",
         "timeout-minutes": 2,
         "permissions": {},
         "steps": [
@@ -67,6 +67,8 @@ def render_workflow(native: NativeSource, control_template: bytes, node_version:
     gate = copy.deepcopy(as_object(template_jobs["full-check-gate"], "gate template"))
     gate["name"] = COORDINATED_GATE_NAME
     gate["needs"] = sorted((PLAN_ID, *execution_ids))
+    for job in (invocation, plan, gate):
+        job["runs-on"] = "ubuntu-26.04-arm"
     for job in (plan, gate):
         for raw_step in as_array(job["steps"], "control steps"):
             step = as_object(raw_step, "control step")
