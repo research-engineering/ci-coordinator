@@ -5,9 +5,9 @@ Status: sole task, priority and readiness register
 Consolidated: 2026-09-23 against source `beb1abf8faa36c6629d82b7dbb8cee6b2a2b6015`.
 This is a documentation/conservation checkpoint, not fresh runtime qualification.
 
-Delivery checkpoint: 2026-09-27 after squash merge of PR #53, master `e3a25881`.
-Work resumed on 2026-09-30 at the user's request. The first delivery follows the
-ARM runner priority below; release artifacts and deployment need their own evidence.
+Delivery checkpoint: 2026-09-30 after squash merge of PR #54, master `0fb7e50`.
+Work resumed on 2026-09-30 at the user's request. ARM runner qualification is
+complete at CI-001; release artifacts and deployment need their own evidence.
 
 ## Authority And Use
 
@@ -71,6 +71,12 @@ context, not additional queues or competing batch definitions.
 | B8 | Optional extensions; embedded chat last | 18 |
 
 ### Immediate Execution Order
+
+CI-001's migration checkpoint is complete. The next source/native step is the
+bounded readiness-cost decision under CI-006/CI-054, then CI-002 qualification
+and publication from exact master. The own-CI live path needs the new authorized
+server through CI-062 and minimum CI-067 admission. The preserved migration
+recipe below remains acceptance context, not another task queue.
 
 First priority, requested on 2026-09-28: CI-001/CI-006 move the repository's
 jobs to `ubuntu-26.04-arm`, subject to preserving their required observations.
@@ -223,12 +229,24 @@ State: open; previous private run and deployment receipts do not qualify this so
 
 | ID | Work And Closure | Depends On |
 | --- | --- | --- |
-| CI-001 | **open** first-priority migration to `ubuntu-26.04-arm` under the [execution order](#immediate-execution-order), including explicit disposition of OS-specific coverage and release-platform contracts. Qualify the current repository execution environment, trusted base/head, native test inventory, required gates and baseline costs. Reobserve hosted/self-hosted runner availability; preserve every required outcome, coverage/mutation floor and secret boundary. No assumed former-account restriction or unapproved runner provisioning. | None |
+| CI-001 | **closed for `0fb7e50`**: owned Linux checks qualified on `ubuntu-26.04-arm`, retaining the explicit macOS witness, amd64 image contract, native test population, required gates, coverage/mutation floors and secret boundaries. PR #54 was squash-merged after exact-source Full Check and runtime qualification; the checkpoint below binds the tested merge tree and baseline. New source epochs still require their own checks. No larger-runner provisioning or paid usage was authorized. | None |
 | CI-002 | **closed for `91f0254`**: immutable release from exact master and its explicitly dispatched [Full Check](https://github.com/research-engineering/ci-coordinator/actions/runs/36343281328). [Publication](https://github.com/research-engineering/ci-coordinator/actions/runs/36344999018) binds OCI index digest `sha256:460b68f434f7522c5f6c676285e2d48dde50c105dae94930cc7ceec2969c19b6`, provenance, SBOM, registry ownership, signing/attestation and packaged build identity. Runtime repair admission expires on 2026-10-11 at 17:27:26 UTC; requalify later source or evidence epochs. Source or local image is not a published artifact, and publication grants no deployment or omission authority. Image admission does not require unrelated follow-ups or all of CI-054. [Release contract](docs/architecture/cross-cutting/release-artifact-publication.md). | CI-001; applicable required image-admission predicates from CI-060/CI-061 |
 | CI-003 | **qualify** this repository as the first consenting non-enforcing consumer: inventory, discovery, real runs, webhook/durable reread, duplicates, errors and browser login/renewal/logout. Preserve independently runnable FullCI. Use the bounded environment's actual admission; do not wait for unrelated product features or claim production capacity. | CI-001, CI-002, CI-062; CI-017 for affected discovery |
 | CI-004 | **qualify** target-local timeout fallback and stable gate under coordinator outage, unavailable reusable definition, invalid/stale plan, fork context, push/PR/merge-group and cancellation. Explicit failure is distinct from FullCI actually executed; required checks cannot turn missing work green. [Consumer laboratory](docs/features/consumer-contract-laboratory.md). | CI-001; live cases CI-003 |
 | CI-005 | **qualify** paired full/selected or shadow experiments on exact source, runner/cache/profile/run/attempt cohorts. Record elapsed time, coordination overhead, real CPU or explicit estimate, negative savings and uncertainty. Do not inherit former five-minute or CPU-saving claims. | CI-003, CI-004, CI-027, CI-028; custom activation CI-018/CI-055 |
 | CI-006 | **open** measure the first-priority ARM migration against the current x64 baseline without assuming an architecture speedup. Continue measured own-CI cost reduction: PostgreSQL preparation/query/cleanup, duplicated coverage runs, fixture lifetime, shards, mutation, Compose, Dev Container, browsers and tool startup. Preserve collected tests and independent oracles; five minutes per job is a design objective, not permission to omit work. [Efficiency contract](docs/features/proof-preserving-ci-efficiency.md). | CI-001; compare before/after, with CI-057 for complete coverage claim |
+
+CI-001 ARM checkpoint (2026-09-30): [Full Check 36709674185](https://github.com/research-engineering/ci-coordinator/actions/runs/36709674185)
+and [runtime qualification 36709673437](https://github.com/research-engineering/ci-coordinator/actions/runs/36709673437)
+passed for head `8272390` and owner-admitted merge subject `3dd5f12`, whose tree
+equals squash master `0fb7e50`. The current x64 baseline at `e3a25881` contained
+16,138 native node IDs; all remain in the 16,222-node ARM candidate, with the
+same 11 shards, Python 3.13.15 and lock digest. The two explicitly optional
+API/serial lanes remain distinct from the required successful population.
+Image/scanner config identity, strict severity/repair admission and bounded
+process controls passed without security exclusions. Observed job costs do
+not establish a universal or causal ARM speedup; CI-006 remains open.
+This checkpoint publishes no image and grants no deployment or omission authority.
 
 CI-001 qualification checkpoint (2026-09-23): hosted jobs execute in the new
 private repository; no self-hosted runners are registered. The recovered PR's

@@ -48,7 +48,7 @@ from ci_coordinator.integrations.github.provider_inventory import GitHubProvider
 from ci_coordinator.integrations.github.repository_membership import GitHubRepositoryAccess
 from ci_coordinator.integrations.keycloak import KeycloakIntegration
 from ci_coordinator.kernel import SystemClock
-from ci_coordinator.persistence import DatabaseReadinessProbe
+from ci_coordinator.persistence import DatabaseReadiness, DatabaseReadinessProbe
 from ci_coordinator.persistence.connection import create_postgres_engine
 from ci_coordinator.persistence.schema import (
     production_admission_authorities,
@@ -110,6 +110,7 @@ def test_composed_workbench_and_readyz_share_managed_connection_lifetime(
     )
     readiness = cast(RuntimeReadiness, resources._readiness)
     database = cast(DatabaseReadinessProbe, readiness._database_probe)
+    assert database.audit_batch_size == 1
     original_close, original_dispose = AsyncConnection.close, AsyncEngine.dispose
     original_check = DatabaseReadinessProbe.check
 
@@ -522,6 +523,15 @@ def test_enforcing_runtime_registers_authority_without_staging_or_activating_it(
         control_plane_identity=control_plane_identity,
     )
 
+    original_check = DatabaseReadinessProbe.check
+    observed_budgets: list[int] = []
+
+    async def check(probe: DatabaseReadinessProbe) -> DatabaseReadiness:
+        observed_budgets.append(probe.audit_batch_size)
+        assert probe.audit_batch_size == 4096
+        return await original_check(probe)
+
+    monkeypatch.setattr(DatabaseReadinessProbe, "check", check)
     runtime = compose_runtime_application(settings)
 
     assert isinstance(runtime, RuntimeApplication)
@@ -540,6 +550,7 @@ def test_enforcing_runtime_registers_authority_without_staging_or_activating_it(
             assert response.status_code == 401
 
     assert (readiness.status_code, readiness.json()["status"]) == (200, "ready")
+    assert observed_budgets and set(observed_budgets) == {4096}
     registration = admission.grant.registration
     assert stored[:2] == (
         (

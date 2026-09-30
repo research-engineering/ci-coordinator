@@ -178,6 +178,7 @@ from ci_coordinator.persistence.proposal_review_adapter import TransactionalProp
 from ci_coordinator.persistence.proposal_review_unit_of_work import (
     PostgresProposalReviewUnitOfWork,
 )
+from ci_coordinator.persistence.readiness import READINESS_AUDIT_BATCH_SIZE
 from ci_coordinator.persistence.workbench_repository import PostgresWorkbenchRepository
 from ci_coordinator.plan_issuance import SignedPlanIssuer, SignedPlanSigner
 from ci_coordinator.production_admission import (
@@ -226,7 +227,6 @@ from ci_coordinator.runtime.resources import RuntimeResources
 from ci_coordinator.runtime.shutdown_budget import partition_shutdown_budget
 from ci_coordinator.runtime.webhook_admission import ProcessWebhookAdmission
 from ci_coordinator.runtime_settings import (
-    ConnectedRuntimeSettings,
     EnforcingRuntimeSettings,
     NonEnforcingRuntimeSettings,
     load_bundled_build_identity,
@@ -306,7 +306,7 @@ def compose_enforcing_dependencies(
 
 
 def _compose_connected_dependencies(
-    settings: ConnectedRuntimeSettings,
+    settings: NonEnforcingRuntimeSettings | EnforcingRuntimeSettings,
     enforcement_authority: ProductionAdmissionGrant | None,
     clock: SystemClock,
     *,
@@ -605,6 +605,9 @@ def _compose_connected_dependencies(
             engine,
             bundled_alembic_config_path(),
             timeout_ms=settings.request_timeout_seconds * 1_000,
+            audit_batch_size=(
+                1 if settings.mode == "non_enforcing" else READINESS_AUDIT_BATCH_SIZE
+            ),
             managed=True,
         )
         workbench_repository = PostgresWorkbenchRepository(engine)

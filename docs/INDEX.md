@@ -237,6 +237,7 @@ does not by itself make the document obsolete.
 - [Developer watch phase admission plan](features/developer-watch-phase-admission-plan.md)
 - [Developer witness failure boundaries](features/developer-witness-diagnostics.md)
 - [Developer witness diagnostics plan](features/developer-witness-diagnostics-plan.md)
+- [Readiness wave budget](features/readiness-wave-budget.md)
 - [Analytics purpose configuration](features/analytics-purpose-configuration.md)
 - [Analytics purpose configuration plan](features/analytics-purpose-configuration-plan.md)
 - [Archive operator workspace](features/archive-operator-workspace.md)

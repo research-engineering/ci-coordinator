@@ -19,6 +19,92 @@ from ci_coordinator.persistence import (
 )
 
 
+@pytest.mark.parametrize("audit_batch_size", [1, 4, 4096])
+def test_database_readiness_audit_budget_is_constructor_owned_and_read_only(
+    tmp_path: Path, audit_batch_size: int
+) -> None:
+    probe = DatabaseReadinessProbe(
+        cast(AsyncEngine, object()), tmp_path / "alembic.ini", audit_batch_size=audit_batch_size
+    )
+    assert probe.audit_batch_size == audit_batch_size
+    field = "audit_batch_size"
+    with pytest.raises(AttributeError):
+        setattr(probe, field, 2)
+    assert probe.audit_batch_size == audit_batch_size
+
+
+@pytest.mark.parametrize("audit_batch_size", [0, -1, 4097, True, False, 1.0, "1", None])
+def test_database_readiness_rejects_invalid_audit_budget(
+    tmp_path: Path, audit_batch_size: object
+) -> None:
+    with pytest.raises(ValueError, match="readiness audit batch size"):
+        DatabaseReadinessProbe(
+            cast(AsyncEngine, object()),
+            tmp_path / "alembic.ini",
+            audit_batch_size=cast(int, audit_batch_size),
+        )
+
+
+def test_database_readiness_default_and_helper_keep_original_audit_budget(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    async def scenario() -> None:
+        observed: list[int] = []
+
+        async def check(
+            *_: object, audit_batch_size: int, **__: object
+        ) -> tuple[DatabaseReadiness, None]:
+            observed.append(audit_batch_size)
+            return DatabaseReadiness(True, "ready"), None
+
+        monkeypatch.setattr(readiness_module, "_check_database_readiness", check)
+        engine = cast(AsyncEngine, object())
+        config = tmp_path / "alembic.ini"
+        probe = DatabaseReadinessProbe(engine, config)
+        try:
+            assert probe.audit_batch_size == 4096
+            assert await probe.check() == DatabaseReadiness(True, "ready", 0)
+            assert await check_database_readiness(engine, config) == DatabaseReadiness(
+                True, "ready", 0
+            )
+            assert observed == [4096, 4096]
+        finally:
+            await probe.drain()
+
+    asyncio.run(scenario())
+
+
+def test_independent_database_readiness_probes_keep_distinct_audit_budgets(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    async def scenario() -> None:
+        observed: list[int] = []
+
+        async def check(
+            *_: object, audit_batch_size: int, **__: object
+        ) -> tuple[DatabaseReadiness, None]:
+            observed.append(audit_batch_size)
+            return DatabaseReadiness(True, "ready"), None
+
+        monkeypatch.setattr(readiness_module, "_check_database_readiness", check)
+        probes = tuple(
+            DatabaseReadinessProbe(
+                cast(AsyncEngine, object()), tmp_path / "alembic.ini", audit_batch_size=budget
+            )
+            for budget in (1, 4)
+        )
+        try:
+            for _ in range(2):
+                for probe in probes:
+                    assert await probe.check() == DatabaseReadiness(True, "ready", 0)
+            assert observed == [1, 4, 1, 4]
+        finally:
+            for probe in probes:
+                await probe.drain()
+
+    asyncio.run(scenario())
+
+
 def test_multiple_migration_heads_fail_before_database_access(tmp_path: Path) -> None:
     script_root = tmp_path / "alembic"
     versions = script_root / "versions"

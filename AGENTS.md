@@ -6,11 +6,11 @@ For setup and command ownership, start with
 before running any check: a listed command is not permission to execute local
 behavioral, database, browser, container, coverage or mutation witnesses.
 
-Independent batch reviews use `gpt-6-astra` with `max` reasoning unless the user
-explicitly overrides this selection. Normally use one reviewer; add a further
-pass only for a material unresolved finding or an uncovered independent scope.
-Do not silently substitute an unavailable model. This current selection takes
-precedence over model names in earlier implementation plans; their proof
+Independent batch reviews use `gpt-6-astra` with `xhigh` reasoning unless the
+user explicitly overrides this selection. Normally use one reviewer; add a
+further pass only for a material unresolved finding or an uncovered independent
+scope. Do not silently substitute an unavailable model. This current selection
+takes precedence over model names in earlier implementation plans; their proof
 obligations remain unchanged. New plans reference this policy instead of
 duplicating model selection.
 

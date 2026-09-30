@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -36,6 +37,7 @@ from ci_coordinator.persistence.schema import audit_events, audit_ledger_head
 from ci_coordinator.persistence.schema_capabilities import audit_ledger_requirements
 
 MAXIMUM_DATABASE_READINESS_WAITERS = 16
+READINESS_AUDIT_BATCH_SIZE = 4_096
 
 
 @dataclass(frozen=True)
@@ -60,13 +62,20 @@ class DatabaseReadinessProbe:
         alembic_config_path: Path,
         *,
         timeout_ms: int = 5_000,
+        audit_batch_size: int = READINESS_AUDIT_BATCH_SIZE,
         managed: bool = False,
     ) -> None:
         if type(timeout_ms) is not int or timeout_ms < 1:
             raise ValueError("readiness timeout must be positive milliseconds")
+        if (
+            type(audit_batch_size) is not int
+            or not 1 <= audit_batch_size <= READINESS_AUDIT_BATCH_SIZE
+        ):
+            raise ValueError("readiness audit batch size must be an integer in 1..4096")
         self._engine = engine
         self._alembic_config_path = alembic_config_path
         self._timeout_ms = timeout_ms
+        self._audit_batch_size: Final[int] = audit_batch_size
         self._inflight: asyncio.Task[tuple[DatabaseReadiness, AuditEventRecord | None]] | None = (
             None
         )
@@ -77,6 +86,10 @@ class DatabaseReadinessProbe:
         self._stopped = False
         self._connection_finalizer: asyncio.Task[None] | None = None
         self._close_failed = False
+
+    @property
+    def audit_batch_size(self) -> int:
+        return self._audit_batch_size
 
     def activate(self) -> None:
         if self._stopped:
@@ -179,6 +192,7 @@ class DatabaseReadinessProbe:
                     self._alembic_config_path,
                     prefix_verified=prefix_verified,
                     previous_record=previous_record,
+                    audit_batch_size=self._audit_batch_size,
                 )
         except TimeoutError:
             return DatabaseReadiness(False, "readiness_timeout"), None
@@ -237,6 +251,7 @@ async def _check_database_readiness(
     *,
     prefix_verified: bool,
     previous_record: AuditEventRecord | None,
+    audit_batch_size: int,
 ) -> tuple[DatabaseReadiness, AuditEventRecord | None]:
     try:
         code_heads = migration_heads(alembic_config_path)
@@ -280,7 +295,7 @@ async def _check_database_readiness(
                     connection,
                     checkpoint_sequence,
                     through_sequence=head.revision,
-                    limit=READINESS_AUDIT_BATCH_SIZE,
+                    limit=audit_batch_size,
                 )
                 verification = verify_audit_chain_extension(previous_record, records)
                 if not verification.valid:
@@ -362,6 +377,3 @@ def _head_matches_record(
     if record is None:
         return head == _LedgerHead(0, None)
     return head.revision == record.sequence and head.event_hash == record.event_hash
-
-
-READINESS_AUDIT_BATCH_SIZE = 4_096
