@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
+from io import StringIO
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from ruamel.yaml import YAML
 from scripts.ci_matrix_risks import (
     CLASS_IDS,
     PROPERTY_IDS,
@@ -15,6 +17,40 @@ from scripts.ci_matrix_risks import (
 from scripts.proofkit_common import read_json_object
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize(
+    "mutation", ["missing", "suppressed", "late", "non-GNU", "other-command", "budget"]
+)
+def test_native_watchdog_requires_prior_unsuppressed_GNU_admission(mutation: str) -> None:
+    from scripts import ci_matrix_risk_execution as execution
+
+    source = (ROOT / ".github/workflows/python-persistence.yml").read_bytes()
+    execution.native_execution_owner(ROOT, source)
+    yaml = YAML(typ="safe")
+    workflow = yaml.load(source)
+    steps = workflow["jobs"]["native-test-shards"]["steps"]
+    admission = next(
+        step for step in steps if step.get("run", "").strip() == execution.GNU_WATCHDOG_ADMISSION
+    )
+    command = next(step for step in steps if step.get("id") == "native_shard")
+    if mutation == "missing":
+        steps.remove(admission)
+    elif mutation == "suppressed":
+        admission["continue-on-error"] = True
+    elif mutation == "late":
+        steps.remove(admission)
+        steps.append(admission)
+    elif mutation == "non-GNU":
+        admission["run"] = admission["run"].replace("GNU coreutils", "uutils coreutils")
+    elif mutation == "other-command":
+        command["run"] = command["run"].replace("/usr/bin/gnutimeout", "timeout")
+    else:
+        command["run"] = command["run"].replace("960s", "961s")
+    output = StringIO()
+    yaml.dump(workflow, output)
+    with pytest.raises(ValueError, match=r"risk execution command|GNU watchdog admission"):
+        execution.native_execution_owner(ROOT, output.getvalue().encode())
 
 
 def _profile() -> dict[str, object]:

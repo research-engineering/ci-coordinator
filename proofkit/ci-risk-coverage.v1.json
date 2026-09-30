@@ -3016,7 +3016,7 @@
     "Existing Proofkit requirements, route bindings and command catalogs retain authority."
   ],
   "executionInputs": {
-    ".github/workflows/python-persistence.yml": "f8518b6d436b3eeb5e65aad5c2a361cd04a5e4682988732ded4bc160b9dee0ab",
+    ".github/workflows/python-persistence.yml": "6815dd2a2ceed427934b6a21498108af7c8308f99b8863b26cf386e7857d394f",
     "docker/ci/connected-administrator.compose.yaml": "049357a27e593380e96a566faced5e20178a0919abfdeefc9c66f6d091db80cf",
     "docker/ci/connected-browser.Dockerfile": "4d2de314d9d175cac3269d1dad8c9bad9900c0432a18ef0fd8dd3c670b5b9e85",
     "frontend/connected.playwright.config.ts": "c8a3e6a7f8671d2bef34a7d9fa9b3dd9a465f242819b493d9c212e0558566603",

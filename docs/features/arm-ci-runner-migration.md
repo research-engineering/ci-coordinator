@@ -29,9 +29,9 @@ preserves the accepted macOS support contract and is not a skipped Linux job.
   configuration, without a wildcard or a runner-rule suppression. The upstream
   configuration key is named `self-hosted-runner`; it does not provision or
   reclassify this GitHub-hosted runner. Unknown labels remain errors.
-- Secret-scanner exceptions require an exact public value, rule and owner path,
-  with changed-value and foreign-owner negative controls. A compact Proofkit
-  identifier is not an API credential; the containing file remains scanned.
+- Keep the admitted secret policy unchanged. Public identifiers recognized by
+  upstream policy require no local exception; real-secret controls retain both
+  the runtime route and foreign paths in the scanner's complete input scope.
 - Admit only complete control-plane tuples for the original Ubuntu x64 and new
   Ubuntu ARM profiles. Mixing runner coordinates between invocation, plan and
   gate remains inadmissible. Existing consumer workflows retain their profile.
@@ -39,6 +39,9 @@ preserves the accepted macOS support contract and is not a skipped Linux job.
   existing `GOARCH=amd64` analyzed target remains explicit and unchanged.
 - Regenerate coordinated workflows and proof projections from their owners.
   Changing a runner changes its execution profile, not just its visual label.
+- The independent native watchdog requires the observed GNU provider, not an
+  ambient `timeout` name. Admit its version before starting the native shard;
+  preserve interruption, escalation and the existing absolute budgets.
 - Keep the published runtime output `linux/amd64`. ARM host migration does not
   authorize a release platform, repair policy or verifier compatibility change.
 

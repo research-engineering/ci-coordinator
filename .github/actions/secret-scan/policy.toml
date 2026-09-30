@@ -66,11 +66,3 @@ condition = "AND"
 regexTarget = "secret"
 paths = ['''^proofkit/routes/developer\-environment\.v2\.json$''']
 regexes = ['''^dev004\-secret\-falsifiers$''']
-
-[[allowlists]]
-description = "Public compact Proofkit witnessIdSuffix identifier in its owner route; not authentication material."
-targetRules = ["generic-api-key"]
-condition = "AND"
-regexTarget = "secret"
-paths = ['''^proofkit/routes/runtime\.v2\.json$''']
-regexes = ['''^economics042\-backend\-tests\-unit\-api\-http\-test\-plan\-authentication$''']

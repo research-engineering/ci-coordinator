@@ -38,10 +38,6 @@ _POLICY_CASES = [
         "proofkit/routes/developer-environment.v2.json",
         "e1969089fedd36310d7f581001ba0008e5e790defb1c99179361a1bc63aba7dc",
     ),
-    (
-        "proofkit/routes/runtime.v2.json",
-        "122dcef74945e7d17bdb62434eb88fa8b55cd3541d790546e182aa06faefa1d8",
-    ),
 ]
 
 
@@ -149,15 +145,47 @@ def test_clean_tree_scans_only_git_observed_nonignored_files(tmp_path: Path, bin
     }
 
 
-@pytest.mark.parametrize("path", ["source.txt", "tests/fixture.txt"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "source.txt",
+        "tests/fixture.txt",
+        "proofkit/routes/runtime.v2.json",
+        "foreign/proofkit/routes/runtime.v2.json",
+    ],
+)
 def test_current_tree_secret_is_rejected_without_a_test_exclusion(
     tmp_path: Path, binary: Path, path: str
 ) -> None:
     root, _ = _repository(tmp_path / "source")
     candidate = root / path
-    candidate.parent.mkdir(exist_ok=True)
+    candidate.parent.mkdir(parents=True, exist_ok=True)
     candidate.write_text(_synthetic_secret() + "\n", encoding="utf-8")
     assert _scan(root, binary)["findings"] > 0
+
+
+@pytest.mark.parametrize(
+    "owner", ["proofkit/routes/runtime.v2.json", "foreign/proofkit/routes/runtime.v2.json"]
+)
+def test_default_benign_identifier_does_not_suppress_a_secret_in_its_file(
+    tmp_path: Path, binary: Path, owner: str
+) -> None:
+    root, _ = _repository(tmp_path / "source")
+    identifier = _public_identifier(
+        "proofkit/routes/runtime.v2.json",
+        "122dcef74945e7d17bdb62434eb88fa8b55cd3541d790546e182aa06faefa1d8",
+    )
+    target = root / owner
+    target.parent.mkdir(parents=True)
+    target.write_text(json.dumps({"key": identifier}) + "\n", encoding="utf-8")
+    assert _scan(root, binary)["findings"] == 0
+    target.write_text(
+        json.dumps({"key": identifier, "token": _synthetic_secret()}) + "\n", encoding="utf-8"
+    )
+    result = _scan(root, binary)
+    assert any(
+        item["file"] == owner and item["rule"] == "github-pat" for item in result["locations"]
+    )
 
 
 def test_added_then_deleted_intermediate_secret_is_detected(tmp_path: Path, binary: Path) -> None:

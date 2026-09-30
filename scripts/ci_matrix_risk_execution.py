@@ -37,13 +37,26 @@ EXECUTION_INPUTS = frozenset(
     }
 )
 _PYTHON_COMMANDS = frozenset({"python.test", "python.persistence-test", "runtime026.test"})
+GNU_WATCHDOG_ADMISSION = (
+    "python3 -I -B - <<'PY'\n"
+    "import subprocess\n"
+    'result = subprocess.run(["/usr/bin/gnutimeout", "--version"], '
+    "capture_output=True, timeout=5, check=True)\n"
+    "lines = result.stdout.splitlines()\n"
+    "if result.stderr or len(result.stdout) > 4096 or not lines or not "
+    'lines[0].startswith(b"timeout (GNU coreutils) "):\n'
+    '    raise SystemExit("native watchdog requires verified GNU coreutils")\n'
+    'print(lines[0].decode("ascii"))\n'
+    "PY"
+)
 _NATIVE_STEPS = {
     "native-test-plan": (
         "backend/.venv/bin/python -m scripts.ci_test_execution plan --plan .ci-native/plan.json "
         "--diagnostics .ci-native/diagnostics/plan",
     ),
     "native-test-shards": (
-        "timeout --signal=INT --kill-after=5s 960s "
+        GNU_WATCHDOG_ADMISSION,
+        "/usr/bin/gnutimeout --signal=INT --kill-after=5s 960s "
         "backend/.venv/bin/python -m scripts.ci_test_execution run "
         '--plan .ci-native/plan.json --shard "$NATIVE_SHARD" '
         '--output ".ci-native/shard-$NATIVE_SHARD" '
@@ -102,6 +115,10 @@ def native_execution_owner(
                 or matches[0].get("continue-on-error", False)
             ):
                 raise ValueError(f"risk execution command is absent or suppressed: {job_id}")
+        if job_id == "native-test-shards":
+            observed = [str(step.get("run", "")).strip() for step in steps]
+            if observed.index(expected[0]) >= observed.index(expected[1]):
+                raise ValueError("GNU watchdog admission must precede native execution")
     return native.workflow, {name: command.argv for name, command in quality.commands.items()}
 
 

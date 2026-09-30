@@ -449,12 +449,14 @@ jobs:
       with:
         name: native-test-plan
         path: .ci-native
+    - name: Verify the independent GNU watchdog
+      run: "python3 -I -B - <<'PY'\nimport subprocess\nresult = subprocess.run([\"/usr/bin/gnutimeout\", \"--version\"], capture_output=True, timeout=5, check=True)\nlines = result.stdout.splitlines()\nif result.stderr or len(result.stdout) > 4096 or not lines or not lines[0].startswith(b\"timeout (GNU coreutils) \"):\n    raise SystemExit(\"native watchdog requires verified GNU coreutils\")\nprint(lines[0].decode(\"ascii\"))\nPY\n"
     - name: Execute the exact assigned collection
       id: native_shard
       env:
         NATIVE_SHARD: ${{ matrix.shard }}
         CI_COORDINATOR_API_ARTIFACTS: ${{ github.workspace }}/.api-contract/native
-      run: timeout --signal=INT --kill-after=5s 960s backend/.venv/bin/python -m scripts.ci_test_execution run --plan .ci-native/plan.json --shard "$NATIVE_SHARD" --output ".ci-native/shard-$NATIVE_SHARD" --diagnostics ".ci-native/diagnostics/$NATIVE_SHARD"
+      run: /usr/bin/gnutimeout --signal=INT --kill-after=5s 960s backend/.venv/bin/python -m scripts.ci_test_execution run --plan .ci-native/plan.json --shard "$NATIVE_SHARD" --output ".ci-native/shard-$NATIVE_SHARD" --diagnostics ".ci-native/diagnostics/$NATIVE_SHARD"
     - name: Retain native shard diagnostics
       if: ${{ !cancelled() && steps.native_shard.outcome != 'skipped' }}
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
