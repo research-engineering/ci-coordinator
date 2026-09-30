@@ -25,6 +25,13 @@ preserves the accepted macOS support contract and is not a skipped Linux job.
   coverage and mutation floors, time bounds, permissions and secret boundaries.
 - Download the already pinned utility versions for ARM and verify their exact
   release checksums. Source/history scanning still consumes all admitted inputs.
+- Admit the observed hosted runner through actionlint's exact additional-label
+  configuration, without a wildcard or a runner-rule suppression. The upstream
+  configuration key is named `self-hosted-runner`; it does not provision or
+  reclassify this GitHub-hosted runner. Unknown labels remain errors.
+- Secret-scanner exceptions require an exact public value, rule and owner path,
+  with changed-value and foreign-owner negative controls. A compact Proofkit
+  identifier is not an API credential; the containing file remains scanned.
 - Admit only complete control-plane tuples for the original Ubuntu x64 and new
   Ubuntu ARM profiles. Mixing runner coordinates between invocation, plan and
   gate remains inadmissible. Existing consumer workflows retain their profile.
@@ -76,3 +83,9 @@ A native ARM runtime artifact is a separate revision requiring deployment
 architecture, component-repair and scanner evidence. It is not necessary merely
 to use an ARM CI host. Revisit this choice when a real ARM deployment is chosen
 or cross-build costs materially outweigh the measured benefit.
+
+The connected SSH log witness admits only the legacy Docker CLI command and
+the current CLI's quoted `--host=unix://` form for its exact selected socket.
+Both select the same fixed executable and argv; incoming command text is never
+executed. Wrong sockets, omitted paths and additional commands remain rejected.
+This does not claim complete compatibility with every future CLI serializer.

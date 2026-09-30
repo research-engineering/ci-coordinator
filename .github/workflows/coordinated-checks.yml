@@ -195,7 +195,7 @@ jobs:
         COMPOSE_SHA256: ${{ matrix.compose-sha256 }}
       run: "mkdir -p \"$HOME/.docker/cli-plugins\"\ncurl --fail --silent --show-error --location \\\n  \"https://github.com/docker/compose/releases/download/v${COMPOSE_VERSION}/docker-compose-linux-aarch64\" \\\n  --output \"$RUNNER_TEMP/docker-compose\"\necho \"$COMPOSE_SHA256  $RUNNER_TEMP/docker-compose\" | sha256sum --check --strict\ninstall -m 0755 \"$RUNNER_TEMP/docker-compose\" \"$HOME/.docker/cli-plugins/docker-compose\"\n"
     - name: Record the actual Compose client
-      run: docker compose version
+      run: "docker --version\ndocker compose version\n"
     - name: Prepare isolated SSH transport witness
       run: "sudo apt-get update\nsudo apt-get install --yes --no-install-recommends openssh-client openssh-server\nsudo install -d -m 0755 /run/sshd\n"
     - name: Set up pnpm for browser effect witnesses

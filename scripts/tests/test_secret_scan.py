@@ -38,6 +38,10 @@ _POLICY_CASES = [
         "proofkit/routes/developer-environment.v2.json",
         "e1969089fedd36310d7f581001ba0008e5e790defb1c99179361a1bc63aba7dc",
     ),
+    (
+        "proofkit/routes/runtime.v2.json",
+        "122dcef74945e7d17bdb62434eb88fa8b55cd3541d790546e182aa06faefa1d8",
+    ),
 ]
 
 
@@ -109,11 +113,11 @@ def _synthetic_secret() -> str:
     return "ghp_" + "1AZvZqMBtxSjTkERGXMFs97RSbMNZA96opY4"
 
 
-def _public_identifier(digest: str) -> str:
+def _public_identifier(owner: str, digest: str) -> str:
     if digest == _TYPE_DIGEST:
         return "Ed25519" + "PrivateKey"
-    owner = secret_scan.ACTION_ROOT.parents[2] / "proofkit/routes/developer-environment.v2.json"
-    rows = json.loads(owner.read_text(encoding="utf-8"))["bindings"]
+    path = secret_scan.ACTION_ROOT.parents[2] / owner
+    rows = json.loads(path.read_text(encoding="utf-8"))["bindings"]
     matches = {
         row[2] for row in rows if hashlib.sha256(row[2].encode("utf-8")).hexdigest() == digest
     }
@@ -203,7 +207,9 @@ def test_exact_public_exception_rejects_a_changed_value_in_the_same_owner(
     root, _ = _repository(tmp_path / "source")
     target = root / owner
     target.parent.mkdir(parents=True)
-    target.write_text(json.dumps({"key": _public_identifier(digest)}) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps({"key": _public_identifier(owner, digest)}) + "\n", encoding="utf-8"
+    )
     assert _scan(root, binary)["findings"] == 0
     changed = base64.b64encode(hashlib.sha256(b"unrelated synthetic replacement").digest()).decode()
     target.write_text(json.dumps({"key": changed}) + "\n", encoding="utf-8")
@@ -221,7 +227,9 @@ def test_exact_public_exception_rejects_the_same_value_under_a_foreign_owner(
     relative = Path("foreign") / owner
     target = root / relative
     target.parent.mkdir(parents=True)
-    target.write_text(json.dumps({"key": _public_identifier(digest)}) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps({"key": _public_identifier(owner, digest)}) + "\n", encoding="utf-8"
+    )
     result = _scan(root, binary)
     assert any(
         item["file"] == relative.as_posix() and item["rule"] == "generic-api-key"
@@ -237,7 +245,9 @@ def test_history_projection_prefix_never_acquires_exception_ownership(
     relative = Path("tree/files") / owner
     target = root / relative
     target.parent.mkdir(parents=True)
-    target.write_text(json.dumps({"key": _public_identifier(digest)}) + "\n", encoding="utf-8")
+    target.write_text(
+        json.dumps({"key": _public_identifier(owner, digest)}) + "\n", encoding="utf-8"
+    )
     _commit(root, "add foreign policy fixture")
     target.unlink()
     head = _commit(root, "remove foreign policy fixture")

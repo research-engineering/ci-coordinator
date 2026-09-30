@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"go/parser"
 	"go/token"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -78,5 +80,32 @@ func TestProviderJobIdentityRemainsStrict(t *testing.T) {
 	}
 	if err := configureJobIdentity(); err == nil {
 		t.Fatal("existing upstream field did not trigger compatibility review")
+	}
+}
+
+func TestAdditionalRunnerLabelRemainsExact(t *testing.T) {
+	config := filepath.Join(t.TempDir(), "actionlint.yaml")
+	if err := os.WriteFile(config, []byte("self-hosted-runner:\n  labels:\n    - ubuntu-26.04-arm\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		label string
+		valid bool
+	}{
+		{"ubuntu-26.04-arm", true},
+		{"ubuntu-26.04-arm64", false},
+		{"ubuntu-26.04-unknown", false},
+		{"ubuntu-24.04", true},
+		{"macos-15", true},
+	} {
+		t.Run(test.label, func(t *testing.T) {
+			source := fmt.Sprintf("name: Probe\non: push\njobs:\n  probe:\n    runs-on: %s\n    steps:\n      - run: echo ok\n", test.label)
+			var output bytes.Buffer
+			cmd := actionlint.Command{Stdin: strings.NewReader(source), Stdout: &output, Stderr: &output}
+			code := cmd.Main([]string{"actionlint", "-config-file", config, "-shellcheck=", "-pyflakes=", "-"})
+			if (code == 0) != test.valid {
+				t.Fatalf("code=%d valid=%v: %s", code, test.valid, output.String())
+			}
+		})
 	}
 }

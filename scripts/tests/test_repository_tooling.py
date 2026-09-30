@@ -11,6 +11,7 @@ from contextlib import ExitStack
 from pathlib import Path
 
 import pytest
+from ruamel.yaml import YAML
 from scripts.bounded_git import capture_git_text
 from scripts.bounded_process import CommandResult, current_process_scope
 from scripts.command_sequence import Command, run_commands
@@ -405,6 +406,9 @@ def lint_sources(tmp_path: Path) -> Path:
         path = tmp_path / source
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("fixture\n", encoding="utf-8")
+    (tmp_path / ".github/actionlint.yaml").write_text(
+        "self-hosted-runner:\n  labels:\n    - ubuntu-26.04-arm\n", encoding="utf-8"
+    )
     return tmp_path
 
 
@@ -412,6 +416,8 @@ def test_workflow_lint_uses_digest_built_actionlint_and_locked_zizmor(lint_sourc
     commands = workflow_lint_commands(lint_sources)
     assert commands[0].argv[:3] == ("docker", "build", "--pull")
     assert commands[1].argv[:3] == ("docker", "run", "--rm")
+    config_index = commands[1].argv.index("-config-file")
+    assert commands[1].argv[config_index + 1] == ".github/actionlint.yaml"
     ignore_index = commands[1].argv.index("-ignore")
     assert "trusted-plan-request" in commands[1].argv[ignore_index + 1]
     assert commands[1].argv[ignore_index + 2 :] == ("--", *_LINT_WORKFLOWS)
@@ -440,6 +446,27 @@ def test_workflow_lint_uses_digest_built_actionlint_and_locked_zizmor(lint_sourc
         "fixtures/native-target-repository/.github",
         "fixtures/target-repository/.github",
     )
+
+
+def test_actionlint_runner_extension_admits_only_the_observed_hosted_label() -> None:
+    root = Path(__file__).resolve().parents[2]
+    configuration = YAML(typ="safe").load(root / ".github/actionlint.yaml")
+    assert configuration == {"self-hosted-runner": {"labels": ["ubuntu-26.04-arm"]}}
+
+
+@pytest.mark.parametrize("kind", ["missing", "directory", "symlink"])
+def test_workflow_lint_rejects_nonregular_runner_configuration(
+    lint_sources: Path, kind: str
+) -> None:
+    path = lint_sources / ".github/actionlint.yaml"
+    path.unlink()
+    if kind == "directory":
+        path.mkdir()
+    elif kind == "symlink":
+        path.symlink_to(lint_sources / ".github/workflows/a.yaml")
+    expected = "symlink" if kind == "symlink" else "not a regular file"
+    with pytest.raises(ValueError, match=expected):
+        workflow_lint_commands(lint_sources)
 
 
 @pytest.mark.parametrize("invalid_kind", ["missing", "empty", "symlink", "directory", "ancestor"])

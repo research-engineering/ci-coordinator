@@ -156,6 +156,7 @@
       ".dockerignore",
       ".env.example",
       ".githooks/**",
+      ".github/actionlint.yaml",
       ".github/actions/**",
       ".github/dependabot.yml",
       ".github/workflows/**",

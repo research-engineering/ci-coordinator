@@ -726,7 +726,9 @@ jobs:
           echo "$COMPOSE_SHA256  $RUNNER_TEMP/docker-compose" | sha256sum --check --strict
           install -m 0755 "$RUNNER_TEMP/docker-compose" "$HOME/.docker/cli-plugins/docker-compose"
       - name: Record the actual Compose client
-        run: docker compose version
+        run: |
+          docker --version
+          docker compose version
       - name: Prepare isolated SSH transport witness
         run: |
           sudo apt-get update

@@ -422,6 +422,7 @@ def test_every_external_action_is_immutable_and_current() -> None:
         SETUP_PYTHON,
         SETUP_UV,
         SETUP_BUILDX,
+        SETUP_QEMU,
         LOGIN,
         BUILD_PUSH,
         UPLOAD_ARTIFACT,

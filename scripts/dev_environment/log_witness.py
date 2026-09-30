@@ -468,6 +468,7 @@ def _ssh_files(
     stage_path = shlex.quote(str(stages)) + '/"$$"'
     _private_text(root / "sshd.log", "")
     remote = "docker --host unix://" + str(socket_path) + " system dial-stdio"
+    remote_current = "docker '--host=unix://" + str(socket_path) + "' system dial-stdio"
     forced = root / "proxy-command"
     _private_text(
         forced,
@@ -477,6 +478,8 @@ def _ssh_files(
         + "\n"
         + 'if [ "${SSH_ORIGINAL_COMMAND-}" != '
         + shlex.quote(remote)
+        + ' ] && [ "${SSH_ORIGINAL_COMMAND-}" != '
+        + shlex.quote(remote_current)
         + " ]; then\n  printf 'rejected\\n' > "
         + stage_path
         + "\n  exit 64\nfi\n"

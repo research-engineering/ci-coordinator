@@ -465,7 +465,22 @@ def test_log_fixture_cleanup_never_removes_a_foreign_container(
     assert len(calls) == 1 and calls[0][0] == "inspect"
 
 
-@pytest.mark.parametrize("command_kind", ["exact", "missing-path", "wrong-path", "extra-command"])
+@pytest.mark.parametrize(
+    "command_kind",
+    [
+        "exact",
+        "exact-current",
+        "missing-path",
+        "wrong-path",
+        "extra-command",
+        "current-wrong-path",
+        "current-extra-command",
+        "current-unquoted-equals",
+        "current-newline",
+        "current-other-executable",
+        "current-second-host",
+    ],
+)
 def test_ssh_fixture_requires_the_cli_selected_socket_and_isolates_client_configuration(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -515,9 +530,21 @@ def test_ssh_fixture_requires_the_cli_selected_socket_and_isolates_client_config
     socket_path = str(tmp_path / "selected-daemon.sock")
     original = {
         "exact": f"docker --host unix://{socket_path} system dial-stdio",
+        "exact-current": f"docker '--host=unix://{socket_path}' system dial-stdio",
         "missing-path": "docker system dial-stdio",
         "wrong-path": f"docker --host unix://{socket_path}-other system dial-stdio",
         "extra-command": f"docker --host unix://{socket_path} system dial-stdio; printf extra",
+        "current-wrong-path": f"docker '--host=unix://{socket_path}-other' system dial-stdio",
+        "current-extra-command": (
+            f"docker '--host=unix://{socket_path}' system dial-stdio; printf extra"
+        ),
+        "current-unquoted-equals": f"docker --host=unix://{socket_path} system dial-stdio",
+        "current-newline": f"docker '--host=unix://{socket_path}' system dial-stdio\nprintf extra",
+        "current-other-executable": f"other '--host=unix://{socket_path}' system dial-stdio",
+        "current-second-host": (
+            f"docker '--host=unix://{socket_path}' '--host=unix://{socket_path}-other'"
+            " system dial-stdio"
+        ),
     }[command_kind]
     result = subprocess.run(
         (str(tmp_path / "proxy-command"),),
@@ -532,7 +559,7 @@ def test_ssh_fixture_requires_the_cli_selected_socket_and_isolates_client_config
     assert len(stages) == 1 and stages[0].name.isdecimal()
     assert stat.S_IMODE(stages[0].stat().st_mode) == 0o600
     assert result.stderr == ""
-    if command_kind == "exact":
+    if command_kind in {"exact", "exact-current"}:
         assert result.returncode == 0
         assert result.stdout.splitlines() == [
             "--host=unix://" + socket_path,
