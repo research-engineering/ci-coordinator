@@ -20,6 +20,7 @@ from ci_coordinator.audit_replay import (
     prepare_audit_event,
 )
 from ci_coordinator.persistence import (
+    DatabaseReadiness,
     DatabaseReadinessProbe,
     PostgresUnitOfWork,
     check_database_readiness,
@@ -413,23 +414,57 @@ def test_readiness_replay_progresses_in_bounded_batches(
 ) -> None:
     async def scenario() -> None:
         runtime_engine = create_postgres_engine(runtime_postgres_database_url)
-        for key in ("batch-first", "batch-second"):
-            async with PostgresUnitOfWork(runtime_engine) as unit_of_work:
-                result = await unit_of_work.audit_events.append(
-                    prepare_audit_event(_event_input(key))
-                )
-                assert isinstance(result, AuditAppendAppended)
-                await unit_of_work.commit()
-        monkeypatch.setattr(readiness_module, "READINESS_AUDIT_BATCH_SIZE", 1)
-        probe = DatabaseReadinessProbe(runtime_engine, ALEMBIC_CONFIG_PATH)
+        probe = DatabaseReadinessProbe(runtime_engine, ALEMBIC_CONFIG_PATH, audit_batch_size=1)
+        records: list[AuditEventRecord] = []
+        loads: list[tuple[int, int, int]] = []
+        original_loader = readiness_module.load_audit_records_after
+
+        async def recording_loader(
+            connection: AsyncConnection,
+            sequence: int,
+            *,
+            through_sequence: int,
+            limit: int,
+        ) -> tuple[AuditEventRecord, ...]:
+            loaded = await original_loader(
+                connection, sequence, through_sequence=through_sequence, limit=limit
+            )
+            loads.append((sequence, limit, len(loaded)))
+            return loaded
+
         try:
+            for key in ("batch-first", "batch-second"):
+                async with PostgresUnitOfWork(runtime_engine) as unit_of_work:
+                    result = await unit_of_work.audit_events.append(
+                        prepare_audit_event(_event_input(key))
+                    )
+                    assert isinstance(result, AuditAppendAppended)
+                    records.append(result.record)
+                    await unit_of_work.commit()
+            monkeypatch.setattr(readiness_module, "load_audit_records_after", recording_loader)
+            for _ in range(2):
+                assert await check_database_readiness(
+                    runtime_engine, ALEMBIC_CONFIG_PATH
+                ) == DatabaseReadiness(True, "ready", 2)
+            assert loads == [(0, 4096, 2), (0, 4096, 2)]
+            loads.clear()
             first = await probe.check()
+            assert probe._last_record == records[0]
             second = await probe.check()
             assert first.reason == "audit_verification_in_progress"
             assert not first.ready
+            assert first.verified_revision == 1
             assert second.ready
+            assert second == DatabaseReadiness(True, "ready", 2)
+            assert probe._last_record == records[1]
+            assert loads == [(0, 1, 1), (1, 1, 1)]
+            assert await probe.check() == second
+            assert loads == [(0, 1, 1), (1, 1, 1)]
         finally:
-            await runtime_engine.dispose()
+            try:
+                await probe.drain()
+            finally:
+                await runtime_engine.dispose()
 
     asyncio.run(scenario())
 
@@ -457,6 +492,7 @@ def test_incremental_prefix_rejects_independent_ledger_corruption(
     async def scenario() -> None:
         engine = create_postgres_engine(runtime_postgres_database_url)
         migration = create_postgres_engine(postgres_database_url)
+        probe = DatabaseReadinessProbe(engine, ALEMBIC_CONFIG_PATH, audit_batch_size=1)
         records: list[AuditEventRecord] = []
         try:
             for index in range(3):
@@ -467,8 +503,6 @@ def test_incremental_prefix_rejects_independent_ledger_corruption(
                     assert isinstance(appended, AuditAppendAppended)
                     records.append(appended.record)
                     await unit.commit()
-            monkeypatch.setattr(readiness_module, "READINESS_AUDIT_BATCH_SIZE", 1)
-            probe = DatabaseReadinessProbe(engine, ALEMBIC_CONFIG_PATH)
             first = await probe.check()
             assert first.reason == "audit_verification_in_progress"
             assert first.verified_revision == 1
@@ -519,7 +553,10 @@ def test_incremental_prefix_rejects_independent_ledger_corruption(
                         "second_hash": bytes.fromhex(records[1].event_hash),
                     },
                 )
-            monkeypatch.setattr(readiness_module, "READINESS_AUDIT_BATCH_SIZE", 4)
+            if corruption in {"predecessor", "event_hash", "head_hash"}:
+                continuation = await probe.check()
+                assert continuation == DatabaseReadiness(False, "audit_verification_in_progress", 2)
+                assert probe._last_record == records[1]
             result = await probe.check()
             assert not result.ready and result.verified_revision is None
             assert result.reason in {
@@ -533,8 +570,13 @@ def test_incremental_prefix_rejects_independent_ledger_corruption(
                 assert probe._last_record is None and not probe._verified
             await probe.drain()
         finally:
-            await engine.dispose()
-            await migration.dispose()
+            try:
+                await probe.drain()
+            finally:
+                try:
+                    await engine.dispose()
+                finally:
+                    await migration.dispose()
 
     asyncio.run(scenario())
 

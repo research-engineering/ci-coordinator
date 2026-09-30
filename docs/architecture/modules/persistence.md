@@ -357,9 +357,13 @@ retryable; an unsuccessful close is retained and cannot become successful drain
 through a repeated no-op. Managed probes begin closed, activate with their
 runtime lifetime and permanently reject new admission after stop. Standalone
 construction and the stateless helper retain their existing admission behavior.
-The 4096-row work unit remains unchanged pending separate native cost admission;
-smaller batches, capacity, worst-case latency and autonomous progress are not
-qualified by this lifecycle contract.
+Each probe selects one read-only audit batch size in `1..4096` at construction.
+The default and stateless helper retain 4096; connected non-enforcing composition
+selects one row, while enforcing retains 4096. The existing SQL `LIMIT` bounds
+the suffix before materialization. This does not alter worker or lifetime
+authority. See the [readiness wave budget](../../features/readiness-wave-budget.md)
+for the conditional catch-up model and recovery tradeoff. Capacity, worst-case
+latency and autonomous progress are not qualified by this lifecycle contract.
 
 This induction relies on the capability-attested immutability and restricted
 runtime principal between checks. It does not detect a privileged external

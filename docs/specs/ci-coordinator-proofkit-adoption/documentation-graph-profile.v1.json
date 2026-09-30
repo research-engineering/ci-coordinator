@@ -10,7 +10,7 @@
   },
   "allowedExternalSchemes": ["https"],
   "limits": {
-    "maxDocumentCount": 353,
+    "maxDocumentCount": 354,
     "maxDocumentBytes": 1048576,
     "maxInventoryBytes": 16777216,
     "maxTotalBytes": 16777216,
