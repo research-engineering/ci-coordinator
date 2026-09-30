@@ -64,6 +64,16 @@ production performance; record the actual environment with every comparison.
 
 ## Acceptance And Revision Conditions
 
+Scanner execution and severity admission are separate predicates. The pinned
+Grype CLI collects all unsuppressed matches with an explicit empty scanner
+threshold and must exit zero. The release-owned validator still rejects every
+High/Critical occurrence without current exact repair evidence, and every
+unknown severity. Qualification, publication and scheduled scanning share this
+version 3 contract. This avoids treating an ambiguous nonzero scanner outcome
+as usable evidence; it does not change the security threshold, matching engine,
+database freshness or repair policy. Older version 2 receipts remain historical
+and do not qualify a new version 3 execution.
+
 1. Compare a fresh exact-master x64 Full Check with the ARM candidate, retaining
    source, event, attempt, job/step durations, outcomes and declared skips.
 2. Independently compare native inventories: every prior node remains present,

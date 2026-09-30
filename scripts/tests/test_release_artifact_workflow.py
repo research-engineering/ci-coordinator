@@ -224,7 +224,7 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
         "--from registry",
         "--platform linux/amd64",
         "--scope squashed",
-        "--fail-on high",
+        '"fail-on-severity": ""',
         '"max-allowed-built-age": "24h"',
         "backend/.venv/bin/python -c",
         '"auto-update": False',
@@ -241,7 +241,15 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
         '--source-commit "${SOURCE_COMMIT}"',
     ):
         assert required in vulnerability
-    for forbidden in ("--only-fixed", "--only-notfixed", "--ignore", "--vex", "--exclude", "--db-"):
+    for forbidden in (
+        "--fail-on",
+        "--only-fixed",
+        "--only-notfixed",
+        "--ignore",
+        "--vex",
+        "--exclude",
+        "--db-",
+    ):
         assert forbidden not in vulnerability
 
     upload = steps[11]

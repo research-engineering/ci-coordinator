@@ -1432,7 +1432,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "abfd168e06a0f47e7a1b9c7f042eec4d79f0b5f36c53f30dd3166ac6ceb22870"
+          "sourceSha256": "920efd4deba79207c647a739fb74ef1c44c687fdcdaef999cd8df4bb8c502fac"
         },
         {
           "requirementId": "REQ-CI-RELEASE-001",
@@ -1448,13 +1448,13 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "abfd168e06a0f47e7a1b9c7f042eec4d79f0b5f36c53f30dd3166ac6ceb22870"
+          "sourceSha256": "920efd4deba79207c647a739fb74ef1c44c687fdcdaef999cd8df4bb8c502fac"
         },
         {
           "requirementId": "REQ-CI-RELEASE-001",
           "witnessPath": "scripts/tests/test_scheduled_advisories.py",
           "assertion": "test_valid_signature_for_wrong_run_or_source_is_not_latest_release",
-          "sourceSha256": "1151d61f47cd4644f506d07926d14b49409a0e29aa3374705fa5adcb3474baf4",
+          "sourceSha256": "eef1b761be711bf1e08ba8330099994e9a2e21d662b9429e6dee95a9f2e7a3f6",
           "commandIds": [
             "python.test"
           ],
@@ -1603,7 +1603,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "adfeb272f37247f772331d26a2343624b9bcbe5b7e783e15c5676f9040299466"
+          "sourceSha256": "7d7f11c02de61ebcfd090b4e19260963aa16effbfc8f23bf41ced35be144f3ae"
         }
       ]
     },
@@ -1632,13 +1632,13 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "abfd168e06a0f47e7a1b9c7f042eec4d79f0b5f36c53f30dd3166ac6ceb22870"
+          "sourceSha256": "920efd4deba79207c647a739fb74ef1c44c687fdcdaef999cd8df4bb8c502fac"
         },
         {
           "requirementId": "REQ-CI-PROOFKIT-012",
           "witnessPath": "scripts/tests/test_scheduled_advisories.py",
           "assertion": "test_receipt_acceptance_binds_age_source_and_all_native_results",
-          "sourceSha256": "1151d61f47cd4644f506d07926d14b49409a0e29aa3374705fa5adcb3474baf4",
+          "sourceSha256": "eef1b761be711bf1e08ba8330099994e9a2e21d662b9429e6dee95a9f2e7a3f6",
           "commandIds": [
             "python.test"
           ],
@@ -1730,7 +1730,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "adfeb272f37247f772331d26a2343624b9bcbe5b7e783e15c5676f9040299466"
+          "sourceSha256": "7d7f11c02de61ebcfd090b4e19260963aa16effbfc8f23bf41ced35be144f3ae"
         }
       ]
     },

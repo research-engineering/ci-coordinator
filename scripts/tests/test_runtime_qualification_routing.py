@@ -142,3 +142,27 @@ def test_exploratory_base_comparison_has_no_obsolete_branch_trigger() -> None:
     )
     assert workflow["on"] == {"workflow_dispatch": {}}
     assert workflow["permissions"] == {}
+
+
+@pytest.mark.parametrize(
+    "filename", ["runtime-image-qualification.yml", "runtime-base-comparison.yml"]
+)
+def test_runtime_scanner_collects_all_findings_with_an_unambiguous_process_result(
+    filename: str,
+) -> None:
+    workflow = YAML(typ="safe").load(ROOT / ".github/workflows" / filename)
+    scripts = "\n".join(
+        step.get("run", "") for job in workflow["jobs"].values() for step in job["steps"]
+    )
+    assert '"fail-on-severity":""' in scripts
+    assert "--fail-on" not in scripts
+    assert 'test "${code}" -eq 0' in scripts
+    assert 'test "${code}" -eq 2' not in scripts
+    assert '.descriptor.configuration["fail-on-severity"] == ""' in scripts
+    if filename == "runtime-image-qualification.yml":
+        assert 'test "${invalid_code}" -eq 1' in scripts
+        assert "grep -Fq 'owner-invalid-presenter'" in scripts
+        assert 'test ! -s "${root}/invalid-presenter.json"' in scripts
+        assert "printf 'Raw scanner exit status: %s\\n'" in scripts
+        assert 'if match["severity"] in {"High", "Critical"}' in scripts
+        assert "assert occurrence_is_repaired(" in scripts

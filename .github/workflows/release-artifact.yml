@@ -249,6 +249,7 @@ jobs:
               "max-allowed-built-age": "24h"
             },
             "check-for-app-update": False,
+            "fail-on-severity": "",
             "only-fixed": False,
             "only-notfixed": False,
             "ignore-wontfix": "",
@@ -281,7 +282,6 @@ jobs:
             --platform linux/amd64 \
             --scope squashed \
             --output json \
-            --fail-on high \
             > "${scan_report}" 2> "${RUNNER_TEMP}/grype-scan.log"
           scanner_exit_code=$?
           set -e

@@ -73,7 +73,7 @@ jobs:
             db: {"cache-dir":$cache,"auto-update":false,"validate-age":true,
                  "validate-by-hash-on-start":true,"require-update-check":true,
                  "max-allowed-built-age":"24h","update-url":"https://grype.anchore.io/databases/v6/latest.json"},
-            "check-for-app-update":false,"only-fixed":false,"only-notfixed":false,
+            "check-for-app-update":false,"fail-on-severity":"","only-fixed":false,"only-notfixed":false,
             "ignore-wontfix":"","match-upstream-kernel-headers":true,
             ignore:[],exclude:[],"vex-documents":[],"vex-add":[],distro:""
           }' > "${root}/config.json"
@@ -85,17 +85,19 @@ jobs:
           scan db status --output json > "${root}/db-before.json"
           image_id="$(jq -r .Id "${root}/image.json")"
           set +e
-          scan "${image_id}" --from docker --scope squashed --output json --fail-on high \
+          scan "${image_id}" --from docker --scope squashed --output json \
             > "${root}/scan.json"
           code=$?
           set -e
-          test "${code}" -eq 0 || test "${code}" -eq 2
+          test "${code}" -eq 0
           test "$(wc -c < "${root}/scan.json")" -le 16777216
           jq -e --arg image "${image_id}" --slurpfile db "${root}/db-before.json" \
             '.source.target.imageID == $image and .source.target.architecture == "amd64"
              and .source.target.os == "linux" and .descriptor.db.status == $db[0]
              and $db[0].valid == true and .descriptor.name == "grype"
-             and .descriptor.version == "0.119.0" and (.ignoredMatches|length==0)
+             and .descriptor.version == "0.119.0"
+             and .descriptor.configuration["fail-on-severity"] == ""
+             and (.ignoredMatches|length==0)
              and .distro.name == "ubuntu" and .distro.version == "26.04"' \
             "${root}/scan.json" > /dev/null
           scan db status --output json > "${root}/db-after.json"
