@@ -33,9 +33,16 @@ GATE_WORKFLOW_ID = "2001"
 WORKFLOW_REF = (
     "research-engineering/ci-coordinator/.github/workflows/release-artifact.yml@refs/heads/master"
 )
+ATTEMPT_BINDING = "Refuse upstream outputs from another run attempt"
+PARTIAL_RERUN_DIAGNOSTIC = (
+    "::error title=Partial release rerun refused::"
+    "Upstream job outputs belong to another run attempt. Re-run all jobs."
+)
 EXECUTED_SHELL_STEPS = {
+    ("attest", ATTEMPT_BINDING),
     ("attest", "Pull by registry digest and inspect without execution"),
     ("attest", "Verify exact signer, source, provenance, and SBOM"),
+    ("build", ATTEMPT_BINDING),
     ("build", "Provision the independent locked predicate validator"),
     ("build", "Validate registry predicates without signing authority"),
     ("build", "Download and verify pinned Grype release"),
@@ -445,7 +452,14 @@ def test_gate_resolution_accepts_the_exact_provider_response(tmp_path: Path) -> 
     ]
     assert {
         line.partition("=")[0] for line in (tmp_path / "github-output").read_text().splitlines()
-    } == {"gate_run_attempt", "gate_run_id", "release_identity", "source_commit"}
+    } == {
+        "gate_run_attempt",
+        "gate_run_id",
+        "release_identity",
+        "release_run_attempt",
+        "source_commit",
+    }
+    assert "release_run_attempt=1" in (tmp_path / "github-output").read_text().splitlines()
 
 
 @pytest.mark.parametrize("reverse", [False, True])
@@ -482,6 +496,79 @@ def test_gate_resolution_rejects_a_wrong_nonselected_candidate(tmp_path: Path) -
 
     assert result.returncode != 0
     assert "release_identity=" not in (tmp_path / "github-output").read_text()
+
+
+@pytest.mark.parametrize(
+    ("preflight_attempt", "release_attempt", "admitted"),
+    [
+        ("1", "2", False),
+        ("2", "1", False),
+        ("", "1", False),
+        ("01", "1", False),
+        ("", "", False),
+        ("2", "2", True),
+    ],
+)
+def test_build_attempt_binding_refuses_retained_preflight_before_push(
+    tmp_path: Path,
+    preflight_attempt: str,
+    release_attempt: str,
+    admitted: bool,
+) -> None:
+    environment = _environment(tmp_path)
+    environment.update(
+        PREFLIGHT_RUN_ATTEMPT=preflight_attempt,
+        RELEASE_RUN_ATTEMPT=release_attempt,
+    )
+
+    result = _execute(_shell("build", ATTEMPT_BINDING), environment)
+
+    output = Path(environment["GITHUB_OUTPUT"])
+    if admitted:
+        assert result.returncode == 0, result.stderr
+        assert output.read_text().splitlines() == [f"release_run_attempt={release_attempt}"]
+    else:
+        assert result.returncode != 0
+        assert not output.exists() or output.read_text() == ""
+    if admitted or not release_attempt:
+        assert PARTIAL_RERUN_DIAGNOSTIC not in result.stdout
+    else:
+        assert result.stdout.splitlines() == [PARTIAL_RERUN_DIAGNOSTIC]
+
+
+@pytest.mark.parametrize(
+    ("preflight_attempt", "build_attempt", "release_attempt", "admitted"),
+    [
+        ("1", "1", "2", False),
+        ("2", "1", "2", False),
+        ("1", "2", "2", False),
+        ("", "", "", False),
+        ("2", "2", "2", True),
+    ],
+)
+def test_attestation_attempt_binding_refuses_retained_producers_before_signing(
+    tmp_path: Path,
+    preflight_attempt: str,
+    build_attempt: str,
+    release_attempt: str,
+    admitted: bool,
+) -> None:
+    environment = _environment(tmp_path)
+    environment.update(
+        BUILD_RUN_ATTEMPT=build_attempt,
+        PREFLIGHT_RUN_ATTEMPT=preflight_attempt,
+        RELEASE_RUN_ATTEMPT=release_attempt,
+    )
+
+    result = _execute(_shell("attest", ATTEMPT_BINDING), environment)
+
+    if admitted:
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == ""
+    else:
+        assert result.returncode != 0
+    if release_attempt and not admitted:
+        assert result.stdout.splitlines() == [PARTIAL_RERUN_DIAGNOSTIC]
 
 
 def test_validator_provisioning_propagates_failure_and_uses_exact_lock(

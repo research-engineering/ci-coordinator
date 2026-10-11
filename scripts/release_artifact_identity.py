@@ -247,6 +247,7 @@ def main() -> int:
     print(f"source_commit={source_commit}")
     print(f"gate_run_id={gate.run_id}")
     print(f"gate_run_attempt={gate.run_attempt}")
+    print(f"release_run_attempt={coordinates.release_run_attempt}")
     return 0
 
 

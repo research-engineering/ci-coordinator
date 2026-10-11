@@ -157,6 +157,36 @@ hash except with SHA-256 collision probability.
 manifest digest `D` remains the content authority because `I` must be embedded
 before `D` exists.
 
+### Run-Attempt Binding
+
+Only a full rerun of the release workflow is supported. A
+[partial rerun](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs)
+increments `github.run_attempt` for the rerun jobs while retained jobs keep
+their earlier outputs and artifacts. Without a binding, a retained `preflight`
+from attempt `1` lets a rerun `build` at attempt `2` embed an `I` that names
+attempt `1` under the discovery tag of attempt `2`, and a retained `build` makes
+the rerun `attest` request evidence artifacts named for an attempt that never
+produced them.
+
+```text
+AttemptBound(job) iff
+  for every upstream u consumed by job:
+    u.releaseRunAttempt = job.github.run_attempt
+```
+
+`preflight` publishes the exact `releaseRunAttempt` hashed into `I`; `build`
+publishes its own attempt after binding. As their first step, before checkout,
+registry login, push, artifact download, signing or attestation, `build`
+requires `AttemptBound` for `preflight` and `attest` requires it for
+`preflight` and `build`. A mismatch fails with the stable diagnostic
+`Upstream job outputs belong to another run attempt. Re-run all jobs.` The
+recovery is **Re-run all jobs**, which reruns every job under one new attempt.
+Consuming retained evidence across attempts is rejected: it would add
+cross-attempt artifact authority without a stronger signer, source or digest
+binding. A successful run therefore has every job at its latest attempt, which
+keeps the discovery tag and certificate attempt selected by periodic
+requalification equal to the attempt that built and signed the image.
+
 ## 5. Authority Separation
 
 The workflow uses three jobs:
@@ -223,7 +253,8 @@ generator bytes; it does not prove scanner correctness or SBOM completeness.
 
 The attest job:
 
-1. rejects a noncanonical SHA-256 manifest digest;
+1. refuses `preflight` or `build` outputs from another run attempt and
+   rejects a noncanonical SHA-256 manifest digest;
 2. pulls `A` by `D`;
 3. validates exact build-identity bytes without running `A`;
 4. re-extracts both predicates and matches their exact SHA-256 hashes to the
@@ -236,7 +267,9 @@ The attest job:
 
 ```text
 Published(A) :=
-  PushReturned(D)
+  AttemptBound(build)
+  and AttemptBound(attest)
+  and PushReturned(D)
   and PullByDigest(A,D)
   and EmbeddedIdentity(A) = (I,S,true)
   and FinalImageVulnerabilityAdmissionPassed(A,D,S)
@@ -265,6 +298,7 @@ and a `run-*` tag are not substitutes for the complete publication evidence.
 Every ambiguity fails the workflow:
 
 - wrong repository, ref, event, or checkout SHA;
+- upstream job outputs from another run attempt after a partial rerun;
 - no observed exact successful Full Check run, an invalid observed candidate,
   duplicate run IDs, an inconsistent count, or an over-budget snapshot;
 - malformed, duplicate-key, unstable, empty, or oversized provider JSON;

@@ -18,6 +18,7 @@ BUILD_PUSH = "docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc"
 ATTEST = "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6"
 UPLOAD_ARTIFACT = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
 DOWNLOAD_ARTIFACT = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+ATTEMPT_BINDING = "Refuse upstream outputs from another run attempt"
 
 
 def _workflow() -> dict[str, object]:
@@ -86,6 +87,7 @@ def test_preflight_binds_exact_repository_source_event_and_full_check() -> None:
         "gate_run_attempt": "${{ steps.identity.outputs.gate_run_attempt }}",
         "gate_run_id": "${{ steps.identity.outputs.gate_run_id }}",
         "release_identity": "${{ steps.identity.outputs.release_identity }}",
+        "release_run_attempt": "${{ steps.identity.outputs.release_run_attempt }}",
         "source_commit": "${{ steps.identity.outputs.source_commit }}",
     }
     assert steps[3]["env"] == {
@@ -138,7 +140,8 @@ def test_preflight_binds_exact_repository_source_event_and_full_check() -> None:
 
 def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> None:
     build = _job(_workflow(), "build")
-    steps = _steps(build)
+    assert _steps(build)[0]["name"] == ATTEMPT_BINDING
+    steps = _steps(build)[1:]
 
     assert build["permissions"] == {"contents": "read", "packages": "write"}
     assert build["needs"] == "preflight"
@@ -190,6 +193,7 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
     )
     assert build["outputs"] == {
         "artifact_digest": "${{ steps.build.outputs.digest }}",
+        "release_run_attempt": "${{ steps.attempt.outputs.release_run_attempt }}",
         "provenance_sha256": "${{ steps.predicates.outputs.provenance_sha256 }}",
         "sbom_sha256": "${{ steps.predicates.outputs.sbom_sha256 }}",
         "vulnerability_evidence_sha256": (
@@ -282,6 +286,33 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
         assert required in predicate_validation
 
 
+def test_each_consuming_job_binds_upstream_run_attempts_before_any_other_step() -> None:
+    workflow = _workflow()
+    expected_upstreams = {
+        "build": {"PREFLIGHT_RUN_ATTEMPT": "${{ needs.preflight.outputs.release_run_attempt }}"},
+        "attest": {
+            "BUILD_RUN_ATTEMPT": "${{ needs.build.outputs.release_run_attempt }}",
+            "PREFLIGHT_RUN_ATTEMPT": "${{ needs.preflight.outputs.release_run_attempt }}",
+        },
+    }
+
+    for job_name, upstreams in expected_upstreams.items():
+        steps = _steps(_job(workflow, job_name))
+        assert [step["name"] for step in steps].count(ATTEMPT_BINDING) == 1
+        binding = steps[0]
+        assert binding["name"] == ATTEMPT_BINDING
+        assert "uses" not in binding
+        assert "if" not in binding
+        assert binding["env"] == {
+            **upstreams,
+            "RELEASE_RUN_ATTEMPT": "${{ github.run_attempt }}",
+        }
+        command = cast(str, binding["run"])
+        assert "${{" not in command
+        assert "Re-run all jobs." in command
+    assert _steps(_job(workflow, "build"))[0]["id"] == "attempt"
+
+
 def test_attestation_requires_successful_build_qualification_without_failure_masking() -> None:
     workflow = _workflow()
     build = _job(workflow, "build")
@@ -307,7 +338,8 @@ def test_attestation_requires_successful_build_qualification_without_failure_mas
 
 def test_attestation_job_has_no_checkout_and_never_executes_the_image() -> None:
     attest = _job(_workflow(), "attest")
-    steps = _steps(attest)
+    assert _steps(attest)[0]["name"] == ATTEMPT_BINDING
+    steps = _steps(attest)[1:]
     uses = [step.get("uses") for step in steps]
 
     assert attest["permissions"] == {
