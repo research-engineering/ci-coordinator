@@ -392,6 +392,63 @@ def test_runtime_deadline_cannot_renew_or_hide_retained_http_close(
     asyncio.run(scenario())
 
 
+class _DeadlineHeldJwksTransport(httpx.AsyncBaseTransport):
+    """Hold one refresh across its close drain until the deadline cancels it again."""
+
+    def __init__(self) -> None:
+        self.fetch_entered = asyncio.Event()
+        self.drain_entered = asyncio.Event()
+        self.close_calls = 0
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == GITHUB_ACTIONS_JWKS_URI
+        self.fetch_entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.drain_entered.set()
+            await asyncio.Event().wait()
+        raise AssertionError("the held refresh must end through cancellation")
+
+    async def aclose(self) -> None:
+        self.close_calls += 1
+
+
+def test_runtime_deadline_fences_the_first_jwks_transport_close_after_an_absorbed_drain() -> None:
+    async def scenario() -> None:
+        async with asyncio.timeout(5):
+            transport = _DeadlineHeldJwksTransport()
+            provider = GitHubActionsJwksProvider(
+                identity_fixture.ManualMonotonicClock(), transport=transport
+            )
+            lookup = asyncio.create_task(provider.get_key_set(identity_fixture.KID))
+            await transport.fetch_entered.wait()
+            events: list[str] = []
+            resources = _resources_with_http_owner(provider, events, timeout=0.1)
+            closing = asyncio.create_task(resources.aclose())
+            await transport.drain_entered.wait()
+            cleanup = resources._cleanup_task
+            assert cleanup is not None and not cleanup.done()
+            assert _http_close_task(provider) is None
+            with pytest.raises(RuntimeError, match="cleanup exceeded its deadline"):
+                await closing
+            await asyncio.wait({cleanup})
+            assert cleanup.cancelled()
+            assert isinstance(await lookup, JwksUnavailable)
+            assert _http_close_task(provider) is None
+            assert transport.close_calls == 0
+            assert resources._jwks_closed is False
+            assert not resources.cleanup_pending
+            assert events == ["github"]
+            with pytest.raises(RuntimeError, match="cleanup exceeded its deadline"):
+                await resources.aclose()
+            assert transport.close_calls == 0
+            await provider.aclose()
+            assert transport.close_calls == 1
+
+    asyncio.run(scenario())
+
+
 class _Closeable:
     def __init__(
         self,

@@ -255,6 +255,26 @@ def validate_successor(
         )
 
 
+def validate_capability_identity_history(
+    retained: tuple[CapabilityDeclaration, ...],
+    candidate: RevisionDeclaration,
+) -> None:
+    """Reject a candidate that binds any retained identifier to another descriptor.
+
+    Identity is write-once over the complete retained lineage, not only adjacent
+    revisions. Reintroducing a removed identifier with its original descriptor hash
+    keeps one meaning and remains admissible.
+    """
+    descriptors: dict[str, str] = {}
+    for capability in (*retained, *candidate.capabilities):
+        known = descriptors.setdefault(capability.capability_id, capability.descriptor_hash)
+        if known != capability.descriptor_hash:
+            raise CompatibilityContractError(
+                "database_capability_descriptor_rewritten",
+                "a capability identifier cannot change descriptor hash within its lineage",
+            )
+
+
 def assert_exact_replay(
     stored: RevisionDeclaration,
     proposed: RevisionDeclaration,

@@ -125,6 +125,11 @@ all close waiters cancel. This is retained unsuccessful cleanup, not proof of
 physical release or a new client. See the
 [close-outcome design](../../features/http-close-outcome.md).
 
+A closer with a pending cancellation request does not start the first transport
+close after its cache step, including when the refresh drain absorbed that
+request. The runtime cleanup deadline uses this request as its fence; the
+unattempted transport remains available to a later uncancelled close.
+
 ```text
 Closed(provider)
 => no cached key is returned
@@ -168,6 +173,8 @@ cache transition logic.
 - a partially failed HTTP close becomes successful on repeat without releasing
   the independently observed remaining resource;
 - cancellation of all close waiters leaves an unobserved terminal failure.
+- a deadline-cancelled closer whose refresh drain absorbed the cancellation
+  initiates no transport close.
 
 ## 8. Non-Claims
 

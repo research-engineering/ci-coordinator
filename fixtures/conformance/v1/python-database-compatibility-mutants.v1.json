@@ -370,8 +370,8 @@
       "requirementIds": ["REQ-CI-CORE-015"],
       "file": "backend/src/ci_coordinator/persistence/migration_protocol.py",
       "operator": "append-without-resulting-capability-attestation",
-      "original": "    _validate_forward_relation(profile, predecessor, proposed)\n    attest_resulting_capabilities(proposed)\n    _insert_declaration(connection, proposed)",
-      "replacement": "    _validate_forward_relation(profile, predecessor, proposed)\n    _insert_declaration(connection, proposed)",
+      "original": "    attest_resulting_capabilities(proposed)\n    _insert_declaration(connection, proposed)",
+      "replacement": "    _insert_declaration(connection, proposed)",
       "witnessId": "database-compatibility.append-without-resulting-capability-attestation",
       "command": [
         "backend/.venv/bin/python",

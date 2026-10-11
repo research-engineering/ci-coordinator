@@ -215,6 +215,14 @@ Declarations are retained across ordinary downgrades. Re-upgrading an already
 declared revision is idempotent only when the proposed declaration is exactly
 equivalent. A conflicting replay is corruption, not an update.
 
+The successor relation compares only adjacent declarations, while capability
+identity is lifetime-immutable. A first append therefore also rejects any
+proposed identifier whose descriptor hash differs from a retained row of that
+identifier anywhere in the lineage, so retire-then-reintroduce cannot rebind its
+meaning. Reintroducing it with the original hash is admitted. This bounded read
+belongs to the [migration protocol](../modules/database-migration-protocol.md);
+runtime admission still reads only the current declaration and its parent.
+
 The declaration hash gives stable content identity and cache binding; it is not
 a signature and does not create trust against the migration owner. Relational
 generation and parent constraints own ancestry continuity.
@@ -237,7 +245,10 @@ M < A:
 
 Thus no admitted application transaction overlaps compatibility-changing DDL.
 The proof depends on every participating client acquiring the same profile-owned
-key before any schema-dependent statement. Advisory locks are cooperative;
+key before any schema-dependent statement. Profile admission requires the
+code-owned key domain and its declared derivation, then recomputes the two-int32
+pair from that domain alone; an edited domain, derivation or pair is rejected
+and no other profile content can move the key. Advisory locks are cooperative;
 the supported runtime architecture exposes repositories only through the
 compatibility-admitted unit of work. Database privileges prevent runtime DDL
 and declaration mutation, but cannot force an arbitrary SQL client to acquire

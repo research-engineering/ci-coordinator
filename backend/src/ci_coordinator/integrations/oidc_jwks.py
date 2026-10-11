@@ -132,7 +132,24 @@ class GitHubActionsJwksProvider:
         return await self._cache.probe() is None
 
     async def aclose(self) -> None:
+        """Close the cache, then start transport close only for an uncancelled closer.
+
+        A cancellation request on the closing task is the runtime cleanup deadline
+        fence. The cache drain can absorb that request while awaiting its refresh, so
+        the request itself, not a raised exception, decides whether the first transport
+        close may still be initiated. An already started transport close is retained.
+        """
         try:
             await self._cache.aclose()
-        finally:
-            await self._transport.aclose()
+        except BaseException:
+            if not _closer_cancellation_requested():
+                await self._transport.aclose()
+            raise
+        if _closer_cancellation_requested():
+            raise asyncio.CancelledError
+        await self._transport.aclose()
+
+
+def _closer_cancellation_requested() -> bool:
+    task = asyncio.current_task()
+    return task is not None and task.cancelling() > 0

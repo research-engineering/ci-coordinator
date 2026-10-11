@@ -7,9 +7,11 @@ from pathlib import Path
 import pytest
 
 from ci_coordinator.persistence.compatibility_profile import (
+    COMPATIBILITY_FENCE_KEY_DOMAIN,
     PROFILE_RESOURCE_NAME,
     PROFILE_SHA256,
     CompatibilityTimeouts,
+    compatibility_fence_key,
     load_bundled_profile,
     parse_profile,
 )
@@ -104,6 +106,50 @@ def test_profile_rejects_unordered_or_disabled_timeouts() -> None:
     value["fence"]["timeoutProfiles"]["participant"]["lockTimeoutMs"] = 0
 
     with pytest.raises(ValueError, match="positive integer"):
+        parse_profile(json.dumps(value).encode("utf-8"))
+
+
+def test_fence_key_is_derived_from_the_code_owned_key_domain() -> None:
+    value = json.loads(
+        files("ci_coordinator.persistence.resources").joinpath(PROFILE_RESOURCE_NAME).read_bytes()
+    )
+    profile = load_bundled_profile()
+
+    assert value["fence"]["keyDomain"] == COMPATIBILITY_FENCE_KEY_DOMAIN
+    assert compatibility_fence_key(COMPATIBILITY_FENCE_KEY_DOMAIN) == (-170580017, 1725555266)
+    assert (profile.fence_class_id, profile.fence_object_id) == compatibility_fence_key(
+        COMPATIBILITY_FENCE_KEY_DOMAIN
+    )
+
+
+@pytest.mark.parametrize(
+    ("alteration", "message"),
+    (
+        ("class-id", "derive from the admitted key domain"),
+        ("object-id", "derive from the admitted key domain"),
+        ("swapped-pair", "derive from the admitted key domain"),
+        ("self-consistent-key-domain", "keyDomain must equal its admitted literal"),
+        ("key-derivation", "keyDerivation must equal its admitted literal"),
+    ),
+)
+def test_profile_rejects_an_altered_fence_key_or_key_domain(alteration: str, message: str) -> None:
+    value = json.loads(
+        files("ci_coordinator.persistence.resources").joinpath(PROFILE_RESOURCE_NAME).read_bytes()
+    )
+    fence = value["fence"]
+    if alteration == "class-id":
+        fence["classId"] += 1
+    elif alteration == "object-id":
+        fence["objectId"] -= 1
+    elif alteration == "swapped-pair":
+        fence["classId"], fence["objectId"] = fence["objectId"], fence["classId"]
+    elif alteration == "self-consistent-key-domain":
+        fence["keyDomain"] = "ci-coordinator/database-compatibility-writer-fence/v2"
+        fence["classId"], fence["objectId"] = compatibility_fence_key(fence["keyDomain"])
+    else:
+        fence["keyDerivation"] = "first eight SHA-256 bytes as one signed big-endian int64"
+
+    with pytest.raises(ValueError, match=message):
         parse_profile(json.dumps(value).encode("utf-8"))
 
 

@@ -20,18 +20,27 @@ decisions have separate owners.
 Let `F` mean that the exclusive fence is held, `T` that the caller's Alembic
 transaction contains both DDL and the version-table movement, `H` that the
 actual current Alembic head equals the declared predecessor, `D` that the
-candidate declaration obeys the profile transition algebra, and `A_static`
-that the revision-owned attestor has proved every resulting capability against
+candidate declaration obeys the profile transition algebra, `I` that no
+proposed capability identifier is bound to a descriptor hash other than one
+already retained for that identifier, and `A_static` that the revision-owned
+attestor has proved every resulting capability against
 the post-DDL state independently of any deploy-time runtime role.
 
 ```text
-SafeForwardAppend iff F and T and H and D and A_static and AtomicInsert
+SafeForwardAppend iff F and T and H and D and I and A_static and AtomicInsert
 ```
 
 `F` prevents a cooperating participant from overlapping the compatibility
 change. `T` gives DDL, declaration insertion, and head movement one commit
 outcome. `H` rejects a declaration for a head other than the one actually
 being migrated. `D` preserves the induction step of the append-only chain.
+`D` compares only the predecessor, so a capability retired by one contract could
+return with another meaning in a later expand. `I` closes that gap over the
+complete retained lineage: a new append reads the distinct retained descriptor
+rows of its proposed identifiers, bounded by the profile capability read limit.
+Reintroducing a retired identifier with its original descriptor hash keeps one
+meaning and is admitted; versioned identifiers remain the way to change meaning.
+Replay appends nothing, and runtime admission never performs this history read.
 `A_static` prevents a declaration from asserting schema, data-domain, codec,
 routine, ownership, object-ACL, or PUBLIC-absence facts before the owning
 migration has checked them. A capability privilege-requirement identifier
@@ -91,7 +100,7 @@ deployment fence and attested per admitted runtime transaction.
 | Condition                                                                              | Result                                                                            |
 |----------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
 | proposed revision is absent, predecessor is undeclared, and declaration table is empty | validate bootstrap, insert declaration and rows, return `APPENDED`                |
-| proposed revision is absent and declared predecessor is current chain tip              | validate successor, attest result, insert declaration and rows, return `APPENDED` |
+| proposed revision is absent and declared predecessor is current chain tip              | validate successor and retained identity, attest, insert, return `APPENDED`       |
 | proposed revision exists and is byte-exact, with the actual predecessor relation valid | attest result, return `REPLAY_VALIDATED`                                          |
 | existing or new declaration violates any relation                                      | reject and let the Alembic transaction roll back                                  |
 
@@ -135,3 +144,5 @@ helper only after its source and declaration are reviewed in the same release.
 6. A valid pre-retention ancestor selection inserts nothing.
 7. A failing resulting-capability attestor appends zero declaration and
    capability rows.
+8. A retired identifier reintroduced with another descriptor hash rejects before
+   attestation and appends nothing; its original hash is admitted.

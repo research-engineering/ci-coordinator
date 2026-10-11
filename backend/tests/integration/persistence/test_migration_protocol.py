@@ -139,6 +139,90 @@ def test_failed_resulting_capability_attestation_appends_zero_rows(
         engine.dispose()
 
 
+def test_forward_append_rejects_a_non_adjacent_capability_rebinding(
+    postgres_database_url: str,
+) -> None:
+    profile = load_bundled_profile()
+    engine = create_engine(postgres_database_url)
+    retired = CapabilityDeclaration("migration-protocol-test/v1", "1" * 64)
+    try:
+        with engine.connect() as connection:
+            transaction = connection.begin()
+            try:
+                current = _current_declaration(connection, profile)
+                added = build_declaration(
+                    profile,
+                    generation=current.generation + 1,
+                    revision_id="20991229_9997",
+                    parent_revision_id=current.revision_id,
+                    transition_kind="expand",
+                    capabilities=(*current.capabilities, retired),
+                )
+                contracted = build_declaration(
+                    profile,
+                    generation=current.generation + 2,
+                    revision_id="20991230_9998",
+                    parent_revision_id=added.revision_id,
+                    transition_kind="contract",
+                    capabilities=current.capabilities,
+                )
+                for previous, proposed in ((current, added), (added, contracted)):
+                    assert (
+                        apply_forward_declaration(
+                            connection,
+                            profile,
+                            previous_revision_id=previous.revision_id,
+                            proposed=proposed,
+                            attest_resulting_capabilities=_attest_resulting_capabilities,
+                        )
+                        is ForwardDeclarationOutcome.APPENDED
+                    )
+                    connection.execute(
+                        text("UPDATE public.alembic_version SET version_num = :revision_id"),
+                        {"revision_id": proposed.revision_id},
+                    )
+
+                def reintroduced(descriptor_hash: str) -> RevisionDeclaration:
+                    return build_declaration(
+                        profile,
+                        generation=current.generation + 3,
+                        revision_id="20991231_9999",
+                        parent_revision_id=contracted.revision_id,
+                        transition_kind="expand",
+                        capabilities=(
+                            *current.capabilities,
+                            CapabilityDeclaration(retired.capability_id, descriptor_hash),
+                        ),
+                    )
+
+                declaration_count = _declaration_count(connection)
+                with pytest.raises(CompatibilityContractError) as error:
+                    apply_forward_declaration(
+                        connection,
+                        profile,
+                        previous_revision_id=contracted.revision_id,
+                        proposed=reintroduced("2" * 64),
+                        attest_resulting_capabilities=_reject_resulting_capabilities,
+                    )
+                assert error.value.code == "database_capability_descriptor_rewritten"
+                assert _declaration_count(connection) == declaration_count
+                assert (
+                    apply_forward_declaration(
+                        connection,
+                        profile,
+                        previous_revision_id=contracted.revision_id,
+                        proposed=reintroduced(retired.descriptor_hash),
+                        attest_resulting_capabilities=_attest_resulting_capabilities,
+                    )
+                    is ForwardDeclarationOutcome.APPENDED
+                )
+                assert _declaration_count(connection) == declaration_count + 1
+            finally:
+                transaction.rollback()
+    finally:
+        engine.dispose()
+
+
 def _current_declaration(
     connection: Connection,
     profile: CompatibilityProfile,
