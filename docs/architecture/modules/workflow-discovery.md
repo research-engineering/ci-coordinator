@@ -182,6 +182,10 @@ labels, permission keys and levels, environment names, service ids, timeout
 values, concurrency declarations, matrix dimensions, conditions, action
 coordinates, and statically named secrets. Dynamic expressions remain syntax
 and create a field-specific unknown when they prevent a static conclusion.
+A `secrets` context use inside `${{ }}` without a static property, such as
+`toJSON(secrets)` or bare `secrets`, cannot enumerate names and therefore
+makes the secret-name set unknown. Opaque `run` and step `with.script` bodies
+are not interpreted for such uses; reusable-workflow call inputs are analyzed.
 
 Declared absence is distinct from effective behavior. Scripts, action
 internals, runtime API calls, effective permissions, OIDC issuance,
@@ -195,8 +199,9 @@ Mapping keys remain bounded to 4,096 UTF-8 bytes during event preflight, before
 node composition. Reflected text and unknown syntax retain their existing
 4,096-byte or narrower field bounds. This distinction does not relax the source
 file, 50,000-event, 20,000-node, or depth-64 limits.
-Parser provenance is `github-actions-static/v3` for this admission change;
-regenerate discovery reports rather than relabeling earlier parser evidence.
+Parser provenance is `github-actions-static/v4` for the whole-context secret
+change; regenerate discovery reports rather than relabeling earlier parser
+evidence.
 
 ## 6. Call Graph
 

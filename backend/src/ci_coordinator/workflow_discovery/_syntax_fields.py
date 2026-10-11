@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Final
 
@@ -14,7 +15,6 @@ from ci_coordinator.workflow_discovery._yaml_nodes import (
     YamlSequence,
     contains_expression,
     scalar_text,
-    walk_scalars,
 )
 from ci_coordinator.workflow_discovery.summary import (
     ConcurrencySummary,
@@ -25,6 +25,10 @@ from ci_coordinator.workflow_discovery.summary import (
 )
 
 _SECRET_NAME = re.compile(r"(?<![A-Za-z0-9_])secrets\.([A-Za-z_][A-Za-z0-9_]*)")
+_SECRETS_CONTEXT = re.compile(r"(?<![A-Za-z0-9_.-])secrets(?![A-Za-z0-9_-])")
+_STATIC_SECRET_PROPERTY = re.compile(r"\.[A-Za-z_]")
+_EXPRESSION_STRING = re.compile(r"'(?:[^']|'')*'")
+_STEP_SCRIPT_PATH: Final = ("steps", None, "with", "script")
 _LITERAL_BRANCH = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/-]*\Z")
 PROPOSAL_EVENT_ACTIONS: Final = (
     ("merge_group", ("checks_requested",)),
@@ -306,11 +310,13 @@ def service_ids(node: YamlNode | None) -> tuple[tuple[str, ...] | None, str | No
 def secret_names(node: YamlNode) -> tuple[tuple[str, ...] | None, str | None]:
     names: set[str] = set()
     unresolved = False
-    for scalar in walk_scalars(node, skip_mapping_keys=frozenset({"run"})):
-        if type(scalar.value) is not str:
-            continue
-        names.update(_SECRET_NAME.findall(scalar.value))
-        if "secrets[" in scalar.value or "secrets.*" in scalar.value:
+    for text, step_script in _secret_scalar_texts(node):
+        names.update(_SECRET_NAME.findall(text))
+        if (
+            "secrets[" in text
+            or "secrets.*" in text
+            or (not step_script and _uses_unnamed_secrets_context(text))
+        ):
             unresolved = True
     if isinstance(node, YamlMapping):
         secrets_node = node.get("secrets")
@@ -319,3 +325,48 @@ def secret_names(node: YamlNode) -> tuple[tuple[str, ...] | None, str | None]:
     if unresolved:
         return None, "dynamic_or_inherited_secret_names"
     return tuple(sorted(names, key=utf16_sort_key)), None
+
+
+def _secret_scalar_texts(
+    node: YamlNode,
+    path: tuple[str | None, ...] = (),
+) -> Iterator[tuple[str, bool]]:
+    """Yield text outside ``run`` bodies, flagging opaque step ``with.script`` bodies."""
+
+    if isinstance(node, YamlScalar):
+        if type(node.value) is str:
+            yield node.value, path == _STEP_SCRIPT_PATH
+    elif isinstance(node, YamlSequence):
+        for item in node.items:
+            yield from _secret_scalar_texts(item, (*path, None)[-4:])
+    else:
+        for key, value in node.entries:
+            if key != "run":
+                yield from _secret_scalar_texts(value, (*path, key)[-4:])
+
+
+def _uses_unnamed_secrets_context(text: str) -> bool:
+    """Detect expression uses, such as ``toJSON(secrets)``, that name no secret."""
+
+    for body in _expression_bodies(text):
+        code = _EXPRESSION_STRING.sub("''", body)
+        if any(
+            _STATIC_SECRET_PROPERTY.match(code, match.end()) is None
+            for match in _SECRETS_CONTEXT.finditer(code)
+        ):
+            return True
+    return False
+
+
+def _expression_bodies(text: str) -> tuple[str, ...]:
+    bodies: list[str] = []
+    start = text.find("${{")
+    while start >= 0:
+        index = start + 3
+        quoted = False
+        while index < len(text) and (quoted or not text.startswith("}}", index)):
+            quoted ^= text[index] == "'"
+            index += 1
+        bodies.append(text[start + 3 : index])
+        start = text.find("${{", index + 2)
+    return tuple(bodies)

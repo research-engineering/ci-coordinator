@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterator
 from dataclasses import dataclass
 
 from ruamel.yaml.nodes import MappingNode, Node, ScalarNode, SequenceNode
@@ -85,23 +84,6 @@ def scalar_int(node: YamlNode | None) -> int | None:
 
 def contains_expression(value: str) -> bool:
     return "${{" in value
-
-
-def walk_scalars(
-    node: YamlNode,
-    *,
-    skip_mapping_keys: frozenset[str] = frozenset(),
-) -> Iterator[YamlScalar]:
-    if isinstance(node, YamlScalar):
-        yield node
-        return
-    if isinstance(node, YamlSequence):
-        for item in node.items:
-            yield from walk_scalars(item, skip_mapping_keys=skip_mapping_keys)
-        return
-    for key, value in node.entries:
-        if key not in skip_mapping_keys:
-            yield from walk_scalars(value, skip_mapping_keys=skip_mapping_keys)
 
 
 def _scalar_value(node: ScalarNode) -> YamlScalarValue:

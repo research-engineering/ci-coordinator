@@ -248,6 +248,45 @@ jobs:
             "job.secrets.static_names",
             "dynamic_or_inherited_secret_names",
         ),
+        (
+            _document(
+                job_body=(
+                    "name: Full CI\nruns-on: ubuntu-latest\nenv:\n"
+                    '  TOKEN: "${{ toJSON(secrets) }}"\n'
+                )
+            ),
+            "job.secrets.static_names",
+            "dynamic_or_inherited_secret_names",
+        ),
+        (
+            _document(
+                job_body=('name: Full CI\nruns-on: ubuntu-latest\nenv:\n  TOKEN: "${{secrets}}"\n')
+            ),
+            "job.secrets.static_names",
+            "dynamic_or_inherited_secret_names",
+        ),
+        (
+            _document(
+                job_body=(
+                    "name: Full CI\nruns-on: ubuntu-latest\nenv:\n"
+                    "  TOKEN: \"${{ format('}}{0}', secrets) }}\"\n"
+                )
+            ),
+            "job.secrets.static_names",
+            "dynamic_or_inherited_secret_names",
+        ),
+        (
+            _document(
+                job_body=(
+                    "name: Full CI\n"
+                    "uses: example/repo/.github/workflows/ci.yml@main\n"
+                    "with:\n"
+                    '  script: "${{ toJSON(secrets) }}"\n'
+                )
+            ),
+            "job.secrets.static_names",
+            "dynamic_or_inherited_secret_names",
+        ),
     ],
 )
 def test_unsupported_or_dynamic_syntax_closes_as_typed_unknown(
@@ -258,6 +297,81 @@ def test_unsupported_or_dynamic_syntax_closes_as_typed_unknown(
     parsed = _parse(document)
 
     assert _reason(parsed, field) == reason
+
+
+def test_whole_secrets_context_expression_projects_unknown_secret_names() -> None:
+    parsed = _parse(
+        _document(
+            job_body=(
+                "name: Full CI\nruns-on: ubuntu-latest\nenv:\n"
+                "  NAMED: ${{ secrets.API_TOKEN }}\n"
+                '  TOKEN: "${{ toJSON(secrets) }}"\n'
+            )
+        )
+    )
+
+    summary = parsed.summary
+    assert summary.static_secret_names is None
+    assert summary.jobs[0].static_secret_names is None
+    assert summary.to_identity_mapping()["staticSecretNames"] is None
+    assert summary.jobs[0].to_identity_mapping()["staticSecretNames"] is None
+    assert _reason(parsed, "workflow.secrets.static_names") == "dynamic_or_inherited_secret_names"
+    assert _reason(parsed, "job.secrets.static_names") == "dynamic_or_inherited_secret_names"
+    assert not [fact for fact in parsed.facts if fact.field.endswith(".secrets.static_names")]
+
+
+@pytest.mark.parametrize(
+    ("job_env", "expected"),
+    [
+        ("", ()),
+        ("  TOKEN: ${{ secrets.API_TOKEN }}\n", ("API_TOKEN",)),
+        (
+            "  TOKEN: ${{ secrets.API_TOKEN }}\n"
+            "  NOTE: rotate secrets and toJSON(secrets) outside expressions\n"
+            '  WHERE: "rotate secrets for ${{ github.repository }}"\n'
+            "  LABEL: \"${{ format('secrets {0}', inputs.secrets) }}\"\n",
+            ("API_TOKEN",),
+        ),
+    ],
+    ids=["no-references", "static-name", "literal-and-property-text"],
+)
+@pytest.mark.parametrize(
+    "script_step",
+    [
+        '  - run: echo "${{ toJSON(secrets) }}" omitted-script-body\n',
+        (
+            "  - uses: actions/github-script@v7\n"
+            "    with:\n"
+            '      script: console.log("${{ toJSON(secrets) }}", "omitted-script-body")\n'
+        ),
+    ],
+    ids=["run", "with-script"],
+)
+def test_static_secret_names_ignore_literal_text_and_opaque_script_bodies(
+    job_env: str,
+    expected: tuple[str, ...],
+    script_step: str,
+) -> None:
+    parsed = _parse(
+        _document(
+            job_body=(
+                "name: Full CI\nruns-on: ubuntu-latest\n"
+                + (f"env:\n{job_env}" if job_env else "")
+                + "steps:\n"
+                + script_step
+            )
+        )
+    )
+
+    summary = parsed.summary
+    assert summary.static_secret_names == expected
+    assert summary.jobs[0].static_secret_names == expected
+    assert not [item for item in parsed.unknowns if item.field.endswith(".secrets.static_names")]
+    secret_fact_fields = {
+        fact.field for fact in parsed.facts if fact.field.endswith(".secrets.static_names")
+    }
+    assert secret_fact_fields == {"job.secrets.static_names", "workflow.secrets.static_names"}
+    assert "omitted-script-body" not in repr(parsed)
 
 
 def _parse(document: str) -> ParsedWorkflow:

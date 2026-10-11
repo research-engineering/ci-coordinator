@@ -1098,6 +1098,63 @@ def test_inventory_enforces_provider_reusable_workflow_limits(
     )
 
 
+@pytest.mark.parametrize(
+    ("late_chain_length", "expected"),
+    [(0, True), (6, True), (7, False), (8, False)],
+    ids=["shallow-only", "shared-at-depth-8", "shared-at-depth-9", "shared-at-depth-10"],
+)
+def test_inventory_bounds_a_shared_callee_at_its_deepest_reusable_workflow_level(
+    late_chain_length: int,
+    expected: bool,
+) -> None:
+    # The root calls the shared workflow directly before the late chain reaches it
+    # again; its two-workflow tail must satisfy the limit at the deeper level.
+    shared_path = ".github/workflows/early.yml"
+    tail_paths = (".github/workflows/tail-1.yml", ".github/workflows/tail-2.yml")
+    late_paths = tuple(
+        f".github/workflows/late-{index}.yml" for index in range(1, late_chain_length + 1)
+    )
+    root = parse_workflow_capability(
+        (
+            "on: pull_request\njobs:\n"
+            + "".join(
+                f"  call-{index}:\n    uses: ./{target}\n"
+                for index, target in enumerate((shared_path, *late_paths[:1]))
+            )
+        ).encode(),
+        path=PATH,
+        revision_sha=REVISION,
+    )
+    assert root is not None
+    assert root.local_reusable_workflow_paths[0] == shared_path
+    chain = (*late_paths, shared_path, *tail_paths)
+    capabilities = (
+        root,
+        *(
+            _workflow_call_capability(
+                path=path,
+                target=chain[index + 1] if index + 1 < len(chain) else None,
+            )
+            for index, path in enumerate(chain)
+        ),
+    )
+    inventory = ProviderWorkflowInventory(
+        revision_sha=REVISION,
+        default_branch_workflows=(),
+        revision_capabilities=tuple(
+            sorted(capabilities, key=lambda item: item.path.encode("utf-16-be"))
+        ),
+    )
+
+    assert (
+        inventory.admits_local_reusable_workflow_closure(
+            root_paths=(PATH,),
+            expected_paths=tuple(sorted((PATH, *chain))),
+        )
+        is expected
+    )
+
+
 def _admits_native_control_plane(capability: RevisionWorkflowCapability) -> bool:
     inventory = ProviderWorkflowInventory(
         revision_sha=REVISION,

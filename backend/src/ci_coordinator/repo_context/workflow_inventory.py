@@ -336,14 +336,17 @@ class ProviderWorkflowInventory:
         def visit(
             path: str,
             depth: int,
-            root_seen: set[str],
+            root_depths: dict[str, int],
             root_visiting: set[str],
         ) -> bool:
-            if depth > 10 or len(root_seen) > 51:
+            if depth > 10 or len(root_depths) > 51:
                 return False
             if path in root_visiting:
                 return False
-            if path in root_seen:
+            # Re-expand a shared callee only when a longer chain reaches it, so its
+            # descendants meet the limit at their deepest level. Depths strictly
+            # increase, bounding each workflow to ten expansions per root.
+            if root_depths.get(path, 0) >= depth:
                 return True
             capability = capabilities.get(path)
             if (
@@ -355,9 +358,9 @@ class ProviderWorkflowInventory:
                 )
             ):
                 return False
-            root_seen.add(path)
+            root_depths[path] = depth
             reachable.add(path)
-            if len(root_seen) > 51:
+            if len(root_depths) > 51:
                 return False
             root_visiting.add(path)
             for target in capability.local_reusable_workflow_paths:
@@ -365,14 +368,14 @@ class ProviderWorkflowInventory:
                 if (
                     target_capability is None
                     or not target_capability.supports_reuse
-                    or not visit(target, depth + 1, root_seen, root_visiting)
+                    or not visit(target, depth + 1, root_depths, root_visiting)
                 ):
                     return False
             root_visiting.remove(path)
             return True
 
         for path in root_paths:
-            if not visit(path, 1, set(), set()):
+            if not visit(path, 1, {}, set()):
                 return False
         return reachable == set(expected_paths)
 
