@@ -224,8 +224,16 @@ def test_runtime_failure_diagnostics_do_not_weaken_required_result_retention() -
     assert diagnostic_options["name"] != result_options["name"]
     assert diagnostic_options["if-no-files-found"] == "warn"
     assert result_options["if-no-files-found"] == "error"
-    assert diagnostic_options["path"] == result_options["path"]
+    failure_only = [
+        "${{ runner.temp }}/qualification/runtime-failure.json",
+        "${{ runner.temp }}/qualification/runtime-failure.log",
+    ]
+    assert diagnostic_options["path"].splitlines() == [
+        *failure_only,
+        *result_options["path"].splitlines(),
+    ]
     result_paths = set(result_options["path"].splitlines())
+    assert result_paths.isdisjoint(failure_only)
     for name in ("repair-observation.json", "vulnerabilities.json", "repair-evidence.json"):
         assert f"${{{{ runner.temp }}}}/qualification/{name}" in result_paths
     assert diagnostic_options["retention-days"] == result_options["retention-days"] == 7

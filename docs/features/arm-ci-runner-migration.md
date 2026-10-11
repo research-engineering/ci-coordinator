@@ -75,6 +75,59 @@ shutdown, layer-reuse and release identity checks. Cross-build and execution
 may be slower. A successful ARM-hosted test cannot establish native amd64
 production performance; record the actual environment with every comparison.
 
+## Open Qualification Observation R-1
+
+Status: open, classified `unknown`; no root cause or repair is claimed.
+
+The `Qualify read-only runtime and PostgreSQL TLS` step intermittently exits
+124 on the ARM runner while executing the amd64 candidate under QEMU. Observed
+occurrences are master push run 36717722372 (`08e4174`) and PR runs 38170139633
+and 38170322646. The step took 98-102 seconds when it passed and 109-112
+seconds when it failed. The retained diagnostics of run 38170322646 include a
+complete `runtime.json` and `migration.txt`, but no `shutdown.json`, so the
+expired command was `timeout 20` around `alembic current`,
+`timeout 5 docker kill` or `timeout 15 docker wait`. A complete
+`migration.txt` does not exclude the first: Alembic prints the current
+revision before its connection teardown, and `docker exec` may return after
+the output arrives. Duration differences alone cannot attribute the remaining
+time.
+
+Source validation found no defect under the
+[audit predicate](current-source-audit-validation.md). The candidate sets
+`CI_COORDINATOR_SHUTDOWN_TIMEOUT_SECONDS=10`, which partitions into a 5-second
+Uvicorn graceful drain, 4 seconds of resource cleanup and a 1-second reserve.
+Disabled mode composes no runtime resources, so its in-process work after the
+signal is bounded by the graceful drain plus the trivial lifespan exit. The
+setting is the
+[cooperative runtime bound](../architecture/modules/runtime-composition.md),
+not a forced process exit. Uvicorn re-raises the captured signal after the
+server returns. Event-loop teardown, non-daemon worker-thread joins,
+interpreter finalization, emulator exit and container teardown are outside it.
+The deployment's container grace period remains the hard termination fence.
+Qualification starts the candidate without `--init`, so the emulated
+interpreter is the container's first process. The deployment recipe uses
+`--init`.
+
+On failure, the step now records each bounded verification, migration, signal
+and wait command with its start time, status and elapsed time. It also records
+the candidate state and, after a signaled shutdown, a separate bounded
+30-second late-exit observation. These records and a bounded log tail go to
+`runtime-failure.json` and `runtime-failure.log` in the failure diagnostics
+artifact. The success path, its artifacts, assertions and command bounds are
+unchanged, and the step's original failure status is preserved.
+
+Keep the 15-second wait. A future occurrence justifies revising it only if
+the evidence shows the expired command was `shutdown-wait`, the log tail
+contains `shutdown_complete` and `process_finished` without `shutdown_failed`
+or `drain_timeout`, and the late observation records an admitted exit code
+with `OOMKilled` false. A revision must also be supported by successful-run
+shutdown durations from the same runner profile. A missing completion event,
+a drain timeout, a late wait that also expires, an expired signal command or
+an expired `migration-current` command points to the application, emulator or
+Docker daemon instead. Each of those needs its own investigation, not a larger
+budget. This observation makes no claim about native amd64 shutdown latency,
+production stop duration or emulator internals.
+
 ## Acceptance And Revision Conditions
 
 Scanner execution and severity admission are separate predicates. The pinned
