@@ -19,6 +19,7 @@ from ci_coordinator.ci_economics.sources import (
     ReconciliationCollectionSource,
 )
 from ci_coordinator.integrations.github.ci_economics_provider import GitHubCiEconomicsProvider
+from ci_coordinator.integrations.github.ci_economics_sources import GitHubCiEconomicsSources
 from ci_coordinator.integrations.github.reconciliation_observer import (
     GitHubActionsReconciliationObserver,
     GitHubReconciliationObservationError,
@@ -57,8 +58,26 @@ class _Observer:
         return outcome
 
 
-def _provider(observer: _Observer) -> GitHubCiEconomicsProvider:
-    return GitHubCiEconomicsProvider(cast(GitHubActionsReconciliationObserver, observer))
+@dataclass
+class _Attempts:
+    observer: _Observer
+    deferred: ProviderAttemptDeferred | None = None
+    attempts: list[AttemptIdentity] = field(default_factory=list)
+    job_reads_before: list[int] = field(default_factory=list)
+
+    async def load_completed_attempt(
+        self, attempt: AttemptIdentity
+    ) -> AttemptIdentity | ProviderAttemptDeferred:
+        self.attempts.append(attempt)
+        self.job_reads_before.append(len(self.observer.attempts))
+        return attempt if self.deferred is None else self.deferred
+
+
+def _provider(observer: _Observer, attempts: _Attempts | None = None) -> GitHubCiEconomicsProvider:
+    return GitHubCiEconomicsProvider(
+        cast(GitHubActionsReconciliationObserver, observer),
+        cast(GitHubCiEconomicsSources, _Attempts(observer) if attempts is None else attempts),
+    )
 
 
 def _job(
@@ -87,16 +106,54 @@ def _job(
 def test_two_equal_complete_reads_promote_one_provider_snapshot(source: CollectionSource) -> None:
     jobs = (_job(2), _job(1, conclusion="action_required"))
     observer = _Observer([jobs, tuple(reversed(jobs))])
+    attempts = _Attempts(observer)
 
-    outcome = asyncio.run(_provider(observer).load_stable(source))
+    outcome = asyncio.run(_provider(observer, attempts).load_stable(source))
 
     assert isinstance(outcome, ProviderAttemptSnapshot)
+    assert attempts.attempts == [source.attempt]
+    assert attempts.job_reads_before == [0]
     assert observer.attempts == [source.attempt, source.attempt]
     assert outcome.subject_id == source.source_id
     assert outcome.attempt == source.attempt
     assert [job.provider_job_id for job in outcome.jobs] == [1, 2]
     assert outcome.jobs[0].conclusion == "action_required"
     assert all(job.delivery_id is None for job in outcome.jobs)
+
+
+@pytest.mark.parametrize(
+    "source", [SOURCE, PROVIDER_SOURCE], ids=["reconciliation", "provider-run"]
+)
+def test_equal_terminal_job_reads_of_an_unfinished_attempt_are_never_promoted(
+    source: CollectionSource,
+) -> None:
+    jobs = (_job(1), _job(2))
+    observer = _Observer([jobs, jobs])
+    attempts = _Attempts(observer, ProviderAttemptDeferred("provider_not_terminal"))
+
+    outcome = asyncio.run(_provider(observer, attempts).load_stable(source))
+
+    assert outcome == ProviderAttemptDeferred("provider_not_terminal")
+    assert attempts.attempts == [source.attempt]
+    assert not observer.attempts
+    assert observer.outcomes == [jobs, jobs]
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["provider_binding_mismatch", "provider_malformed", "provider_unavailable"],
+)
+def test_attempt_completion_failures_stop_before_job_reads(
+    reason: ProviderCollectionFailureReason,
+) -> None:
+    jobs = (_job(1),)
+    observer = _Observer([jobs, jobs])
+    attempts = _Attempts(observer, ProviderAttemptDeferred(reason))
+
+    outcome = asyncio.run(_provider(observer, attempts).load_stable(PROVIDER_SOURCE))
+
+    assert outcome == ProviderAttemptDeferred(reason)
+    assert not observer.attempts
 
 
 @pytest.mark.parametrize(
@@ -149,8 +206,10 @@ def test_provider_errors_are_closed_into_collection_failure_algebra(
 @pytest.mark.parametrize("source", [SUBJECT, SOURCE.attempt, None])
 def test_provider_rejects_a_non_source_before_reading(source: object) -> None:
     observer = _Observer([])
+    attempts = _Attempts(observer)
     with pytest.raises(TypeError, match="exact collection source"):
-        asyncio.run(_provider(observer).load_stable(cast(CollectionSource, source)))
+        asyncio.run(_provider(observer, attempts).load_stable(cast(CollectionSource, source)))
+    assert not attempts.attempts
     assert not observer.attempts
 
 
@@ -169,10 +228,12 @@ def test_valid_reconciliation_outside_economics_identity_domain_is_deferred(
         run_attempt=2,
     )
     observer = _Observer([])
+    attempts = _Attempts(observer)
 
     outcome = asyncio.run(
-        _provider(observer).load_stable(ReconciliationCollectionSource(subject, CONTRACT))
+        _provider(observer, attempts).load_stable(ReconciliationCollectionSource(subject, CONTRACT))
     )
 
     assert outcome == ProviderAttemptDeferred("provider_malformed")
+    assert not attempts.attempts
     assert not observer.attempts

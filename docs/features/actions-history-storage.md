@@ -471,10 +471,27 @@ An earlier pure-time check alone cannot discharge this witness.
 The new catalog reuses the existing economics attestation adapter, including
 its conservative check of the installed economics guard routine. This is an
 explicit dependency, not a claim that archive storage owns that routine. A
-standalone archive database would require revisiting that reuse. Runtime ACLs
-grant column-level updates rather than scope/attempt identity updates. Their
-installation requires drained sessions under the existing deployment fence;
-this change does not claim rolling coexistence with the predecessor ACL.
+standalone archive database would require revisiting that reuse.
+
+The archive catalog attests the inbox foreign key to `ci_workflow_observations`,
+not that relation's column contract, which `ci-economics-evidence` owns and
+the history unit of work does not admit. Transfer therefore selects every source
+column and revalidates each one at the delivery decoder: an exact strict column
+set, the 90-day retention law, canonical identity columns and a semantic hash
+recomputed from the canonical body. Source-column drift fails closed after
+admission: the history transaction rolls back and wraps the SQL or decoder
+error as store unavailability, so the round reports a `store_unavailable`
+transfer outcome rather than capability unavailability before repository
+exposure, and acknowledges no source. Superuser
+and migration-owner bypass remain database-compatibility non-claims. Reopen by
+admitting the economics evidence capability for transfer, or attesting the
+consumed columns here, if drift must be rejected before exposure or archive
+storage becomes deployable without economics evidence.
+
+Runtime ACLs grant column-level updates rather than scope/attempt identity
+updates. Their installation requires drained sessions under the existing
+deployment fence; this change does not claim rolling coexistence with the
+predecessor ACL.
 
 Gap insertion and replay use the already-held transaction-scoped repository
 lock and locked dataset row. They must not request `FOR UPDATE` on the

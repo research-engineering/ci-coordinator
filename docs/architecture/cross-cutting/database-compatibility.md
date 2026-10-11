@@ -75,8 +75,13 @@ implementing incompatible contracts.
 Each declaration capability row binds its identifier to a canonical descriptor
 hash over schema, data-domain, codec, backfill, routine, and privilege
 requirements. The revision hash includes the sorted `(capabilityId,
-descriptorHash)` pairs. Therefore silently changing an identifier's meaning is
-both an admission mismatch and a declaration-content mismatch.
+descriptorHash)` pairs. Therefore changing any descriptor coordinate under an
+unchanged capability identifier is both an admission mismatch and a
+declaration-content mismatch. The hash covers the versioned coordinate
+identifiers, not the code-owned catalog facts they name. Changing those facts
+behind an unchanged coordinate identifier is not detected by hashing; the
+new-identifier rule above forbids it, and section 7 attestation rejects a
+database that does not match the admitting binary's catalog.
 
 ## 4. Transaction Protocol
 

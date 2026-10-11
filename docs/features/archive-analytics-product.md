@@ -121,8 +121,9 @@ that the bounded route cannot serve representative data, or calibration fails
 to support a useful administrator decision. No global optimum is claimed.
 
 Limits: 100000 scoped attempts, 1000000 jobs inspected before job filtering,
-366 returned buckets, 64 mapping entries, 1 MiB serialized response, 4096 query
-bytes, two admitted concurrent HTTP requests, 5-second SQL statement timeout
+366 returned buckets, 64 mapping entries, 1 MiB serialized response, the raw GET
+query budget owned by [archive read qualification](archive-read-retention-product.md#qualification-refinements),
+two admitted concurrent HTTP requests, 5-second SQL statement timeout
 and 20-second application deadline. Exceeding a row limit returns explicit
 unavailable, never silently sampled totals. Read-committed snapshots are accepted
 only if the entire dataset value is unchanged before/after all scalar reads.

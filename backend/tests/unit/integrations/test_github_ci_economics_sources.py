@@ -8,6 +8,7 @@ from typing import cast
 import pytest
 
 from ci_coordinator.ci_economics.discovery import ProviderRunDiscoveryPage, RunDiscoveryWindow
+from ci_coordinator.ci_economics.model import AttemptIdentity
 from ci_coordinator.ci_economics.ports import ProviderAttemptDeferred
 from ci_coordinator.ci_economics.sources import ProviderRunCollectionSource
 from ci_coordinator.config_control import RepositoryScope
@@ -317,3 +318,25 @@ def test_wrong_scope_type_never_selects_credentials() -> None:
             GitHubCiEconomicsSources(provider).resolve_attempt(cast(RepositoryScope, None), 1, 1)
         )
     assert not provider.installations
+
+
+def test_completed_attempt_read_returns_the_exact_requested_attempt() -> None:
+    attempt = AttemptIdentity(SCOPE, RUN_ID, ATTEMPT, "b" * 40)
+    provider = _Provider([_response(_repository()), _response(_run())])
+
+    result = asyncio.run(GitHubCiEconomicsSources(provider).load_completed_attempt(attempt))
+
+    assert result is attempt
+    assert provider.bindings == [(101, 202)]
+    assert [request.path for request in provider.requests] == ["/repositories/202", PATH]
+    assert not provider.responses
+
+
+@pytest.mark.parametrize("value", [SCOPE, None, (RUN_ID, ATTEMPT)])
+def test_completed_attempt_read_rejects_a_non_attempt_before_credentials(value: object) -> None:
+    provider = _Provider([])
+    with pytest.raises(TypeError, match="exact attempt identity"):
+        asyncio.run(
+            GitHubCiEconomicsSources(provider).load_completed_attempt(cast(AttemptIdentity, value))
+        )
+    assert not provider.installations and not provider.requests

@@ -136,7 +136,11 @@ domain dump in the router. Native roundtrip, malformed-instance and exact wire
 tests distinguish these obligations from a permissive parser workaround.
 
 Raw GET query budgets are 8192 bytes for analytics and 16384 for archive pages.
-The former accommodates a 512-scalar astral job name (6144 percent-encoded bytes)
-and all finite analytics parameters. The latter additionally accommodates a
-4096-byte URL-safe cursor. Scalar bounds remain unchanged; byte guards reject
-oversized encoding before parsing, rather than silently truncating filters.
+Each counts the whole undecoded ASGI `query_string`, including separators and
+percent escapes, and admits exactly its budget. This section is the single
+authority for both values; it supersedes the analytics design's initial
+4096-byte figure. The analytics budget accommodates a 512-scalar astral job
+name (6144 percent-encoded bytes) and all finite analytics parameters. The
+archive-page budget additionally accommodates a 4096-byte URL-safe cursor.
+Scalar bounds remain unchanged; byte guards reject oversized encoding before
+parsing, rather than silently truncating filters.

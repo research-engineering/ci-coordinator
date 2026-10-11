@@ -441,7 +441,7 @@ def _compose_connected_dependencies(
         ci_economics_store = TransactionalCiEconomicsStore(ci_economics_uow)
         ci_economics_collection = CiEconomicsCollectionService(
             ci_economics_store,
-            GitHubCiEconomicsProvider(provider_observer),
+            GitHubCiEconomicsProvider(provider_observer, GitHubCiEconomicsSources(github)),
             ci_economics_profile,
             runtime_metrics=runtime_metrics,
             worker_id=runtime_worker_id,
