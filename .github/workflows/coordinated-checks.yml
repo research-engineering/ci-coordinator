@@ -124,7 +124,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -181,7 +181,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -230,7 +230,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Enable the pinned amd64 emulator
       uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1
       with:
@@ -261,7 +261,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Install the pinned mise binary
       run: "curl --fail --silent --show-error --location \\\n  https://github.com/jdx/mise/releases/download/v2026.9.11/mise-v2026.9.11-linux-arm64 \\\n  --output \"$RUNNER_TEMP/mise\"\necho \"80ad6e9589d3c4483fd67a4a97f07e28330964dde64ca8cad15d5cb56134a54d  $RUNNER_TEMP/mise\" | sha256sum --check --strict\nchmod 0755 \"$RUNNER_TEMP/mise\"\n"
     - name: Verify sparse-host backend preparation
@@ -285,7 +285,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -326,7 +326,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -356,7 +356,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -369,7 +369,7 @@ jobs:
     - name: Install locked Python dependencies
       run: "python3 -m scripts.python_witness lock-check\npython3 -m scripts.python_witness install-check\n"
     - name: Verify exact Python identity
-      run: backend/.venv/bin/python -c 'import platform; actual = platform.python_version(); raise SystemExit(0 if actual == "3.13.15" else f"expected Python 3.13.15, got {actual}")'
+      run: backend/.venv/bin/python -c 'import platform; actual = platform.python_version(); raise SystemExit(0 if actual == "3.13.16" else f"expected Python 3.13.16, got {actual}")'
     - name: Freeze the complete native test universe
       id: native_collection
       run: backend/.venv/bin/python -m scripts.ci_test_execution plan --plan .ci-native/plan.json --diagnostics .ci-native/diagnostics/plan
@@ -427,7 +427,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -440,7 +440,7 @@ jobs:
     - name: Install locked Python dependencies
       run: "python3 -m scripts.python_witness lock-check\npython3 -m scripts.python_witness install-check\n"
     - name: Verify exact Python identity
-      run: backend/.venv/bin/python -c 'import platform; actual = platform.python_version(); raise SystemExit(0 if actual == "3.13.15" else f"expected Python 3.13.15, got {actual}")'
+      run: backend/.venv/bin/python -c 'import platform; actual = platform.python_version(); raise SystemExit(0 if actual == "3.13.16" else f"expected Python 3.13.16, got {actual}")'
     - name: Install the admitted scanner for native falsifiers
       if: startsWith(matrix.shard, 'tooling-')
       run: "scanner_binary=\"$(bash .github/actions/secret-scan/install.sh \"$RUNNER_TEMP/gitleaks-native\")\"\necho \"GITLEAKS_TEST_BINARY=$scanner_binary\" >> \"$GITHUB_ENV\"\ndirname \"$scanner_binary\" >> \"$GITHUB_PATH\"\n"
@@ -501,7 +501,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -604,7 +604,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -652,7 +652,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -665,7 +665,7 @@ jobs:
     - name: Install locked Python dependencies
       run: "python3 -m scripts.python_witness lock-check\npython3 -m scripts.python_witness install-check\n"
     - name: Verify exact Python identity
-      run: backend/.venv/bin/python -c 'import platform; actual = platform.python_version(); raise SystemExit(0 if actual == "3.13.15" else f"expected Python 3.13.15, got {actual}")'
+      run: backend/.venv/bin/python -c 'import platform; actual = platform.python_version(); raise SystemExit(0 if actual == "3.13.16" else f"expected Python 3.13.16, got {actual}")'
     - name: Download the frozen native plan
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
       with:
@@ -726,7 +726,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up uv
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -840,7 +840,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up locked package manager
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -848,7 +848,7 @@ jobs:
         enable-cache: true
         cache-dependency-glob: tooling/quality/uv.lock
     - name: Install locked utility environment
-      run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      run: uv sync --locked --project tooling/quality --python 3.13.16 --no-dev
     - name: Execute complete utility group
       run: tooling/quality/.venv/bin/python -m scripts.ci_matrix run --group config
     - name: Retain exact group receipt
@@ -881,7 +881,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up locked package manager
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -889,7 +889,7 @@ jobs:
         enable-cache: true
         cache-dependency-glob: tooling/quality/uv.lock
     - name: Install locked utility environment
-      run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      run: uv sync --locked --project tooling/quality --python 3.13.16 --no-dev
     - name: Set up pinned build checks provider
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       with:
@@ -934,7 +934,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up locked package manager
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -942,7 +942,7 @@ jobs:
         enable-cache: true
         cache-dependency-glob: tooling/quality/uv.lock
     - name: Install locked utility environment
-      run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      run: uv sync --locked --project tooling/quality --python 3.13.16 --no-dev
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
       with:
@@ -993,7 +993,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up locked package manager
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -1001,7 +1001,7 @@ jobs:
         enable-cache: true
         cache-dependency-glob: tooling/quality/uv.lock
     - name: Install locked utility environment
-      run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      run: uv sync --locked --project tooling/quality --python 3.13.16 --no-dev
     - name: Set up Go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
       with:
@@ -1050,7 +1050,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
       with:
-        python-version: 3.13.15
+        python-version: 3.13.16
     - name: Set up locked package manager
       uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4
       with:
@@ -1058,7 +1058,7 @@ jobs:
         enable-cache: true
         cache-dependency-glob: tooling/quality/uv.lock
     - name: Install locked utility environment
-      run: uv sync --locked --project tooling/quality --python 3.13.15 --no-dev
+      run: uv sync --locked --project tooling/quality --python 3.13.16 --no-dev
     - name: Execute complete utility group
       run: tooling/quality/.venv/bin/python -m scripts.ci_matrix run --group spelling
     - name: Retain exact group receipt

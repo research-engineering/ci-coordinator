@@ -19,9 +19,8 @@ LD_LIBRARY_PATH=/tmp/zlib-baseline timeout 10 /out/check_zlib \
     /tmp/zlib-baseline/libz.so.1.3.2 > /out/zlib-before.json || baseline=$?
 test "$baseline" -eq 10
 
-baseline=0
-timeout 10 python -I -B /security/check_tarfile.py > /out/python-before.json || baseline=$?
-test "$baseline" -eq 10
+# CPython 3.13.16 contains the CVE-2026-82049 repair; the vendor interpreter must pass.
+timeout 10 python -I -B /security/check_tarfile.py > /out/python-before.json
 timeout 30 python -I -B /security/check_stdlib.py before > /out/stdlib-before.json
 python -I -B /security/apply_stdlib.py
 timeout 10 python -I -B /security/check_tarfile.py > /out/python-after.json

@@ -350,17 +350,23 @@ def main() -> int:
     parser.add_argument("--source-commit", required=True)
     parser.add_argument("--policy", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    # Diagnostic copy of the observation, written before admission so a reviewer can
+    # inspect stale installed bytes or witnesses. It is never admitted evidence.
+    parser.add_argument("--observation-output", type=Path)
     args = parser.parse_args()
     evidence = collect(
         subject=args.subject, source_commit=args.source_commit, policy_path=args.policy
     )
+    raw = evidence_bytes(evidence)
+    if len(raw) > MAX_REPAIR_BYTES:
+        raise ValueError("repair evidence exceeds bound")
+    if args.observation_output is not None:
+        with args.observation_output.open("xb") as observation:
+            observation.write(raw)
     policy_hash, policy = read_policy(args.policy, ROOT)
     validate_observations(
         policy=policy, policy_sha256=policy_hash, evidence=evidence, observed=datetime.now(UTC)
     )
-    raw = evidence_bytes(evidence)
-    if len(raw) > MAX_REPAIR_BYTES:
-        raise ValueError("repair evidence exceeds bound")
     with args.output.open("xb") as output:
         output.write(raw)
     return 0

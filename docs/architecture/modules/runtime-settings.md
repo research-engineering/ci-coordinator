@@ -361,14 +361,14 @@ source path. Completeness is checked against the canonical caller inventory and
 entrypoint dispositions described above.
 
 The interpreter contract is the singleton
-`{GIL-enabled CPython 3.13.15}`. The duplicate-free machine profile, runtime
+`{GIL-enabled CPython 3.13.16}`. The duplicate-free machine profile, runtime
 admission, provider workflow, package marker, development toolchain, and
 container are exact projections of that set. The packaging field
-`requires-python = "==3.13.15"` is therefore an exact admission constraint,
+`requires-python = "==3.13.16"` is therefore an exact admission constraint,
 not a wider compatibility envelope. Consequently:
 
 ```text
-RuntimeAdmitted iff ExactRuntimeIdentity = GIL-enabled CPython 3.13.15
+RuntimeAdmitted iff ExactRuntimeIdentity = GIL-enabled CPython 3.13.16
 ```
 
 Every other patch is rejected both by package installation and again before
@@ -480,7 +480,7 @@ planner, or an environment module.
 - `disabled` construction exposes selected-plan issuance;
 - a mutable process input can relabel the packaged release identity or source
   commit, or a development sentinel becomes production eligible;
-- an implementation other than CPython, a patch other than `3.13.15`,
+- an implementation other than CPython, a patch other than `3.13.16`,
   or a free-threaded build reaches a runtime or replay entrypoint;
 - packaging, provider matrix, container, static target, canonical profile, or
   packaged profile diverges from the admitted interpreter set.

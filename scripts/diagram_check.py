@@ -66,8 +66,8 @@ def check(
 ) -> dict[str, object]:
     started = monotonic()
     deadline = started + load_profile(root).runTimeoutSeconds
-    if sys.version.split()[0] != "3.13.15":
-        raise ValueError("diagram check requires the locked Python 3.13.15 environment")
+    if sys.version.split()[0] != "3.13.16":
+        raise ValueError("diagram check requires the locked Python 3.13.16 environment")
     admit_python_packages(root)
     manifest = build_manifest(root, revision, deadline=deadline, stop_requested=stop_requested)
     if stop_requested is not None and stop_requested():

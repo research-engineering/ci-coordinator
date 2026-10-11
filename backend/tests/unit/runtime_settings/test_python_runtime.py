@@ -17,37 +17,37 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 
 
 def test_exact_supported_python_version_is_admitted() -> None:
-    assert admit_python_runtime((3, 13, 15)) is None
+    assert admit_python_runtime((3, 13, 16)) is None
 
 
 @pytest.mark.parametrize(
     "version",
-    ((3, 12, 13), (3, 13, 14), (3, 13, 16), (3, 14, 7), (3, 15, 0)),
+    ((3, 12, 13), (3, 13, 15), (3, 13, 17), (3, 14, 7), (3, 15, 0)),
 )
 def test_every_other_python_patch_is_rejected(version: tuple[int, int, int]) -> None:
     assert admit_python_runtime(version) == UnsupportedPythonRuntime(
         actual_implementation="CPython",
         actual_version=".".join(str(part) for part in version),
         supported_implementation="CPython",
-        supported_versions=("3.13.15",),
+        supported_versions=("3.13.16",),
     )
 
 
 def test_non_cpython_implementation_is_rejected() -> None:
-    assert admit_python_runtime((3, 13, 15), "PyPy") == UnsupportedPythonRuntime(
+    assert admit_python_runtime((3, 13, 16), "PyPy") == UnsupportedPythonRuntime(
         actual_implementation="PyPy",
-        actual_version="3.13.15",
+        actual_version="3.13.16",
         supported_implementation="CPython",
-        supported_versions=("3.13.15",),
+        supported_versions=("3.13.16",),
     )
 
 
 def test_free_threaded_cpython_build_is_rejected() -> None:
-    assert admit_python_runtime((3, 13, 15), free_threaded=True) == UnsupportedPythonRuntime(
+    assert admit_python_runtime((3, 13, 16), free_threaded=True) == UnsupportedPythonRuntime(
         actual_implementation="CPython",
-        actual_version="3.13.15",
+        actual_version="3.13.16",
         supported_implementation="CPython",
-        supported_versions=("3.13.15",),
+        supported_versions=("3.13.16",),
         actual_build_variant="free-threaded",
         supported_build_variant="gil-enabled",
     )
@@ -59,7 +59,7 @@ def test_malformed_runtime_versions_are_typed_rejections(version: tuple[int, ...
         actual_implementation="CPython",
         actual_version="<invalid>",
         supported_implementation="CPython",
-        supported_versions=("3.13.15",),
+        supported_versions=("3.13.16",),
     )
 
 
@@ -68,10 +68,10 @@ def test_bundled_profile_is_the_exact_admitted_contract() -> None:
         PythonRuntimeProfile(
             implementation="CPython",
             build_variant="gil-enabled",
-            supported_versions=((3, 13, 15),),
-            requires_python="==3.13.15",
+            supported_versions=((3, 13, 16),),
+            requires_python="==3.13.16",
             static_target="3.13",
-            container_version=(3, 13, 15),
+            container_version=(3, 13, 16),
         )
         == PYTHON_RUNTIME_PROFILE
     )

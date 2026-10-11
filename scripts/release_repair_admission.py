@@ -24,16 +24,7 @@ INSTALLED_PATHS = frozenset(
         "/usr/local/lib/libpython3.13.so.1.0",
         ZLIB,
         "/usr/share/ci-coordinator/security-repairs.json",
-        *(
-            STDLIB + name
-            for name in (
-                "tarfile.py",
-                "stringprep.py",
-                "urllib/request.py",
-                "poplib.py",
-                "zipfile/__init__.py",
-            )
-        ),
+        STDLIB + "poplib.py",
     )
 )
 INSTALLED_PATHS |= {
@@ -55,11 +46,7 @@ SOURCE_PATHS = frozenset(
         "check_stdlib.py",
         "check_tarfile.py",
         "check_zlib.c",
-        "python-tarfile.patch",
-        "python-stringprep.patch",
-        "python-urllib-request.patch",
         "python-poplib.patch",
-        "python-zipfile-__init__.patch",
     )
 )
 SOURCE_PATHS |= {
@@ -70,16 +57,7 @@ SOURCE_PATHS |= {
     "docker/runtime/package_metadata.py",
     "docker/runtime/application_layer.py",
 }
-STDLIB_CVES = frozenset(
-    (
-        "CVE-2026-17084",
-        "CVE-2026-15806",
-        "CVE-2025-15367",
-        "CVE-2026-19672",
-        "CVE-2026-87910",
-        "CVE-2026-15310",
-    )
-)
+STDLIB_CVES = frozenset(("CVE-2025-15367",))
 
 
 class Closed(BaseModel):
@@ -180,8 +158,8 @@ def read_policy(path: Path, root: Path) -> tuple[str, RepairPolicy]:
                 "zlib-location",
             )
         else:
-            _require(identity == ("python", "3.13.15", "binary"), "python-owner")
-            _require(item.purl == "pkg:generic/python@3.13.15", "python-purl")
+            _require(identity == ("python", "3.13.16", "binary"), "python-owner")
+            _require(item.purl == "pkg:generic/python@3.13.16", "python-purl")
             _require(
                 set(locations)
                 == {
@@ -197,16 +175,17 @@ def _expected_witnesses() -> dict[str, object]:
     result: dict[str, object] = {}
     for phase in ("before", "after", "final"):
         repaired = phase != "before"
+        # The vendor interpreter contains the tarfile repair before backports apply.
         result["python-" + phase] = {
             "cve": "CVE-2026-82049",
-            "safeFilters": {"data": repaired, "tar": repaired},
+            "safeFilters": {"data": True, "tar": True},
         }
         result["stdlib-" + phase] = {
             "phase": "after" if repaired else "before",
             "repairs": dict.fromkeys(sorted(STDLIB_CVES), repaired),
             "positiveControls": "passed",
             "fileUriMutationsKilled": ["file-content"],
-            "legacyMutationsKilled": ["input-drain", "terminal"] if repaired else [],
+            "legacyMutationsKilled": ["input-drain", "terminal"],
         }
         result["zlib-" + phase] = {
             "cve": "CVE-2026-85091",

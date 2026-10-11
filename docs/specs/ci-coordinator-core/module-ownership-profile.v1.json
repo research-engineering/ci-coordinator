@@ -42,7 +42,7 @@
       }
     ],
     "grammarId": "ci-coordinator.module-ownership-signals.v2",
-    "runtimeIds": ["cpython-3.13.15"],
+    "runtimeIds": ["cpython-3.13.16"],
     "unknownDisposition": "review-required",
     "verdictCeiling": "review-required"
   },

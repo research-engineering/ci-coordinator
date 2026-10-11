@@ -15,10 +15,10 @@ Date: 2026-09-21.
 Build the smallest justified runtime closure without sacrificing supported
 behavior, security evidence or measured performance. Size is a result, not a
 60 MB acceptance threshold. This change does not alter planning, authorization,
-persistence, CI omission or the supported Python 3.13.15 application contract.
+persistence, CI omission or the supported Python 3.13.16 application contract.
 
 The selected construction is a scratch filesystem with Ubuntu 26.04 system
-libraries and the optimized official CPython 3.13.15 interpreter. It is not a
+libraries and the optimized official CPython 3.13.16 interpreter. It is not a
 full Ubuntu installation and not an unchanged vendor image. The Dockerfile
 owns immutable base digests; the signed Ubuntu snapshot owns package resolution.
 
@@ -42,7 +42,7 @@ the same support, runtime, performance and admission predicates at lower cost.
 
 1. Bootstrap HTTPS using the certificate bundle from the pinned Python image.
    Resolve runtime and builder packages from snapshot
-   `20260921T000000Z`; require signed APT metadata, explicit CAInfo, finite
+   `20261011T170000Z`; require signed APT metadata, explicit CAInfo, finite
    retries/timeouts and fatal index-update errors. Never disable TLS or signatures.
 2. Copy the official optimized interpreter, not Debian system libraries.
    Compile the narrowly patched zlib for the Ubuntu ABI. Use truthful local
@@ -66,9 +66,15 @@ cross-builder byte-identical OCI images.
 
 ## Security Repairs And Admission
 
-Seven Python advisory repairs and one zlib repair are disclosed in
+One Python advisory repair (CVE-2025-15367, `poplib`) and one zlib repair are
+disclosed in
 [the upstream input manifest](../../docker/runtime/security/stdlib-backports.json)
 and [the installed repair manifest builder](../../docker/runtime/security/manifest.py).
+CPython 3.13.16 contains every hunk of the former `tarfile`, `stringprep`,
+`urllib.request` and `zipfile` backports, so those patches were removed. Its
+`tarfile` also carries an additional vendor PAX size change. The retired
+backports' witnesses remain vendor regression controls that must pass in every
+phase; they are not repair claims.
 Original component versions remain visible to scanners. Pure-Python repairs
 require original-module and patch hashes, zero-fuzz application, exact resulting
 module hashes and checked-hash bytecode. The zlib package requires the source
@@ -110,6 +116,25 @@ The fixed policy window is at most 14 days. Expiry is exclusive and does not
 renew when scanned. Source or installed-byte drift requires a reviewed policy
 change and fresh qualification. Remove backports when maintained vendor
 releases pass equivalent witnesses; never renew solely to unblock CI.
+
+Runtime qualification also retains the collector's observation as
+`repair-observation.json`, written before admission. It is a diagnostic, not
+admitted evidence and never an automatic policy update. The bounded scanner
+report `vulnerabilities.json` is written before the scan is bound to admitted
+repair evidence, so a rejected repair policy still yields scan occurrences; the
+binding and admission checks that follow still fail the job. A failed job
+retains whichever results exist in a separate diagnostics artifact, while the
+required results artifact is uploaded only after success. A reviewed policy
+change may copy observed installed hashes and start a new window at that
+qualification; admission still rejects stale bytes and expired windows.
+
+The current policy copies the installed hashes observed by the CPython 3.13.16
+qualification and starts its window at that observation,
+`2026-10-11T19:39:14Z`, with exclusive expiry 14 days later. It lists only the
+two observed Medium repaired occurrences: CVE-2025-15367 for `python` 3.13.16
+and CVE-2026-85091 for `zlib1g`. Grype no longer matches CVE-2026-82049; its
+`tarfile` witness remains a vendor regression control. Admission still requires
+current repair evidence when no High or Critical occurrence depends on it.
 
 ## Trust And Effect Boundaries
 
@@ -155,7 +180,7 @@ nonzero-exit waiver.
 | Owner | Intended delta | Protected observations | Independent falsifier |
 | --- | --- | --- | --- |
 | Runtime assembly | Minimal glibc closure and stable layers | Interpreter, dependency lock, ABI, UI, migrations, UID | Native read-only/TLS/rollback/shutdown and loader checks |
-| Repair inputs | Eight disclosed upstream repairs | Valid behavior and truthful original versions | Before/after/final causal witnesses and byte hashes |
+| Repair inputs | Two disclosed upstream repairs | Valid behavior and truthful original versions | Before/after/final causal witnesses and byte hashes |
 | Release admission | Exact expiring repaired occurrences | Raw matches, severity, database, registry identity | Independently mutated subject, source, bytes, CVE, location, layer, time and witness |
 | Signing and schedule | Signed immutable proof reuse | No image execution in signer or schedule | Wrong run/attempt/source/predicate and disagreeing store payloads |
 | Tooling projections | Current source discovery and proof routes | Existing mandatory checks | Static generation/readback plus native focused and full checks |

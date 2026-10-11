@@ -461,6 +461,27 @@
         ],
         "rationale": "The generation-fenced v2 runtime resource replaces v1 admission in the atomic successor cut. The old specification and published migration bytes remain historical evidence; v1 cannot confer current selected-execution authority. Existing receipt, persistence, signature and fallback witnesses remain live."
       }
+    },
+    {
+      "transitionId": "ci-coordinator.vendor-contained-stdlib-backport-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "e1797fe430c3bd1460f74ed61e70bf011243261e4b03b457e6d1ae43c9db5c17",
+          "affectedRequirementIds": ["REQ-CI-RELEASE-001"]
+        }
+      ],
+      "paths": [
+        "docker/runtime/security/python-stringprep.patch",
+        "docker/runtime/security/python-tarfile.patch",
+        "docker/runtime/security/python-urllib-request.patch",
+        "docker/runtime/security/python-zipfile-__init__.patch"
+      ],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-PROOFKIT-007", "REQ-CI-RELEASE-001"],
+        "rationale": "CPython 3.13.16 contains every retired tarfile, stringprep, urllib.request and zipfile repair hunk; its tarfile also carries an additional vendor PAX size change, so the module is not byte-identical to the former patched result. The runtime no longer applies these backports. The poplib and zlib repairs, the repair policy, the stdlib backport manifest and the vendor regression witnesses remain live release witnesses."
+      }
     }
   ]
 }

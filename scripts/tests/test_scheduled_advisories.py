@@ -23,9 +23,15 @@ from scripts.scheduled_release_subject import (
     strict_json,
 )
 from scripts.tests.test_dependency_audit import uv_report
+from scripts.tests.test_release_vulnerability_admission import (
+    POLICY_RELATIVE_PATH,
+    REPAIR_POLICY_RELATIVE_PATH,
+    _repair_evidence,
+    _scan,
+    write_high_repair_fixture,
+)
 from scripts.tests.test_release_vulnerability_admission import SUBJECT as OWNER_SUBJECT
 from scripts.tests.test_release_vulnerability_admission import _admit as admit_image_fixture
-from scripts.tests.test_release_vulnerability_admission import _repair_evidence, _scan
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SHA = "a" * 40
@@ -541,12 +547,20 @@ def _scan_command(directory: Path, exit_code: int) -> dict[str, object]:
     ],
 )
 def test_repaired_scan_and_scheduled_summary_compose_without_a_status_waiver(
-    tmp_path: Path, mutation: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
 ) -> None:
     from scripts.release_vulnerability_admission import VulnerabilityAdmissionError
     from scripts.tests.test_release_vulnerability_admission import OBSERVED_AT
 
-    proof = _repair_evidence()
+    # A synthetic repository root binds the scheduled receipt to the High-occurrence fixture.
+    root = tmp_path / "repository"
+    repair_policy, gate = write_high_repair_fixture(root)
+    for name in SOURCE_PATHS:
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_bytes((REPO_ROOT / name).read_bytes())
+    paths = SOURCE_PATHS | {POLICY_RELATIVE_PATH, REPAIR_POLICY_RELATIVE_PATH}
+    monkeypatch.setattr(audit, "repository_paths", lambda _root: tuple(sorted(paths)))
+    proof = _repair_evidence(repair_policy)
     finding = {
         "vulnerability": {
             "id": "CVE-2026-82049",
@@ -555,9 +569,9 @@ def test_repaired_scan_and_scheduled_summary_compose_without_a_status_waiver(
         },
         "artifact": {
             "name": "python",
-            "version": "3.13.15",
+            "version": "3.13.16",
             "type": "binary",
-            "purl": "pkg:generic/python@3.13.15",
+            "purl": "pkg:generic/python@3.13.16",
             "locations": [
                 {"path": path, "layerID": proof["runtimeLayer"], "annotations": {"evidence": kind}}
                 for path, kind in [
@@ -577,9 +591,21 @@ def test_repaired_scan_and_scheduled_summary_compose_without_a_status_waiver(
         ].pop("layerID")
     if mutation in {"unknown", "unproved", "layer"}:
         with pytest.raises(VulnerabilityAdmissionError):
-            admit_image_fixture(tmp_path, scan=_scan([finding]))
+            admit_image_fixture(
+                tmp_path,
+                scan=_scan([finding]),
+                repair_evidence=proof,
+                policy=gate,
+                repair_policy=repair_policy,
+            )
     else:
-        admit_image_fixture(tmp_path, scan=_scan([finding]))
+        admit_image_fixture(
+            tmp_path,
+            scan=_scan([finding]),
+            repair_evidence=proof,
+            policy=gate,
+            repair_policy=repair_policy,
+        )
     evidence = tmp_path / "released-image-vulnerabilities.json"
     evidence.write_bytes((tmp_path / "evidence.json").read_bytes())
     commands = [
@@ -606,7 +632,7 @@ def test_repaired_scan_and_scheduled_summary_compose_without_a_status_waiver(
     observed = receipt()
     observed.update(
         scope="released-image",
-        inputs=audit.input_digests(REPO_ROOT, "released-image"),
+        inputs=audit.input_digests(root, "released-image"),
         startedAt=OBSERVED_AT,
         observedAt=OBSERVED_AT,
         commands=commands,
@@ -639,7 +665,7 @@ def test_repaired_scan_and_scheduled_summary_compose_without_a_status_waiver(
     def admit() -> None:
         audit.admit_fresh_receipt(
             observed,
-            root=REPO_ROOT,
+            root=root,
             scope="released-image",
             source_commit=SHA,
             observed_at=OBSERVED_AT,

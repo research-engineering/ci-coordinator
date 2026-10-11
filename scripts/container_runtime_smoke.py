@@ -110,7 +110,7 @@ def _inspect(context: InspectionContext) -> dict[str, JsonValue]:
         ],
         "runtime user identity",
     )
-    if python_version != "Python 3.13.15":
+    if python_version != "Python 3.13.16":
         raise RuntimeError(f"unexpected Python version: {python_version}")
     if user_identity != "10001 10001":
         raise RuntimeError("runtime container must use UID/GID 10001")

@@ -186,7 +186,7 @@ def test_ui_build_copies_dependency_patches_before_frozen_install(
 def test_operator_ui_build_can_use_only_provider_supplied_node_proxy_settings() -> None:
     dockerfile = _repo_path("Dockerfile").read_text(encoding="utf-8")
     operator_stage, runtime_stages = dockerfile.split(
-        "FROM python:3.13.15-slim-trixie@",
+        "FROM python:3.13.16-slim-trixie@",
         maxsplit=1,
     )
 
