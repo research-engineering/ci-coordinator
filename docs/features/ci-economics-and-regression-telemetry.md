@@ -107,14 +107,16 @@ observation.
 
 The GitHub REST adapter already traverses the attempt-specific jobs endpoint
 with finite page, byte, and cardinality limits. It additionally emits a
-content-addressed snapshot only when every decoded job is terminal and two
-consecutive bounded reads have the same canonical digest.
+content-addressed snapshot only when the exact attempt endpoint first reports
+the attempt completed, every decoded job is terminal and two consecutive bounded
+reads have the same canonical digest.
 
 ```text
 CompleteSnapshot(P(A))
   => exact repository id
   and exact workflow run id
   and exact run attempt
+  and attempt status = completed, read before the first job read
   and unique provider job ids
   and observed count = provider total_count
   and terminal pagination
@@ -122,6 +124,16 @@ CompleteSnapshot(P(A))
   and Hash(FirstRead.canonicalJobs) = Hash(SecondRead.canonicalJobs)
   and SnapshotDigest = Hash(CanonicalJobs)
 ```
+
+Terminal listed jobs and equal reads do not imply a completed attempt: a
+dependent, dynamic-matrix or reusable-workflow job may be created after every
+listed job completed. A completed attempt creates no further job, so its status
+is read once before the job reads; a later status re-read would add no
+population evidence because the snapshot retains no attempt-header facts. An
+active status is `provider_not_terminal`, and a different run, attempt,
+repository or head SHA is `provider_binding_mismatch`. The gate costs one
+repository resolution plus one attempt read per collection poll, and an active
+attempt stops before any job read. Source registration remains status-free.
 
 Snapshot recording is idempotent. An equal identity with equal canonical bytes
 is a replay; an equal identity with different bytes is a conflict. Provider
@@ -482,6 +494,7 @@ The design is false if an assigned witness permits:
 - accepting a job with inconsistent run, attempt, head SHA, or timestamps;
 - treating a partial REST page as a complete snapshot;
 - promoting terminal jobs when two consecutive complete reads differ;
+- promoting terminal jobs before the provider reports their attempt completed;
 - overwriting a terminal snapshot with different provider facts;
 - preserving `exact` after mutating any shared webhook/REST fact;
 - treating two semantically equal provider snapshots as conflicting because of

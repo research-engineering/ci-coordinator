@@ -9,7 +9,7 @@ from typing import cast
 
 import pytest
 
-from ci_coordinator.ci_economics import ProviderAttemptSnapshot
+from ci_coordinator.ci_economics import ProviderAttemptDeferred, ProviderAttemptSnapshot
 from ci_coordinator.ci_economics.model import AttemptIdentity
 from ci_coordinator.ci_economics.sources import ProviderRunCollectionSource
 from ci_coordinator.config_control import RepositoryScope
@@ -17,6 +17,7 @@ from ci_coordinator.execution_orchestration.provider_signal import ProviderSigna
 from ci_coordinator.integrations.github import reconciliation_observer
 from ci_coordinator.integrations.github.app_transport_profile import GITHUB_API_VERSION
 from ci_coordinator.integrations.github.ci_economics_provider import GitHubCiEconomicsProvider
+from ci_coordinator.integrations.github.ci_economics_sources import GitHubCiEconomicsSources
 from ci_coordinator.integrations.github.contracts import (
     GitHubPaginationEvidence,
     GitHubRequest,
@@ -40,6 +41,7 @@ from ci_coordinator.reconciliation import (
 REPOSITORY_ID = 202
 WORKFLOW_RUN_ID = 303
 RUN_ATTEMPT = 2
+ATTEMPT_PATH = "/repos/acme/service/actions/runs/303/attempts/2"
 JOBS_PATH = "/repos/acme/service/actions/runs/303/attempts/2/jobs"
 SUBJECT = ReconciliationSubject.create(
     installation_id=101,
@@ -578,19 +580,12 @@ def test_hosted_runner_wire_evidence_reaches_stable_economics_snapshot() -> None
         "runner_group_id": 0,
         "runner_group_name": "GitHub Actions",
     }
-    transport = _Transport(_complete_handler([job]))
+    transport = _Transport(_attempt_handler("completed", "success", [job]))
     factory = _Factory(transport)
-    attempt = AttemptIdentity(
-        RepositoryScope(SUBJECT.installation_id, SUBJECT.repository_id),
-        SUBJECT.workflow_run_id,
-        SUBJECT.run_attempt,
-        SUBJECT.head_sha,
-    )
-    source = ProviderRunCollectionSource(
-        attempt, datetime(2026, 9, 4, 12, tzinfo=UTC), GITHUB_API_VERSION, "e" * 64
-    )
+    source = _provider_run_source()
+    attempt = source.attempt
 
-    outcome = asyncio.run(GitHubCiEconomicsProvider(_observer(factory)).load_stable(source))
+    outcome = asyncio.run(_economics_provider(factory).load_stable(source))
 
     assert isinstance(outcome, ProviderAttemptSnapshot)
     assert outcome.subject_id == source.source_id and outcome.attempt == attempt
@@ -605,13 +600,122 @@ def test_hosted_runner_wire_evidence_reaches_stable_economics_snapshot() -> None
     }
     assert fact.timing.started_at == datetime(2026, 9, 4, 12, tzinfo=UTC)
     assert fact.timing.completed_at == datetime(2026, 9, 4, 12, 2, tzinfo=UTC)
-    assert factory.installations == [SUBJECT.installation_id, SUBJECT.installation_id]
+    assert factory.installations == [SUBJECT.installation_id] * 3
     assert [request.path for request in transport.requests] == [
+        "/repositories/202",
+        ATTEMPT_PATH,
         "/repositories/202",
         JOBS_PATH,
         "/repositories/202",
         JOBS_PATH,
     ]
+
+
+@pytest.mark.parametrize("status", ["queued", "in_progress", "waiting", "requested", "pending"])
+def test_active_wire_attempt_with_only_terminal_listed_jobs_is_not_captured(status: str) -> None:
+    transport = _Transport(
+        _attempt_handler(status, None, [_job(1, SIGNAL.job_name, "completed", "success")])
+    )
+
+    outcome = asyncio.run(
+        _economics_provider(_Factory(transport)).load_stable(_provider_run_source())
+    )
+
+    assert outcome == ProviderAttemptDeferred("provider_not_terminal")
+    assert [request.path for request in transport.requests] == [
+        "/repositories/202",
+        ATTEMPT_PATH,
+    ]
+
+
+@pytest.mark.parametrize(
+    ("changes", "reason"),
+    [
+        ({"id": WORKFLOW_RUN_ID + 1}, "provider_binding_mismatch"),
+        ({"run_attempt": RUN_ATTEMPT + 1}, "provider_binding_mismatch"),
+        ({"repository": {"id": REPOSITORY_ID + 1}}, "provider_binding_mismatch"),
+        ({"head_sha": "c" * 40}, "provider_binding_mismatch"),
+        ({"status": "unknown"}, "provider_malformed"),
+        ({"status": None}, "provider_malformed"),
+        ({"status": "in_progress", "conclusion": "success"}, "provider_malformed"),
+    ],
+    ids=[
+        "run",
+        "attempt",
+        "repository",
+        "head-sha",
+        "unknown-status",
+        "missing-status",
+        "active-with-conclusion",
+    ],
+)
+def test_wire_attempt_completion_requires_the_exact_completed_attempt(
+    changes: dict[str, object], reason: str
+) -> None:
+    transport = _Transport(
+        _attempt_handler(
+            "completed",
+            "success",
+            [_job(1, SIGNAL.job_name, "completed", "success")],
+            changes=changes,
+        )
+    )
+
+    outcome = asyncio.run(
+        _economics_provider(_Factory(transport)).load_stable(_provider_run_source())
+    )
+
+    assert isinstance(outcome, ProviderAttemptDeferred) and outcome.reason == reason
+    assert [request.path for request in transport.requests] == [
+        "/repositories/202",
+        ATTEMPT_PATH,
+    ]
+
+
+def _provider_run_source() -> ProviderRunCollectionSource:
+    attempt = AttemptIdentity(
+        RepositoryScope(SUBJECT.installation_id, SUBJECT.repository_id),
+        SUBJECT.workflow_run_id,
+        SUBJECT.run_attempt,
+        SUBJECT.head_sha,
+    )
+    return ProviderRunCollectionSource(
+        attempt, datetime(2026, 9, 4, 12, tzinfo=UTC), GITHUB_API_VERSION, "e" * 64
+    )
+
+
+def _economics_provider(factory: _Factory) -> GitHubCiEconomicsProvider:
+    return GitHubCiEconomicsProvider(_observer(factory), GitHubCiEconomicsSources(factory))
+
+
+def _attempt_value(status: str, conclusion: str | None) -> dict[str, object]:
+    return {
+        "id": WORKFLOW_RUN_ID,
+        "run_attempt": RUN_ATTEMPT,
+        "repository": {"id": REPOSITORY_ID},
+        "head_sha": SUBJECT.head_sha,
+        "created_at": "2026-09-04T12:00:00Z",
+        "status": status,
+        "conclusion": conclusion,
+    }
+
+
+def _attempt_handler(
+    status: str,
+    conclusion: str | None,
+    jobs: list[dict[str, object]],
+    *,
+    changes: dict[str, object] | None = None,
+) -> Callable[[GitHubRequest], GitHubTransportResult]:
+    jobs_handler = _complete_handler(jobs)
+    attempt = {**_attempt_value(status, conclusion), **(changes or {})}
+
+    def handler(request: GitHubRequest) -> GitHubTransportResult:
+        if request.operation == "actions.get_workflow_run_attempt":
+            return _response(_json_bytes(attempt))
+        return jobs_handler(request)
+
+    return handler
 
 
 def _observer(

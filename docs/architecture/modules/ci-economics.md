@@ -129,7 +129,10 @@ the independently owned application and metric inventories.
 
 ## 4. Evidence Semantics
 
-A REST snapshot is complete only after two equal bounded terminal reads. Its
+A REST snapshot is complete only after the provider reports its attempt completed
+and two equal bounded terminal job reads follow, as the design's
+[CompleteSnapshot](../../features/ci-economics-and-regression-telemetry.md#5-complete-attempt-snapshot)
+predicate defines. Its
 identity excludes process-local observation time. A retained snapshot contains
 provider-only facts; webhook delivery identity remains in the independently
 owned observation relation.

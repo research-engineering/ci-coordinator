@@ -33,6 +33,7 @@ from ci_coordinator.integrations.github.ci_economics_admission import (
     bound_economics_response,
     load_economics_repository,
 )
+from ci_coordinator.integrations.github.ci_history_decoding import _ACTIVE_STATUSES
 from ci_coordinator.integrations.github.contracts import (
     GitHubIncomplete,
     GitHubSuccess,
@@ -124,6 +125,58 @@ class GitHubCiEconomicsSources:
         return _provider_source(
             attempt_source.attempt, run_source.run_created_at, self._api_version
         )
+
+    async def load_completed_attempt(
+        self, attempt: AttemptIdentity
+    ) -> AttemptIdentity | ProviderAttemptDeferred:
+        """Return the exact attempt only while the provider reports it completed."""
+        if type(attempt) is not AttemptIdentity:
+            raise TypeError("attempt completion requires an exact attempt identity")
+        client = ActionsClient(
+            self._transport_factory.for_installation(
+                attempt.scope.installation_id, repository_id=attempt.scope.repository_id
+            ),
+            api_version=self._api_version,
+        )
+        repository = await load_economics_repository(
+            client, attempt.scope, api_version=self._api_version
+        )
+        if isinstance(repository, ProviderAttemptDeferred):
+            return repository
+        body = bound_economics_response(
+            await client.get_workflow_run_attempt(
+                repository, attempt.workflow_run_id, attempt.run_attempt
+            ),
+            operation="actions.get_workflow_run_attempt",
+            path=workflow_run_attempt_path(
+                repository, attempt.workflow_run_id, attempt.run_attempt
+            ),
+            api_version=self._api_version,
+        )
+        if isinstance(body, ProviderAttemptDeferred):
+            return body
+        value = json_object_or_none(body)
+        if value is None:
+            return ProviderAttemptDeferred("provider_malformed")
+        source = _decode_source(
+            value,
+            attempt.scope,
+            self._api_version,
+            expected_run_id=attempt.workflow_run_id,
+            expected_attempt=attempt.run_attempt,
+        )
+        if isinstance(source, ProviderAttemptDeferred):
+            return source
+        if source.attempt != attempt:
+            return ProviderAttemptDeferred("provider_binding_mismatch")
+        status = value.get("status")
+        if type(status) is not str or "conclusion" not in value:
+            return ProviderAttemptDeferred("provider_malformed")
+        if status in _ACTIVE_STATUSES and value["conclusion"] is None:
+            return ProviderAttemptDeferred("provider_not_terminal")
+        if status != "completed":
+            return ProviderAttemptDeferred("provider_malformed")
+        return attempt
 
     async def discover_page(
         self,

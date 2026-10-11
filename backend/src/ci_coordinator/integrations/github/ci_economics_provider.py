@@ -15,6 +15,7 @@ from ci_coordinator.ci_economics.sources import (
     ProviderRunCollectionSource,
     ReconciliationCollectionSource,
 )
+from ci_coordinator.integrations.github.ci_economics_sources import GitHubCiEconomicsSources
 from ci_coordinator.integrations.github.reconciliation_observer import (
     GitHubActionsReconciliationObserver,
     GitHubReconciliationObservationError,
@@ -25,10 +26,15 @@ from ci_coordinator.kernel import hash_object
 
 
 class GitHubCiEconomicsProvider:
-    """Promote two equal complete provider reads into one semantic snapshot."""
+    """Promote two equal complete reads of a completed provider attempt into one snapshot."""
 
-    def __init__(self, observer: GitHubActionsReconciliationObserver) -> None:
+    def __init__(
+        self,
+        observer: GitHubActionsReconciliationObserver,
+        attempts: GitHubCiEconomicsSources,
+    ) -> None:
         self._observer = observer
+        self._attempts = attempts
 
     async def load_stable(
         self,
@@ -43,6 +49,11 @@ class GitHubCiEconomicsProvider:
             attempt = source.attempt
         except ValueError:
             return ProviderAttemptDeferred("provider_malformed")
+        # Terminal listed jobs do not prove that the attempt will create no later job;
+        # a completed attempt does, so its status is read before the first job read.
+        completed = await self._attempts.load_completed_attempt(attempt)
+        if isinstance(completed, ProviderAttemptDeferred):
+            return completed
         try:
             first = await self._observer.load_attempt_identity(attempt)
             if not first:

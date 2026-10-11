@@ -157,3 +157,25 @@ def test_encoded_unicode_job_names_obey_the_same_scalar_and_transport_bounds(
         assert use_case.read.await_args.kwargs["query"].job_name == name
     else:
         use_case.read.assert_not_awaited()
+
+
+@pytest.mark.parametrize("query_bytes,expected", [(8192, 200), (8193, 400)])
+def test_raw_query_budget_counts_undecoded_bytes_inclusively(
+    query_bytes: int, expected: int
+) -> None:
+    use_case = AsyncMock(spec=CiHistoryAnalyticsUseCase)
+    use_case.read.return_value = AnalyticsUnavailable(reason="dataset_unavailable")
+    name = "\U0001f680" * 512
+    head = QUERY.removeprefix("?")
+    tail = urlencode({"jobName": name})
+    query = head + "&" * (query_bytes - len(head) - len(tail)) + tail
+    assert len(query.encode("ascii")) == query_bytes
+    with TestClient(_app(use_case)) as client:
+        response = client.get(PATH + "?" + query)
+    assert response.status_code == expected
+    if expected == 200:
+        assert use_case.read.await_args is not None
+        assert use_case.read.await_args.kwargs["query"].job_name == name
+    else:
+        assert response.json() == {"ok": False, "error": "invalid_request"}
+        use_case.read.assert_not_awaited()
