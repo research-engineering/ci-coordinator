@@ -1062,27 +1062,37 @@ async def _register_attestation(
 
 
 async def _ensure_control_plane_session(engine: AsyncEngine, *, actor: str = _ACTOR) -> None:
-    if actor not in {_ACTOR, _OTHER_ACTOR}:
-        raise ValueError("test session actor is not admitted")
-    digest = _SESSION_DIGEST if actor == _ACTOR else b"t" * 32
     store = PostgresControlPlaneSessionStore(engine)
-    if await store.load(digest) is not None:
+    if await store.load(_control_plane_session_digest(actor)) is not None:
         return
-    now = await store.current_time()
+    login_start = await store.login_start_anchor()
     await store.replace(
         previous_handle_digest=None,
-        record=ControlPlaneSessionRecord(
-            handle_digest=digest,
-            issuer=_ISSUER,
-            subject=_SUBJECT if actor == _ACTOR else "other-reviewer",
-            keycloak_session_id="proposal-review-session",
-            actor_id=actor,
-            roles=frozenset(("configure",)),
-            authority_profile_digest=_PROFILE_DIGEST,
-            issued_at=now - timedelta(seconds=1),
-            expires_at=now + timedelta(minutes=10),
-            display=DisplayMetadata("proposal-reviewer", "Proposal Reviewer"),
-        ),
+        record=_control_plane_session_record(login_start.started_at, actor=actor),
+        login_start=login_start,
+    )
+
+
+def _control_plane_session_digest(actor: str) -> bytes:
+    if actor not in {_ACTOR, _OTHER_ACTOR}:
+        raise ValueError("test session actor is not admitted")
+    return _SESSION_DIGEST if actor == _ACTOR else b"t" * 32
+
+
+def _control_plane_session_record(
+    now: datetime, *, actor: str = _ACTOR
+) -> ControlPlaneSessionRecord:
+    return ControlPlaneSessionRecord(
+        handle_digest=_control_plane_session_digest(actor),
+        issuer=_ISSUER,
+        subject=_SUBJECT if actor == _ACTOR else "other-reviewer",
+        keycloak_session_id="proposal-review-session",
+        actor_id=actor,
+        roles=frozenset(("configure",)),
+        authority_profile_digest=_PROFILE_DIGEST,
+        issued_at=now - timedelta(seconds=1),
+        expires_at=now + timedelta(minutes=10),
+        display=DisplayMetadata("proposal-reviewer", "Proposal Reviewer"),
     )
 
 

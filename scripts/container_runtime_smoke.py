@@ -41,8 +41,9 @@ _MIGRATION_REVISIONS = (
     "20260915_0015_total_collection_state.py",
     "20260926_0016_retire_pending_review_authority.py",
     "20260926_0017_explicit_review_renewal.py",
+    "20261011_0018_control_plane_logout_fence.py",
 )
-_MIGRATION_HEAD = "20260926_0017 (head)"
+_MIGRATION_HEAD = "20261011_0018 (head)"
 _RUNTIME_BUILD_TOOLS_CHECK = (
     "import importlib.metadata,shutil; "
     "forbidden={'setuptools','debugpy','pytest','ruff','mypy','agentic-proofkit'}; "

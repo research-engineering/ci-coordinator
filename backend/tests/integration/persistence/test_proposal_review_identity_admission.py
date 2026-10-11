@@ -21,6 +21,7 @@ from ci_coordinator.control_plane_identity import (
     BackChannelLogoutEvidence,
     BackChannelLogoutTarget,
     ControlPlaneSessionRecord,
+    LoginStartAnchor,
 )
 from ci_coordinator.control_plane_identity.activity_cursor import ActivityCursorCodec
 from ci_coordinator.control_plane_identity.activity_query import ActivityQuery
@@ -363,6 +364,8 @@ def test_existing_identity_operations_invoke_one_catalog_attestor(
         try:
             now = await one(sessions.current_time)
             assert isinstance(now, datetime)
+            login_start = await one(sessions.login_start_anchor)
+            assert isinstance(login_start, LoginStartAnchor)
             principal = replace(human_principal(), expires_at=now + timedelta(minutes=5))
             record = ControlPlaneSessionRecord(
                 handle_digest=b"c" * 32,
@@ -376,9 +379,17 @@ def test_existing_identity_operations_invoke_one_catalog_attestor(
                 expires_at=principal.expires_at,
                 display=principal.display,
             )
-            await one(lambda: sessions.replace(previous_handle_digest=None, record=record))
+            await one(
+                lambda: sessions.replace(
+                    previous_handle_digest=None, record=record, login_start=login_start
+                )
+            )
             assert await one(lambda: sessions.load(record.handle_digest)) == record
-            await one(lambda: sessions.delete(record.handle_digest))
+            await one(
+                lambda: sessions.logout(
+                    record.handle_digest, issuer=record.issuer, subject=record.subject
+                )
+            )
             evidence = BackChannelLogoutEvidence(
                 issuer=record.issuer,
                 token_id="identity-catalog-once",

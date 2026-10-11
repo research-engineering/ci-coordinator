@@ -177,7 +177,9 @@ async def _session(store: PostgresControlPlaneSessionStore) -> ControlPlaneSessi
         expires_at=now + timedelta(minutes=5),
         display=DisplayMetadata(None, None),
     )
-    await store.replace(previous_handle_digest=None, record=record)
+    await store.replace(
+        previous_handle_digest=None, record=record, login_start=await store.login_start_anchor()
+    )
     return record
 
 

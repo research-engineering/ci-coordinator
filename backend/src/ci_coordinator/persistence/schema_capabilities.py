@@ -223,6 +223,28 @@ CONTROL_PLANE_IDENTITY_STATE = CapabilityDefinition(
     privilege_requirements=("runtime-control-plane-identity-bounded-lock-dml/v1",),
 )
 
+CONTROL_PLANE_LOGOUT_FENCE = CapabilityDefinition(
+    capability_id="control-plane-logout-fence/v1",
+    schema_requirements=(
+        "ci_coordinator.control_plane_logout_fences/v1",
+        "ci_coordinator.control_plane_logout_fence_generation/v1",
+    ),
+    read_domain_id="issuer-subject-or-sid-logout-generation-above-deleted-floor/v1",
+    write_domain_id="lock-ordered-transactional-generation-fence-with-time-bounded-cleanup/v1",
+    codec_id="sealed-fence-generation-and-database-time-login-anchor/v1",
+    backfill_state_id="zero-generation-singleton-without-fences/v1",
+    bridge_constraint_ids=(
+        "ci_coordinator.ck_control_plane_logout_fences_target_kind/v1",
+        "ci_coordinator.ck_control_plane_logout_fence_generation_singleton/v1",
+        "ci_coordinator.ck_control_plane_logout_fence_generation_order/v1",
+    ),
+    routine_requirements=(),
+    privilege_requirements=(
+        "runtime-logout-fence-select-insert-delete-update-generation-instant/v1",
+        "runtime-logout-fence-generation-select-update-counters/v1",
+    ),
+)
+
 RUNTIME_INGRESS_ISSUANCE_STATE = CapabilityDefinition(
     capability_id="runtime-ingress-issuance-state/v1",
     schema_requirements=(
@@ -539,6 +561,7 @@ _CAPABILITY_DEFINITIONS = {
     PROPOSAL_REVIEW_REGISTRATION_V2.capability_id: PROPOSAL_REVIEW_REGISTRATION_V2,
     GOVERNANCE_BASELINE_STATE.capability_id: GOVERNANCE_BASELINE_STATE,
     CONTROL_PLANE_IDENTITY_STATE.capability_id: CONTROL_PLANE_IDENTITY_STATE,
+    CONTROL_PLANE_LOGOUT_FENCE.capability_id: CONTROL_PLANE_LOGOUT_FENCE,
     RUNTIME_INGRESS_ISSUANCE_STATE.capability_id: RUNTIME_INGRESS_ISSUANCE_STATE,
     WEBHOOK_BODY_IDENTITY.capability_id: WEBHOOK_BODY_IDENTITY,
     SHADOW_RECONCILIATION_STATE.capability_id: SHADOW_RECONCILIATION_STATE,
@@ -611,6 +634,18 @@ def control_plane_identity_state_requirements(
         (
             DATABASE_COMPATIBILITY_PROTOCOL.declaration(),
             CONTROL_PLANE_IDENTITY_STATE.declaration(),
+        ),
+    )
+
+
+def control_plane_session_lifecycle_requirements(
+    profile: CompatibilityProfile,
+) -> tuple[CapabilityDeclaration, ...]:
+    return required_capabilities(
+        profile,
+        (
+            *control_plane_identity_state_requirements(profile),
+            CONTROL_PLANE_LOGOUT_FENCE.declaration(),
         ),
     )
 

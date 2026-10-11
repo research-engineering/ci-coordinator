@@ -12,7 +12,11 @@ from ci_coordinator.persistence.compatibility_contracts import (
     declaration_hash,
 )
 from ci_coordinator.persistence.compatibility_profile import load_bundled_profile
-from ci_coordinator.persistence.schema_capabilities import CI_ECONOMICS_EVIDENCE
+from ci_coordinator.persistence.review_renewal_migration import renewal_declarations
+from ci_coordinator.persistence.schema_capabilities import (
+    CI_ECONOMICS_EVIDENCE,
+    CONTROL_PLANE_LOGOUT_FENCE,
+)
 
 _MIGRATION_DIRECTORY = Path(__file__).parents[3] / "alembic" / "versions"
 _MIGRATION_PATH = _MIGRATION_DIRECTORY / "20260716_0001_initial_schema.py"
@@ -20,6 +24,7 @@ _REGISTRATION_MIGRATION_PATH = (
     _MIGRATION_DIRECTORY / "20260901_0002_config_epoch_registration_operations.py"
 )
 _ECONOMICS_MIGRATION_PATH = _MIGRATION_DIRECTORY / "20260904_0003_ci_economics_evidence.py"
+_LOGOUT_FENCE_MIGRATION_PATH = _MIGRATION_DIRECTORY / "20261011_0018_control_plane_logout_fence.py"
 _RETAINED_DATA_TABLES = (
     "active_config_epochs",
     "audit_events",
@@ -76,6 +81,7 @@ def test_published_bootstrap_is_the_root_of_the_forward_migration_chain() -> Non
         "20260915_0015_total_collection_state.py",
         "20260926_0016_retire_pending_review_authority.py",
         "20260926_0017_explicit_review_renewal.py",
+        "20261011_0018_control_plane_logout_fence.py",
     )
     assert migration.revision == "20260716_0001"
     assert migration.down_revision is None
@@ -154,6 +160,22 @@ def test_ci_economics_migration_is_one_exact_additive_successor() -> None:
             )
         )
     )
+
+
+def test_logout_fence_migration_adds_only_its_capability_to_the_renewal_head() -> None:
+    migration = _load_migration(_LOGOUT_FENCE_MIGRATION_PATH, "control_plane_logout_fence")
+    predecessor = renewal_declarations()[2]
+
+    assert migration.revision == "20261011_0018"
+    assert migration.down_revision == predecessor.revision_id
+    assert predecessor == migration._PREDECESSOR
+    assert migration._SUCCESSOR.transition_kind == "expand"
+    assert migration._SUCCESSOR.parent_revision_id == predecessor.revision_id
+    assert migration._SUCCESSOR.generation == predecessor.generation + 1
+    assert set(migration._SUCCESSOR.capabilities) - set(predecessor.capabilities) == {
+        CONTROL_PLANE_LOGOUT_FENCE.declaration()
+    }
+    assert set(predecessor.capabilities) < set(migration._SUCCESSOR.capabilities)
 
 
 def test_retained_data_catalog_is_exact() -> None:

@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta, timezone
+from typing import cast
 
 import pytest
 
@@ -30,11 +31,12 @@ from ci_coordinator.control_plane_identity import (
     KeycloakBrowserEvidence,
     KeycloakEvidenceRejected,
     KeycloakUnavailable,
+    LoginStartAnchor,
 )
 from ci_coordinator.control_plane_identity.activity import (
     ActivityPrincipal,
     IdentityActivityObserver,
-    SessionEndReason,
+    SessionDeletionReason,
 )
 from ci_coordinator.kernel import FixedClock
 
@@ -56,7 +58,7 @@ def test_login_persists_only_token_free_identity_and_roles() -> None:
     provider = _Provider()
     sessions = _Sessions()
     service = _service(provider=provider, sessions=sessions)
-    start = service.start_login()
+    start = asyncio.run(service.start_login())
     assert isinstance(start, BrowserLoginStart)
 
     result = asyncio.run(
@@ -95,7 +97,7 @@ def test_retained_session_survives_service_recomposition_with_unchanged_keys_and
     provider = _Provider()
     sessions = _Sessions()
     before = _service(provider=provider, sessions=sessions)
-    started = before.start_login()
+    started = asyncio.run(before.start_login())
     assert isinstance(started, BrowserLoginStart)
     completed = asyncio.run(
         before.complete_login(
@@ -121,7 +123,7 @@ def test_retained_session_survives_service_recomposition_with_unchanged_keys_and
 def test_malformed_unicode_code_is_rejected_before_provider_exchange() -> None:
     provider = _Provider()
     service = _service(provider=provider)
-    start = service.start_login()
+    start = asyncio.run(service.start_login())
     assert isinstance(start, BrowserLoginStart)
 
     result = asyncio.run(
@@ -140,8 +142,153 @@ def test_malformed_unicode_code_is_rejected_before_provider_exchange() -> None:
 def test_login_start_maps_provider_failure_to_typed_unavailability() -> None:
     provider = _Provider(authorization_error=KeycloakUnavailable("provider unavailable"))
 
-    assert _service(provider=provider).start_login() == IdentityUnavailable(
+    assert asyncio.run(_service(provider=provider).start_login()) == IdentityUnavailable(
         "identity_provider_unavailable"
+    )
+
+
+@pytest.mark.parametrize(
+    "start_result",
+    [
+        ControlPlaneSessionStoreUnavailable("logout fence unavailable"),
+        _NOW,
+    ],
+    ids=("store-unavailable", "instant-without-generation"),
+)
+def test_login_start_fails_closed_without_a_durable_anchor(
+    start_result: datetime | ControlPlaneSessionStoreUnavailable,
+) -> None:
+    provider = _Provider()
+    sessions = _Sessions(start_result=start_result)
+
+    result = asyncio.run(_service(provider=provider, sessions=sessions).start_login())
+
+    assert result == IdentityUnavailable("session_store_unavailable")
+    assert provider.state == ""
+    assert provider.nonce == ""
+
+
+def test_callback_carries_the_login_start_anchor_instead_of_callback_time() -> None:
+    provider = _Provider()
+    anchor = LoginStartAnchor(fence_generation=3, started_at=_NOW - timedelta(seconds=7))
+    sessions = _Sessions(start_result=anchor)
+    service = _service(provider=provider, sessions=sessions)
+    start = asyncio.run(service.start_login())
+    assert isinstance(start, BrowserLoginStart)
+    sessions.start_result = LoginStartAnchor(
+        fence_generation=9, started_at=_NOW + timedelta(seconds=30)
+    )
+
+    result = asyncio.run(
+        service.complete_login(
+            code="authorization-code",
+            state=provider.state,
+            transaction_cookie=start.transaction_cookie,
+            previous_session_handle=None,
+        )
+    )
+
+    assert isinstance(result, BrowserLoginCompleted)
+    assert sessions.login_starts == [anchor]
+
+
+def test_evidence_from_a_login_started_before_logout_cannot_create_a_later_session() -> None:
+    activity, provider = _Activity(), _Provider()
+    sessions = _Sessions()
+    service = _service(provider=provider, sessions=sessions, activity=activity)
+    first = asyncio.run(service.start_login())
+    assert isinstance(first, BrowserLoginStart)
+    first_state = provider.state
+    completed = asyncio.run(
+        service.complete_login(
+            code="first-code",
+            state=first_state,
+            transaction_cookie=first.transaction_cookie,
+            previous_session_handle=None,
+        )
+    )
+    assert isinstance(completed, BrowserLoginCompleted)
+    pending = asyncio.run(service.start_login())
+    assert isinstance(pending, BrowserLoginStart)
+    pending_state = provider.state
+
+    sessions.now = _NOW + timedelta(seconds=1)
+    assert asyncio.run(service.logout(completed.principal)) == (
+        BrowserLogoutCompleted("https://auth.example.test/logout")
+    )
+    sessions.now = _NOW + timedelta(seconds=2)
+    late = asyncio.run(
+        service.complete_login(
+            code="code-issued-before-logout",
+            state=pending_state,
+            transaction_cookie=pending.transaction_cookie,
+            previous_session_handle=None,
+        )
+    )
+
+    assert late == IdentityRejected("invalid_login")
+    assert sessions.records == {}
+    assert activity.calls == ["login_rejected"]
+
+    after_logout = asyncio.run(service.start_login())
+    assert isinstance(after_logout, BrowserLoginStart)
+    renewed = asyncio.run(
+        service.complete_login(
+            code="code-after-logout",
+            state=provider.state,
+            transaction_cookie=after_logout.transaction_cookie,
+            previous_session_handle=None,
+        )
+    )
+
+    assert isinstance(renewed, BrowserLoginCompleted)
+    assert sessions.login_starts == [
+        LoginStartAnchor(fence_generation=0, started_at=_NOW),
+        LoginStartAnchor(fence_generation=0, started_at=_NOW),
+        LoginStartAnchor(fence_generation=1, started_at=_NOW + timedelta(seconds=2)),
+    ]
+
+
+def test_logout_fences_the_authenticated_subject_after_a_concurrent_replacement() -> None:
+    provider = _Provider()
+    sessions = _Sessions()
+    service = _service(provider=provider, sessions=sessions)
+
+    def started() -> tuple[BrowserLoginStart, str]:
+        start = asyncio.run(service.start_login())
+        assert isinstance(start, BrowserLoginStart)
+        return start, provider.state
+
+    def complete(
+        start: tuple[BrowserLoginStart, str], previous: str | None
+    ) -> BrowserLoginCompleted | IdentityRejected | IdentityUnavailable:
+        return asyncio.run(
+            service.complete_login(
+                code="authorization-code",
+                state=start[1],
+                transaction_cookie=start[0].transaction_cookie,
+                previous_session_handle=previous,
+            )
+        )
+
+    first = complete(started(), None)
+    assert isinstance(first, BrowserLoginCompleted)
+    replacing, late = started(), started()
+    authenticated = asyncio.run(service.authenticate(first.principal.session_handle))
+    assert authenticated == first.principal
+    # Another tab's callback replaces the authenticated handle before logout runs.
+    replacement = complete(replacing, first.principal.session_handle)
+    assert isinstance(replacement, BrowserLoginCompleted)
+    assert asyncio.run(service.logout(first.principal)) == (
+        BrowserLogoutCompleted("https://auth.example.test/logout")
+    )
+
+    assert complete(late, None) == IdentityRejected("invalid_login")
+    assert len(sessions.logouts) == 1
+    assert sessions.logouts[0][1:] == (_ISSUER, "subject")
+    assert len(sessions.records) == 1
+    assert asyncio.run(service.authenticate(replacement.principal.session_handle)) == (
+        replacement.principal
     )
 
 
@@ -179,7 +326,7 @@ def test_login_preserves_provider_and_session_failure_algebra(
     provider = _Provider(exchange_error=provider_error)
     sessions = _Sessions(replace_error=store_error)
     service = _service(provider=provider, sessions=sessions)
-    start = service.start_login()
+    start = asyncio.run(service.start_login())
     assert isinstance(start, BrowserLoginStart)
 
     result = asyncio.run(
@@ -233,7 +380,7 @@ def test_login_rejects_noncanonical_or_stale_provider_evidence(
 ) -> None:
     provider = _Provider(evidence=evidence)
     service = _service(provider=provider)
-    start = service.start_login()
+    start = asyncio.run(service.start_login())
     assert isinstance(start, BrowserLoginStart)
 
     result = asyncio.run(
@@ -262,7 +409,7 @@ def test_callback_fails_before_exchange_on_changed_transaction_authority(
 ) -> None:
     provider = _Provider()
     original = _service(provider=provider)
-    start = original.start_login()
+    start = asyncio.run(original.start_login())
     assert isinstance(start, BrowserLoginStart)
     candidate_state = provider.state if state == "provider-state" else state
     service = _service(provider=provider, profile_digest=profile_digest)
@@ -284,7 +431,7 @@ def test_session_authentication_invalidates_profile_change() -> None:
     sessions = _Sessions()
     provider = _Provider()
     original = _service(provider=provider, sessions=sessions)
-    start = original.start_login()
+    start = asyncio.run(original.start_login())
     assert isinstance(start, BrowserLoginStart)
     completed = asyncio.run(
         original.complete_login(
@@ -330,7 +477,7 @@ def test_logout_deletes_local_authority_before_remote_failure() -> None:
     sessions = _Sessions()
     provider = _Provider()
     service = _service(provider=provider, sessions=sessions)
-    start = service.start_login()
+    start = asyncio.run(service.start_login())
     assert isinstance(start, BrowserLoginStart)
     completed = asyncio.run(
         service.complete_login(
@@ -347,7 +494,7 @@ def test_logout_deletes_local_authority_before_remote_failure() -> None:
         raise KeycloakUnavailable("remote logout unavailable")
 
     provider.on_logout = fail_after_local_delete
-    result = asyncio.run(service.logout(completed.principal.session_handle))
+    result = asyncio.run(service.logout(completed.principal))
 
     assert result == BrowserLogoutCompleted(None)
     assert sessions.records == {}
@@ -444,7 +591,7 @@ def test_login_diagnostics_never_receive_credentials_or_assert_commit(store_fail
         else None
     )
     service = _service(provider=provider, sessions=sessions, activity=activity)
-    start = service.start_login()
+    start = asyncio.run(service.start_login())
     assert isinstance(start, BrowserLoginStart)
     result = asyncio.run(
         service.complete_login(
@@ -549,18 +696,36 @@ class _Sessions:
         None
     )
     load_error: ControlPlaneSessionStoreUnavailable | None = None
+    start_result: LoginStartAnchor | datetime | ControlPlaneSessionStoreUnavailable | None = None
+    login_starts: list[LoginStartAnchor] = field(default_factory=list)
+    generation: int = 0
+    fences: dict[tuple[str, str], int] = field(default_factory=dict)
+    logouts: list[tuple[bytes, str, str]] = field(default_factory=list)
 
     async def current_time(self) -> datetime:
         return self.now
+
+    async def login_start_anchor(self) -> LoginStartAnchor:
+        if isinstance(self.start_result, ControlPlaneSessionStoreUnavailable):
+            raise self.start_result
+        if self.start_result is None:
+            return LoginStartAnchor(fence_generation=self.generation, started_at=self.now)
+        # A non-anchor result models a store that returns only an unordered instant.
+        return cast(LoginStartAnchor, self.start_result)
 
     async def replace(
         self,
         *,
         previous_handle_digest: bytes | None,
         record: ControlPlaneSessionRecord,
+        login_start: LoginStartAnchor,
     ) -> None:
+        self.login_starts.append(login_start)
         if self.replace_error is not None:
             raise self.replace_error
+        fenced = self.fences.get((record.issuer, record.subject))
+        if fenced is not None and fenced > login_start.fence_generation:
+            raise ControlPlaneSessionStoreRejected("login evidence predates a logout")
         if previous_handle_digest is not None:
             self.records.pop(previous_handle_digest, None)
         self.records[record.handle_digest] = record
@@ -570,7 +735,14 @@ class _Sessions:
             raise self.load_error
         return self.records.get(handle_digest)
 
-    async def delete(self, handle_digest: bytes, *, reason: SessionEndReason = "logout") -> None:
+    async def logout(self, handle_digest: bytes, *, issuer: str, subject: str) -> None:
+        self.records.pop(handle_digest, None)
+        self.generation += 1
+        self.fences[(issuer, subject)] = self.generation
+        self.logouts.append((handle_digest, issuer, subject))
+
+    async def delete(self, handle_digest: bytes, *, reason: SessionDeletionReason) -> None:
+        del reason
         self.records.pop(handle_digest, None)
 
 

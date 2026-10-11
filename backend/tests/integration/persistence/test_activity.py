@@ -18,6 +18,7 @@ from ci_coordinator.control_plane_identity import (
     BackChannelLogoutReplay,
     BackChannelLogoutTarget,
     ControlPlaneSessionRecord,
+    ControlPlaneSessionStoreRejected,
     ControlPlaneSessionStoreUnavailable,
     DisplayMetadata,
 )
@@ -92,7 +93,11 @@ def test_session_and_journal_rollback_together_on_failure_or_cancellation(
             with pytest.raises(
                 asyncio.CancelledError if cancelled else ControlPlaneSessionStoreUnavailable
             ):
-                await store.replace(previous_handle_digest=None, record=record)
+                await store.replace(
+                    previous_handle_digest=None,
+                    record=record,
+                    login_start=await store.login_start_anchor(),
+                )
             assert await store.load(record.handle_digest) is None
             async with engine.connect() as connection:
                 assert (
@@ -112,11 +117,19 @@ def test_login_logout_replay_and_backchannel_are_actual_effects(
         try:
             store = PostgresControlPlaneSessionStore(engine)
             record = await _record(store)
-            await store.replace(previous_handle_digest=None, record=record)
-            await store.delete(record.handle_digest)
-            await store.delete(record.handle_digest)
+            await store.replace(
+                previous_handle_digest=None,
+                record=record,
+                login_start=await store.login_start_anchor(),
+            )
+            await store.logout(record.handle_digest, issuer=record.issuer, subject=record.subject)
+            await store.logout(record.handle_digest, issuer=record.issuer, subject=record.subject)
             second = await _record(store, "second")
-            await store.replace(previous_handle_digest=None, record=second)
+            await store.replace(
+                previous_handle_digest=None,
+                record=second,
+                login_start=await store.login_start_anchor(),
+            )
             evidence = BackChannelLogoutEvidence(
                 issuer=second.issuer,
                 token_id="replay-identifier",
@@ -175,7 +188,11 @@ def test_expiry_retains_actor_once_and_logout_failure_rolls_back(
         try:
             store = PostgresControlPlaneSessionStore(engine)
             record = await _record(store)
-            await store.replace(previous_handle_digest=None, record=record)
+            await store.replace(
+                previous_handle_digest=None,
+                record=record,
+                login_start=await store.login_start_anchor(),
+            )
             original = activity_write.delete_sessions_with_activity
 
             async def fail(
@@ -188,7 +205,9 @@ def test_expiry_retains_actor_once_and_logout_failure_rolls_back(
                 # noinspection PyUnresolvedReferences
                 patch.setattr(session_owner, "delete_sessions_with_activity", fail)
                 with pytest.raises(ControlPlaneSessionStoreUnavailable):
-                    await store.delete(record.handle_digest)
+                    await store.logout(
+                        record.handle_digest, issuer=record.issuer, subject=record.subject
+                    )
             assert session_owner.__dict__["delete_sessions_with_activity"] is original
             assert await store.load(record.handle_digest) == record
             with psycopg.connect(to_psycopg_connection_string(postgres_database_url)) as admin:
@@ -231,9 +250,17 @@ def test_keyset_projection_survives_reconnect_and_excludes_newer_events(
         try:
             sessions = PostgresControlPlaneSessionStore(engine)
             record = await _record(sessions, "one")
-            await sessions.replace(previous_handle_digest=None, record=record)
+            await sessions.replace(
+                previous_handle_digest=None,
+                record=record,
+                login_start=await sessions.login_start_anchor(),
+            )
             second = await _record(sessions, "two")
-            await sessions.replace(previous_handle_digest=None, record=second)
+            await sessions.replace(
+                previous_handle_digest=None,
+                record=second,
+                login_start=await sessions.login_start_anchor(),
+            )
             query = ActivityQuery(
                 "security",
                 (record.issued_at - timedelta(seconds=1)).replace(microsecond=0),
@@ -247,7 +274,11 @@ def test_keyset_projection_survives_reconnect_and_excludes_newer_events(
             first = await reader.page(query, principal, None)
             assert len(first.items) == 1 and first.next_cursor is not None
             third = await _record(sessions, "three")
-            await sessions.replace(previous_handle_digest=None, record=third)
+            await sessions.replace(
+                previous_handle_digest=None,
+                record=third,
+                login_start=await sessions.login_start_anchor(),
+            )
             # A fresh reader has no process-local pagination or persistence authority.
             reader = PostgresActivityStore(engine, ActivityCursorCodec(b"k" * 32))
             last = await reader.page(query, principal, first.next_cursor)
@@ -355,15 +386,30 @@ def test_concurrent_logout_and_replacement_journal_only_actual_deletions(
             store = PostgresControlPlaneSessionStore(engine)
             previous = await _record(store, "previous")
             successor = await _record(store, "successor")
-            await store.replace(previous_handle_digest=None, record=previous)
+            await store.replace(
+                previous_handle_digest=None,
+                record=previous,
+                login_start=await store.login_start_anchor(),
+            )
+            pending = await store.login_start_anchor()
             outcomes = await asyncio.gather(
-                store.delete(previous.handle_digest),
-                store.replace(previous_handle_digest=previous.handle_digest, record=successor),
+                store.logout(
+                    previous.handle_digest, issuer=previous.issuer, subject=previous.subject
+                ),
+                store.replace(
+                    previous_handle_digest=previous.handle_digest,
+                    record=successor,
+                    login_start=pending,
+                ),
                 return_exceptions=True,
             )
-            assert all(
-                value is None or isinstance(value, ControlPlaneSessionStoreUnavailable)
-                for value in outcomes
+            logout_outcome, replace_outcome = outcomes
+            assert logout_outcome is None or isinstance(
+                logout_outcome, ControlPlaneSessionStoreUnavailable
+            )
+            assert replace_outcome is None or isinstance(
+                replace_outcome,
+                ControlPlaneSessionStoreRejected | ControlPlaneSessionStoreUnavailable,
             )
             old = await store.load(previous.handle_digest)
             new = await store.load(successor.handle_digest)
@@ -373,12 +419,32 @@ def test_concurrent_logout_and_replacement_journal_only_actual_deletions(
                 )
             assert actions.count("login") == 1 + int(new is not None)
             assert actions.count("logout") + actions.count("replaced") == int(old is None)
-            if outcomes[0] is None or outcomes[1] is None:
+            if logout_outcome is None or replace_outcome is None:
                 assert old is None
-            if outcomes[1] is None:
+            if replace_outcome is None:
                 assert new == successor
+            if isinstance(replace_outcome, ControlPlaneSessionStoreRejected):
+                # The committed logout precedes insertion, so the earlier login start is fenced.
+                assert logout_outcome is None and new is None
+                assert actions.count("logout") == 1
+                with pytest.raises(ControlPlaneSessionStoreRejected):
+                    await store.replace(
+                        previous_handle_digest=previous.handle_digest,
+                        record=successor,
+                        login_start=pending,
+                    )
             if new is None:
-                await store.replace(previous_handle_digest=previous.handle_digest, record=successor)
+                renewed_start = await store.login_start_anchor()
+                successor = replace(
+                    successor,
+                    issued_at=renewed_start.started_at,
+                    expires_at=renewed_start.started_at + timedelta(minutes=5),
+                )
+                await store.replace(
+                    previous_handle_digest=previous.handle_digest,
+                    record=successor,
+                    login_start=renewed_start,
+                )
             assert await store.load(previous.handle_digest) is None
             assert await store.load(successor.handle_digest) == successor
         finally:

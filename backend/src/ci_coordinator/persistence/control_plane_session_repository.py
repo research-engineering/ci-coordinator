@@ -5,16 +5,17 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import Any, Final, Literal
 
-from sqlalchemy import delete, func, insert, literal, select, text, tuple_
+from sqlalchemy import and_, delete, func, insert, literal, or_, select, text, tuple_, update
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from sqlalchemy.sql.dml import ReturningInsert
 
 from ci_coordinator.control_plane_identity import (
+    LOGOUT_FENCE_RETENTION_SECONDS,
     BackChannelLogoutApplied,
     BackChannelLogoutEvidence,
     BackChannelLogoutReplay,
@@ -22,8 +23,9 @@ from ci_coordinator.control_plane_identity import (
     ControlPlaneSessionRecord,
     ControlPlaneSessionStoreRejected,
     ControlPlaneSessionStoreUnavailable,
+    LoginStartAnchor,
 )
-from ci_coordinator.control_plane_identity.activity import SessionEndReason
+from ci_coordinator.control_plane_identity.activity import SessionDeletionReason
 from ci_coordinator.persistence.activity_capability import ADMINISTRATOR_ACTIVITY
 from ci_coordinator.persistence.activity_write import (
     cleanup_activity,
@@ -45,15 +47,35 @@ from ci_coordinator.persistence.connection import configure_read_committed, veri
 from ci_coordinator.persistence.control_plane_session_codec import record_from_row, record_values
 from ci_coordinator.persistence.errors import PersistenceError
 from ci_coordinator.persistence.schema import (
+    control_plane_logout_fence_generation,
+    control_plane_logout_fences,
     control_plane_logout_replays,
     control_plane_sessions,
 )
 from ci_coordinator.persistence.schema_capabilities import (
     control_plane_identity_state_requirements,
+    control_plane_session_lifecycle_requirements,
 )
 
 _MAX_SESSIONS_PER_IDENTITY = 8
 _EXPIRED_CLEANUP_LIMIT = 128
+_LOGOUT_FENCE_RETENTION: Final = timedelta(seconds=LOGOUT_FENCE_RETENTION_SECONDS)
+_LOGOUT_FENCE_RETENTION_INTERVAL: Final = text(
+    f"INTERVAL '{LOGOUT_FENCE_RETENTION_SECONDS} seconds'"
+)
+# Fence writers hold this lock exclusively and advance the transactional generation under it;
+# login-start reads and session insertion share it. A login start therefore reads a generation
+# that every earlier fence write has committed and every later one exceeds.
+_EXCLUSIVE_LOGOUT_FENCE_LOCK: Final = text(
+    "SELECT pg_catalog.pg_advisory_xact_lock("
+    "pg_catalog.hashtextextended('control-plane-logout-fence/v1', 0))"
+)
+_SHARED_LOGOUT_FENCE_LOCK: Final = text(
+    "SELECT pg_catalog.pg_advisory_xact_lock_shared("
+    "pg_catalog.hashtextextended('control-plane-logout-fence/v1', 0))"
+)
+
+type LogoutFenceTarget = Literal["subject", "sid"]
 
 
 class PostgresControlPlaneSessionStore:
@@ -61,6 +83,8 @@ class PostgresControlPlaneSessionStore:
         self._engine = engine
         self._profile = load_bundled_profile()
         self._required_capabilities = control_plane_identity_state_requirements(self._profile)
+        # Reads of existing sessions do not depend on the fence; login and logout do.
+        self._lifecycle_capabilities = control_plane_session_lifecycle_requirements(self._profile)
 
     async def current_time(self) -> datetime:
         try:
@@ -77,22 +101,54 @@ class PostgresControlPlaneSessionStore:
                 "control-plane session clock is unavailable"
             ) from error
 
+    async def login_start_anchor(self) -> LoginStartAnchor:
+        try:
+            async with _identity_transaction(
+                self._engine,
+                self._profile,
+                self._lifecycle_capabilities,
+            ) as connection:
+                await _lock_logout_fence(connection, exclusive=False)
+                row = (
+                    await connection.execute(
+                        select(
+                            control_plane_logout_fence_generation.c.current_generation,
+                            func.statement_timestamp().label("started_at"),
+                        )
+                    )
+                ).one()
+                return LoginStartAnchor(
+                    fence_generation=row.current_generation,
+                    started_at=row.started_at,
+                )
+        except asyncio.CancelledError:
+            raise
+        except (PersistenceError, SQLAlchemyError, TypeError, ValueError) as error:
+            raise ControlPlaneSessionStoreUnavailable(
+                "control-plane login start anchor is unavailable"
+            ) from error
+
     async def replace(
         self,
         *,
         previous_handle_digest: bytes | None,
         record: ControlPlaneSessionRecord,
+        login_start: LoginStartAnchor,
     ) -> None:
         if type(record) is not ControlPlaneSessionRecord:
             raise TypeError("control-plane session record must be exact")
+        if type(login_start) is not LoginStartAnchor:
+            raise TypeError("control-plane login start anchor must be exact")
         if previous_handle_digest is not None:
             _require_digest(previous_handle_digest, "previous control-plane session digest")
+        started_at = login_start.started_at
         try:
             async with _identity_transaction(
                 self._engine,
                 self._profile,
-                self._required_capabilities,
+                self._lifecycle_capabilities,
             ) as connection:
+                await _lock_logout_fence(connection, exclusive=False)
                 await lock_activity(connection)
                 await connection.execute(
                     text("SELECT pg_catalog.pg_advisory_xact_lock(:identity_lock)"),
@@ -102,6 +158,15 @@ class PostgresControlPlaneSessionStore:
                 if not record.issued_at <= database_now < record.expires_at:
                     raise ControlPlaneSessionStoreRejected(
                         "control-plane session is outside the database clock window"
+                    )
+                # Liveness bound only; the generation comparison below carries the safety.
+                if not started_at <= database_now < started_at + _LOGOUT_FENCE_RETENTION:
+                    raise ControlPlaneSessionStoreRejected(
+                        "control-plane login start is outside the login age bound"
+                    )
+                if await _logout_fence_covers(connection, record, login_start.fence_generation):
+                    raise ControlPlaneSessionStoreRejected(
+                        "control-plane login evidence predates a logout"
                     )
                 await _cleanup_expired_sessions(connection)
                 if previous_handle_digest is not None:
@@ -198,10 +263,44 @@ class PostgresControlPlaneSessionStore:
                 "control-plane session lookup failed"
             ) from error
 
-    async def delete(self, handle_digest: bytes, *, reason: SessionEndReason = "logout") -> None:
+    async def logout(self, handle_digest: bytes, *, issuer: str, subject: str) -> None:
         _require_digest(handle_digest, "control-plane session digest")
-        if reason not in ("logout", "expired", "revoked", "replaced"):
-            raise ValueError("invalid session end reason")
+        if type(issuer) is not str or type(subject) is not str:
+            raise TypeError("logout fence identity must be exact text")
+        try:
+            async with _identity_transaction(
+                self._engine,
+                self._profile,
+                self._lifecycle_capabilities,
+            ) as connection:
+                await _lock_logout_fence(connection, exclusive=True)
+                await lock_activity(connection)
+                await delete_sessions_with_activity(
+                    connection,
+                    delete(control_plane_sessions).where(
+                        control_plane_sessions.c.handle_digest == handle_digest
+                    ),
+                    "logout",
+                )
+                # A concurrent replacement may already have deleted the authenticated handle;
+                # the caller's authenticated identity still fences later insertions.
+                await _advance_logout_fence(
+                    connection,
+                    issuer=issuer,
+                    target_kind="subject",
+                    target_value=subject,
+                )
+        except asyncio.CancelledError:
+            raise
+        except (PersistenceError, SQLAlchemyError, TypeError, ValueError) as error:
+            raise ControlPlaneSessionStoreUnavailable(
+                "control-plane session logout failed"
+            ) from error
+
+    async def delete(self, handle_digest: bytes, *, reason: SessionDeletionReason) -> None:
+        _require_digest(handle_digest, "control-plane session digest")
+        if reason not in ("expired", "revoked", "replaced"):
+            raise ValueError("invalid session deletion reason")
         try:
             async with _identity_transaction(
                 self._engine,
@@ -228,7 +327,7 @@ class PostgresBackChannelLogoutStore:
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
         self._profile = load_bundled_profile()
-        self._required_capabilities = control_plane_identity_state_requirements(self._profile)
+        self._required_capabilities = control_plane_session_lifecycle_requirements(self._profile)
 
     async def consume_and_delete(
         self,
@@ -247,6 +346,7 @@ class PostgresBackChannelLogoutStore:
                 self._profile,
                 self._required_capabilities,
             ) as connection:
+                await _lock_logout_fence(connection, exclusive=True)
                 await lock_activity(connection)
                 await _cleanup_expired_replays(connection)
                 await connection.execute(
@@ -262,6 +362,13 @@ class PostgresBackChannelLogoutStore:
                 if inserted.scalar_one_or_none() is None:
                     return BackChannelLogoutReplay()
                 deleted_count = await _delete_target_sessions(connection, evidence)
+                target_kind, target_value = _back_channel_fence_target(evidence)
+                await _advance_logout_fence(
+                    connection,
+                    issuer=evidence.issuer,
+                    target_kind=target_kind,
+                    target_value=target_value,
+                )
                 return BackChannelLogoutApplied(deleted_count)
         except asyncio.CancelledError:
             raise
@@ -297,6 +404,97 @@ async def _identity_transaction(
 async def _database_time(connection: AsyncConnection) -> datetime:
     value = await connection.scalar(select(func.statement_timestamp()))
     return _aware_utc(value, "database identity clock")
+
+
+async def _lock_logout_fence(connection: AsyncConnection, *, exclusive: bool) -> None:
+    await connection.execute(
+        _EXCLUSIVE_LOGOUT_FENCE_LOCK if exclusive else _SHARED_LOGOUT_FENCE_LOCK
+    )
+
+
+async def _logout_fence_covers(
+    connection: AsyncConnection,
+    record: ControlPlaneSessionRecord,
+    login_fence_generation: int,
+) -> bool:
+    # Cleanup erased fences up to the floor; evidence older than it cannot be proven unfenced.
+    floor = (
+        await connection.execute(
+            select(control_plane_logout_fence_generation.c.deleted_generation_floor)
+        )
+    ).scalar_one()
+    if floor > login_fence_generation:
+        return True
+    fences = control_plane_logout_fences
+    covering = await connection.scalar(
+        select(fences.c.issuer)
+        .where(
+            fences.c.issuer == record.issuer,
+            fences.c.generation > login_fence_generation,
+            or_(
+                and_(fences.c.target_kind == "subject", fences.c.target_value == record.subject),
+                and_(
+                    fences.c.target_kind == "sid",
+                    fences.c.target_value == record.keycloak_session_id,
+                ),
+            ),
+        )
+        .limit(1)
+    )
+    return covering is not None
+
+
+async def _advance_logout_fence(
+    connection: AsyncConnection,
+    *,
+    issuer: str,
+    target_kind: LogoutFenceTarget,
+    target_value: str,
+) -> None:
+    fences = control_plane_logout_fences
+    counter = control_plane_logout_fence_generation
+    expired = (
+        select(fences.c.issuer, fences.c.target_kind, fences.c.target_value)
+        .where(fences.c.fenced_at <= func.statement_timestamp() - _LOGOUT_FENCE_RETENTION_INTERVAL)
+        .order_by(fences.c.fenced_at, fences.c.issuer, fences.c.target_kind, fences.c.target_value)
+        .limit(_EXPIRED_CLEANUP_LIMIT)
+    )
+    erased = await connection.execute(
+        delete(fences)
+        .where(tuple_(fences.c.issuer, fences.c.target_kind, fences.c.target_value).in_(expired))
+        .returning(fences.c.generation)
+    )
+    erased_floor = max(erased.scalars().all(), default=0)
+    # Wall time selects what to erase; the floor keeps erased fences effective for older logins.
+    generation = (
+        await connection.execute(
+            update(counter)
+            .values(
+                current_generation=counter.c.current_generation + 1,
+                deleted_generation_floor=func.greatest(
+                    counter.c.deleted_generation_floor,
+                    literal(erased_floor, type_=counter.c.deleted_generation_floor.type),
+                ),
+            )
+            .returning(counter.c.current_generation)
+        )
+    ).scalar_one()
+    statement = postgresql_insert(fences).values(
+        issuer=issuer,
+        target_kind=target_kind,
+        target_value=target_value,
+        generation=generation,
+        fenced_at=func.statement_timestamp(),
+    )
+    await connection.execute(
+        statement.on_conflict_do_update(
+            index_elements=(fences.c.issuer, fences.c.target_kind, fences.c.target_value),
+            set_={
+                "generation": statement.excluded.generation,
+                "fenced_at": statement.excluded.fenced_at,
+            },
+        )
+    )
 
 
 async def _cleanup_expired_sessions(connection: AsyncConnection) -> None:
@@ -409,6 +607,17 @@ def _identity_lock_key(actor_id: str) -> int:
     if len(digest_prefix) != 8:
         raise ValueError("control-plane actor identity is invalid")
     return int.from_bytes(digest_prefix, byteorder="big", signed=True)
+
+
+def _back_channel_fence_target(
+    evidence: BackChannelLogoutEvidence,
+) -> tuple[LogoutFenceTarget, str]:
+    # A sid names one Keycloak session, so a sid-bearing token fences no other sessions.
+    if evidence.target.keycloak_session_id is not None:
+        return "sid", evidence.target.keycloak_session_id
+    if evidence.target.subject is not None:
+        return "subject", evidence.target.subject
+    raise ValueError("back-channel logout target is empty")
 
 
 def _require_digest(value: object, name: str) -> None:

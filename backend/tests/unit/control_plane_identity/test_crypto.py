@@ -1,19 +1,24 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.control_plane_identity import (
     ControlPlaneIdentityCrypto,
     DisplayMetadata,
     KeycloakBrowserEvidence,
+    LoginStartAnchor,
     ReviewerStepUpBinding,
     derive_human_actor_id,
 )
+from ci_coordinator.control_plane_identity import crypto as identity_crypto
+from ci_coordinator.kernel import canonical_json
 
 _ISSUER = "https://auth.example.test/realms/coordinator"
 _PROFILE = "a" * 64
 _NOW = datetime(2026, 9, 2, 12, tzinfo=UTC)
+_LOGIN_STARTED_AT = datetime(2026, 9, 2, 13, 59, 58, 125_000, tzinfo=timezone(timedelta(hours=2)))
+_LOGIN_START = LoginStartAnchor(fence_generation=41, started_at=_LOGIN_STARTED_AT)
 
 
 class _Entropy:
@@ -34,12 +39,16 @@ def test_browser_transaction_is_aead_pkce_nonce_state_and_profile_bound() -> Non
 
     request = crypto.new_browser_transaction(
         issued_at=_NOW,
+        login_start=_LOGIN_START,
         authority_profile_digest=_PROFILE,
     )
     opened = crypto.open_browser_transaction(request.transaction_cookie)
 
     assert opened is not None
     assert opened.authority_profile_digest == _PROFILE
+    assert opened.issued_at == _NOW
+    assert opened.login_start == _LOGIN_START
+    assert opened.login_start.started_at.tzinfo is UTC
     assert opened.nonce == request.nonce
     assert crypto.state_matches(opened, request.state)
     assert not crypto.state_matches(opened, "A" * 43)
@@ -51,12 +60,59 @@ def test_browser_and_reviewer_transaction_domains_are_not_interchangeable() -> N
     crypto = _crypto()
     browser = crypto.new_browser_transaction(
         issued_at=_NOW,
+        login_start=_LOGIN_START,
         authority_profile_digest=_PROFILE,
     )
     reviewer = crypto.new_reviewer_transaction(_reviewer_binding(crypto))
 
     assert crypto.open_reviewer_transaction(browser.transaction_cookie) is None
     assert crypto.open_browser_transaction(reviewer.transaction_cookie) is None
+
+
+def test_sealed_browser_transaction_without_an_exact_login_start_anchor_is_rejected() -> None:
+    crypto = _crypto()
+    request = crypto.new_browser_transaction(
+        issued_at=_NOW,
+        login_start=_LOGIN_START,
+        authority_profile_digest=_PROFILE,
+    )
+    opened = crypto.open_browser_transaction(request.transaction_cookie)
+    assert opened is not None
+    predecessor_shape: dict[str, object] = {
+        "authorityProfileDigest": _PROFILE,
+        "issuedAt": _NOW.isoformat(),
+        "nonce": opened.nonce,
+        "stateDigest": opened.state_digest.hex(),
+        "verifier": opened.code_verifier,
+    }
+
+    def sealed(payload: dict[str, object]) -> str:
+        # noinspection PyProtectedMember
+        return crypto._seal(
+            crypto._browser_transaction,
+            canonical_json(payload),
+            identity_crypto._BROWSER_TRANSACTION_AAD,
+        )
+
+    exact_anchor: dict[str, object] = {
+        **predecessor_shape,
+        "loginFenceGeneration": 41,
+        "loginStartedAt": _LOGIN_STARTED_AT.isoformat(),
+    }
+    # The first predecessor release sealed only a wall-clock anchor.
+    time_only = {key: value for key, value in exact_anchor.items() if key != "loginFenceGeneration"}
+    for rejected in (
+        predecessor_shape,
+        time_only,
+        {**exact_anchor, "loginStartedAt": "2026-09-02T11:59:58"},
+        {**exact_anchor, "loginFenceGeneration": -1},
+        {**exact_anchor, "loginFenceGeneration": True},
+        {**exact_anchor, "loginFenceGeneration": "41"},
+    ):
+        assert crypto.open_browser_transaction(sealed(rejected)) is None
+    restored = crypto.open_browser_transaction(sealed(exact_anchor))
+    assert restored is not None
+    assert restored.login_start == _LOGIN_START
 
 
 def test_reviewer_transaction_round_trip_preserves_every_binding() -> None:

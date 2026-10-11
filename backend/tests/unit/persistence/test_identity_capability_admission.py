@@ -15,6 +15,7 @@ from ci_coordinator.control_plane_identity import (
     ControlPlaneSessionStoreRejected,
     ControlPlaneSessionStoreUnavailable,
     DisplayMetadata,
+    LoginStartAnchor,
     derive_human_actor_id,
 )
 from ci_coordinator.persistence import (
@@ -38,6 +39,7 @@ from ci_coordinator.persistence.schema_capabilities import (
     ADMINISTRATOR_ACTIVITY,
     AUDIT_LEDGER,
     CONTROL_PLANE_IDENTITY_STATE,
+    CONTROL_PLANE_LOGOUT_FENCE,
     control_plane_identity_state_requirements,
     proposal_review_registration_requirements,
 )
@@ -53,6 +55,7 @@ class _Connection:
                 {
                     *proposal_review_registration_requirements(load_bundled_profile()),
                     CONTROL_PLANE_IDENTITY_STATE.declaration(),
+                    CONTROL_PLANE_LOGOUT_FENCE.declaration(),
                     ADMINISTRATOR_ACTIVITY.declaration(),
                 }
             )
@@ -115,6 +118,7 @@ def admitted_connection(monkeypatch: pytest.MonkeyPatch) -> _Connection:
 
     for name in (
         "activity_schema_matches_contract",
+        "control_plane_logout_fence_schema_matches_contract",
         "schema_matches_contract",
         "audit_ledger_bridge_constraints_are_validated",
         "audit_ledger_seed_is_valid",
@@ -265,6 +269,7 @@ def test_identity_move_preserves_public_failures_before_body_sql(
                         expires_at=now + timedelta(minutes=5),
                         display=DisplayMetadata(None, None),
                     ),
+                    login_start=LoginStartAnchor(fence_generation=0, started_at=now),
                 )
         if failure == "cancelled":
             assert rejected.value is error
@@ -275,6 +280,47 @@ def test_identity_move_preserves_public_failures_before_body_sql(
 
     asyncio.run(scenario())
     assert connection.events.count("identity") == 1
+    assert connection.events[-1] == "end"
+
+
+@pytest.mark.parametrize("damage", ["undeclared", "facts"])
+def test_logout_fence_capability_gates_every_session_lifecycle_body(
+    admitted_connection: _Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    damage: Literal["undeclared", "facts"],
+) -> None:
+    connection = admitted_connection
+    expected = "does not provide"
+    if damage == "undeclared":
+        connection.provided = tuple(
+            item
+            for item in connection.provided
+            if item.capability_id != CONTROL_PLANE_LOGOUT_FENCE.capability_id
+        )
+    else:
+        expected = "logout fence schema facts"
+
+        async def mismatched(*_args: object) -> bool:
+            connection.events.append("logout_fence")
+            return False
+
+        monkeypatch.setattr(
+            compatibility_admission,
+            "control_plane_logout_fence_schema_matches_contract",
+            mismatched,
+        )
+
+    async def scenario() -> None:
+        store = control_plane_session_repository.PostgresControlPlaneSessionStore(
+            cast(AsyncEngine, _Engine(connection))
+        )
+        with pytest.raises(ControlPlaneSessionStoreUnavailable) as rejected:
+            await store.login_start_anchor()
+        assert isinstance(rejected.value.__cause__, DatabaseCapabilityUnavailable)
+        assert expected in str(rejected.value.__cause__)
+
+    asyncio.run(scenario())
+    assert "identity" not in connection.events
     assert connection.events[-1] == "end"
 
 

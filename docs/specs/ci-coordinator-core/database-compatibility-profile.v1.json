@@ -304,6 +304,21 @@
   ],
   "implementationInventory": [
     {
+      "path": "backend/alembic/versions/20261011_0018_control_plane_logout_fence.py",
+      "responsibility": "generation-eighteen durable logout revocation fence expansion over the exact renewal head",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/control_plane_logout_fence_schema_contract.py",
+      "responsibility": "exact logout fence catalog, constraint and index contract shared by migration and runtime admission",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_control_plane_logout_fence_migration.py",
+      "responsibility": "native atomic forward expansion, replay, downgrade refusal, damaged catalog and runtime ACL falsifiers",
+      "proofClass": "postgres"
+    },
+    {
       "path": "backend/alembic/versions/20260926_0016_retire_pending_review_authority.py",
       "responsibility": "exclusive-fence retirement of config/proposal V1 and invalidation of only unconsumed pending attestations",
       "proofClass": "postgres"

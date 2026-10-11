@@ -72,6 +72,8 @@ from ci_coordinator.persistence._schema_governance_baselines import (
     governance_baselines as governance_baselines,
 )
 from ci_coordinator.persistence._schema_control_plane_identity import (
+    control_plane_logout_fence_generation as control_plane_logout_fence_generation,
+    control_plane_logout_fences as control_plane_logout_fences,
     control_plane_logout_replays as control_plane_logout_replays,
     control_plane_sessions as control_plane_sessions,
 )
@@ -130,6 +132,8 @@ __all__ = (
     "config_epoch_activations",
     "config_epoch_registrations",
     "config_epochs",
+    "control_plane_logout_fence_generation",
+    "control_plane_logout_fences",
     "control_plane_logout_replays",
     "control_plane_sessions",
     "governance_baseline_operations",

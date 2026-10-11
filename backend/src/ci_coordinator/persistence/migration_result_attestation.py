@@ -44,6 +44,9 @@ from ci_coordinator.persistence.config_epoch_schema_attestation import (
 from ci_coordinator.persistence.control_plane_identity_schema_attestation import (
     control_plane_identity_schema_matches_contract_sync,
 )
+from ci_coordinator.persistence.control_plane_logout_fence_schema_contract import (
+    control_plane_logout_fence_schema_matches_sync,
+)
 from ci_coordinator.persistence.data_attestation import (
     application_schema_is_empty_of_public_default_privileges_sync,
     audit_ledger_bridge_constraints_are_validated_sync,
@@ -169,6 +172,7 @@ _CAPABILITY_ATTESTORS: Final[dict[str, CapabilityAttestor]] = {
         and history_default_is_valid_sync(connection)
     ),
     "control-plane-identity-state/v1": control_plane_identity_schema_matches_contract_sync,
+    "control-plane-logout-fence/v1": control_plane_logout_fence_schema_matches_sync,
     "database-compatibility-protocol/v1": (compatibility_protocol_schema_matches_contract_sync),
     "governance-baseline-state/v1": governance_baseline_schema_matches_contract_sync,
     "operator-override-state/v1": _operator_override_matches,

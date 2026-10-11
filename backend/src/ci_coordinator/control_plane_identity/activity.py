@@ -10,6 +10,8 @@ from ci_coordinator.control_plane_identity.model import (
 )
 
 type SessionEndReason = Literal["logout", "expired", "revoked", "replaced"]
+# Session ends other than logout; only logout advances a logout fence.
+type SessionDeletionReason = Literal["expired", "revoked", "replaced"]
 type SecurityAction = Literal[
     "login", "logout", "expired", "revoked", "replaced", "role_denied", "export"
 ]

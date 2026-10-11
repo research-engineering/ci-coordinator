@@ -60,6 +60,8 @@ RUNTIME_TABLE_GRANTS: Final[Mapping[str, tuple[LiteralString, ...]]] = MappingPr
         "activity_events": ("SELECT", "INSERT", "DELETE"),
         "activity_diagnostic_buckets": ("SELECT", "INSERT", "DELETE"),
         "control_plane_logout_replays": ("INSERT", "DELETE"),
+        "control_plane_logout_fences": ("SELECT", "INSERT", "DELETE"),
+        "control_plane_logout_fence_generation": ("SELECT",),
         "webhook_deliveries": ("SELECT", "INSERT"),
         "ci_workflow_observations": ("SELECT", "INSERT", "DELETE"),
         "ci_workflow_attempt_collections": ("SELECT", "INSERT", "DELETE"),
@@ -322,6 +324,10 @@ RUNTIME_COLUMN_GRANTS: Final[Mapping[str, tuple[ColumnGrant, ...]]] = MappingPro
             ColumnGrant("SELECT", _CONTROL_PLANE_LOGOUT_REPLAY_COLUMNS),
         ),
         "control_plane_sessions": (ColumnGrant("UPDATE", _CONTROL_PLANE_SESSION_LOCK_COLUMNS),),
+        "control_plane_logout_fences": (ColumnGrant("UPDATE", ("generation", "fenced_at")),),
+        "control_plane_logout_fence_generation": (
+            ColumnGrant("UPDATE", ("current_generation", "deleted_generation_floor")),
+        ),
         "activity_diagnostic_buckets": (ColumnGrant("UPDATE", ("count",)),),
         "shadow_evidence": (
             ColumnGrant("SELECT", _SHADOW_EVIDENCE_COLUMNS),

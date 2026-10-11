@@ -141,6 +141,8 @@ does not by itself make the document obsolete.
 - [Automatic App inventory](features/automatic-app-inventory.md)
 - [Bounded browser session recovery](features/browser-session-recovery.md)
 - [Browser session recovery implementation plan](features/browser-session-recovery-implementation-plan.md)
+- [Logout revocation fence](features/logout-revocation-fence.md)
+- [Logout revocation fence implementation plan](features/logout-revocation-fence-implementation-plan.md)
 - [Workspace session continuity](features/workspace-session-continuity.md)
 - [Workspace session continuity plan](features/workspace-session-continuity-plan.md)
 - [HTTP import startup](features/http-import-startup.md)

@@ -61,14 +61,21 @@ def test_session_round_trip_replaces_previous_handle_without_bearer_columns(
             now = await store.current_time()
             previous = _record("previous", now)
             replacement = _record("replacement", now)
-            await store.replace(previous_handle_digest=None, record=previous)
+            await store.replace(
+                previous_handle_digest=None,
+                record=previous,
+                login_start=await store.login_start_anchor(),
+            )
             await store.replace(
                 previous_handle_digest=previous.handle_digest,
                 record=replacement,
+                login_start=await store.login_start_anchor(),
             )
             assert await store.load(previous.handle_digest) is None
             assert await store.load(replacement.handle_digest) == replacement
-            await store.delete(replacement.handle_digest)
+            await store.logout(
+                replacement.handle_digest, issuer=replacement.issuer, subject=replacement.subject
+            )
             assert await store.load(replacement.handle_digest) is None
             return previous, replacement
         finally:
@@ -119,6 +126,7 @@ def test_replacement_enforces_eight_sessions_per_exact_issuer_subject(
                 await store.replace(
                     previous_handle_digest=None,
                     record=_record(f"same-identity-{index}", now),
+                    login_start=await store.login_start_anchor(),
                 )
             await store.replace(
                 previous_handle_digest=None,
@@ -127,6 +135,7 @@ def test_replacement_enforces_eight_sessions_per_exact_issuer_subject(
                     now,
                     issuer=_OTHER_ISSUER,
                 ),
+                login_start=await store.login_start_anchor(),
             )
         finally:
             await engine.dispose()
@@ -163,8 +172,16 @@ def test_replacement_and_expiry_cleanup_commit_or_roll_back_together(
                 subject="subject-expired",
                 lifetime_seconds=300,
             )
-            await store.replace(previous_handle_digest=None, record=previous)
-            await store.replace(previous_handle_digest=None, record=collision)
+            await store.replace(
+                previous_handle_digest=None,
+                record=previous,
+                login_start=await store.login_start_anchor(),
+            )
+            await store.replace(
+                previous_handle_digest=None,
+                record=collision,
+                login_start=await store.login_start_anchor(),
+            )
             async with migration_engine.begin() as connection:
                 await connection.execute(
                     text(
@@ -194,6 +211,7 @@ def test_replacement_and_expiry_cleanup_commit_or_roll_back_together(
                 await store.replace(
                     previous_handle_digest=previous.handle_digest,
                     record=conflicting_replacement,
+                    login_start=await store.login_start_anchor(),
                 )
             async with migration_engine.connect() as connection:
                 retained = await connection.scalar(
@@ -213,6 +231,7 @@ def test_replacement_and_expiry_cleanup_commit_or_roll_back_together(
             await store.replace(
                 previous_handle_digest=previous.handle_digest,
                 record=replacement,
+                login_start=await store.login_start_anchor(),
             )
             assert await store.load(previous.handle_digest) is None
             assert await store.load(replacement.handle_digest) == replacement
@@ -293,8 +312,13 @@ def test_session_operation_uses_time_after_compatibility_fence(
             store = PostgresControlPlaneSessionStore(engine)
             now = await store.current_time()
             record = _record("fence-expiry", now, lifetime_seconds=2)
+            login_start = await store.login_start_anchor()
             if operation == "load":
-                await store.replace(previous_handle_digest=None, record=record)
+                await store.replace(
+                    previous_handle_digest=None,
+                    record=record,
+                    login_start=login_start,
+                )
             profile = load_bundled_profile()
             await blocker.execute(
                 "SELECT pg_catalog.pg_advisory_xact_lock(%s, %s)",
@@ -317,7 +341,11 @@ def test_session_operation_uses_time_after_compatibility_fence(
                     assert await store.load(record.handle_digest) is None
                 elif operation == "replace":
                     with pytest.raises(ControlPlaneSessionStoreRejected):
-                        await store.replace(previous_handle_digest=None, record=record)
+                        await store.replace(
+                            previous_handle_digest=None,
+                            record=record,
+                            login_start=login_start,
+                        )
                 else:
                     assert await store.current_time() >= record.expires_at
 
@@ -376,7 +404,11 @@ def test_back_channel_logout_uses_exact_issuer_and_target_conjunction(
                 ),
             }
             for record in records.values():
-                await sessions.replace(previous_handle_digest=None, record=record)
+                await sessions.replace(
+                    previous_handle_digest=None,
+                    record=record,
+                    login_start=await sessions.login_start_anchor(),
+                )
             target = BackChannelLogoutTarget(
                 keycloak_session_id=None if target_kind == "subject" else "sid-a",
                 subject=None if target_kind == "sid" else "subject-a",
@@ -410,14 +442,23 @@ def test_logout_replay_marker_prevents_a_later_session_delete(
                 BackChannelLogoutTarget(keycloak_session_id="sid-a"),
                 token_id="logout-replay",
             )
-            await sessions.replace(previous_handle_digest=None, record=first)
+            await sessions.replace(
+                previous_handle_digest=None,
+                record=first,
+                login_start=await sessions.login_start_anchor(),
+            )
             assert await logouts.consume_and_delete(
                 evidence=evidence,
                 replay_retained_until=now + timedelta(minutes=3),
             ) == BackChannelLogoutApplied(1)
 
-            later = _record("replay-later", now)
-            await sessions.replace(previous_handle_digest=None, record=later)
+            later_start = await sessions.login_start_anchor()
+            later = _record("replay-later", later_start.started_at)
+            await sessions.replace(
+                previous_handle_digest=None,
+                record=later,
+                login_start=later_start,
+            )
             assert (
                 type(
                     await logouts.consume_and_delete(
@@ -444,7 +485,11 @@ def test_control_plane_identity_schema_and_runtime_acl_are_exact(
             store = PostgresControlPlaneSessionStore(engine)
             now = await store.current_time()
             record = _record("runtime-acl-witness", now)
-            await store.replace(previous_handle_digest=None, record=record)
+            await store.replace(
+                previous_handle_digest=None,
+                record=record,
+                login_start=await store.login_start_anchor(),
+            )
             return record.handle_digest
         finally:
             await engine.dispose()

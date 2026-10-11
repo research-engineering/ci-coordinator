@@ -89,7 +89,7 @@ class _Identity:
         self.back_channel_result: BackChannelLogoutResult = BackChannelLogoutCompleted(1)
         self.calls: list[tuple[object, ...]] = []
 
-    def start_login(self) -> BrowserLoginStart | IdentityUnavailable:
+    async def start_login(self) -> BrowserLoginStart | IdentityUnavailable:
         self.calls.append(("start",))
         return self.start_result
 
@@ -108,8 +108,8 @@ class _Identity:
         self.calls.append(("authenticate", session_handle))
         return self.authentication_result
 
-    async def logout(self, session_handle: str | None) -> BrowserLogoutResult:
-        self.calls.append(("logout", session_handle))
+    async def logout(self, principal: KeycloakHumanPrincipal) -> BrowserLogoutResult:
+        self.calls.append(("logout", principal))
         return self.logout_result
 
     async def apply_back_channel_logout(
@@ -331,7 +331,7 @@ def test_session_and_logout_preserve_identity_roles_and_request_integrity() -> N
         200,
         {"ok": True, "redirectUrl": "https://auth.example.test/logout"},
     )
-    assert identity.calls[-1] == ("logout", _PRINCIPAL.session_handle)
+    assert identity.calls[-1] == ("logout", _PRINCIPAL)
     assert "Max-Age=0" in logout.headers["set-cookie"]
 
 
