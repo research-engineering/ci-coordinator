@@ -166,3 +166,66 @@ def test_runtime_scanner_collects_all_findings_with_an_unambiguous_process_resul
         assert "printf 'Raw scanner exit status: %s\\n'" in scripts
         assert 'if match["severity"] in {"High", "Critical"}' in scripts
         assert "assert occurrence_is_repaired(" in scripts
+
+
+def _qualification_steps() -> list[dict[str, Any]]:
+    workflow: dict[str, Any] = YAML(typ="safe").load(
+        (ROOT / ".github/workflows/runtime-image-qualification.yml").read_text()
+    )
+    steps: list[dict[str, Any]] = workflow["jobs"]["qualify"]["steps"]
+    return steps
+
+
+def _named_step(steps: list[dict[str, Any]], name: str) -> dict[str, Any]:
+    return next(step for step in steps if step.get("name") == name)
+
+
+def test_runtime_qualification_installs_locked_python_before_uv_sync() -> None:
+    steps = _qualification_steps()
+    setup = [step for step in steps if step.get("uses", "").startswith("actions/setup-python@")]
+    assert len(setup) == 1
+    assert setup[0]["uses"] == "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97"
+    assert setup[0]["with"] == {"python-version": "3.13.16"}
+    uv = next(step for step in steps if step.get("uses", "").startswith("astral-sh/setup-uv@"))
+    contracts = _named_step(steps, "Check image and qualification contracts")
+    assert "uv sync --project backend --frozen" in contracts["run"]
+    assert steps.index(setup[0]) < steps.index(uv) < steps.index(contracts)
+
+
+def test_runtime_scan_diagnostics_precede_repair_evidence_binding_and_admission() -> None:
+    steps = _qualification_steps()
+    verify = _named_step(steps, "Verify repaired components in the final image")
+    scan = _named_step(steps, "Measure final filesystem vulnerability evidence")
+    assert scan["if"] == "${{ !cancelled() && steps.capture.outputs.built == 'true' }}"
+    assert steps.index(verify) < steps.index(scan)
+    assert '--output "${root}/repair-evidence.json"' in verify["run"]
+    run = scan["run"]
+    diagnostics = run.index('"${root}/scan.json" > "${root}/vulnerabilities.json"')
+    evidence = run.index('config_id="$(jq -r .imageId "${root}/repair-evidence.json")"')
+    binding = run.index('jq -e --arg id "${config_id}" --arg input "${image_id}"')
+    admission = run.index("validate_observations(policy=policy, policy_sha256=digest")
+    assert run.count("repair-evidence.json") == 2
+    assert run.index("set -euo pipefail") < run.index('test "${code}" -eq 0') < diagnostics
+    assert diagnostics < evidence < binding < admission
+    assert ".source.target.imageID == $id and .source.target.userInput == $input" in run
+    assert 'proof.imageId == report["imageId"]' in run
+
+
+def test_runtime_failure_diagnostics_do_not_weaken_required_result_retention() -> None:
+    steps = _qualification_steps()
+    diagnostics = _named_step(steps, "Retain qualification failure diagnostics")
+    results = _named_step(steps, "Preserve bounded qualification results")
+    assert steps.index(diagnostics) < steps.index(results) == len(steps) - 1
+    assert diagnostics["if"] == "${{ failure() }}"
+    assert "if" not in results
+    diagnostic_options = diagnostics["with"]
+    result_options = results["with"]
+    assert diagnostics["uses"] == results["uses"]
+    assert diagnostic_options["name"] != result_options["name"]
+    assert diagnostic_options["if-no-files-found"] == "warn"
+    assert result_options["if-no-files-found"] == "error"
+    assert diagnostic_options["path"] == result_options["path"]
+    result_paths = set(result_options["path"].splitlines())
+    for name in ("repair-observation.json", "vulnerabilities.json", "repair-evidence.json"):
+        assert f"${{{{ runner.temp }}}}/qualification/{name}" in result_paths
+    assert diagnostic_options["retention-days"] == result_options["retention-days"] == 7

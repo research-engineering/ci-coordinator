@@ -352,7 +352,7 @@ thin-target and explicit-proxy design diagrams or formulas.
 
 The runtime-version clauses in the local-development and Python-tooling
 decisions are preserved historical inputs. The current singleton CPython
-3.13.15 authority is owned by the
+3.13.16 authority is owned by the
 [runtime machine profile](specs/ci-coordinator-runtime/python-runtime-profile.v1.json)
 and the [supported runtime decision](decisions/lts-dependency-consolidation.md).
 

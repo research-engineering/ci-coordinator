@@ -89,10 +89,6 @@ _OWNER_INPUTS: dict[str, tuple[str, str, str]] = {
             "security/check_zlib.c",
             "security/zlib.patch",
             "security/python-poplib.patch",
-            "security/python-stringprep.patch",
-            "security/python-tarfile.patch",
-            "security/python-urllib-request.patch",
-            "security/python-zipfile-__init__.patch",
         )
     },
     ".github/actions/secret-scan/checksums.txt": (

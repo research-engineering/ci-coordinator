@@ -65,7 +65,7 @@ def main() -> int:
         return 0
 
     if command == "exec" and args[2:] == ["python", "--version"]:
-        version = "Python 3.13.14" if scenario == "wrong_version" else "Python 3.13.15"
+        version = "Python 3.13.14" if scenario == "wrong_version" else "Python 3.13.16"
         sys.stdout.write(f"{version}\n")
         return 0
 

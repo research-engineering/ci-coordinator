@@ -366,7 +366,7 @@ def test_dependency_audit_covers_supported_python_and_frontend_locks(
             "--service-url",
             "https://api.osv.dev",
             "--python-version",
-            "3.13.15",
+            "3.13.16",
         )
         for project in ("backend", "tooling/quality")
     ]

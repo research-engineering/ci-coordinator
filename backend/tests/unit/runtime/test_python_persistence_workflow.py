@@ -70,7 +70,7 @@ def test_provider_workflow_supports_only_the_admitted_python_patches() -> None:
     supported_versions = [
         ".".join(map(str, version)) for version in PYTHON_RUNTIME_PROFILE.supported_versions
     ]
-    assert supported_versions == ["3.13.15"]
+    assert supported_versions == ["3.13.16"]
     postgres_steps = _sequence(_mapping(jobs["postgres-witness"])["steps"])
     postgres_setup = next(step for step in postgres_steps if step.get("name") == "Set up Python")
     assert _mapping(postgres_setup["with"])["python-version"] == ".".join(
@@ -479,8 +479,8 @@ def test_native_jobs_require_unconditional_execution_and_coverage_join() -> None
         "python3 -m scripts.python_witness lock-check\n"
         "python3 -m scripts.python_witness install-check",
         "backend/.venv/bin/python -c 'import platform; actual = platform.python_version(); "
-        'raise SystemExit(0 if actual == "3.13.15" else '
-        'f"expected Python 3.13.15, got {actual}")\'',
+        'raise SystemExit(0 if actual == "3.13.16" else '
+        'f"expected Python 3.13.16, got {actual}")\'',
         combine_command,
     ]
     with (_REPOSITORY_ROOT / "backend/pyproject.toml").open("rb") as source:
@@ -576,7 +576,7 @@ def test_api_campaign_is_isolated_and_full_qualification_admits_the_optional_res
     names = [step.get("name") for step in steps]
     install_index = names.index("Install locked Python dependencies")
     for name, input_name, version in (
-        ("Set up Python", "python-version", "3.13.15"),
+        ("Set up Python", "python-version", "3.13.16"),
         ("Set up uv", "version", "0.12.17"),
     ):
         setup_index = names.index(name)

@@ -15,7 +15,6 @@ import socket
 import ssl
 import struct
 import sys
-import tarfile
 from email import policy
 from email.parser import Parser
 from pathlib import Path
@@ -40,7 +39,7 @@ class _RepairManifest(TypedDict):
     repairs: list[_RepairRecord]
 
 
-assert platform.python_version() == "3.13.15"
+assert platform.python_version() == "3.13.16"
 assert (os.getuid(), os.getgid()) == (10001, 10001)
 assert not any(
     Path(p).exists()
@@ -54,16 +53,10 @@ repair_manifest: _RepairManifest = json.loads(
 )
 bytecode_files: dict[str, str] = {}
 assert {record["cve"] for record in repair_manifest["repairs"]} == {
-    "CVE-2026-82049",
     "CVE-2026-85091",
-    "CVE-2026-17084",
-    "CVE-2026-15806",
-    "CVE-2026-19672",
-    "CVE-2026-87910",
     "CVE-2025-15367",
-    "CVE-2026-15310",
 }
-assert len(repair_manifest["repairs"]) == 8
+assert len(repair_manifest["repairs"]) == 2
 for record in repair_manifest["repairs"]:
     assert (
         hashlib.sha256(Path(record["path"]).read_bytes()).hexdigest() == record["installedSha256"]
@@ -75,10 +68,6 @@ for record in repair_manifest["repairs"]:
         bytecode_files[importlib.util.cache_from_source(record["path"])] = hashlib.sha256(
             bytecode
         ).hexdigest()
-assert Path(tarfile.__file__).resolve() == Path("/usr/local/lib/python3.13/tarfile.py")
-tarfile_bytecode = Path(importlib.util.cache_from_source(tarfile.__file__)).read_bytes()
-assert tarfile_bytecode[:4] == importlib.util.MAGIC_NUMBER
-assert struct.unpack("<I", tarfile_bytecode[4:8]) == (3,)
 zlib_copies: list[dict[str, str]] = []
 for directory in (
     Path("/lib"),

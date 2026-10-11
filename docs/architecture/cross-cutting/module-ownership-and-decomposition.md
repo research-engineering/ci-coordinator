@@ -164,7 +164,7 @@ The closed source grammar is versioned as
 `ci-coordinator.module-ownership-signals.v2` and is intentionally narrow:
 
 - Python parsing is pinned to the CPython 3.13 grammar and the exact admitted
-  CPython 3.13.15 parser runtime. Recognized public declarations are
+  CPython 3.13.16 parser runtime. Recognized public declarations are
   a single static unique-string module-scope `__all__`, or, when module-scope
   `__all__` is absent, top-level public function, class, and simple assignment
   declarations; imports are not counted unless named by `__all__`;

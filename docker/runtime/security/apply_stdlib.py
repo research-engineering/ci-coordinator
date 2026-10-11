@@ -24,7 +24,7 @@ class _StdlibRepairs(TypedDict):
 security = Path("/security")
 stdlib = Path("/usr/local/lib/python3.13")
 manifest: _StdlibRepairs = json.loads((security / "stdlib-backports.json").read_bytes())
-if manifest["pythonVersion"] != "3.13.15":
+if manifest["pythonVersion"] != "3.13.16":
     raise ValueError("Unexpected Python repair target")
 for record in manifest["modules"]:
     module = stdlib / record["module"]

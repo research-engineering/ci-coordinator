@@ -7,14 +7,16 @@ Owner: runtime and developer-environment contracts.
 
 The comprehensive CI matrix selected Python 3.14 and Node 26 Current while
 updating the complete toolchain. The required support boundary is now Python
-3.13.15 and Node 24.21.0 LTS. Independently applying runtime, typings and
+3.13.16 and Node 24.21.0 LTS. Independently applying runtime, typings and
 container proposals can violate the single-patch runtime contract or restore
 older dependency versions already superseded by the matrix update.
 
 ## Decision
 
-Admit Python 3.13.15 and Node 24.21.0 exactly in native manifests, lock files,
-images, runtime profiles, workflow inputs and consumer runtime guards. Python
+Admit Python 3.13.16 and Node 24.21.0 exactly in native manifests, lock files,
+images, runtime profiles, workflow inputs and consumer runtime guards. In
+October 2026, 3.13.16 replaced the originally selected 3.13.15 patch inside
+the same support line to consume the CVE-2026-19445 and CVE-2026-19553 fixes. Python
 linting, type checking and formatting target 3.13. Node declarations use the
 latest compatible 24.x typings, currently 24.13.6. Keep every other latest
 compatible stable dependency selected as of 20 September 2026.

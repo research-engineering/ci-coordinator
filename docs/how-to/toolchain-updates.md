@@ -179,8 +179,10 @@ Security entry merely because automated PRs are disabled. Container/runtime
 vulnerability coverage is also not proved by enabling dependency alerts.
 Keep the existing dependency-review and other security gates.
 
-The September 2026 supported runtime selection is **Python 3.13.15** and
+The October 2026 supported runtime selection is **Python 3.13.16** and
 **Node 24.21.0 LTS**, coordinated across mise, manifests, images and locks.
+Python 3.13.16 replaces 3.13.15 within the same line to consume the upstream
+CVE-2026-19445 and CVE-2026-19553 fixes.
 Docker `python` ignores versions `>=3.14`; Docker `node` and npm `@types/node`
 ignore versions `>=25` if version PRs are later re-enabled. Other dependencies
 use the latest compatible stable release, with compatibility exceptions owned

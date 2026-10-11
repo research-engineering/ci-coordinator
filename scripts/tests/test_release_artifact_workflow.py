@@ -166,7 +166,7 @@ def test_build_uses_exact_source_and_registry_digest_is_the_only_authority() -> 
         "persist-credentials": False,
         "ref": "${{ needs.preflight.outputs.source_commit }}",
     }
-    assert steps[1]["with"] == {"python-version": "3.13.15"}
+    assert steps[1]["with"] == {"python-version": "3.13.16"}
     assert steps[2]["with"] == {"enable-cache": False, "version": "0.12.17"}
     assert steps[3]["with"] == {
         "image": "tonistiigi/binfmt@sha256:"

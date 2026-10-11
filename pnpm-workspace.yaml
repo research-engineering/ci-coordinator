@@ -17,6 +17,9 @@ overrides:
   "chevrotain@11.1.2>lodash-es": 4.18.1
   "@chevrotain/cst-dts-gen@11.1.2>lodash-es": 4.18.1
   "@chevrotain/gast@11.1.2>lodash-es": 4.18.1
+  # Remove when mermaid-lint's native edge drops braces or braces publishes a
+  # GHSA-vfj7-8cjw-p6xm fix. The package only calls isMatch(path, patterns).
+  "@mermaid-lint/core@0.53.1>micromatch": npm:picomatch@4.0.7
   # TypeScript 6 preserves the 5.9 API consumed by openapi-typescript.
   "openapi-typescript@7.13.0>typescript": ">=5 <7"
 

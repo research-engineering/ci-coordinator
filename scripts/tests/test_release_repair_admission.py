@@ -6,6 +6,7 @@ import tarfile
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -17,6 +18,7 @@ from scripts.release_repair_admission import (
     RepairEvidence,
     RepairPolicy,
     _expected_witnesses,
+    evidence_bytes,
     file_hash,
     occurrence_is_repaired,
     read_policy,
@@ -44,9 +46,9 @@ def policy_value() -> dict[str, object]:
                 "cve": "CVE-2026-82049",
                 "severity": "High",
                 "package": "python",
-                "version": "3.13.15",
+                "version": "3.13.16",
                 "packageType": "binary",
-                "purl": "pkg:generic/python@3.13.15",
+                "purl": "pkg:generic/python@3.13.16",
                 "locations": [
                     {"path": "/usr/local/bin/python3.13", "evidence": "primary"},
                     {"path": "/usr/local/lib/libpython3.13.so.1.0", "evidence": "supporting"},
@@ -193,9 +195,9 @@ def test_repair_does_not_admit_a_different_scanner_occurrence(change: str) -> No
         "cve": "CVE-2026-82049",
         "severity": "High",
         "package": "python",
-        "version": "3.13.15",
+        "version": "3.13.16",
         "package_type": "binary",
-        "purl": "pkg:generic/python@3.13.15",
+        "purl": "pkg:generic/python@3.13.16",
     }
     locations = tuple((item.path, item.evidence, LAYER) for item in policy.occurrences[0].locations)
     assert occurrence_is_repaired(policy, evidence, **values, locations=locations)
@@ -388,3 +390,49 @@ def test_collector_rejects_mutable_identity_before_any_effect(
     monkeypatch.setattr(collector, "command", forbidden)
     with pytest.raises(ValueError):
         collector.collect(subject=subject, source_commit=source, policy_path=Path("unused"))
+
+
+@pytest.mark.parametrize("observation", [False, True])
+@pytest.mark.parametrize("state", ["current", "stale-installed", "expired"])
+def test_observation_diagnostic_never_changes_repair_admission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str, observation: bool
+) -> None:
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(policy_value()))
+    digest, policy = read_policy(policy_path, ROOT)
+    value = evidence_value(policy)
+    value["policySha256"] = digest
+    if state == "stale-installed":
+        value["installedFiles"] = dict.fromkeys(INSTALLED_PATHS, "1" * 64)
+    evidence = RepairEvidence.model_validate(value)
+    observed = datetime(2026, 10, 5, tzinfo=UTC) if state == "expired" else OBSERVED
+    monkeypatch.setattr(collector, "datetime", SimpleNamespace(now=lambda _zone: observed))
+    monkeypatch.setattr(collector, "collect", lambda **_arguments: evidence)
+    output = tmp_path / "evidence.json"
+    diagnostic = tmp_path / "observation.json"
+    argv = [
+        "release_repair_evidence",
+        "--subject",
+        SUBJECT,
+        "--source-commit",
+        COMMIT,
+        "--policy",
+        str(policy_path),
+        "--output",
+        str(output),
+    ]
+    if observation:
+        argv += ["--observation-output", str(diagnostic)]
+    monkeypatch.setattr("sys.argv", argv)
+    if state == "current":
+        assert collector.main() == 0
+        assert output.read_bytes() == evidence_bytes(evidence)
+    else:
+        reason = "repair-installed-files" if state == "stale-installed" else "repair-expired"
+        with pytest.raises(ValueError, match=reason):
+            collector.main()
+        assert not output.exists()
+    if observation:
+        assert diagnostic.read_bytes() == evidence_bytes(evidence)
+    else:
+        assert not diagnostic.exists()

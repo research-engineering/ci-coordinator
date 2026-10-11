@@ -283,20 +283,25 @@ def zip_compatibility_sensitivity() -> list[str]:
 
 
 checks: dict[str, Callable[[], bool]] = {
+    "CVE-2025-15367": pop_commands,
+}
+# CPython 3.13.16 contains these upstream repairs; they must hold in every phase.
+vendor_controls: dict[str, Callable[[], bool]] = {
     "CVE-2026-17084": idna_mapping,
     "CVE-2026-15806": credential_schemes,
-    "CVE-2025-15367": pop_commands,
     "CVE-2026-19672": tar_parent_excursion,
     "CVE-2026-87910": tar_skipped_fallback,
     "CVE-2026-15310": zip_bounded_expansion,
 }
+vendor_results = {cve: control() for cve, control in vendor_controls.items()}
+assert all(vendor_results.values()), vendor_results
 results = {cve: check() for cve, check in checks.items()}
 local_file_roundtrip()
 file_mutations = local_file_sensitivity()
 legacy_zip_roundtrip()
 assert sys.argv[1:] in (["before"], ["after"])
 expected = sys.argv[1] == "after"
-mutations = zip_compatibility_sensitivity() if expected else []
+mutations = zip_compatibility_sensitivity()
 print(
     json.dumps(
         {

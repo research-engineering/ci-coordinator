@@ -43,7 +43,7 @@ EXPECTED_SUCCESS_STDOUT = (
     '    "20260926_0017_explicit_review_renewal.py"\n'
     "  ],\n"
     '  "operatorUiBundle": "admitted",\n'
-    '  "pythonVersion": "Python 3.13.15",\n'
+    '  "pythonVersion": "Python 3.13.16",\n'
     '  "runtimeUserId": "10001",\n'
     '  "runtimeBuildTools": "absent",\n'
     '  "nonClaims": [\n'

@@ -16,7 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PROFILE_PATH = Path("docs/specs/ci-coordinator-core/module-ownership-profile.v1.json")
 MAX_PROFILE_BYTES = 128 * 1024
 _SIGNAL_GRAMMAR_ID = "ci-coordinator.module-ownership-signals.v2"
-_SIGNAL_RUNTIME_IDS = ("cpython-3.13.15",)
+_SIGNAL_RUNTIME_IDS = ("cpython-3.13.16",)
 _FILE_KINDS = (
     "composition-root",
     "declarative",
