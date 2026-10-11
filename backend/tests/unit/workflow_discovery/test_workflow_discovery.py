@@ -196,6 +196,17 @@ def test_identical_snapshot_produces_identical_admitted_proposal() -> None:
     assert first.proposal.admission.source_bytes == first.proposal.policy_source
 
 
+def test_report_binds_the_current_parser_version_and_refuses_relabeled_v3() -> None:
+    report = _completed(_source(_valid_document())).report
+
+    assert report.parser_version == "github-actions-static/v4"
+    assert {fact.provenance.parser_version for fact in report.facts} | {
+        unknown.provenance.parser_version for unknown in report.unknowns
+    } == {"github-actions-static/v4"}
+    with pytest.raises(ValueError, match="parser version is not admitted"):
+        replace(report, parser_version="github-actions-static/v3")
+
+
 def test_adoption_assessment_is_total_and_fail_closed_without_owner_contract() -> None:
     valid = _source(_valid_document(), ".github/workflows/a-valid.yml")
     invalid = _source("jobs: {}\njobs: {}\n", ".github/workflows/b-invalid.yml")
