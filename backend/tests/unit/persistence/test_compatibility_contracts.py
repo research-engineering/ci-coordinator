@@ -7,11 +7,13 @@ import pytest
 from ci_coordinator.persistence.compatibility_contracts import (
     CapabilityDeclaration,
     CompatibilityContractError,
+    RevisionDeclaration,
     assert_exact_replay,
     build_declaration,
     capabilities_cover,
     declaration_hash,
     required_capabilities,
+    validate_capability_identity_history,
     validate_declaration,
     validate_successor,
 )
@@ -149,6 +151,52 @@ def test_successor_laws_reject_the_smallest_invalid_transition(candidate: str) -
 
     with pytest.raises(CompatibilityContractError):
         validate_successor(profile, bootstrap, successor)
+
+
+def test_capability_identity_is_write_once_across_non_adjacent_revisions() -> None:
+    profile = load_bundled_profile()
+    retired = CapabilityDeclaration("workflow-observation/v1", "1" * 64)
+    first = build_declaration(
+        profile,
+        generation=1,
+        revision_id=_BASELINE_REVISION,
+        parent_revision_id=None,
+        transition_kind="bootstrap",
+        capabilities=(AUDIT_LEDGER.declaration(), retired),
+    )
+    contracted = build_declaration(
+        profile,
+        generation=2,
+        revision_id=_SUCCESSOR_REVISION,
+        parent_revision_id=first.revision_id,
+        transition_kind="contract",
+        capabilities=(AUDIT_LEDGER.declaration(),),
+    )
+
+    def expanded_with(capability: CapabilityDeclaration) -> RevisionDeclaration:
+        return build_declaration(
+            profile,
+            generation=3,
+            revision_id=_SECOND_SUCCESSOR_REVISION,
+            parent_revision_id=contracted.revision_id,
+            transition_kind="expand",
+            capabilities=(AUDIT_LEDGER.declaration(), capability),
+        )
+
+    retained = (*first.capabilities, *contracted.capabilities)
+    rebound = expanded_with(CapabilityDeclaration(retired.capability_id, "2" * 64))
+    validate_successor(profile, None, first)
+    validate_successor(profile, first, contracted)
+    validate_successor(profile, contracted, rebound)
+    with pytest.raises(CompatibilityContractError) as error:
+        validate_capability_identity_history(retained, rebound)
+    assert error.value.code == "database_capability_descriptor_rewritten"
+
+    validate_capability_identity_history(retained, expanded_with(retired))
+    validate_capability_identity_history(
+        retained,
+        expanded_with(CapabilityDeclaration("workflow-observation/v2", "2" * 64)),
+    )
 
 
 def test_exact_replay_and_required_capabilities_are_fail_closed() -> None:

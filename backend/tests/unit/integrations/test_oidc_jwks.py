@@ -343,6 +343,32 @@ def test_jwks_fetch_is_fenced_before_a_scheduled_close_can_reach_httpx() -> None
     asyncio.run(scenario())
 
 
+def test_cancelled_provider_close_initiates_no_transport_close_after_its_cache_step() -> None:
+    async def scenario() -> None:
+        async def handler(_: httpx.Request) -> httpx.Response:
+            raise AssertionError("close must not fetch")
+
+        provider = GitHubActionsJwksProvider(
+            ManualMonotonicClock(),
+            transport=httpx.MockTransport(handler),
+        )
+        transport = provider._transport
+        async with provider._cache._lock:
+            closing = asyncio.create_task(provider.aclose())
+            await asyncio.sleep(0)
+            assert not closing.done()
+            closing.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await closing
+            assert transport._close_task is None
+            assert transport._client.is_closed is False
+        await provider.aclose()
+        assert transport._close_task is not None and transport._close_task.done()
+        assert transport._client.is_closed is True
+
+    asyncio.run(scenario())
+
+
 def _jwk(key_id: str) -> dict[str, object]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public = RSAAlgorithm.to_jwk(private_key.public_key(), as_dict=True)

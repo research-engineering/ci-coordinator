@@ -233,6 +233,24 @@ def test_public_rollback_is_task_bound() -> None:
     asyncio.run(scenario())
 
 
+def test_public_commit_is_task_bound() -> None:
+    async def scenario() -> None:
+        transaction = _FakeTransaction()
+        connection = _FakeConnection(transaction)
+        unit_of_work = PostgresUnitOfWork(cast(AsyncEngine, _FakeEngine(connection)))
+        async with unit_of_work:
+            child = asyncio.create_task(unit_of_work.commit())
+            with pytest.raises(RuntimeError, match="shared across tasks"):
+                await child
+            assert not transaction.committed
+            await unit_of_work.commit()
+        assert transaction.committed
+        assert not transaction.rolled_back
+        assert connection.closed
+
+    asyncio.run(scenario())
+
+
 def test_compatibility_fence_precedes_schema_admission(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

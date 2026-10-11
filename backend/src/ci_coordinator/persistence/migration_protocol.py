@@ -18,6 +18,7 @@ from ci_coordinator.persistence.compatibility_contracts import (
     CompatibilityContractError,
     RevisionDeclaration,
     assert_exact_replay,
+    validate_capability_identity_history,
     validate_successor,
 )
 from ci_coordinator.persistence.compatibility_profile import CompatibilityProfile
@@ -69,6 +70,10 @@ def apply_forward_declaration(
                 "a new declaration cannot fork retained compatibility history"
             )
     _validate_forward_relation(profile, predecessor, proposed)
+    validate_capability_identity_history(
+        _retained_capability_descriptors(connection, profile, proposed),
+        proposed,
+    )
     attest_resulting_capabilities(proposed)
     _insert_declaration(connection, proposed)
     return ForwardDeclarationOutcome.APPENDED
@@ -238,6 +243,50 @@ def _load_capabilities(
     except SQLAlchemyError as error:
         raise DatabaseCompatibilityError(
             "could not read database compatibility capabilities"
+        ) from error
+    if len(rows) == profile.capability_read_limit:
+        raise DatabaseCompatibilityError("database compatibility capability bound is exceeded")
+    try:
+        return tuple(capability_from_row(row) for row in rows)
+    except CompatibilityContractError as error:
+        raise DatabaseCompatibilityError(
+            "database compatibility capabilities violate their immutable contract"
+        ) from error
+
+
+def _retained_capability_descriptors(
+    connection: Connection,
+    profile: CompatibilityProfile,
+    proposed: RevisionDeclaration,
+) -> tuple[CapabilityDeclaration, ...]:
+    """Read each distinct retained descriptor of the proposed identifiers.
+
+    Write-once identity admits at most one row per proposed identifier, so reaching
+    the per-revision read limit already proves a rewritten identifier.
+    """
+    try:
+        rows = tuple(
+            connection.execute(
+                select(
+                    compatibility_capabilities.c.capability_id,
+                    compatibility_capabilities.c.descriptor_hash,
+                )
+                .where(
+                    compatibility_capabilities.c.capability_id.in_(
+                        [capability.capability_id for capability in proposed.capabilities]
+                    )
+                )
+                .distinct()
+                .order_by(
+                    compatibility_capabilities.c.capability_id,
+                    compatibility_capabilities.c.descriptor_hash,
+                )
+                .limit(profile.capability_read_limit)
+            ).mappings()
+        )
+    except SQLAlchemyError as error:
+        raise DatabaseCompatibilityError(
+            "could not read retained database compatibility capabilities"
         ) from error
     if len(rows) == profile.capability_read_limit:
         raise DatabaseCompatibilityError("database compatibility capability bound is exceeded")

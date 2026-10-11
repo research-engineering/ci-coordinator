@@ -11,6 +11,10 @@ from typing import Literal, cast
 
 PROFILE_RESOURCE_NAME = "database-compatibility-profile.v1.json"
 PROFILE_SHA256 = "3ef586fe882ed135b9ce484fa8a39ab4b63c9f6851a83400867bc066b4a4a702"
+COMPATIBILITY_FENCE_KEY_DOMAIN = "ci-coordinator/database-compatibility-writer-fence/v1"
+_COMPATIBILITY_FENCE_KEY_DERIVATION = (
+    "first eight SHA-256 bytes split into two signed big-endian int32 values"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +65,15 @@ def load_bundled_profile() -> CompatibilityProfile:
     if digest != PROFILE_SHA256:
         raise ValueError("bundled database compatibility profile digest does not match admission")
     return parse_profile(profile_bytes)
+
+
+def compatibility_fence_key(key_domain: str) -> tuple[int, int]:
+    """Derive the advisory-lock pair from its key domain, never from profile content."""
+    digest = sha256(key_domain.encode("utf-8")).digest()
+    return (
+        int.from_bytes(digest[0:4], "big", signed=True),
+        int.from_bytes(digest[4:8], "big", signed=True),
+    )
 
 
 def parse_profile(profile_bytes: bytes) -> CompatibilityProfile:
@@ -192,8 +205,12 @@ def parse_profile(profile_bytes: bytes) -> CompatibilityProfile:
     _literal(fence, "keySpace", "two-int32", "fence")
     _literal(fence, "participantFunction", "pg_advisory_xact_lock_shared", "fence")
     _literal(fence, "migrationFunction", "pg_advisory_xact_lock", "fence")
+    _literal(fence, "keyDomain", COMPATIBILITY_FENCE_KEY_DOMAIN, "fence")
+    _literal(fence, "keyDerivation", _COMPATIBILITY_FENCE_KEY_DERIVATION, "fence")
     fence_class_id = _integer(fence, "classId", "fence")
     fence_object_id = _integer(fence, "objectId", "fence")
+    if (fence_class_id, fence_object_id) != compatibility_fence_key(COMPATIBILITY_FENCE_KEY_DOMAIN):
+        raise ValueError("fence classId and objectId must derive from the admitted key domain")
     timeouts = _record_field(fence, "timeoutProfiles", "fence")
     _literal(
         timeouts,

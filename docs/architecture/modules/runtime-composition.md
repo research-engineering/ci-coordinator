@@ -159,7 +159,10 @@ unsettled cleanup child enters `cleanup_pending`; the runtime remains not ready,
 cannot restart or retry cleanup, and advances to `deadline_exceeded` only when
 the child settles. A deadline fence prevents that child from initiating any
 later close operation, although one already active third-party close can finish
-after the deadline. Cleanup exception objects and causes never cross the
+after the deadline. The fence reaches nested close owners as the child's pending
+cancellation request: the Actions JWKS provider starts its first transport close
+only while no such request exists, even when its cache drain absorbed the
+cancellation. Cleanup exception objects and causes never cross the
 lifespan logging boundary. This is a cooperative asynchronous bound and does not
 claim control over code that blocks the event loop or suppresses cancellation
 indefinitely.
