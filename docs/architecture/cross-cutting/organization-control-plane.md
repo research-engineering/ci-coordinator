@@ -211,6 +211,8 @@ logout endpoint with the exact client id and registered post-logout URI.
 Failure of remote logout cannot restore the local session.
 
 Short lifetime plus back-channel logout bounds the residual revocation window.
+A durable [logout fence](../../features/logout-revocation-fence.md) prevents
+login evidence acquired before a committed logout from creating a later session.
 Immediate revocation is not claimed. If an owner later requires a smaller
 window than this bound, token introspection or per-command reauthentication
 becomes a new requirement rather than an implicit implementation detail.

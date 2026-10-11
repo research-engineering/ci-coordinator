@@ -101,6 +101,8 @@ def _reset_ledger(database_url: str) -> None:
             "ci_coordinator.operator_overrides, "
             "ci_coordinator.governance_baseline_operations, "
             "ci_coordinator.governance_baselines, "
+            "ci_coordinator.control_plane_logout_fences, "
+            "ci_coordinator.control_plane_logout_fence_generation, "
             "ci_coordinator.control_plane_logout_replays, "
             "ci_coordinator.control_plane_sessions, "
             "ci_coordinator.repository_attestation_transactions, "
@@ -118,6 +120,10 @@ def _reset_ledger(database_url: str) -> None:
             "(singleton, revision, detail_policy_canonical, updated_at) "
             "VALUES (TRUE, 1, %s, clock_timestamp())",
             (b'{"anchor":"first_successful_detail_import","days":365,"mode":"days"}',),
+        )
+        cursor.execute(
+            "INSERT INTO ci_coordinator.control_plane_logout_fence_generation "
+            "(singleton, current_generation, deleted_generation_floor) VALUES (TRUE, 0, 0)"
         )
         cursor.execute(
             "INSERT INTO ci_coordinator.audit_ledger_head "

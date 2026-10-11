@@ -62,6 +62,8 @@ _EXPECTED_SCHEMA_EXPORTS = {
     "config_epoch_activations",
     "config_epoch_registrations",
     "config_epochs",
+    "control_plane_logout_fence_generation",
+    "control_plane_logout_fences",
     "control_plane_logout_replays",
     "control_plane_sessions",
     "governance_baselines",
@@ -216,6 +218,16 @@ _EXPECTED_TABLE_TOPOLOGY: tuple[tuple[str, str, Table], ...] = (
         "ci_coordinator.control_plane_logout_replays",
         "control_plane_logout_replays",
         identity_schema.control_plane_logout_replays,
+    ),
+    (
+        "ci_coordinator.control_plane_logout_fences",
+        "control_plane_logout_fences",
+        identity_schema.control_plane_logout_fences,
+    ),
+    (
+        "ci_coordinator.control_plane_logout_fence_generation",
+        "control_plane_logout_fence_generation",
+        identity_schema.control_plane_logout_fence_generation,
     ),
     (
         "ci_coordinator.webhook_deliveries",

@@ -184,6 +184,12 @@ control_plane_sessions
 control_plane_logout_replays
   issuer, jti, retain_until
 
+control_plane_logout_fences
+  issuer, target_kind(subject|sid), target_value, generation, fenced_at
+
+control_plane_logout_fence_generation
+  singleton, current_generation, deleted_generation_floor
+
 repository_attestation_transactions
   transaction_digest, session_handle_digest, scope, operation_id,
   proposal_manifest_id, provider_revision, proposal_digest,
@@ -198,6 +204,21 @@ Session lookup uses trusted database time after compatibility admission.
 Expiry, profile mismatch, malformed state, logout, and key rotation all remove
 authority. Back-channel logout replay identity is durable until no accepted
 clock interpretation can make the token valid.
+
+Login evidence acquired before a logout cannot create a later session. The
+[logout revocation fence](../../features/logout-revocation-fence.md) anchors
+each login transaction at the newest committed fence generation and a database
+instant, read under a shared fence lock and carried in the sealed transaction
+cookie. Local logout advances the authenticated principal's issuer/subject
+fence, even when a concurrent replacement already removed its handle, and
+admitted back-channel logout advances its sid (else subject) fence; each takes
+the next generation of a transactional singleton counter under the exclusive
+lock in the deletion transaction. Session insertion rejects any matching fence
+with a newer generation, or an anchor below the deleted-generation floor, in the
+same locked transaction. Database time bounds only login age and fence
+retention, so clock regression cannot admit earlier evidence. Session reads do
+not require the fence capability, but runtime ACL drift on fence relations
+fails the global restricted-principal attestation for every operation.
 
 Anonymous login diagnostics update only fixed hourly counters. They retain the
 bounded inline cleanup of expired diagnostic buckets but neither acquire the

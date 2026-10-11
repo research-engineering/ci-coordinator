@@ -37,6 +37,9 @@ from ci_coordinator.persistence.config_epoch_schema_attestation import (
 from ci_coordinator.persistence.control_plane_identity_schema_attestation import (
     control_plane_identity_schema_matches_contract,
 )
+from ci_coordinator.persistence.control_plane_logout_fence_schema_contract import (
+    control_plane_logout_fence_schema_matches_contract,
+)
 from ci_coordinator.persistence.data_attestation import (
     application_schema_is_empty_of_public_default_privileges,
     audit_ledger_bridge_constraints_are_validated,
@@ -105,6 +108,12 @@ async def admit_schema_dependent_operation(
             await activity_schema_matches_contract(connection)
         ):
             raise DatabaseCapabilityUnavailable("administrator activity schema facts do not match")
+        if "control-plane-logout-fence/v1" in capability_ids and not (
+            await control_plane_logout_fence_schema_matches_contract(connection)
+        ):
+            raise DatabaseCapabilityUnavailable(
+                "control-plane logout fence schema facts do not match"
+            )
         if "audit-ledger/v1" in capability_ids and not await schema_matches_contract(connection):
             raise DatabaseCapabilityUnavailable("audit ledger schema facts do not match")
         if (

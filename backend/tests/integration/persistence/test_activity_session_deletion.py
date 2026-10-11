@@ -152,8 +152,13 @@ def test_local_deletion_removes_malformed_rows_without_attribution_or_replay(
         try:
             store = PostgresControlPlaneSessionStore(engine)
             for record in (valid, malformed):
-                await store.delete(record.handle_digest, reason=reason)
-                await store.delete(record.handle_digest, reason=reason)
+                for _attempt in range(2):
+                    if reason == "logout":
+                        await store.logout(
+                            record.handle_digest, issuer=record.issuer, subject=record.subject
+                        )
+                    else:
+                        await store.delete(record.handle_digest, reason=reason)
             async with engine.connect() as connection:
                 assert await _retained_handles(connection) == set()
                 await _assert_events(connection, [(valid, reason)])
@@ -181,7 +186,9 @@ def test_previous_handle_replacement_attributes_only_the_admitted_deleted_row(
                 expires_at=now + timedelta(minutes=5),
             )
             await store.replace(
-                previous_handle_digest=records[previous_index].handle_digest, record=successor
+                previous_handle_digest=records[previous_index].handle_digest,
+                record=successor,
+                login_start=await store.login_start_anchor(),
             )
             assert await store.load(successor.handle_digest) == successor
             async with engine.connect() as connection:
@@ -214,7 +221,11 @@ def test_replacement_preserves_original_cleanup_limit_and_capacity_selection(
                 issued_at=now,
                 expires_at=now + timedelta(minutes=5),
             )
-            await store.replace(previous_handle_digest=None, record=successor)
+            await store.replace(
+                previous_handle_digest=None,
+                record=successor,
+                login_start=await store.login_start_anchor(),
+            )
             # All fixture times tie: expiry keeps the tail, capacity keeps the newest seven handles.
             removed_count = 128 if expired else 257
             retained = records[removed_count:]

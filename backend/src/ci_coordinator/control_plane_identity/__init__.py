@@ -1,6 +1,7 @@
 """Organization control-plane identity domain."""
 
 from ci_coordinator.control_plane_identity.browser import (
+    LOGOUT_FENCE_RETENTION_SECONDS,
     BackChannelLogoutCompleted,
     BackChannelLogoutResult,
     BrowserAuthenticationResult,
@@ -44,6 +45,7 @@ from ci_coordinator.control_plane_identity.model import (
     KeycloakHumanPrincipal,
     KeycloakMachineTokenEvidence,
     KeycloakWorkloadPrincipal,
+    LoginStartAnchor,
     ReviewerOAuthTransaction,
     ReviewerPermission,
     ReviewerStepUpBinding,
@@ -75,6 +77,7 @@ from ci_coordinator.control_plane_identity.ports import (
 
 __all__ = [
     "CONTROL_PLANE_ROLES",
+    "LOGOUT_FENCE_RETENTION_SECONDS",
     "BackChannelLogoutApplied",
     "BackChannelLogoutCompleted",
     "BackChannelLogoutEvidence",
@@ -120,6 +123,7 @@ __all__ = [
     "KeycloakMachineTokenVerifier",
     "KeycloakUnavailable",
     "KeycloakWorkloadPrincipal",
+    "LoginStartAnchor",
     "MachineAuthenticationResult",
     "MachineIdentityPolicy",
     "MachineIdentityService",

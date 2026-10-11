@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
+from types import MappingProxyType
 
 import pytest
 from alembic import command
-from sqlalchemy import Table, create_engine, select, text
+from sqlalchemy import Table, create_engine, func, insert, select, text
 from sqlalchemy.engine import Connection, make_url
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from ci_coordinator.persistence import PostgresUnitOfWork, compatibility_profile
+from ci_coordinator.persistence import (
+    PostgresUnitOfWork,
+    compatibility_profile,
+    principal_attestation,
+    runtime_principal_access,
+)
 from ci_coordinator.persistence import review_renewal_migration as migration
 from ci_coordinator.persistence.compatibility_contracts import (
     RevisionDeclaration,
@@ -22,8 +29,12 @@ from ci_coordinator.persistence.compatibility_profile import (
     load_bundled_profile,
 )
 from ci_coordinator.persistence.connection import create_postgres_engine
+from ci_coordinator.persistence.control_plane_session_codec import record_values
 from ci_coordinator.persistence.errors import DatabaseCapabilityUnavailable
-from ci_coordinator.persistence.migration_protocol import apply_forward_declaration
+from ci_coordinator.persistence.migration_protocol import (
+    _load_declaration,
+    apply_forward_declaration,
+)
 from ci_coordinator.persistence.migration_result_attestation import attest_resulting_capabilities
 from ci_coordinator.persistence.proposal_review_unit_of_work import PostgresProposalReviewUnitOfWork
 from ci_coordinator.persistence.schema import (
@@ -52,6 +63,7 @@ from ci_coordinator.proposal_review import (
 from .conftest import RUNTIME_PASSWORD, RUNTIME_ROLE, _provision_runtime_principal, alembic_config
 from .test_proposal_review_registration import (
     _attestation,
+    _control_plane_session_record,
     _draft,
     _prepare,
     _register_attestation,
@@ -94,7 +106,9 @@ def test_cutoff_rolls_back_on_failure_then_preserves_history_and_rejects_old_pen
 ) -> None:
     config = alembic_config(unmigrated_database_url)
     command.upgrade(config, "20260915_0015")
+    _project_runtime_acl_before_logout_fence(monkeypatch)
     _provision_runtime_principal(unmigrated_database_url)
+    _seed_session_before_logout_fence(unmigrated_database_url)
     runtime_url = (
         make_url(unmigrated_database_url)
         .set(username=RUNTIME_ROLE, password=RUNTIME_PASSWORD)
@@ -285,11 +299,12 @@ def test_each_current_review_requirement_is_independently_required(
 ) -> None:
     command.upgrade(alembic_config(unmigrated_database_url), "head")
     _provision_runtime_principal(unmigrated_database_url)
-    _, _, current = migration.renewal_declarations()
     profile = load_bundled_profile()
+    current = _head_declaration(unmigrated_database_url)
+    assert set(migration.renewal_declarations()[2].capabilities) <= set(current.capabilities)
     contracted = build_declaration(
         profile,
-        generation=18,
+        generation=current.generation + 1,
         revision_id="20991231_9981",
         parent_revision_id=current.revision_id,
         transition_kind="contract",
@@ -333,3 +348,81 @@ def test_each_current_review_requirement_is_independently_required(
         asyncio.run(attempt())
     finally:
         engine.dispose()
+
+
+def _project_runtime_acl_before_logout_fence(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Current grants include the relations created by 20261011_0018; earlier revisions lack them.
+    fence = {"control_plane_logout_fences", "control_plane_logout_fence_generation"}
+    table_grants = MappingProxyType(
+        {
+            relation: privileges
+            for relation, privileges in runtime_principal_access.RUNTIME_TABLE_GRANTS.items()
+            if relation not in fence
+        }
+    )
+    column_grants = MappingProxyType(
+        {
+            relation: grants
+            for relation, grants in runtime_principal_access.RUNTIME_COLUMN_GRANTS.items()
+            if relation not in fence
+        }
+    )
+    for module in (runtime_principal_access, principal_attestation):
+        monkeypatch.setattr(module, "RUNTIME_TABLE_GRANTS", table_grants)
+        monkeypatch.setattr(module, "RUNTIME_COLUMN_GRANTS", column_grants)
+    monkeypatch.setattr(
+        principal_attestation,
+        "_EXPECTED_TABLE_PRIVILEGES_JSON",
+        _canonical_json(
+            [
+                {
+                    "allowed": privilege in granted,
+                    "privilege_type": privilege,
+                    "relation_name": name,
+                }
+                for name, granted in table_grants.items()
+                for privilege in runtime_principal_access.RUNTIME_TABLE_PRIVILEGES
+            ]
+        ),
+    )
+    monkeypatch.setattr(
+        principal_attestation, "_EXPECTED_TABLE_GRANTS_JSON", _canonical_json(dict(table_grants))
+    )
+    monkeypatch.setattr(
+        principal_attestation,
+        "_EXPECTED_COLUMN_GRANTS_JSON",
+        principal_attestation._column_grants_json(),
+    )
+
+
+def _seed_session_before_logout_fence(database_url: str) -> None:
+    # Current session insertion requires the 0018 fence, so the owner seeds the historic row.
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            now = connection.scalar(select(func.statement_timestamp()))
+            assert isinstance(now, datetime)
+            connection.execute(
+                insert(control_plane_sessions).values(
+                    **record_values(_control_plane_session_record(now))
+                )
+            )
+    finally:
+        engine.dispose()
+
+
+def _head_declaration(database_url: str) -> RevisionDeclaration:
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            head = connection.scalar(text("SELECT version_num FROM public.alembic_version"))
+            assert type(head) is str
+            declaration = _load_declaration(connection, load_bundled_profile(), head)
+    finally:
+        engine.dispose()
+    assert declaration is not None
+    return declaration
+
+
+def _canonical_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=True, separators=(",", ":"), sort_keys=True)

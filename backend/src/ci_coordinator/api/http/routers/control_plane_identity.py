@@ -180,7 +180,7 @@ def build_control_plane_identity_router(
         if request.query_params or _header_values(request, b"authorization"):
             await observe_login(dependencies.activity, "login_rejected")
             return _error(status.HTTP_400_BAD_REQUEST, "invalid_login")
-        started = dependencies.identity.start_login()
+        started = await dependencies.identity.start_login()
         if isinstance(started, IdentityUnavailable):
             await observe_login(dependencies.activity, "login_unavailable")
             return _error(status.HTTP_503_SERVICE_UNAVAILABLE, "unavailable")
@@ -313,7 +313,7 @@ def build_control_plane_identity_router(
             return principal
         if not dependencies.mutation_admission.admits(request, principal):
             return _error(status.HTTP_403_FORBIDDEN, "forbidden")
-        completed = await dependencies.identity.logout(principal.session_handle)
+        completed = await dependencies.identity.logout(principal)
         if isinstance(completed, IdentityUnavailable):
             return _error(status.HTTP_503_SERVICE_UNAVAILABLE, "unavailable")
         if not isinstance(completed, BrowserLogoutCompleted):

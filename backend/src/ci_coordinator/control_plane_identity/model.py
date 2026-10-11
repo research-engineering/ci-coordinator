@@ -268,12 +268,33 @@ class ControlPlaneSessionRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class LoginStartAnchor:
+    """Durable logout-fence position read before a browser authorization request."""
+
+    # Newest committed logout-fence generation; the only value ordered against logouts.
+    fence_generation: int
+    # Database time; bounds the login age only and never orders it against a logout.
+    started_at: datetime
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.fence_generation) is not int
+            or not 0 <= self.fence_generation <= MAX_SAFE_JSON_INTEGER
+        ):
+            raise ValueError("logout fence generation must be a safe non-negative integer")
+        object.__setattr__(
+            self, "started_at", _aware_utc(self.started_at, "login start database time")
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BrowserOAuthTransaction:
     state_digest: bytes = field(repr=False)
     nonce: str = field(repr=False)
     code_verifier: str = field(repr=False)
     authority_profile_digest: str
     issued_at: datetime
+    login_start: LoginStartAnchor
 
     def __post_init__(self) -> None:
         _bytes(self.state_digest, "OAuth state digest", exact=32)
@@ -281,6 +302,8 @@ class BrowserOAuthTransaction:
         _opaque_handle(self.code_verifier, "PKCE verifier")
         _digest(self.authority_profile_digest, "authority profile digest")
         object.__setattr__(self, "issued_at", _aware_utc(self.issued_at, "OAuth issue time"))
+        if type(self.login_start) is not LoginStartAnchor:
+            raise TypeError("OAuth login start anchor must be exact")
 
 
 @dataclass(frozen=True, slots=True)

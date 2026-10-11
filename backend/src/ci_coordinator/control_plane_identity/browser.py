@@ -6,7 +6,7 @@ import asyncio
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Protocol, cast
+from typing import Final, Protocol, cast
 from urllib.parse import urlsplit
 
 from ci_coordinator.control_plane_identity.activity import IdentityActivityObserver, observe_login
@@ -17,6 +17,7 @@ from ci_coordinator.control_plane_identity.model import (
     IdentityUnavailable,
     KeycloakBrowserEvidence,
     KeycloakHumanPrincipal,
+    LoginStartAnchor,
     is_canonical_oidc_issuer,
 )
 from ci_coordinator.control_plane_identity.ports import (
@@ -34,6 +35,14 @@ from ci_coordinator.control_plane_identity.ports import (
 from ci_coordinator.kernel import Clock, NoQueueAdmission
 
 MAXIMUM_CONCURRENT_SESSION_LOOKUPS = 16
+MAXIMUM_LOGIN_TRANSACTION_SECONDS: Final = 300
+MAXIMUM_CLOCK_SKEW_SECONDS: Final = 120
+# Database-time age bound of an admitted login and retention of its logout fences. It is
+# liveness only: generations order logins against logouts, and fence cleanup raises the
+# deleted-generation floor, so neither clock regression nor early cleanup admits old evidence.
+LOGOUT_FENCE_RETENTION_SECONDS: Final = (
+    MAXIMUM_LOGIN_TRANSACTION_SECONDS + MAXIMUM_CLOCK_SKEW_SECONDS
+)
 _MAX_CODE_BYTES = 1_024
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
@@ -56,8 +65,13 @@ class BrowserIdentityPolicy:
         ):
             raise ValueError("authority profile digest must be lowercase SHA-256 hexadecimal")
         _bounded_integer(self.session_maximum_seconds, "session maximum", 60, 900)
-        _bounded_integer(self.transaction_maximum_seconds, "transaction maximum", 60, 300)
-        _bounded_integer(self.clock_skew_seconds, "clock skew", 0, 120)
+        _bounded_integer(
+            self.transaction_maximum_seconds,
+            "transaction maximum",
+            60,
+            MAXIMUM_LOGIN_TRANSACTION_SECONDS,
+        )
+        _bounded_integer(self.clock_skew_seconds, "clock skew", 0, MAXIMUM_CLOCK_SKEW_SECONDS)
         _bounded_integer(
             self.logout_token_maximum_age_seconds,
             "logout token maximum age",
@@ -86,7 +100,12 @@ class BrowserLoginStart:
             "expires_at",
             _aware_utc(self.expires_at, "transaction expiry"),
         )
-        _bounded_integer(self.lifetime_seconds, "transaction lifetime", 60, 300)
+        _bounded_integer(
+            self.lifetime_seconds,
+            "transaction lifetime",
+            60,
+            MAXIMUM_LOGIN_TRANSACTION_SECONDS,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,7 +147,7 @@ type BackChannelLogoutResult = BackChannelLogoutCompleted | IdentityRejected | I
 
 
 class BrowserIdentityUseCase(Protocol):
-    def start_login(self) -> BrowserLoginStart | IdentityUnavailable: ...
+    async def start_login(self) -> BrowserLoginStart | IdentityUnavailable: ...
 
     async def complete_login(
         self,
@@ -141,7 +160,7 @@ class BrowserIdentityUseCase(Protocol):
 
     async def authenticate(self, session_handle: str | None) -> BrowserAuthenticationResult: ...
 
-    async def logout(self, session_handle: str | None) -> BrowserLogoutResult: ...
+    async def logout(self, principal: KeycloakHumanPrincipal) -> BrowserLogoutResult: ...
 
     async def apply_back_channel_logout(
         self,
@@ -178,10 +197,19 @@ class BrowserIdentityService:
         self._activity = activity
         self._session_lookup_admission = NoQueueAdmission(MAXIMUM_CONCURRENT_SESSION_LOOKUPS)
 
-    def start_login(self) -> BrowserLoginStart | IdentityUnavailable:
+    async def start_login(self) -> BrowserLoginStart | IdentityUnavailable:
+        try:
+            login_start = await self._sessions.login_start_anchor()
+        except asyncio.CancelledError:
+            raise
+        except ControlPlaneSessionStoreUnavailable:
+            return IdentityUnavailable("session_store_unavailable")
+        if type(login_start) is not LoginStartAnchor:
+            return IdentityUnavailable("session_store_unavailable")
         now = _clock_now(self._clock)
         request = self._crypto.new_browser_transaction(
             issued_at=now,
+            login_start=login_start,
             authority_profile_digest=self._policy.authority_profile_digest,
         )
         try:
@@ -271,6 +299,7 @@ class BrowserIdentityService:
             await self._sessions.replace(
                 previous_handle_digest=self._crypto.handle_digest(previous_session_handle),
                 record=record,
+                login_start=transaction.login_start,
             )
         except asyncio.CancelledError:
             raise
@@ -313,15 +342,19 @@ class BrowserIdentityService:
         finally:
             lease.release()
 
-    async def logout(self, session_handle: str | None) -> BrowserLogoutResult:
-        digest = self._crypto.handle_digest(session_handle)
-        if digest is not None:
-            try:
-                await self._sessions.delete(digest)
-            except asyncio.CancelledError:
-                raise
-            except ControlPlaneSessionStoreUnavailable:
-                return IdentityUnavailable("session_store_unavailable")
+    async def logout(self, principal: KeycloakHumanPrincipal) -> BrowserLogoutResult:
+        if type(principal) is not KeycloakHumanPrincipal:
+            raise TypeError("logout requires an exact authenticated human principal")
+        digest = self._crypto.handle_digest(principal.session_handle)
+        if digest is None:
+            raise ValueError("authenticated session handle is invalid")
+        try:
+            # The authenticated identity, not the possibly replaced row, selects the fence.
+            await self._sessions.logout(digest, issuer=principal.issuer, subject=principal.subject)
+        except asyncio.CancelledError:
+            raise
+        except ControlPlaneSessionStoreUnavailable:
+            return IdentityUnavailable("session_store_unavailable")
         try:
             remote_url = await self._provider.logout_url()
             return BrowserLogoutCompleted(remote_url)

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from ci_coordinator.control_plane_identity.activity import SessionEndReason
+from ci_coordinator.control_plane_identity.activity import SessionDeletionReason
 from ci_coordinator.control_plane_identity.model import (
     BackChannelLogoutEvidence,
     ControlPlanePrincipal,
@@ -14,6 +14,7 @@ from ci_coordinator.control_plane_identity.model import (
     ControlPlaneSessionRecord,
     KeycloakBrowserEvidence,
     KeycloakMachineTokenEvidence,
+    LoginStartAnchor,
     RoleAdmission,
 )
 
@@ -78,18 +79,24 @@ class KeycloakBrowserPort(Protocol):
 class ControlPlaneSessionStore(Protocol):
     async def current_time(self) -> datetime: ...
 
+    # The newest committed logout-fence generation, read after every in-flight fence write.
+    async def login_start_anchor(self) -> LoginStartAnchor: ...
+
+    # Rejects when a matching logout fence or deleted-fence floor is newer than login_start.
     async def replace(
         self,
         *,
         previous_handle_digest: bytes | None,
         record: ControlPlaneSessionRecord,
+        login_start: LoginStartAnchor,
     ) -> None: ...
 
     async def load(self, handle_digest: bytes) -> ControlPlaneSessionRecord | None: ...
 
-    async def delete(
-        self, handle_digest: bytes, *, reason: SessionEndReason = "logout"
-    ) -> None: ...
+    # Deletes only the handle but fences the authenticated issuer/subject even if it is gone.
+    async def logout(self, handle_digest: bytes, *, issuer: str, subject: str) -> None: ...
+
+    async def delete(self, handle_digest: bytes, *, reason: SessionDeletionReason) -> None: ...
 
 
 class BackChannelLogoutStore(Protocol):

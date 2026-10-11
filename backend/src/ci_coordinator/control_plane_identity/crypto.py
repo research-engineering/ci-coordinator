@@ -24,6 +24,7 @@ from ci_coordinator.control_plane_identity.model import (
     ControlPlaneSessionRecord,
     KeycloakBrowserEvidence,
     KeycloakHumanPrincipal,
+    LoginStartAnchor,
     ReviewerOAuthTransaction,
     ReviewerStepUpBinding,
     derive_human_actor_id,
@@ -80,6 +81,7 @@ class ControlPlaneIdentityCrypto:
         self,
         *,
         issued_at: datetime,
+        login_start: LoginStartAnchor,
         authority_profile_digest: str,
     ) -> BrowserAuthorizationRequest:
         state = _encode(self._random_bytes())
@@ -91,11 +93,14 @@ class ControlPlaneIdentityCrypto:
             code_verifier=verifier,
             authority_profile_digest=authority_profile_digest,
             issued_at=issued_at,
+            login_start=login_start,
         )
         payload = canonical_json(
             {
                 "authorityProfileDigest": transaction.authority_profile_digest,
                 "issuedAt": transaction.issued_at.isoformat(),
+                "loginFenceGeneration": transaction.login_start.fence_generation,
+                "loginStartedAt": transaction.login_start.started_at.isoformat(),
                 "nonce": transaction.nonce,
                 "stateDigest": transaction.state_digest.hex(),
                 "verifier": transaction.code_verifier,
@@ -117,6 +122,8 @@ class ControlPlaneIdentityCrypto:
         if value is None or set(value) != {
             "authorityProfileDigest",
             "issuedAt",
+            "loginFenceGeneration",
+            "loginStartedAt",
             "nonce",
             "stateDigest",
             "verifier",
@@ -129,6 +136,10 @@ class ControlPlaneIdentityCrypto:
                 code_verifier=_exact_text(value, "verifier"),
                 authority_profile_digest=_exact_text(value, "authorityProfileDigest"),
                 issued_at=_instant(value, "issuedAt"),
+                login_start=LoginStartAnchor(
+                    fence_generation=_exact_int(value, "loginFenceGeneration"),
+                    started_at=_instant(value, "loginStartedAt"),
+                ),
             )
         except (TypeError, ValueError):
             return None

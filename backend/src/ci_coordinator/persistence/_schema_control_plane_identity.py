@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from sqlalchemy import (
+    BigInteger,
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
@@ -123,4 +125,69 @@ Index(
     control_plane_logout_replays.c.retain_until,
     control_plane_logout_replays.c.issuer,
     control_plane_logout_replays.c.jti,
+)
+
+control_plane_logout_fences = Table(
+    "control_plane_logout_fences",
+    metadata,
+    Column("issuer", String(512), nullable=False),
+    Column("target_kind", String(16), nullable=False),
+    Column("target_value", String(512), nullable=False),
+    Column("generation", BigInteger, nullable=False),
+    Column("fenced_at", DateTime(timezone=True), nullable=False),
+    CheckConstraint(
+        "octet_length(issuer) BETWEEN 1 AND 512",
+        name="ck_control_plane_logout_fences_issuer",
+    ),
+    CheckConstraint(
+        "target_kind IN ('subject', 'sid')",
+        name="ck_control_plane_logout_fences_target_kind",
+    ),
+    CheckConstraint(
+        "octet_length(target_value) BETWEEN 1 AND 512",
+        name="ck_control_plane_logout_fences_target_value",
+    ),
+    CheckConstraint(
+        "generation BETWEEN 1 AND 9007199254740991",
+        name="ck_control_plane_logout_fences_generation",
+    ),
+    CheckConstraint(
+        "isfinite(fenced_at)",
+        name="ck_control_plane_logout_fences_fenced_at",
+    ),
+    PrimaryKeyConstraint(
+        "issuer",
+        "target_kind",
+        "target_value",
+        name="pk_control_plane_logout_fences",
+    ),
+    schema=APPLICATION_SCHEMA,
+)
+
+Index(
+    "ix_control_plane_logout_fences_fenced_at",
+    control_plane_logout_fences.c.fenced_at,
+    control_plane_logout_fences.c.issuer,
+    control_plane_logout_fences.c.target_kind,
+    control_plane_logout_fences.c.target_value,
+)
+
+# Singleton logout-fence counter: generations order logins against logouts without wall time.
+control_plane_logout_fence_generation = Table(
+    "control_plane_logout_fence_generation",
+    metadata,
+    Column("singleton", Boolean, nullable=False),
+    Column("current_generation", BigInteger, nullable=False),
+    Column("deleted_generation_floor", BigInteger, nullable=False),
+    CheckConstraint(
+        "singleton IS TRUE",
+        name="ck_control_plane_logout_fence_generation_singleton",
+    ),
+    CheckConstraint(
+        "deleted_generation_floor BETWEEN 0 AND current_generation "
+        "AND current_generation <= 9007199254740991",
+        name="ck_control_plane_logout_fence_generation_order",
+    ),
+    PrimaryKeyConstraint("singleton", name="pk_control_plane_logout_fence_generation"),
+    schema=APPLICATION_SCHEMA,
 )
