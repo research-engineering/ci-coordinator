@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from copy import deepcopy
 from importlib.resources import files
@@ -10,8 +11,21 @@ import pytest
 
 # isort: split
 from scripts.proofkit_admission import _admitted_report, _admitted_witness_plan
-from scripts.proofkit_cli import invoke_proofkit, resolve_proofkit_executable
+from scripts.proofkit_cli import (
+    PROOFKIT_CLI_ENVIRONMENT_ALLOWLIST,
+    invoke_proofkit,
+    resolve_proofkit_executable,
+)
 from scripts.proofkit_common import parse_json_object, read_json_object
+from scripts.quality_plan import WitnessCommand, execute_commands, load_quality_plan
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+PROOFKIT_CLI_ORCHESTRATORS = (
+    "proofkit.verify",
+    "requirements.admission",
+    "selective.plan",
+    "text.policy",
+)
 
 USED_PROOFKIT_COMMANDS = (
     "repo-profile-admission",
@@ -115,6 +129,83 @@ def test_invoke_proofkit_preserves_status_and_streams(tmp_path: Path) -> None:
     assert result.returncode == 4
     assert result.stdout == "out\n"
     assert result.stderr == "err\n"
+
+
+def test_direct_proofkit_cli_receives_only_its_declared_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CI_COORDINATOR_UNDECLARED_SENTINEL", "must-not-cross")
+    probe = (
+        "import json, os; print(json.dumps({"
+        "'path': os.environ.get('PATH'), "
+        "'sentinel': 'CI_COORDINATOR_UNDECLARED_SENTINEL' in os.environ}))"
+    )
+
+    result = invoke_proofkit(sys.executable, "-c", (probe,), cwd=tmp_path)
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"path": os.environ["PATH"], "sentinel": False}
+
+
+def test_quality_plan_route_gives_the_proofkit_cli_only_its_declared_subset(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "environment.json"
+    names = ("PATH", "CI_COORDINATOR_PARENT_DECLARED", "CI_COORDINATOR_UNDECLARED_SENTINEL")
+    child_probe = f"import json, os; print(json.dumps({{n: n in os.environ for n in {names!r}}}))"
+    parent_probe = (
+        "import json, os, sys; from pathlib import Path; "
+        "from scripts.proofkit_cli import invoke_proofkit; "
+        f"result = invoke_proofkit(sys.executable, '-c', ({child_probe!r},), "
+        f"cwd=Path({str(tmp_path)!r})); "
+        "assert result.returncode == 0, result.stderr; "
+        f"Path({str(marker)!r}).write_text(json.dumps({{"
+        f"'parent': {{n: n in os.environ for n in {names!r}}}, "
+        "'child': json.loads(result.stdout)}))"
+    )
+    command = WitnessCommand(
+        argv=(sys.executable, "-c", parent_probe),
+        cache_policy="read-only",
+        command_id="proofkit-cli.environment-probe",
+        credential_class="none",
+        cwd=REPO_ROOT,
+        environment_allowlist=("PATH", "CI_COORDINATOR_PARENT_DECLARED"),
+        environment_classes=("local-python",),
+        environment_inherit="allowlist",
+        network_policy="none",
+        timeout_ms=30_000,
+    )
+
+    execute_commands(
+        (command,),
+        environment={
+            "PATH": os.environ["PATH"],
+            "CI_COORDINATOR_PARENT_DECLARED": "parent-only",
+            "CI_COORDINATOR_UNDECLARED_SENTINEL": "must-not-cross",
+        },
+    )
+
+    assert json.loads(marker.read_text(encoding="utf-8")) == {
+        "parent": {
+            "PATH": True,
+            "CI_COORDINATOR_PARENT_DECLARED": True,
+            "CI_COORDINATOR_UNDECLARED_SENTINEL": False,
+        },
+        "child": {
+            "PATH": True,
+            "CI_COORDINATOR_PARENT_DECLARED": False,
+            "CI_COORDINATOR_UNDECLARED_SENTINEL": False,
+        },
+    }
+
+
+@pytest.mark.parametrize("command_id", PROOFKIT_CLI_ORCHESTRATORS)
+def test_proofkit_cli_allowlist_is_declared_by_each_orchestrating_witness(
+    command_id: str,
+) -> None:
+    declared = load_quality_plan().commands[command_id].environment_allowlist
+
+    assert set(PROOFKIT_CLI_ENVIRONMENT_ALLOWLIST) <= set(declared)
 
 
 def test_invoke_proofkit_enforces_output_bound_while_process_runs(

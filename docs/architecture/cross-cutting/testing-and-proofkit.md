@@ -111,7 +111,8 @@ runtime sandbox.
 
 Repository proof commands use the bounded lifecycle defined by
 [`proof-command-execution.md`](proof-command-execution.md). A command receives
-only its declared environment allowlist, has a positive finite timeout and a
+only its declared environment allowlist, including the children of direct
+command sequences and Proofkit CLI adapters, has a positive finite timeout and a
 shared stdout-plus-stderr limit, and runs in an owned process group. Proofkit
 network and cache declarations remain route classifications; local subprocess
 execution does not claim OS-level network or filesystem isolation.
@@ -254,6 +255,12 @@ TargetedNativeWitnesses
   -> CommitReviewedPatch
   -> ExactBaseHeadMutationAndFreshnessGate
 ```
+
+Branch-head quality is supported only on Linux hosts, including GitHub Linux
+runners, because the sequence includes Linux-only native witnesses such as
+`python.native-timeout`. On any other host it refuses the whole route with a
+stable diagnostic before Git discovery, range admission, preflight or any
+witness; it never skips an individual witness.
 
 Detached mutation runners test `HEAD`, not dirty worktree bytes. Therefore a
 mutation result produced before commit cannot prove the current worktree. A

@@ -193,9 +193,11 @@ witness and must be reported unavailable, not silently omitted, when its
 provider cannot be reached.
 
 Set `BASE_SHA` to the exact reviewed-base commit and `HEAD_SHA` to the exact
-current commit. `CI=true` is an explicit acknowledgement that this gate may
-create and remove isolated Docker resources; it is neither an execution-policy
-exception nor a readiness claim.
+current commit. Branch-head quality runs only on a Linux host; on macOS or
+another host it refuses before Git discovery or any witness starts. `CI=true`
+is an explicit acknowledgement that this gate may create and remove isolated
+Docker resources; it is neither an execution-policy exception nor a readiness
+claim.
 
 ## Direct Command Fallback
 

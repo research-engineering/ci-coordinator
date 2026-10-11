@@ -22,6 +22,21 @@ from scripts.quality_plan import (
 ReceiptReader = Callable[[Path, Mapping[str, str]], BranchHeadReceipt]
 CommandExecutor = Callable[[WitnessCommand], None]
 ReceiptWriter = Callable[[str], None]
+BRANCH_HEAD_HOST_PLATFORM = "linux"
+
+
+class UnsupportedBranchHeadHostError(RuntimeError):
+    pass
+
+
+def assert_branch_head_host(host_platform: str) -> None:
+    if host_platform != BRANCH_HEAD_HOST_PLATFORM:
+        raise UnsupportedBranchHeadHostError(
+            "branch-head quality is supported only on Linux hosts; refusing on "
+            f"{host_platform} before any witness starts because the sequence includes "
+            "Linux-only native witnesses such as python.native-timeout (GNU timeout). "
+            "Run it on a Linux host or GitHub Linux runner."
+        )
 
 
 def run_branch_head_quality(
@@ -31,7 +46,9 @@ def run_branch_head_quality(
     execute_command: CommandExecutor | None = None,
     read_receipt: ReceiptReader = admit_exact_branch_head_range,
     write_receipt: ReceiptWriter = print,
+    host_platform: str = sys.platform,
 ) -> BranchHeadReceipt:
+    assert_branch_head_host(host_platform)
     root = repository_root.resolve()
     lifecycle = DetachedWorktreeLifecycle(
         repo_root=root,
@@ -95,14 +112,23 @@ def assert_tracked_tree_clean(repository_root: Path, stage: str) -> None:
         raise ValueError(f"{stage}: tracked worktree must equal HEAD\n{status}")
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    host_platform: str = sys.platform,
+) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments:
         print("usage: python -m scripts.proofkit_branch_head_quality", file=sys.stderr)
         return 2
     try:
+        assert_branch_head_host(host_platform)
         root = Path(_git_capture(Path.cwd(), ("rev-parse", "--show-toplevel")))
-        run_branch_head_quality(root, environment=os.environ)
+        run_branch_head_quality(
+            root,
+            environment=os.environ,
+            host_platform=host_platform,
+        )
     except Exception as error:
         print(str(error), file=sys.stderr)
         return 1
