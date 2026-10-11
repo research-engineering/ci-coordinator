@@ -25,6 +25,7 @@ jobs:
       gate_run_attempt: ${{ steps.identity.outputs.gate_run_attempt }}
       gate_run_id: ${{ steps.identity.outputs.gate_run_id }}
       release_identity: ${{ steps.identity.outputs.release_identity }}
+      release_run_attempt: ${{ steps.identity.outputs.release_run_attempt }}
       source_commit: ${{ steps.identity.outputs.source_commit }}
     steps:
       - name: Check out the exact release source
@@ -115,6 +116,7 @@ jobs:
       packages: write # Push the newly built image to this repository's GHCR package.
     outputs:
       artifact_digest: ${{ steps.build.outputs.digest }}
+      release_run_attempt: ${{ steps.attempt.outputs.release_run_attempt }}
       provenance_sha256: ${{ steps.predicates.outputs.provenance_sha256 }}
       sbom_sha256: ${{ steps.predicates.outputs.sbom_sha256 }}
       vulnerability_evidence_sha256: ${{ steps.vulnerability.outputs.vulnerability_evidence_sha256 }}
@@ -123,6 +125,19 @@ jobs:
       DOCKER_BUILD_RECORD_UPLOAD: "false"
       IMAGE_NAME: ${{ needs.preflight.outputs.image }}
     steps:
+      - name: Refuse upstream outputs from another run attempt
+        id: attempt
+        env:
+          PREFLIGHT_RUN_ATTEMPT: ${{ needs.preflight.outputs.release_run_attempt }}
+          RELEASE_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          [[ "${RELEASE_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
+          if test "${PREFLIGHT_RUN_ATTEMPT}" != "${RELEASE_RUN_ATTEMPT}"; then
+            echo "::error title=Partial release rerun refused::Upstream job outputs belong to another run attempt. Re-run all jobs."
+            exit 1
+          fi
+          printf 'release_run_attempt=%s\n' "${RELEASE_RUN_ATTEMPT}" >> "${GITHUB_OUTPUT}"
       - name: Check out admitted source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -370,6 +385,20 @@ jobs:
       VULNERABILITY_EVIDENCE_SHA256: ${{ needs.build.outputs.vulnerability_evidence_sha256 }}
       REPAIR_EVIDENCE_SHA256: ${{ needs.build.outputs.repair_evidence_sha256 }}
     steps:
+      - name: Refuse upstream outputs from another run attempt
+        env:
+          BUILD_RUN_ATTEMPT: ${{ needs.build.outputs.release_run_attempt }}
+          PREFLIGHT_RUN_ATTEMPT: ${{ needs.preflight.outputs.release_run_attempt }}
+          RELEASE_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          [[ "${RELEASE_RUN_ATTEMPT}" =~ ^[1-9][0-9]*$ ]]
+          for upstream_run_attempt in "${PREFLIGHT_RUN_ATTEMPT}" "${BUILD_RUN_ATTEMPT}"; do
+            if test "${upstream_run_attempt}" != "${RELEASE_RUN_ATTEMPT}"; then
+              echo "::error title=Partial release rerun refused::Upstream job outputs belong to another run attempt. Re-run all jobs."
+              exit 1
+            fi
+          done
       - name: Set up pinned Buildx and BuildKit
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
