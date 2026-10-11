@@ -34,7 +34,12 @@ sessions such as Compose Watch, target-repository workflow jobs, provider
 runners, or deployment isolation.
 
 Supported hosts are Linux and macOS. Windows and musl remain outside the
-tooling support contract.
+tooling support contract. Branch-head quality is narrower: its sequence includes
+Linux-only native witnesses such as `python.native-timeout`, which requires GNU
+`timeout`. It therefore runs only on Linux hosts, including GitHub Linux
+runners, and refuses every other host with a stable diagnostic before Git
+discovery, range admission, preflight or any witness. It never skips an
+individual witness.
 
 ## 3. Model
 
@@ -97,6 +102,7 @@ after cleanup.
 ```text
 inherit(c) = allowlist => Environment(c) = ChildEnvironment(c, sourceEnvironment)
 inherit(c) = none => Environment(c) = empty
+DirectAdapter(c) => Environment(c) = ChildEnvironment(c, sourceEnvironment)
 credentialClass(c) = none => no credential-shaped allowlist name
 id(c) = selective.plan => allowlist(c) includes the exact base/head range pair
 orchestrates(parent, child) => allowlist(child) subset-of allowlist(parent)
@@ -132,6 +138,15 @@ failure(c) => no success receipt
 DelegatingAdapter(c) => executionOwner(c) = scripts/bounded_process.py
 DelegatingAdapter(c) => finite(timeout(c)) and timeout(c) > 0
 ```
+
+Direct adapters do not inherit the caller's ambient environment. A direct
+command sequence requires an explicit allowlist from its caller; workflow lint
+declares exactly the `workflow.lint` witness allowlist. The Proofkit CLI adapter
+declares `PATH` only, a subset of the allowlist of every orchestrating witness
+command (`proofkit.verify`, `text.policy`, `requirements.admission` and
+`selective.plan`). A direct invocation and a quality-plan invocation therefore
+give these children the same environment. Range inputs reach the selective
+planner through its JSON input, not through the CLI environment.
 
 The quiescence interval distinguishes an observable leak from ordinary process
 shutdown scheduling. It is not a daemonization allowance: the interval is
@@ -177,8 +192,8 @@ witnesses had already completed.
 | `scripts/dev_environment/watch_witness.py`        | Managed interactive Compose Watch session, concurrent provider observation, and bounded session shutdown under the developer-environment contract                              |
 | `scripts/devcontainer_witness.py`                 | Exact Dev Container cleanup route and independent post-cleanup provider postconditions                                                                                         |
 | `scripts/quality_plan.py`                         | Command order, policy admission, exact environment projection, and exit-policy interpretation                                                                                  |
-| `scripts/proofkit_cli.py`                         | Proofkit argv/input and public result adaptation                                                                                                                               |
-| `scripts/command_sequence.py`                     | Ordered direct command execution and first-failure status                                                                                                                      |
+| `scripts/proofkit_cli.py`                         | Proofkit argv/input, declared child environment projection, and public result adaptation                                                                                       |
+| `scripts/command_sequence.py`                     | Ordered direct command execution, caller-declared environment projection, and first-failure status                                                                             |
 | `scripts/mutation/detached_worktree_lifecycle.py` | Signal state, detached-worktree allocation, idempotent cleanup, and result adaptation; delegates every command and Git process to the sole execution owner                     |
 
 No lower owner interprets product requirements, Proofkit semantic output, or
@@ -228,7 +243,8 @@ specified sandbox and adversarial escape witnesses.
 The contract is admitted only when native tests prove the following:
 
 - normal status and non-zero status;
-- exact environment projection;
+- exact environment projection, including direct command-sequence and Proofkit
+  CLI children invoked directly or through the quality plan;
 - closed stdin;
 - combined-stream overflow;
 - pre-spawn-admission and in-flight stop observation;

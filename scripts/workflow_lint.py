@@ -8,6 +8,9 @@ from scripts.command_sequence import Command, run_commands
 
 ACTIONLINT_VERSION = "1.7.12"
 ACTIONLINT_CONFIGURATION = ".github/actionlint.yaml"
+# Equals the workflow.lint witness-plan allowlist, so direct and quality-plan
+# invocations give Docker and zizmor the same child environment.
+WORKFLOW_LINT_ENVIRONMENT_ALLOWLIST = ("PATH",)
 WORKFLOW_DIRECTORIES = (
     ".github/workflows",
     "fixtures/native-target-repository/.github/workflows",
@@ -176,7 +179,10 @@ def shell_source_paths(repo_root: Path, tracked_paths: Sequence[str]) -> tuple[s
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parent.parent
-    return run_commands(commands(repo_root))
+    return run_commands(
+        commands(repo_root),
+        environment_allowlist=WORKFLOW_LINT_ENVIRONMENT_ALLOWLIST,
+    )
 
 
 if __name__ == "__main__":

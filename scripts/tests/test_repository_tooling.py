@@ -25,6 +25,7 @@ from scripts.tests.test_dev_environment_dependencies import (
     managed_entry_context,
 )
 from scripts.workflow_lint import commands as workflow_lint_commands
+from scripts.workflow_lint import main as workflow_lint_main
 from scripts.workflow_lint import shell_source_paths
 
 
@@ -42,6 +43,8 @@ def test_command_sequence_stops_at_first_failure(tmp_path: Path) -> None:
             Command(("second",), tmp_path),
             Command(("third",), tmp_path),
         ],
+        environment_allowlist=("PATH",),
+        source_environment={"PATH": "/bin"},
         runner=run,
     )
 
@@ -64,12 +67,53 @@ def test_default_command_sequence_enforces_process_bounds(
         return CommandResult(status=0, stdout="", stderr="")
 
     monkeypatch.setattr("scripts.command_sequence.spawn", bounded_spawn)
+    monkeypatch.setenv("PATH", "/declared/bin")
+    monkeypatch.setenv("CI_COORDINATOR_DECLARED_PROBE", "declared")
+    monkeypatch.setenv("CI_COORDINATOR_UNDECLARED_SENTINEL", "must-not-cross")
+    monkeypatch.delenv("CI_COORDINATOR_ABSENT_PROBE", raising=False)
 
-    assert run_commands((Command(("probe", "argument"), tmp_path),)) == 0
+    assert (
+        run_commands(
+            (Command(("probe", "argument"), tmp_path),),
+            environment_allowlist=(
+                "PATH",
+                "CI_COORDINATOR_DECLARED_PROBE",
+                "CI_COORDINATOR_ABSENT_PROBE",
+            ),
+        )
+        == 0
+    )
     assert observed["command"] == "probe"
     assert observed["args"] == ("argument",)
+    assert observed["env"] == {
+        "PATH": "/declared/bin",
+        "CI_COORDINATOR_DECLARED_PROBE": "declared",
+    }
     assert observed["max_buffer"] == 16 * 1024 * 1024
     assert observed["timeout_seconds"] == 600.0
+
+
+def test_workflow_lint_projects_its_declared_witness_allowlist(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, object] = {}
+    lint_commands = (Command(("probe",), tmp_path),)
+
+    def capture(commands: object, **kwargs: object) -> int:
+        observed.update(commands=commands, **kwargs)
+        return 0
+
+    monkeypatch.setattr("scripts.workflow_lint.commands", lambda _root: lint_commands)
+    monkeypatch.setattr("scripts.workflow_lint.run_commands", capture)
+
+    assert workflow_lint_main() == 0
+    assert observed == {
+        "commands": lint_commands,
+        "environment_allowlist": (
+            load_quality_plan().commands["workflow.lint"].environment_allowlist
+        ),
+    }
 
 
 def test_install_check_compiles_only_locked_dependency_bytecode(

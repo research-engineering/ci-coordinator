@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -33,10 +34,13 @@ class Command:
 def run_commands(
     commands: Iterable[Command],
     *,
-    env: Environment | None = None,
+    environment_allowlist: tuple[str, ...],
+    source_environment: Environment | None = None,
     runner: CommandRunner | None = None,
 ) -> int:
     execute = _run if runner is None else runner
+    source = os.environ if source_environment is None else source_environment
+    env = {name: source[name] for name in environment_allowlist if name in source}
     for command in commands:
         status = execute(command.argv, cwd=command.cwd, env=env)
         if status != 0:

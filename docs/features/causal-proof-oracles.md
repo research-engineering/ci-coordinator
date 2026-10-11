@@ -84,6 +84,13 @@ Survived := BaselineValid and SameSelection
             and exit_mutant = 0 and F_mutant = X_mutant = empty
 ```
 
+`Killed` is a machine call-phase kill. It excludes fixture, collection and
+selection drift, but it does not match the failing assertion to the guard a
+mutant targets. A guard-specific causal kill additionally needs manual review
+of the retained node, phase and assertion, as the
+[managed check lifetime](managed-check-lifetime.md) admission does. A machine
+report never claims that review.
+
 Store canonical identity-set hashes rather than repeating all identities in
 every mutation report. This relies on the existing SHA-256 collision-resistance
 assumption. Missing, stale, nonregular, malformed, contradictory or partial
