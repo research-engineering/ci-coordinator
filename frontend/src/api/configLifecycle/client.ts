@@ -2,11 +2,13 @@ import type { components } from "../generated";
 import { operationIdIsAdmitted } from "../shared/operationId";
 import { epochIdentityMatches, validationMatches } from "./identity";
 import {
+  type ConfigPreview,
   type ConfigRegistration,
   type ConfigRollback,
   type ConfigScope,
   type ConfigStatus,
   type ConfigValidation,
+  previewSchema,
   registrationSchema,
   rollbackCommandSchema,
   rollbackSchema,
@@ -35,6 +37,8 @@ export interface RollbackCommand {
   readonly body: components["schemas"]["ConfigEpochRollbackBody"];
 }
 export type ConfigurationCommand = RegistrationCommand | RollbackCommand;
+
+const SHA256 = /^[0-9a-f]{64}$/;
 
 export function validateSource(
   scope: ConfigScope,
@@ -158,5 +162,34 @@ export function readConfigStatus(
       if (!(await epochIdentityMatches(scope, epoch))) return { kind: "invalid-response" };
     }
     return { kind: "ready", value };
+  });
+}
+
+export function readConfigPreview(
+  scope: ConfigScope,
+  baseEpochId: string,
+  targetEpochId: string,
+  signal?: AbortSignal,
+): Promise<LifecycleResult<ConfigPreview>> {
+  return attempt(async () => {
+    if (
+      !scopeSchema.safeParse(scope).success ||
+      !SHA256.test(baseEpochId) ||
+      !SHA256.test(targetEpochId)
+    )
+      return { kind: "invalid-request" };
+    const query = new URLSearchParams({ baseEpochId });
+    const response = await lifecycleRequest(
+      `/api/v1/config/repositories/${scope.installationId}/${scope.repositoryId}/epochs/${targetEpochId}/preview?${query}`,
+      signal,
+    );
+    if (response.status !== 200) return failure(response);
+    const value = await jsonResult(response, previewSchema.parse);
+    return value.installationId === scope.installationId &&
+      value.repositoryId === scope.repositoryId &&
+      value.baseEpochId === baseEpochId &&
+      value.targetEpochId === targetEpochId
+      ? { kind: "ready", value }
+      : { kind: "invalid-response" };
   });
 }

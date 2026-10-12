@@ -46,3 +46,20 @@ test("source proxy admits exact epoch and safe scope without query", () => {
   }
   expect(proxyRequestIsAdmitted("POST", "/api/v1/config/activations")).toBe(true);
 });
+
+test("preview proxy admits exactly one baseEpochId and no other query", () => {
+  const path = `/api/v1/config/repositories/1/2/epochs/${"a".repeat(64)}/preview`;
+  const base = "b".repeat(64);
+  expect(proxyRequestIsAdmitted("GET", `${path}?baseEpochId=${base}`)).toBe(true);
+  for (const query of [
+    "",
+    `?baseEpochId=${base}&baseEpochId=${base}`,
+    `?baseEpochId=${base}&limit=1`,
+    `?base_epoch_id=${base}`,
+    `?baseEpochId=${"B".repeat(64)}`,
+    "?baseEpochId=",
+  ]) {
+    expect(proxyRequestIsAdmitted("GET", `${path}${query}`)).toBe(false);
+  }
+  expect(proxyRequestIsAdmitted("POST", `${path}?baseEpochId=${base}`)).toBe(false);
+});

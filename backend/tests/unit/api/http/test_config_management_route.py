@@ -9,6 +9,7 @@ import pytest
 from config_epoch_support import CONFIG_SOURCE, admitted_config_epoch
 from control_plane_http_support import (
     ACTOR,
+    StaticControlPlaneAuthenticator,
     StaticMutationAdmission,
     StaticRoleAdmission,
     human_principal,
@@ -41,6 +42,11 @@ from ci_coordinator.app.config_admission import (
     ConfigAdmissionUseCase,
 )
 from ci_coordinator.app.config_queries import (
+    ConfigEpochPreview,
+    ConfigPreviewAvailable,
+    ConfigPreviewResult,
+    ConfigQueryForbidden,
+    ConfigQueryNotFound,
     ConfigQueryUnavailable,
     ConfigSourceAvailable,
     ConfigSourceResult,
@@ -67,6 +73,7 @@ from ci_coordinator.control_plane_identity import (
     RoleAdmission,
 )
 from ci_coordinator.operator_controls.auth import RepositoryAccessUnavailable
+from ci_coordinator.proposal_review import compare_policy_drafts
 from ci_coordinator.runtime.policy_admission import ProcessPolicyAdmission
 
 
@@ -265,11 +272,14 @@ class _Queries:
         *,
         status_result: ConfigStatusResult | None = None,
         source_result: ConfigSourceResult | None = None,
+        preview_result: ConfigPreviewResult | None = None,
     ) -> None:
         self.status_result = status_result or ConfigQueryUnavailable()
         self.source_result = source_result or ConfigQueryUnavailable()
+        self.preview_result = preview_result or ConfigQueryUnavailable()
         self.status_calls: list[tuple[str, RepositoryScope, str | None, int]] = []
         self.source_calls: list[tuple[str, RepositoryScope, str]] = []
+        self.preview_calls: list[tuple[str, RepositoryScope, str, str]] = []
 
     async def status(
         self,
@@ -291,6 +301,17 @@ class _Queries:
     ) -> ConfigSourceResult:
         self.source_calls.append((actor, scope, epoch_id))
         return self.source_result
+
+    async def preview(
+        self,
+        *,
+        actor: str,
+        scope: RepositoryScope,
+        base_epoch_id: str,
+        target_epoch_id: str,
+    ) -> ConfigPreviewResult:
+        self.preview_calls.append((actor, scope, base_epoch_id, target_epoch_id))
+        return self.preview_result
 
 
 def test_config_mutations_are_authenticated_stable_control_plane_routes() -> None:
@@ -820,6 +841,7 @@ def test_status_is_scope_bound_and_projects_one_bounded_page() -> None:
                     document_hash=draft.document_hash,
                     epoch_hash=draft.epoch_hash,
                     source_byte_count=len(draft.source_bytes),
+                    previously_activated=True,
                 ),
             ),
             next_cursor=draft.epoch_id,
@@ -842,7 +864,7 @@ def test_status_is_scope_bound_and_projects_one_bounded_page() -> None:
     assert (response.status_code, response.json()) == (
         200,
         {
-            "schemaVersion": "ci-config-epoch-status/v1",
+            "schemaVersion": "ci-config-epoch-status/v2",
             "installationId": 1,
             "repositoryId": 2,
             "active": {"epochId": draft.epoch_id, "revision": 3},
@@ -854,6 +876,7 @@ def test_status_is_scope_bound_and_projects_one_bounded_page() -> None:
                     "documentHash": draft.document_hash,
                     "epochHash": draft.epoch_hash,
                     "sourceByteCount": len(draft.source_bytes),
+                    "previouslyActivated": True,
                 }
             ],
             "nextCursor": draft.epoch_id,
@@ -907,6 +930,7 @@ def test_config_lifecycle_routes_enforce_the_profile_role_partition() -> None:
                 )
             ),
             source_result=ConfigSourceAvailable(draft),
+            preview_result=ConfigPreviewAvailable(_preview_value(draft, draft)),
         ),
         role_admission=role_admission,
     )
@@ -945,17 +969,162 @@ def test_config_lifecycle_routes_enforce_the_profile_role_partition() -> None:
             },
         ),
         client.post("/api/v1/config/rollbacks", json=_rollback_body()),
+        client.get(
+            f"/api/v1/config/repositories/1/2/epochs/{draft.epoch_id}/preview",
+            params={"baseEpochId": draft.epoch_id},
+        ),
     )
 
-    assert tuple(response.status_code for response in responses) == (200, 201, 200, 200, 200, 200)
+    assert tuple(response.status_code for response in responses) == (
+        200,
+        201,
+        200,
+        200,
+        200,
+        200,
+        200,
+    )
+    # Provisional D3: status and preview are metadata reads; exact source stays `configure`.
     assert role_admission.required_roles == [
         frozenset({"configure"}),
         frozenset({"configure"}),
-        frozenset({"configure"}),
+        frozenset({"read"}),
         frozenset({"configure"}),
         frozenset({"activate"}),
         frozenset({"activate"}),
+        frozenset({"read"}),
     ]
+
+
+def test_read_only_principal_sees_metadata_but_not_source_or_commands() -> None:
+    draft = _admitted_draft()
+    queries = _Queries(
+        status_result=ConfigStatusAvailable(
+            ConfigEpochStatus(
+                scope=draft.scope,
+                active=None,
+                epochs=ConfigEpochPage(items=(), next_cursor=None),
+            )
+        ),
+        source_result=ConfigSourceAvailable(draft),
+        preview_result=ConfigPreviewAvailable(_preview_value(draft, draft)),
+    )
+    use_case = _UseCase(
+        ConfigRegistrationOutcome("created", epoch_id=draft.epoch_id),
+        ConfigActivationOutcome("applied", epoch_id=draft.epoch_id, revision=1),
+    )
+    client = _client(
+        "operator",
+        use_case,
+        authenticator=StaticControlPlaneAuthenticator(human_principal(roles=frozenset({"read"}))),
+        queries=queries,
+    )
+
+    status_response = client.get("/api/v1/config/repositories/1/2/status")
+    preview_response = client.get(
+        f"/api/v1/config/repositories/1/2/epochs/{draft.epoch_id}/preview",
+        params={"baseEpochId": draft.epoch_id},
+    )
+    source_response = client.get(f"/api/v1/config/repositories/1/2/epochs/{draft.epoch_id}/source")
+    rollback_response = client.post("/api/v1/config/rollbacks", json=_rollback_body())
+
+    # Kills a mutant that keeps status on `configure` or widens exact source export to `read`.
+    assert (status_response.status_code, preview_response.status_code) == (200, 200)
+    assert source_response.status_code == 403
+    assert source_response.json() == {"ok": False, "error": "forbidden", "diagnostics": []}
+    assert rollback_response.status_code == 403
+    assert queries.source_calls == []
+    assert use_case.rollback_commands == []
+
+
+def test_preview_projects_pointers_coverage_and_diff_identity_without_values() -> None:
+    base = _admitted_draft()
+    target = admitted_config_epoch(
+        source=CONFIG_SOURCE.replace(b'"owner":"example-org"', b'"owner":"trunk-owner-org"')
+    )
+    queries = _Queries(preview_result=ConfigPreviewAvailable(_preview_value(base, target)))
+    client = _client(
+        "operator",
+        _UseCase(
+            ConfigRegistrationOutcome("unavailable"),
+            ConfigActivationOutcome("unavailable"),
+        ),
+        queries=queries,
+    )
+
+    response = client.get(
+        f"/api/v1/config/repositories/1/2/epochs/{target.epoch_id}/preview",
+        params={"baseEpochId": base.epoch_id},
+    )
+
+    diff = compare_policy_drafts(base, target)
+    assert (response.status_code, response.json()) == (
+        200,
+        {
+            "schemaVersion": "ci-config-epoch-preview/v1",
+            "installationId": 1,
+            "repositoryId": 2,
+            "baseEpochId": base.epoch_id,
+            "targetEpochId": target.epoch_id,
+            "coverageRelation": "incomparable",
+            "diffState": "complete",
+            "changedPointers": ["/repository/owner"],
+            "diffHash": diff.diff_hash,
+        },
+    )
+    assert b"trunk-owner-org" not in response.content
+    assert queries.preview_calls == [(ACTOR, base.scope, base.epoch_id, target.epoch_id)]
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_preview_maps_limit_missing_forbidden_and_unavailable_outcomes() -> None:
+    draft = _admitted_draft()
+    over_limit = ConfigPreviewAvailable(
+        ConfigEpochPreview(
+            scope=draft.scope,
+            base_epoch_id=draft.epoch_id,
+            target_epoch_id=draft.epoch_id,
+            coverage_relation="equal",
+            diff=None,
+        )
+    )
+    observed: list[tuple[int, object]] = []
+    for result in (
+        over_limit,
+        ConfigQueryNotFound(),
+        ConfigQueryForbidden(),
+        ConfigQueryUnavailable(),
+    ):
+        response = _client(
+            "operator",
+            _UseCase(
+                ConfigRegistrationOutcome("unavailable"),
+                ConfigActivationOutcome("unavailable"),
+            ),
+            queries=_Queries(preview_result=result),
+        ).get(
+            f"/api/v1/config/repositories/1/2/epochs/{draft.epoch_id}/preview",
+            params={"baseEpochId": draft.epoch_id},
+        )
+        body = response.json()
+        observed.append(
+            (response.status_code, body.get("diffState") if body.get("ok") is None else body)
+        )
+    missing_base = _client(
+        "operator",
+        _UseCase(
+            ConfigRegistrationOutcome("unavailable"),
+            ConfigActivationOutcome("unavailable"),
+        ),
+    ).get(f"/api/v1/config/repositories/1/2/epochs/{draft.epoch_id}/preview")
+
+    assert observed == [
+        (200, "limit_exceeded"),
+        (404, {"ok": False, "error": "target_unavailable", "diagnostics": []}),
+        (403, {"ok": False, "error": "forbidden", "diagnostics": []}),
+        (503, {"ok": False, "error": "unavailable", "diagnostics": []}),
+    ]
+    assert missing_base.status_code == 422
 
 
 def test_config_openapi_declares_security_success_and_error_algebras() -> None:
@@ -1005,6 +1174,12 @@ def test_config_openapi_declares_security_success_and_error_algebras() -> None:
         (
             "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/"
             "{epoch_id}/source",
+            "get",
+            {"200", "401", "403", "404", "422", "500", "503"},
+        ),
+        (
+            "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/"
+            "{epoch_id}/preview",
             "get",
             {"200", "401", "403", "404", "422", "500", "503"},
         ),
@@ -1103,7 +1278,7 @@ def _client(
     actor: str | None,
     use_case: _UseCase,
     *,
-    authenticator: _Authenticator | None = None,
+    authenticator: _Authenticator | StaticControlPlaneAuthenticator | None = None,
     admission: ConfigAdmissionUseCase | None = None,
     queries: _Queries | None = None,
     role_admission: StaticRoleAdmission | _RecordingRoleAdmission | None = None,
@@ -1124,6 +1299,16 @@ def _client(
             )
         ),
         raise_server_exceptions=False,
+    )
+
+
+def _preview_value(base: ValidatedEpochDraft, target: ValidatedEpochDraft) -> ConfigEpochPreview:
+    return ConfigEpochPreview(
+        scope=target.scope,
+        base_epoch_id=base.epoch_id,
+        target_epoch_id=target.epoch_id,
+        coverage_relation="equal" if base == target else "incomparable",
+        diff=compare_policy_drafts(base, target),
     )
 
 

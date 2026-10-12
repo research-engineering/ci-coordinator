@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { activateConfig } from "../src/api/configActivation/client";
+import { activateConfig, activateRegisteredEpoch } from "../src/api/configActivation/client";
 import { configActivationSchema } from "../src/api/configActivation/schema";
 import {
   fetchControlPlaneSession,
@@ -936,5 +936,92 @@ describe("development proxy authority", () => {
     ["GET", "/api/v1/operator/overrides", false],
   ] as const)("admits only the bounded operator UI route", (method, url, expected) => {
     expect(proxyRequestIsAdmitted(method, url)).toBe(expected);
+  });
+});
+
+const registeredActivation = (expectedRevision: number | null = 4) => ({
+  scope: { installationId: 1, repositoryId: 1 },
+  expectedRevision,
+  operationId: "activate-one",
+  registeredEpochReviewOperationId: "review-one",
+  expectedSourceHash: "5".repeat(64),
+  targetEpochId: "4".repeat(64),
+});
+
+describe("registered-epoch activation v3", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  test.each([4, null])("posts the exact v3 selector at revision %s", async (expectedRevision) => {
+    const requests: Request[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (request: Request) => {
+        requests.push(request);
+        return Response.json(
+          configActivationFixture({
+            epochId: "4".repeat(64),
+            revision: (expectedRevision ?? 0) + 1,
+          }),
+        );
+      }),
+    );
+    await expect(
+      activateRegisteredEpoch(registeredActivation(expectedRevision), csrfToken),
+    ).resolves.toMatchObject({ kind: "complete" });
+    expect(new URL(requests[0]?.url ?? "").pathname).toBe("/api/v1/config/activations");
+    expect(requests[0]?.headers.get("x-csrf-token")).toBe(csrfToken);
+    // Kills mutants that drop the source hash, reuse v2 or send a proposal manifest.
+    expect(await requests[0]?.json()).toEqual({
+      schemaVersion: "ci-config-epoch-activation/v3",
+      installationId: 1,
+      repositoryId: 1,
+      targetEpochId: "4".repeat(64),
+      expectedSourceHash: "5".repeat(64),
+      registeredEpochReviewOperationId: "review-one",
+      expectedRevision,
+      operationId: "activate-one",
+    });
+  });
+
+  test.each([
+    { epochId: "b".repeat(64), revision: 5 },
+    { epochId: "4".repeat(64), revision: 4 },
+  ])("rejects receipt drift %j", async (receipt) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json(configActivationFixture(receipt))),
+    );
+    await expect(activateRegisteredEpoch(registeredActivation(), csrfToken)).resolves.toEqual({
+      kind: "invalid-response",
+    });
+  });
+
+  test.each([
+    { ...registeredActivation(), expectedSourceHash: "x" },
+    { ...registeredActivation(), registeredEpochReviewOperationId: "" },
+    { ...registeredActivation(), targetEpochId: "A".repeat(64) },
+    { ...registeredActivation(), expectedRevision: 0 },
+  ])("refuses an inadmissible command before transport %#", async (command) => {
+    const transport = vi.fn();
+    vi.stubGlobal("fetch", transport);
+    await expect(activateRegisteredEpoch(command, csrfToken)).resolves.toEqual({
+      kind: "invalid-response",
+    });
+    expect(transport).not.toHaveBeenCalled();
+  });
+
+  test("maps a definitive attestation refusal", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          { ok: false, error: "attestation_invalid", diagnostics: [] },
+          { status: 409 },
+        ),
+      ),
+    );
+    await expect(activateRegisteredEpoch(registeredActivation(), csrfToken)).resolves.toEqual({
+      kind: "attestation_invalid",
+    });
   });
 });

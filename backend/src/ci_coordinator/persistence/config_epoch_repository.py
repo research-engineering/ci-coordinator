@@ -6,7 +6,7 @@ import asyncio
 from collections.abc import Callable, Mapping
 from typing import Final, Literal, cast
 
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import Select, func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -279,7 +279,17 @@ class _PostgresConfigEpochRepository:
                 ).mappings()
             )
             visible = rows[:limit]
-            items = tuple(_summary_from_row(dict(row)) for row in visible)
+            activated = await self._activated_epoch_ids(
+                scope,
+                tuple(_required_string(dict(row), "epoch_id") for row in visible),
+            )
+            items = tuple(
+                _summary_from_row(
+                    dict(row),
+                    previously_activated=_required_string(dict(row), "epoch_id") in activated,
+                )
+                for row in visible
+            )
             active = None
             if active_row is not None:
                 active_fields = dict(active_row)
@@ -519,20 +529,28 @@ class _PostgresConfigEpochRepository:
         # Only an activation transition counts. A retained rollback transition is
         # not activation evidence, so an earlier rollback cannot qualify its target.
         found = await self._connection.scalar(
-            select(config_epoch_activations.c.operation_id)
-            .join(
-                audit_events,
-                audit_events.c.audit_event_id == config_epoch_activations.c.audit_event_id,
-            )
-            .where(
-                config_epoch_activations.c.installation_id == scope.installation_id,
-                config_epoch_activations.c.repository_id == scope.repository_id,
-                config_epoch_activations.c.target_epoch_id == epoch_id,
-                audit_events.c.event_type == _ACTIVATION_EVENT_TYPE.encode("utf-8"),
-            )
+            _activation_evidence(scope)
+            .where(config_epoch_activations.c.target_epoch_id == epoch_id)
             .limit(1)
         )
         return found is not None
+
+    async def _activated_epoch_ids(
+        self,
+        scope: RepositoryScope,
+        epoch_ids: tuple[str, ...],
+    ) -> frozenset[str]:
+        # Status projects the exact rollback-target predicate for one bounded page.
+        if not epoch_ids:
+            return frozenset()
+        result = await self._connection.execute(
+            _activation_evidence(scope)
+            .where(config_epoch_activations.c.target_epoch_id.in_(epoch_ids))
+            .distinct()
+        )
+        return frozenset(
+            _required_string(dict(row), "target_epoch_id") for row in result.mappings()
+        )
 
     async def _load_activation(
         self,
@@ -743,7 +761,26 @@ def _draft_from_row(row: Mapping[str, object]) -> ValidatedEpochDraft:
         raise PersistenceInvariantViolation("stored config epoch is invalid") from error
 
 
-def _summary_from_row(row: Mapping[str, object]) -> ConfigEpochSummary:
+def _activation_evidence(scope: RepositoryScope) -> Select[tuple[str]]:
+    return (
+        select(config_epoch_activations.c.target_epoch_id)
+        .join(
+            audit_events,
+            audit_events.c.audit_event_id == config_epoch_activations.c.audit_event_id,
+        )
+        .where(
+            config_epoch_activations.c.installation_id == scope.installation_id,
+            config_epoch_activations.c.repository_id == scope.repository_id,
+            audit_events.c.event_type == _ACTIVATION_EVENT_TYPE.encode("utf-8"),
+        )
+    )
+
+
+def _summary_from_row(
+    row: Mapping[str, object],
+    *,
+    previously_activated: bool,
+) -> ConfigEpochSummary:
     try:
         return ConfigEpochSummary(
             epoch_id=_required_string(row, "epoch_id"),
@@ -752,6 +789,7 @@ def _summary_from_row(row: Mapping[str, object]) -> ConfigEpochSummary:
             document_hash=_required_string(row, "document_hash"),
             epoch_hash=_required_string(row, "epoch_hash"),
             source_byte_count=_required_int(row, "source_byte_count"),
+            previously_activated=previously_activated,
         )
     except (ValueError, TypeError) as error:
         raise PersistenceInvariantViolation("stored config epoch summary is invalid") from error

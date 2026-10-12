@@ -9,7 +9,7 @@ export function configLifecycleProxyRequestIsAdmitted(
   )
     return method === "POST" && url.search === "";
   const match =
-    /^\/api\/v1\/config\/repositories\/([1-9][0-9]*)\/([1-9][0-9]*)\/(status|epochs\/([0-9a-f]{64})\/source)$/.exec(
+    /^\/api\/v1\/config\/repositories\/([1-9][0-9]*)\/([1-9][0-9]*)\/(status|epochs\/([0-9a-f]{64})\/(source|preview))$/.exec(
       url.pathname,
     );
   if (
@@ -18,8 +18,14 @@ export function configLifecycleProxyRequestIsAdmitted(
     ![match[1], match[2]].every((value) => Number.isSafeInteger(Number(value)))
   )
     return false;
-  if (match[3] !== "status") return url.search === "";
   const params = url.searchParams;
+  if (match[5] === "preview")
+    return (
+      [...params.keys()].length === 1 &&
+      params.getAll("baseEpochId").length === 1 &&
+      /^[0-9a-f]{64}$/.test(params.get("baseEpochId") ?? "")
+    );
+  if (match[3] !== "status") return url.search === "";
   if (
     [...params.keys()].some((key) => key !== "limit" && key !== "afterEpochId") ||
     params.getAll("limit").length > 1 ||

@@ -191,6 +191,23 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/preview": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Preview Config Epoch */
+        readonly get: operations["preview_config_epoch"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/source": {
         readonly parameters: {
             readonly query?: never;
@@ -1671,6 +1688,31 @@ export interface components {
             /** Targetepochid */
             readonly targetEpochId: string;
         };
+        /** ConfigEpochPreviewBody */
+        readonly ConfigEpochPreviewBody: {
+            readonly baseEpochId: components["schemas"]["LowercaseSha256Hex"];
+            /** Changedpointers */
+            readonly changedPointers: readonly components["schemas"]["PolicySemanticPointer"][];
+            /**
+             * Coveragerelation
+             * @enum {string}
+             */
+            readonly coverageRelation: "equal" | "greater" | "less" | "incomparable" | "unknown";
+            readonly diffHash: components["schemas"]["LowercaseSha256Hex"] | null;
+            /**
+             * Diffstate
+             * @enum {string}
+             */
+            readonly diffState: "complete" | "limit_exceeded";
+            readonly installationId: components["schemas"]["JsonSafePositiveInteger"];
+            readonly repositoryId: components["schemas"]["JsonSafePositiveInteger"];
+            /**
+             * Schemaversion
+             * @constant
+             */
+            readonly schemaVersion: "ci-config-epoch-preview/v1";
+            readonly targetEpochId: components["schemas"]["LowercaseSha256Hex"];
+        };
         /** ConfigEpochRegistrationBody */
         readonly ConfigEpochRegistrationBody: {
             /** Operationid */
@@ -1748,13 +1790,15 @@ export interface components {
              * Schemaversion
              * @constant
              */
-            readonly schemaVersion: "ci-config-epoch-status/v1";
+            readonly schemaVersion: "ci-config-epoch-status/v2";
         };
         /** ConfigEpochSummaryBody */
         readonly ConfigEpochSummaryBody: {
             readonly documentHash: components["schemas"]["LowercaseSha256Hex"];
             readonly epochHash: components["schemas"]["LowercaseSha256Hex"];
             readonly epochId: components["schemas"]["LowercaseSha256Hex"];
+            /** Previouslyactivated */
+            readonly previouslyActivated: boolean;
             readonly sourceByteCount: components["schemas"]["PolicySourceByteCount"];
             /**
              * Sourceformat
@@ -3776,6 +3820,7 @@ export interface components {
         };
         /** @enum {string} */
         readonly PolicyPhase: "source" | "decode" | "parse" | "structure" | "semantics" | "feasibility" | "compile";
+        readonly PolicySemanticPointer: string;
         readonly PolicySourceByteCount: number;
         readonly PositiveCounter: number;
         readonly PositiveId: number;
@@ -5393,6 +5438,90 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["ErrorBody"] | components["schemas"]["ConfigControlErrorBody"];
+                };
+            };
+            /** @description Internal Server Error */
+            readonly 500: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ConfigControlErrorBody"];
+                };
+            };
+        };
+    };
+    readonly preview_config_epoch: {
+        readonly parameters: {
+            readonly query: {
+                readonly baseEpochId: string;
+            };
+            readonly header?: never;
+            readonly path: {
+                readonly epoch_id: string;
+                readonly installation_id: number;
+                readonly repository_id: number;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Successful Response */
+            readonly 200: {
+                headers: {
+                    /** @description The configuration projection is never cacheable. */
+                    readonly "Cache-Control"?: "no-store";
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ConfigEpochPreviewBody"];
+                };
+            };
+            /** @description Unauthorized */
+            readonly 401: {
+                headers: {
+                    /** @description Bearer authentication challenge. */
+                    readonly "WWW-Authenticate"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ConfigControlErrorBody"];
+                };
+            };
+            /** @description Forbidden */
+            readonly 403: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ConfigControlErrorBody"];
+                };
+            };
+            /** @description Not Found */
+            readonly 404: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ConfigControlErrorBody"];
+                };
+            };
+            /** @description Unprocessable Content */
+            readonly 422: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             /** @description Internal Server Error */

@@ -8,6 +8,7 @@ export type ConfigEpoch = components["schemas"]["ConfigEpochSummaryBody"];
 export type ConfigRegistration = components["schemas"]["ConfigEpochAcceptedBody"];
 export type ConfigRollback = components["schemas"]["ConfigActivationAcceptedBody"];
 export type ConfigError = components["schemas"]["ConfigControlErrorBody"];
+export type ConfigPreview = components["schemas"]["ConfigEpochPreviewBody"];
 export type SourceFormat = ConfigEpoch["sourceFormat"];
 
 export const MAX_SOURCE_BYTES = 2_097_152;
@@ -46,7 +47,7 @@ export const validationSchema: z.ZodType<ConfigValidation> = z.strictObject({
 });
 
 export const statusSchema: z.ZodType<ConfigStatus> = z.strictObject({
-  schemaVersion: z.literal("ci-config-epoch-status/v1"),
+  schemaVersion: z.literal("ci-config-epoch-status/v2"),
   installationId: positive,
   repositoryId: positive,
   active: z.strictObject({ epochId: hash, revision: positive }).nullable(),
@@ -59,11 +60,44 @@ export const statusSchema: z.ZodType<ConfigStatus> = z.strictObject({
         documentHash: hash,
         epochHash: hash,
         sourceByteCount: positive.max(MAX_SOURCE_BYTES),
+        previouslyActivated: z.boolean(),
       }),
     )
     .max(100),
   nextCursor: hash.nullable(),
 });
+
+export const MAX_PREVIEW_POINTERS = 1_024;
+const MAX_PREVIEW_POINTER_BYTES = 65_536;
+
+// Pointers name schema fields only; the server never publishes policy values here.
+export const previewSchema: z.ZodType<ConfigPreview> = z
+  .strictObject({
+    schemaVersion: z.literal("ci-config-epoch-preview/v1"),
+    installationId: positive,
+    repositoryId: positive,
+    baseEpochId: hash,
+    targetEpochId: hash,
+    coverageRelation: z.enum(["equal", "greater", "less", "incomparable", "unknown"]),
+    diffState: z.enum(["complete", "limit_exceeded"]),
+    changedPointers: z
+      .array(
+        z
+          .string()
+          .max(MAX_PREVIEW_POINTER_BYTES)
+          .refine(utf8Fits(MAX_PREVIEW_POINTER_BYTES))
+          .refine((pointer) => pointer === "" || pointer.startsWith("/")),
+      )
+      .max(MAX_PREVIEW_POINTERS),
+    diffHash: hash.nullable(),
+  })
+  .refine(
+    (value) =>
+      (value.diffState === "complete") === (value.diffHash !== null) &&
+      (value.diffState === "complete" || value.changedPointers.length === 0) &&
+      new Set(value.changedPointers).size === value.changedPointers.length,
+    "preview diff state does not bind its projection",
+  );
 
 export const registrationSchema: z.ZodType<ConfigRegistration> = z.strictObject({
   schemaVersion: z.literal("ci-config-epoch-registration-result/v1"),

@@ -1,10 +1,14 @@
-import { ChevronLeft, ChevronRight, Download, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, GitCompare, RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { RollbackCommand } from "../../api/configLifecycle/client";
 import type { ConfigEpoch, ConfigScope, ConfigStatus } from "../../api/configLifecycle/schema";
 import { exportConfigSource } from "../../api/configLifecycle/source";
 import type { LifecycleFailure } from "../../api/configLifecycle/transport";
+import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
+import type { RegisteredEpochReviewHint } from "../workbench/navigation";
 import { ConfigurationNotice } from "./ConfigurationNotice";
+import { EpochPreview, useEpochPreview } from "./EpochPreview";
+import { RegisteredEpochReviewRequest } from "./RegisteredEpochReview";
 import { RollbackReview } from "./RollbackReview";
 import { useConfigurationStatus } from "./useConfigurationStatus";
 
@@ -13,8 +17,9 @@ export function RetainedEpochs({
   active,
   minimumActive,
   readRevision,
-  canRollback,
+  session,
   onRollback,
+  onReviewed,
   sharedReadRevision = 0,
   minimumConflict = false,
 }: {
@@ -22,8 +27,9 @@ export function RetainedEpochs({
   readonly active: boolean;
   readonly minimumActive: ConfigStatus["active"] | undefined;
   readonly readRevision: number;
-  readonly canRollback: boolean;
+  readonly session: ControlPlaneSession;
   readonly onRollback: (command: RollbackCommand) => void;
+  readonly onReviewed: (hint: RegisteredEpochReviewHint) => void;
   readonly sharedReadRevision?: number;
   readonly minimumConflict?: boolean;
 }) {
@@ -60,8 +66,9 @@ export function RetainedEpochs({
             key={query.key}
             status={query.result.value}
             scope={scope}
-            canRollback={canRollback}
+            session={session}
             onRollback={onRollback}
+            onReviewed={onReviewed}
           />
           <nav className="configuration-actions" aria-label="Epoch pages">
             <button
@@ -95,13 +102,15 @@ export function RetainedEpochs({
 function EpochPage({
   status,
   scope,
-  canRollback,
+  session,
   onRollback,
+  onReviewed,
 }: {
   readonly status: ConfigStatus;
   readonly scope: ConfigScope;
-  readonly canRollback: boolean;
+  readonly session: ControlPlaneSession;
   readonly onRollback: (command: RollbackCommand) => void;
+  readonly onReviewed: (hint: RegisteredEpochReviewHint) => void;
 }) {
   const [selected, setSelected] = useState<ConfigEpoch>();
   return (
@@ -125,6 +134,7 @@ function EpochPage({
                 <th scope="col">Format</th>
                 <th scope="col">Bytes</th>
                 <th scope="col">State</th>
+                <th scope="col">Activated before</th>
               </tr>
             </thead>
             <tbody>
@@ -144,6 +154,7 @@ function EpochPage({
                   <td>{epoch.sourceFormat}</td>
                   <td>{epoch.sourceByteCount.toLocaleString("en-US")}</td>
                   <td>{epoch.epochId === status.active?.epochId ? "Active" : "Retained"}</td>
+                  <td>{epoch.previouslyActivated ? "Yes" : "No"}</td>
                 </tr>
               ))}
             </tbody>
@@ -156,8 +167,9 @@ function EpochPage({
           scope={scope}
           status={status}
           epoch={selected}
-          canRollback={canRollback}
+          session={session}
           onRollback={onRollback}
+          onReviewed={onReviewed}
         />
       ) : null}
     </>
@@ -168,18 +180,30 @@ function EpochDetail({
   scope,
   status,
   epoch,
-  canRollback,
+  session,
   onRollback,
+  onReviewed,
 }: {
   readonly scope: ConfigScope;
   readonly status: ConfigStatus;
   readonly epoch: ConfigEpoch;
-  readonly canRollback: boolean;
+  readonly session: ControlPlaneSession;
   readonly onRollback: (command: RollbackCommand) => void;
+  readonly onReviewed: (hint: RegisteredEpochReviewHint) => void;
 }) {
   const [failure, setFailure] = useState<LifecycleFailure>();
   const [busy, setBusy] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [comparing, setComparing] = useState(false);
+  const activeEpochId = status.active?.epochId;
+  const retained = activeEpochId !== undefined && activeEpochId !== epoch.epochId;
+  // The detail is unmounted whenever the epochs panel is inactive or hidden.
+  const preview = useEpochPreview(
+    scope,
+    comparing && retained ? activeEpochId : undefined,
+    epoch.epochId,
+    true,
+  );
   const controller = useRef<AbortController | undefined>(undefined);
   const objectUrl = useRef<string | undefined>(undefined);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -237,22 +261,53 @@ function EpochDetail({
           <code>{epoch.epochHash}</code>
         </dd>
       </dl>
-      <button
-        type="button"
-        className="button button--secondary"
-        disabled={busy}
-        onClick={() => void download()}
-      >
-        <Download className="button-icon" aria-hidden="true" />
-        {busy ? "Verifying source" : "Download source"}
-      </button>
+      {session.roles.includes("configure") ? (
+        <button
+          type="button"
+          className="button button--secondary"
+          disabled={busy}
+          onClick={() => void download()}
+        >
+          <Download className="button-icon" aria-hidden="true" />
+          {busy ? "Verifying source" : "Download source"}
+        </button>
+      ) : (
+        <p>Configure role required to export source.</p>
+      )}
       {failure ? <ConfigurationNotice failure={failure} /> : null}
       {downloaded ? <p role="status">Verified source download started.</p> : null}
-      {canRollback ? (
-        <RollbackReview status={status} target={epoch} onSubmit={onRollback} />
+      {retained && activeEpochId ? (
+        comparing ? (
+          <EpochPreview label="Change against the active epoch" result={preview} />
+        ) : (
+          <button
+            type="button"
+            className="button button--secondary"
+            onClick={() => setComparing(true)}
+          >
+            <GitCompare className="button-icon" aria-hidden="true" />
+            Compare with active epoch
+          </button>
+        )
+      ) : null}
+      {epoch.epochId === activeEpochId ? null : session.roles.includes("configure") ? (
+        <RegisteredEpochReviewRequest
+          scope={scope}
+          status={status}
+          epoch={epoch}
+          session={session}
+          onReviewed={onReviewed}
+        />
       ) : (
-        <p>Activate role required for rollback.</p>
+        <p>Configure role required to request review.</p>
       )}
+      {!session.roles.includes("activate") ? (
+        <p>Activate role required for rollback.</p>
+      ) : epoch.previouslyActivated ? (
+        <RollbackReview status={status} target={epoch} onSubmit={onRollback} />
+      ) : retained ? (
+        <p>Rollback is offered only for an epoch previously activated in this repository.</p>
+      ) : null}
     </section>
   );
 }

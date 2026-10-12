@@ -270,8 +270,9 @@ test.each(["status", "validation", "export"] as const)(
           active: true,
           minimumActive: undefined,
           readRevision: 0,
-          canRollback: true,
+          session: controlPlaneSessionFixture(),
           onRollback: vi.fn(),
+          onReviewed: vi.fn(),
         };
         const view = render(createElement(RetainedEpochs, props));
         await userEvent.click(

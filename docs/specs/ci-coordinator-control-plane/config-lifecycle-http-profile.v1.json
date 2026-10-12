@@ -56,10 +56,10 @@
       "httpOperationId": "get_config_epoch_status",
       "method": "GET",
       "path": "/api/v1/config/repositories/{installation_id}/{repository_id}/status",
-      "requiredRoles": ["configure"],
+      "requiredRoles": ["read"],
       "effect": "bounded-postgresql-read",
       "requestSchema": null,
-      "successSchema": "ci-config-epoch-status/v1"
+      "successSchema": "ci-config-epoch-status/v2"
     },
     {
       "semanticOperationId": "export-configuration-source",
@@ -70,6 +70,16 @@
       "effect": "exact-postgresql-read",
       "requestSchema": null,
       "successSchema": "exact-retained-source-bytes"
+    },
+    {
+      "semanticOperationId": "preview-configuration-epoch",
+      "httpOperationId": "preview_config_epoch",
+      "method": "GET",
+      "path": "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/preview",
+      "requiredRoles": ["read"],
+      "effect": "exact-postgresql-read",
+      "requestSchema": null,
+      "successSchema": "ci-config-epoch-preview/v1"
     }
   ],
   "invariants": [
@@ -84,6 +94,7 @@
     "unknown-legacy-activation-operations-reject-without-new-writes",
     "status-cardinality-is-page-bounded",
     "export-revalidates-and-emits-exact-retained-bytes",
+    "preview-compares-two-retained-epochs-without-values-or-effects",
     "success-projections-do-not-widen-runtime-value-domains"
   ],
   "nonClaims": [

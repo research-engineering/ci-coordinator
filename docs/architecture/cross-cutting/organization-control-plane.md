@@ -117,7 +117,8 @@ fine-grained roles.
 | inventory, workbench, discovery, provider status | `read`                    | `read`                    | GitHub App read profile           | exact installation and repository relation                                       |
 | configuration validation                         | `configure`               | `configure`               | none                              | pure admission; optional exact provider-evidence receipt input                   |
 | configuration registration                       | `configure`               | `configure`               | none                              | idempotency, exact bytes, audit transaction                                      |
-| configuration status and exact source export     | `configure`               | `configure`               | none                              | bounded scope-first PostgreSQL read                                              |
+| configuration status and epoch preview           | `read`                    | `read`                    | none                              | bounded scope-first PostgreSQL read; preview pointers name schema fields only    |
+| exact configuration source export                | `configure`               | `configure`               | none                              | exact scope-first PostgreSQL read of re-admitted bytes                           |
 | activation                                       | `activate`                | `activate`                | GitHub App read profile           | fresh reviewer-permission recheck, optimistic concurrency, and audit transaction |
 | rollback                                         | `activate`                | `activate`                | none                              | optimistic concurrency and audit transaction                                     |
 | force FullCI or disable omission                 | `override`                | `override`                | none                              | monotonic safety command                                                         |
@@ -129,6 +130,10 @@ The read operation may issue a bounded, repository- and observation-bound
 `current-read-receipt`. Pure validation may consume that receipt but cannot
 refresh it. This separates a deterministic admission result from provider
 availability while preserving an exact freshness and scope proof.
+
+The status/preview split from source export is a provisional owner decision
+(2026-10-11), CI-019 D3, recorded in the
+[API lifecycle](../../features/api-first-configuration-lifecycle.md#21-ci-019-provisional-owner-decisions-2026-10-11).
 
 This table freezes semantic operation families and caller authority. The
 profile freezes fixed trust-boundary routes, but does not yet claim the complete

@@ -27,6 +27,7 @@ def _summary(epoch_id: str) -> ConfigEpochSummary:
         document_hash="b" * 64,
         epoch_hash="c" * 64,
         source_byte_count=2,
+        previously_activated=False,
     )
 
 
@@ -89,6 +90,13 @@ def test_epoch_summary_rejects_invalid_persisted_projections(
 ) -> None:
     with pytest.raises(ValueError):
         mutate(_summary("1"))
+
+
+@pytest.mark.parametrize("value", (1, 0, None, "true"))
+def test_epoch_summary_requires_exact_previous_activation_evidence(value: object) -> None:
+    # Kills a mutant that coerces truthy journal evidence into a rollback-target claim.
+    with pytest.raises(TypeError, match="exact boolean"):
+        replace(_summary("1"), previously_activated=cast(bool, value))
 
 
 def test_epoch_status_requires_exact_page_and_scope_consistency() -> None:

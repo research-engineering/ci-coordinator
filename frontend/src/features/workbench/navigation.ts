@@ -46,7 +46,11 @@ export function readConsoleRoute(search: string): ConsoleRoute {
       : !scope || selected === "repositories"
         ? "repositories"
         : (REPOSITORY_VIEWS.find((candidate) => candidate === selected) ??
-          (reviewHint(query, scope) ? "workflows" : "overview"));
+          (reviewHint(query, scope)
+            ? "workflows"
+            : registeredEpochReviewHint(query, scope)
+              ? "configuration"
+              : "overview"));
   const tab =
     query.getAll("tab").length === 1
       ? (EVIDENCE_TABS.find((candidate) => candidate === query.get("tab")) ?? "plans")
@@ -75,7 +79,8 @@ export function consoleHref(route: ConsoleRoute, currentSearch = ""): string {
     query.set("installationId", String(scope.installationId));
     query.set("repositoryId", String(scope.repositoryId));
     query.set("limit", String(scope.limit));
-    const hint = reviewHint(new URLSearchParams(currentSearch), scope);
+    const currentQuery = new URLSearchParams(currentSearch);
+    const hint = reviewHint(currentQuery, scope);
     if (hint) {
       query.set("repositoryAttestation", "reviewed");
       query.set("proposalManifestId", hint.manifestId);
@@ -87,6 +92,18 @@ export function consoleHref(route: ConsoleRoute, currentSearch = ""): string {
           hint.expectedActive ? String(hint.expectedActive.revision) : "",
         );
       }
+    }
+    const registered = hint ? undefined : registeredEpochReviewHint(currentQuery, scope);
+    if (registered) {
+      query.set("repositoryAttestation", "registered-epoch-reviewed");
+      query.set("targetEpochId", registered.targetEpochId);
+      query.set("expectedSourceHash", registered.expectedSourceHash);
+      query.set("reviewOperationId", registered.operationId);
+      query.set("reviewBaseEpochId", registered.expectedActive?.epochId ?? "");
+      query.set(
+        "reviewBaseRevision",
+        registered.expectedActive ? String(registered.expectedActive.revision) : "",
+      );
     }
   }
   const view = scope || route.view === "activity" ? route.view : "repositories";
@@ -112,6 +129,65 @@ export function sameScope(left: WorkbenchScope | undefined, right: WorkbenchScop
     left?.repositoryId === right?.repositoryId &&
     left?.limit === right?.limit
   );
+}
+
+export interface RegisteredEpochReviewHint {
+  readonly targetEpochId: string;
+  readonly expectedSourceHash: string;
+  readonly operationId: string;
+  readonly expectedActive: ExpectedActiveEpoch | null;
+}
+
+// The CI-018 callback redirect names one retained review; it grants nothing by itself.
+export function registeredEpochReviewHint(
+  query: URLSearchParams,
+  scope: Pick<WorkbenchScope, "installationId" | "repositoryId">,
+): RegisteredEpochReviewHint | undefined {
+  const keys = [
+    "repositoryAttestation",
+    "installationId",
+    "repositoryId",
+    "targetEpochId",
+    "expectedSourceHash",
+    "reviewOperationId",
+    "reviewBaseEpochId",
+    "reviewBaseRevision",
+  ];
+  const targetEpochId = query.get("targetEpochId");
+  const expectedSourceHash = query.get("expectedSourceHash");
+  const operationId = query.get("reviewOperationId");
+  if (
+    !keys.every((key) => query.getAll(key).length === 1) ||
+    query.has("proposalManifestId") ||
+    query.get("repositoryAttestation") !== "registered-epoch-reviewed" ||
+    query.get("installationId") !== String(scope.installationId) ||
+    query.get("repositoryId") !== String(scope.repositoryId) ||
+    targetEpochId === null ||
+    !/^[0-9a-f]{64}$/.test(targetEpochId) ||
+    expectedSourceHash === null ||
+    !/^[0-9a-f]{64}$/.test(expectedSourceHash) ||
+    operationId === null ||
+    !operationIdIsAdmitted(operationId)
+  )
+    return undefined;
+  const expectedActive = reviewBaseline(query);
+  return expectedActive === undefined
+    ? undefined
+    : { targetEpochId, expectedSourceHash, operationId, expectedActive };
+}
+
+function reviewBaseline(query: URLSearchParams): ExpectedActiveEpoch | null | undefined {
+  const epochId = query.get("reviewBaseEpochId");
+  const revisionText = query.get("reviewBaseRevision");
+  const revision = Number(revisionText);
+  if (epochId === "" && revisionText === "") return null;
+  return epochId !== null &&
+    /^[0-9a-f]{64}$/.test(epochId) &&
+    revisionText !== null &&
+    /^[1-9][0-9]*$/.test(revisionText) &&
+    Number.isSafeInteger(revision)
+    ? { epochId, revision }
+    : undefined;
 }
 
 export function reviewHint(query: URLSearchParams, scope: WorkbenchScope) {

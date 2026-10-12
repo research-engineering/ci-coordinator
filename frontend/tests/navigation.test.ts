@@ -5,6 +5,7 @@ import {
   EVIDENCE_TABS,
   REPOSITORY_VIEWS,
   readConsoleRoute,
+  registeredEpochReviewHint,
   sameScope,
 } from "../src/features/workbench/navigation";
 
@@ -203,4 +204,47 @@ test("scope identity includes every admitted coordinate", () => {
   for (const coordinate of ["installationId", "repositoryId", "limit"] as const) {
     expect(sameScope(scope, { ...scope, [coordinate]: scope[coordinate] + 1 })).toBe(false);
   }
+});
+
+const registeredCallback = `${coordinates}&repositoryAttestation=registered-epoch-reviewed&targetEpochId=${"b".repeat(64)}&expectedSourceHash=${"c".repeat(64)}&reviewOperationId=review-two&reviewBaseEpochId=${"a".repeat(64)}&reviewBaseRevision=7`;
+
+test("registered-epoch callback lands on Configuration and survives canonical navigation", () => {
+  const route = readConsoleRoute(registeredCallback);
+  expect(route.view).toBe("configuration");
+  expect(registeredEpochReviewHint(new URLSearchParams(registeredCallback), scope)).toEqual({
+    targetEpochId: "b".repeat(64),
+    expectedSourceHash: "c".repeat(64),
+    operationId: "review-two",
+    expectedActive: { epochId: "a".repeat(64), revision: 7 },
+  });
+  const workflows = consoleHref({ ...route, view: "workflows" }, registeredCallback);
+  const back = new URL(workflows, "https://console.example").search;
+  expect(readConsoleRoute(back).view).toBe("workflows");
+  expect(registeredEpochReviewHint(new URLSearchParams(back), scope)?.operationId).toBe(
+    "review-two",
+  );
+  const absent = registeredCallback
+    .replace(`reviewBaseEpochId=${"a".repeat(64)}`, "reviewBaseEpochId=")
+    .replace("reviewBaseRevision=7", "reviewBaseRevision=");
+  expect(registeredEpochReviewHint(new URLSearchParams(absent), scope)?.expectedActive).toBeNull();
+  expect(
+    registeredEpochReviewHint(new URLSearchParams(registeredCallback), {
+      ...scope,
+      repositoryId: 32,
+    }),
+  ).toBeUndefined();
+});
+
+test.each([
+  ["missing baseline", registeredCallback.replace("&reviewBaseRevision=7", "")],
+  ["zero revision", registeredCallback.replace("reviewBaseRevision=7", "reviewBaseRevision=0")],
+  ["half baseline", registeredCallback.replace("reviewBaseRevision=7", "reviewBaseRevision=")],
+  ["uppercase target", registeredCallback.replace("b".repeat(64), "B".repeat(64))],
+  ["short source hash", registeredCallback.replace("c".repeat(64), "c".repeat(63))],
+  ["duplicate target", `${registeredCallback}&targetEpochId=${"b".repeat(64)}`],
+  ["proposal mixing", `${registeredCallback}&proposalManifestId=proposal:one`],
+  ["proposal marker", registeredCallback.replace("registered-epoch-reviewed", "reviewed")],
+])("drops a malformed registered-epoch callback hint: %s", (_name, search) => {
+  expect(registeredEpochReviewHint(new URLSearchParams(search), scope)).toBeUndefined();
+  expect(consoleHref(readConsoleRoute(search), search)).not.toContain("targetEpochId");
 });

@@ -1,14 +1,14 @@
 # API-First Configuration Lifecycle
 
-Status: accepted design
-Last updated: 2026-09-04
+Status: accepted design; CI-019 read-model and preview delta provisional
+Last updated: 2026-10-11
 Owner requirements: `REQ-CI-CORE-016`, `REQ-CI-CONTROL-009`
 
 ## 1. Decision
 
 CI Coordinator exposes repository configuration validation, registration,
-status, and exact retained-source export through versioned HTTP contracts
-before adding their UI projections.
+status, epoch-to-epoch preview, and exact retained-source export through
+versioned HTTP contracts before adding their UI projections.
 
 The capability has four owners:
 
@@ -33,14 +33,15 @@ already owns that command's replay identity.
 
 The Batch D transport profile is finite and exact:
 
-| Operation       | Method and path                                                                              | Role        | Effect                                    |
-|-----------------|----------------------------------------------------------------------------------------------|-------------|-------------------------------------------|
-| Validate source | `POST /api/v1/config/validations`                                                            | `configure` | Pure configuration use case               |
-| Register epoch  | `POST /api/v1/config/epochs`                                                                 | `configure` | PostgreSQL and audit                      |
-| Activate epoch  | `POST /api/v1/config/activations`                                                            | `activate`  | PostgreSQL, audit, and attested authority |
-| Roll back epoch | `POST /api/v1/config/rollbacks`                                                              | `activate`  | PostgreSQL and audit                      |
-| Read status     | `GET /api/v1/config/repositories/{installation_id}/{repository_id}/status`                   | `configure` | Bounded read                              |
-| Export source   | `GET /api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/source` | `configure` | Exact read                                |
+| Operation       | Method and path                                                                               | Role        | Effect                                    |
+|-----------------|-----------------------------------------------------------------------------------------------|-------------|-------------------------------------------|
+| Validate source | `POST /api/v1/config/validations`                                                             | `configure` | Pure configuration use case               |
+| Register epoch  | `POST /api/v1/config/epochs`                                                                  | `configure` | PostgreSQL and audit                      |
+| Activate epoch  | `POST /api/v1/config/activations`                                                             | `activate`  | PostgreSQL, audit, and attested authority |
+| Roll back epoch | `POST /api/v1/config/rollbacks`                                                               | `activate`  | PostgreSQL and audit                      |
+| Read status     | `GET /api/v1/config/repositories/{installation_id}/{repository_id}/status`                    | `read`      | Bounded read                              |
+| Export source   | `GET /api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/source`  | `configure` | Exact read                                |
+| Preview epoch   | `GET /api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/preview` | `read`      | Two exact reads, pure comparison          |
 
 Activation admits three request generations: v1 is exact retained replay only,
 v2 selects a proposal review by `reviewOperationId`, and v3 selects a reviewed
@@ -54,6 +55,40 @@ rejected at the wire. The registered epoch's review itself starts at
 This map closes only configuration lifecycle API coverage. The aggregate
 `REQ-CI-CONTROL-008` remains deferred until every product operation and its UI
 projection are covered.
+
+### 2.1 CI-019 Provisional Owner Decisions (2026-10-11)
+
+Each item below is a provisional owner decision (2026-10-11) for ROADMAP
+CI-019; revisit it when its falsifier is observed.
+
+- **D1, files.** "Files" means the existing single-document JSON or YAML 1.2
+  source import (UI file input) and exact retained-source export. There is no
+  multi-file bundle or repository-resident policy source: the policy schema is
+  one closed document and content addressing binds one source byte sequence.
+  Falsifier: the schema admits includes, or the owner requires a
+  repository-resident policy file.
+- **D2, dry-run.** Validation remains the pure dry-run of unregistered source.
+  A separate read-only preview compares two retained same-scope epochs:
+  `ci-config-epoch-preview/v1` returns the `policy-semantic-diff/v1` changed
+  pointers and hash from the proposal-review owner and the rollback coverage
+  relation of the target against the base. Falsifier: the coverage relation
+  cannot be computed from two re-admitted drafts alone.
+- **D3, visibility.** Status and preview are metadata reads with the `read`
+  role; exact source export keeps `configure`; validation and registration keep
+  `configure`; activation and rollback keep `activate`. Admission stays all-of:
+  an `activate`-only actor sees no status or preview and must also hold `read`.
+  Pointer disclosure analysis: every object in
+  `repository-policy.schema.v1.json` is closed (`additionalProperties: false`)
+  and the diff collapses any changed array to its own pointer, so every pointer
+  segment is a schema field name. User-authored text such as rule names,
+  branches, signal names or paths never appears in a pointer. Falsifier: the
+  policy schema admits an open map or the diff descends into array members;
+  then the pointer list must move behind `configure` and `read` keeps only the
+  coverage relation, pointer count, limit state and diff hash.
+
+Status changed shape for D8 rollback-target visibility, so its success schema
+is `ci-config-epoch-status/v2`. A strict v1 client rejects the added field and
+fails closed; there is no dual-version negotiation on the same route.
 
 ## 3. Formal Model
 
@@ -130,7 +165,13 @@ descriptor.
 ## 5. Read Semantics
 
 Status is a live, bounded keyset traversal over immutable epochs plus the
-current mutable active pointer:
+current mutable active pointer. Each projected epoch carries
+`previouslyActivated`, the exact rollback-target predicate of the lifecycle
+owner: a same-scope activation-journal transition whose pair-owned audit event
+is `config-epoch-activation/v1`. A rollback transition is not activation
+evidence. One extra query evaluates this predicate for the at most 100 page
+identities; no index, table or migration is added. The flag is a read-time
+projection; the rollback command re-evaluates it under the scope lock.
 
 ```text
 Status(S, after, limit)
@@ -159,6 +200,24 @@ Content-Digest = RFC 9530 raw sha-256 digest of response.body
 
 Missing, cross-scope, malformed, or integrity-invalid rows cannot publish any
 stored bytes.
+
+Preview loads the base and target epochs through the same scope-filtered,
+re-admitting read, then reuses `compare_policy_drafts` and the conservative
+rollback coverage comparator:
+
+```text
+Preview(S, base, target)
+  => Authorized(P, S) and both epochs retained in S
+  and changedPointers = PolicySemanticDiff(base, target).changedPointers
+  and coverageRelation = Coverage(active := base, target)
+  and no clock, transaction write, audit or provider effect
+```
+
+An over-limit diff returns `diffState = limit_exceeded`, no pointers and no
+hash, but keeps the coverage relation. A missing epoch is `404`. The preview is
+advisory: activation and rollback re-check coverage, review and revision at
+command time. Each preview re-admits both drafts inside the request; this is
+the same CPU cost as rollback admission and is not process-isolated.
 
 ## 6. HTTP And Error Algebra
 
@@ -233,7 +292,11 @@ The design is false if any assigned witness permits:
 - a different operation with the same source to create a second content epoch;
 - status to exceed its bound, return source bytes, or traverse nondeterministically;
 - a cross-scope query to materialize or emit a row;
-- export to return bytes after any stored-draft integrity mutation; or
+- export to return bytes after any stored-draft integrity mutation;
+- status to report `previouslyActivated` for a rollback-only, foreign-scope or
+  registration-only epoch;
+- preview to emit a policy value, write state, or differ from the review diff
+  owner or rollback coverage owner for the same two drafts; or
 - a success response schema to admit values outside its runtime result domain; or
 - runtime routes, generated OpenAPI, and the exact transport profile to differ.
 

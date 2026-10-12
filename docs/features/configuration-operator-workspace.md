@@ -39,9 +39,10 @@ and C be one immutable command including its operation ID.
 CanRegister = current(A) & configure(A) & validUtf8(D) & bounded(D)
               & V.scope=S & V.sourceHash=hash(D) & V.epochIdentityMatches
               & reviewed(D,V) & explicitlyConfirmed & noUnresolvedCommand
-CanRollback = current(A) & configure(A) & activate(A)
+CanRollback = current(A) & activate(A)
               & currentRead(Q,S) & retained(P.target) & active(P.current)
-              & P.target!=P.current & boundedNonblankReason
+              & P.target!=P.current & previouslyActivated(P.target)
+              & boundedNonblankReason
               & reviewed(P,reason) & explicitlyConfirmed & noUnresolvedCommand
 ReadPublish = same(S,A,Q) & visibleView & admittedShapeAndIdentity
 Replay = explicitGesture & current(A) & same(S,A,C) & exactRetainedCommand
@@ -86,10 +87,11 @@ No provider string is rendered as HTML.
 ## Activation And Rollback
 
 Validation is not registration, and registration is not activation. This page
-cannot mint `proposalManifestId`, proof or repository attestation. The next
-valid activation action opens the existing Workflows review journey; arbitrary
-uploaded policies cannot be activated unconditionally. No manual manifest input
-or alternate activation route is added.
+cannot mint `proposalManifestId`, proof or repository attestation. A
+proposal-created epoch is activated through the existing Workflows review
+journey. A standalone registered epoch is activated only after the CI-018
+GitHub review described in the CI-019 delta below; arbitrary uploaded policies
+cannot be activated unconditionally. No manual manifest input is added.
 
 Rollback review displays full current and target epoch identity, revision and
 reason. It is a local command preview, not a backend safety verdict. The server
@@ -97,6 +99,53 @@ still checks current revision, prior same-scope activation and non-reducing
 coverage. A conflict requires a
 fresh read and fresh review, not silent rebasing. A lost response retains the
 original operation ID, expected revision, target and reason for explicit replay.
+
+## CI-019 Delta (2026-10-11)
+
+This section extends the projection for ROADMAP CI-019 under the provisional
+owner decisions (2026-10-11) D1-D3 recorded in the
+[API lifecycle](api-first-configuration-lifecycle.md#21-ci-019-provisional-owner-decisions-2026-10-11).
+The backend owners above remain authoritative.
+
+Each control mirrors exactly the role its route admits; the UI adds no
+stricter or weaker role rule. The page opens for a current session with `read`,
+`configure` or `activate`. Source validation and registration need `configure`; retained
+epochs, comparison and the reviewed-activation diff need `read`; export and
+review start need `configure`; rollback and activation need `activate`. A
+missing role shows its name instead of the control.
+
+- **Rollback targets.** Status v2 carries `previouslyActivated`. The table
+  shows it, and rollback review is offered only for such an epoch. This is a
+  preview of the server rule; `409 target_never_activated` still renders its
+  distinct notice when the journal disagrees with the earlier read.
+- **Comparison.** "Compare with active epoch" is an explicit gesture that reads
+  `ci-config-epoch-preview/v1` for the selected and active epochs. It renders
+  the coverage relation, changed schema-field pointers (no values) and the diff
+  identity; an over-limit diff shows only the relation.
+- **Review.** For a non-active selected epoch, "Request GitHub review" posts
+  `ci-registered-epoch-attestation-start/v1` with the selected epoch, its source
+  hash and the active pointer from the same read, then hands control to
+  GitHub. A lost or unverifiable start response keeps the same request for an
+  explicit retry while the selection remains; it is not a durable command.
+  `already_reviewed` on such a retry resumes from the retained review.
+- **Activation.** The callback `repositoryAttestation=registered-epoch-reviewed`
+  lands on Configuration. The page shows the reviewed target, source hash,
+  baseline revision and review operation, loads the preview against the
+  reviewed baseline, and offers "Activate reviewed epoch". With `read` and a
+  reviewed baseline, the button stays disabled until the preview shows a
+  terminal result: the diff, the over-limit relation or a failure notice. The
+  preview reads only while Configuration is the visible view; leaving the view
+  or hiding the document aborts and discards it, and it is read again on
+  return. Without `read` or a baseline the notice replaces it. The command is
+  `ci-config-epoch-activation/v3` with the reviewed revision. It joins the
+  serialized registration/rollback hook: an uncertain response retains the
+  exact command for explicit replay, `attestation_invalid` and other definitive
+  refusals require a fresh review.
+
+Navigation keeps the registered-review hint across views like the proposal
+hint, rejects malformed, duplicated, foreign-scope or proposal-mixed hints, and
+never treats the hint as authority. Browser witnesses for these new journeys are
+not added in this delta; component witnesses own them.
 
 ## Alternatives And Cost
 

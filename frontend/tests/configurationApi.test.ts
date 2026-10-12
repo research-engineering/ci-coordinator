@@ -1,6 +1,7 @@
 import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import {
+  readConfigPreview,
   readConfigStatus,
   registerSource,
   rollbackConfig,
@@ -17,6 +18,7 @@ import { observeResponses } from "../src/api/shared/responseObservation";
 import {
   configEpoch,
   configJson,
+  configPreview,
   configStatus,
   configValidation,
   rollbackCommand,
@@ -215,6 +217,9 @@ test.each([
   { active: { epochId: "wrong", revision: 1 } },
   { epochs: [{ ...configEpoch(), sourceByteCount: MAX_SOURCE_BYTES + 1 }] },
   { active: { epochId: configEpoch().epochId, revision: 0 } },
+  { schemaVersion: "ci-config-epoch-status/v1" },
+  { epochs: [{ ...configEpoch(), previouslyActivated: 1 }] },
+  { epochs: [{ ...configEpoch(), previouslyActivated: undefined }] },
 ])("rejects raw status drift %j", async (delta) => {
   vi.stubGlobal(
     "fetch",
@@ -341,4 +346,68 @@ test("missing no-store and malformed media cannot be accepted", async () => {
   vi.stubGlobal("fetch", fetch);
   expect((await readConfigStatus(scope, null)).kind).toBe("invalid-response");
   expect((await readConfigStatus(scope, null)).kind).toBe("invalid-response");
+});
+
+const base = configEpoch(`${source}\n`).epochId;
+const target = configEpoch().epochId;
+
+test("preview reads one exact base/target pair through the baseEpochId alias", async () => {
+  const fetch = vi.fn(async (request: Request) => {
+    const url = new URL(request.url);
+    expect(url.pathname).toBe(`/api/v1/config/repositories/1/1/epochs/${target}/preview`);
+    expect([...url.searchParams]).toEqual([["baseEpochId", base]]);
+    expect(request.method).toBe("GET");
+    expect(request.headers.has("x-csrf-token")).toBe(false);
+    return configJson(configPreview());
+  });
+  vi.stubGlobal("fetch", fetch);
+  expect(await readConfigPreview(scope, base, target)).toEqual({
+    kind: "ready",
+    value: configPreview(),
+  });
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+
+test.each([
+  { baseEpochId: target },
+  { targetEpochId: base },
+  { repositoryId: 2 },
+  { installationId: 2 },
+  { schemaVersion: "ci-config-epoch-preview/v2" },
+  { diffHash: null },
+  { diffState: "limit_exceeded" },
+  { diffState: "limit_exceeded", diffHash: null },
+  { changedPointers: ["/repository/rules", "/repository/rules"] },
+  { changedPointers: ["repository"] },
+  { coverageRelation: "unavailable" },
+  { values: ["main"] },
+])("preview rejects rebinding or projection drift %j", async (delta) => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => configJson({ ...configPreview(), ...delta })),
+  );
+  expect((await readConfigPreview(scope, base, target)).kind).toBe("invalid-response");
+});
+
+test("preview admits a bounded over-limit diff that publishes only coverage", async () => {
+  const limited = configPreview({
+    diffState: "limit_exceeded",
+    changedPointers: [],
+    diffHash: null,
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => configJson(limited)),
+  );
+  expect(await readConfigPreview(scope, base, target)).toEqual({ kind: "ready", value: limited });
+});
+
+test.each([
+  ["A".repeat(64), target],
+  [base, "short"],
+])("invalid preview identities %s / %s perform no fetch", async (left, right) => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  expect((await readConfigPreview(scope, left, right)).kind).toBe("invalid-request");
+  expect(fetch).not.toHaveBeenCalled();
 });

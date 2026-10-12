@@ -23,6 +23,14 @@ export interface RepositoryAttestationCommand {
   readonly expectedActive: ExpectedActiveEpoch | null;
 }
 
+export interface RegisteredEpochReviewCommand {
+  readonly scope: RepositoryScope;
+  readonly operationId: string;
+  readonly targetEpochId: string;
+  readonly expectedSourceHash: string;
+  readonly expectedActive: ExpectedActiveEpoch | null;
+}
+
 export type RepositoryAttestationResult =
   | { readonly kind: "ready"; readonly authorizationUrl: string }
   | { readonly kind: RepositoryAttestationError }
@@ -43,19 +51,65 @@ export async function startRepositoryAttestation(
   if (!attestationCommandIsAdmitted(command) || !/^[A-Za-z0-9_-]{43}$/.test(csrfToken)) {
     return { kind: "invalid-response" };
   }
+  return postAttestationStart(
+    {
+      schemaVersion: "ci-repository-attestation-start/v2",
+      installationId: command.scope.installationId,
+      repositoryId: command.scope.repositoryId,
+      expectedActive: command.expectedActive,
+      expectedManifestId: command.expectedManifestId,
+      operationId: command.operationId,
+    },
+    csrfToken,
+    signal,
+    timeoutMs,
+  );
+}
+
+// Starts the CI-018 GitHub step-up for one retained registered epoch; it never activates.
+export async function startRegisteredEpochReview(
+  command: RegisteredEpochReviewCommand,
+  csrfToken: string,
+  signal?: AbortSignal,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<RepositoryAttestationResult> {
+  if (
+    !scopeAndBaselineAreAdmitted(command.scope, command.expectedActive) ||
+    !operationIdIsAdmitted(command.operationId) ||
+    !/^[0-9a-f]{64}$/.test(command.targetEpochId) ||
+    !/^[0-9a-f]{64}$/.test(command.expectedSourceHash) ||
+    !/^[A-Za-z0-9_-]{43}$/.test(csrfToken)
+  ) {
+    return { kind: "invalid-response" };
+  }
+  return postAttestationStart(
+    {
+      schemaVersion: "ci-registered-epoch-attestation-start/v1",
+      installationId: command.scope.installationId,
+      repositoryId: command.scope.repositoryId,
+      expectedActive: command.expectedActive,
+      targetEpochId: command.targetEpochId,
+      expectedSourceHash: command.expectedSourceHash,
+      operationId: command.operationId,
+    } satisfies components["schemas"]["RegisteredEpochAttestationStartRequest"],
+    csrfToken,
+    signal,
+    timeoutMs,
+  );
+}
+
+async function postAttestationStart(
+  body: object,
+  csrfToken: string,
+  signal: AbortSignal | undefined,
+  timeoutMs: number,
+): Promise<RepositoryAttestationResult> {
   try {
     const response = await boundedFetch(
       new Request(
         new URL("/api/v1/repository-attestations/github/start", globalThis.location.origin),
         {
-          body: JSON.stringify({
-            schemaVersion: "ci-repository-attestation-start/v2",
-            installationId: command.scope.installationId,
-            repositoryId: command.scope.repositoryId,
-            expectedActive: command.expectedActive,
-            expectedManifestId: command.expectedManifestId,
-            operationId: command.operationId,
-          }),
+          body: JSON.stringify(body),
           credentials: "same-origin",
           headers: {
             accept: "application/json",
@@ -108,14 +162,22 @@ async function attestationFailure(response: Response): Promise<RepositoryAttesta
 }
 
 function attestationCommandIsAdmitted(command: RepositoryAttestationCommand): boolean {
-  const active = command.expectedActive;
   return (
-    Number.isSafeInteger(command.scope.installationId) &&
-    command.scope.installationId > 0 &&
-    Number.isSafeInteger(command.scope.repositoryId) &&
-    command.scope.repositoryId > 0 &&
+    scopeAndBaselineAreAdmitted(command.scope, command.expectedActive) &&
     operationIdIsAdmitted(command.operationId) &&
-    /^proposal:[0-9a-f]{32}$/.test(command.expectedManifestId) &&
+    /^proposal:[0-9a-f]{32}$/.test(command.expectedManifestId)
+  );
+}
+
+function scopeAndBaselineAreAdmitted(
+  scope: RepositoryScope,
+  active: ExpectedActiveEpoch | null,
+): boolean {
+  return (
+    Number.isSafeInteger(scope.installationId) &&
+    scope.installationId > 0 &&
+    Number.isSafeInteger(scope.repositoryId) &&
+    scope.repositoryId > 0 &&
     (active === null ||
       (/^[0-9a-f]{64}$/.test(active.epochId) &&
         Number.isSafeInteger(active.revision) &&

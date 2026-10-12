@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { RollbackCommand, ValidatedSource } from "../src/api/configLifecycle/client";
 import type {
   ConfigEpoch,
+  ConfigPreview,
   ConfigScope,
   ConfigStatus,
   ConfigValidation,
@@ -64,6 +65,7 @@ export function configEpoch(
     epochHash,
     sourceFormat,
     sourceByteCount: Buffer.byteLength(source, "utf8"),
+    previouslyActivated: true,
   };
 }
 
@@ -72,11 +74,25 @@ export function configStatus(): ConfigStatus {
     left.epochId < right.epochId ? -1 : 1,
   );
   return {
-    schemaVersion: "ci-config-epoch-status/v1",
+    schemaVersion: "ci-config-epoch-status/v2",
     ...configurationScope,
     active: { epochId: configEpoch(`${configurationSource}\n`).epochId, revision: 4 },
     epochs,
     nextCursor: null,
+  };
+}
+
+export function configPreview(overrides: Partial<ConfigPreview> = {}): ConfigPreview {
+  return {
+    schemaVersion: "ci-config-epoch-preview/v1",
+    ...configurationScope,
+    baseEpochId: configEpoch(`${configurationSource}\n`).epochId,
+    targetEpochId: configEpoch().epochId,
+    coverageRelation: "equal",
+    diffState: "complete",
+    changedPointers: ["/repository/rules"],
+    diffHash: digest("synthetic semantic diff"),
+    ...overrides,
   };
 }
 

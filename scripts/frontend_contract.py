@@ -85,6 +85,7 @@ from ci_coordinator.api.http.routers.ci_observation import (
     OBSERVATION_WORKFLOWS_PATH,
 )
 from ci_coordinator.api.http.routers.config_lifecycle_queries import (
+    CONFIG_PREVIEW_PATH,
     CONFIG_SOURCE_PATH,
     CONFIG_STATUS_PATH,
 )
@@ -200,6 +201,7 @@ def rendered_contract() -> bytes:
         CONFIG_VALIDATIONS_PATH,
         CONFIG_STATUS_PATH,
         CONFIG_SOURCE_PATH,
+        CONFIG_PREVIEW_PATH,
         CI_ECONOMICS_ATTEMPTS_PATH,
         CI_ECONOMICS_JOBS_PATH,
         CI_ECONOMICS_MEASUREMENTS_PATH,

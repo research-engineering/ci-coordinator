@@ -26,6 +26,9 @@ def test_rendered_contract_has_exact_control_plane_workbench_surface() -> None:
     config_source_path = (
         "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/source"
     )
+    config_preview_path = (
+        "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/preview"
+    )
     economics_attempts_path = (
         "/api/v1/economics/repositories/{installation_id}/{repository_id}/attempts"
     )
@@ -93,6 +96,10 @@ def test_rendered_contract_has_exact_control_plane_workbench_surface() -> None:
         ),
         ("get", config_source_path): (
             "export_config_epoch_source",
+            {"200", "401", "403", "404", "422", "503"},
+        ),
+        ("get", config_preview_path): (
+            "preview_config_epoch",
             {"200", "401", "403", "404", "422", "503"},
         ),
         ("get", economics_attempts_path): (
@@ -309,6 +316,7 @@ def test_rendered_contract_has_exact_control_plane_workbench_surface() -> None:
         ("post", "/api/v1/config/validations"),
         ("get", config_status_path),
         ("get", config_source_path),
+        ("get", config_preview_path),
         ("get", economics_attempts_path),
         ("get", economics_jobs_path),
         (
@@ -525,7 +533,10 @@ def test_rendered_contract_has_exact_control_plane_workbench_surface() -> None:
         == "ci-config-epoch-validation-result/v1"
     )
     assert schemas["ConfigEpochStatusBody"]["properties"]["schemaVersion"]["const"] == (
-        "ci-config-epoch-status/v1"
+        "ci-config-epoch-status/v2"
+    )
+    assert schemas["ConfigEpochPreviewBody"]["properties"]["schemaVersion"]["const"] == (
+        "ci-config-epoch-preview/v1"
     )
     assert schemas["FactValue"] == {
         "anyOf": [

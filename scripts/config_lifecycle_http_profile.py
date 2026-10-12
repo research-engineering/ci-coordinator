@@ -17,6 +17,7 @@ from ci_coordinator.config_epochs import (
     MAX_ROLLBACK_REASON_UTF8_BYTES,
 )
 from ci_coordinator.kernel.canonical_json import MAX_SAFE_JSON_INTEGER
+from ci_coordinator.proposal_review import MAX_CHANGED_POINTERS, MAX_SEMANTIC_DIFF_BYTES
 from scripts.proofkit_common import JsonObject, as_array, as_object
 from scripts.repository_paths import read_repository_regular_file
 
@@ -48,6 +49,7 @@ _EXPECTED_INVARIANTS = (
     "unknown-legacy-activation-operations-reject-without-new-writes",
     "status-cardinality-is-page-bounded",
     "export-revalidates-and-emits-exact-retained-bytes",
+    "preview-compares-two-retained-epochs-without-values-or-effects",
     "success-projections-do-not-widen-runtime-value-domains",
 )
 _EXPECTED_NON_CLAIMS = (
@@ -128,10 +130,10 @@ _EXPECTED_OPERATIONS = (
         "get_config_epoch_status",
         "GET",
         "/api/v1/config/repositories/{installation_id}/{repository_id}/status",
-        ("configure",),
+        ("read",),
         "bounded-postgresql-read",
         None,
-        "ci-config-epoch-status/v1",
+        "ci-config-epoch-status/v2",
     ),
     ConfigLifecycleHttpOperation(
         "export-configuration-source",
@@ -142,6 +144,16 @@ _EXPECTED_OPERATIONS = (
         "exact-postgresql-read",
         None,
         "exact-retained-source-bytes",
+    ),
+    ConfigLifecycleHttpOperation(
+        "preview-configuration-epoch",
+        "preview_config_epoch",
+        "GET",
+        ("/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/preview"),
+        ("read",),
+        "exact-postgresql-read",
+        None,
+        "ci-config-epoch-preview/v1",
     ),
 )
 
@@ -464,6 +476,7 @@ def _assert_openapi_bounds(
             "documentHash",
             "epochHash",
         ),
+        "ConfigEpochPreviewBody": ("baseEpochId", "targetEpochId"),
     }
     for schema_name, field_names in hash_fields.items():
         for field_name in field_names:
@@ -496,6 +509,7 @@ def _assert_openapi_bounds(
         "ConfigActivationAcceptedBody": ("revision",),
         "ConfigEpochStatusBody": ("installationId", "repositoryId"),
         "ConfigEpochValidationAcceptedBody": ("installationId", "repositoryId"),
+        "ConfigEpochPreviewBody": ("installationId", "repositoryId"),
     }
     for schema_name, field_names in positive_integer_fields.items():
         for field_name in field_names:
@@ -558,6 +572,16 @@ def _assert_openapi_bounds(
     if len(resolved_alternatives) != 2 or len(non_null) != 1 or null_count != 1:
         raise ValueError("config status cursor nullability differs from its profile")
     _assert_sha256_schema(non_null[0], "ConfigEpochStatusBody.nextCursor")
+
+    pointers = _property_schema(document, "ConfigEpochPreviewBody", "changedPointers")
+    pointer = _resolve_schema(document, pointers.get("items"))
+    if (
+        pointers.get("maxItems") != MAX_CHANGED_POINTERS
+        or pointer.get("type") != "string"
+        or pointer.get("maxLength") != MAX_SEMANTIC_DIFF_BYTES
+        or pointer.get("x-max-utf8-bytes") != MAX_SEMANTIC_DIFF_BYTES
+    ):
+        raise ValueError("config preview pointer bound differs from the semantic diff owner")
 
 
 def _property_schema(

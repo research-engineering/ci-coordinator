@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from ci_coordinator.api.http.control_plane_authentication import authenticate_and_admit_roles
 from ci_coordinator.api.http.dependencies import (
@@ -17,6 +17,10 @@ from ci_coordinator.api.http.dependencies import (
 )
 from ci_coordinator.api.http.model_contracts import RequestModel, ResponseModel
 from ci_coordinator.api.http.security import WWW_AUTHENTICATE_HEADER
+from ci_coordinator.app.config_queries import (
+    MAX_PREVIEW_CHANGED_POINTERS,
+    MAX_PREVIEW_POINTER_BYTES,
+)
 from ci_coordinator.config_control import PolicyPhase
 from ci_coordinator.config_control.limits import (
     MAX_CONFIG_CONTRACT_ID_UTF8_BYTES,
@@ -340,15 +344,47 @@ class ConfigEpochSummaryBody(ResponseModel):
     document_hash: LowercaseSha256Hex
     epoch_hash: LowercaseSha256Hex
     source_byte_count: PolicySourceByteCount
+    previously_activated: bool
 
 
 class ConfigEpochStatusBody(ResponseModel):
-    schema_version: Literal["ci-config-epoch-status/v1"]
+    schema_version: Literal["ci-config-epoch-status/v2"]
     installation_id: JsonSafePositiveInteger
     repository_id: JsonSafePositiveInteger
     active: ActiveConfigEpochBody | None
     epochs: tuple[ConfigEpochSummaryBody, ...] = Field(max_length=MAX_CONFIG_EPOCH_PAGE_SIZE)
     next_cursor: LowercaseSha256Hex | None
+
+
+type PolicySemanticPointer = Annotated[
+    str,
+    Field(
+        max_length=MAX_PREVIEW_POINTER_BYTES,
+        json_schema_extra={"x-max-utf8-bytes": MAX_PREVIEW_POINTER_BYTES},
+    ),
+]
+
+
+class ConfigEpochPreviewBody(ResponseModel):
+    schema_version: Literal["ci-config-epoch-preview/v1"]
+    installation_id: JsonSafePositiveInteger
+    repository_id: JsonSafePositiveInteger
+    base_epoch_id: LowercaseSha256Hex
+    target_epoch_id: LowercaseSha256Hex
+    coverage_relation: Literal["equal", "greater", "less", "incomparable", "unknown"]
+    diff_state: Literal["complete", "limit_exceeded"]
+    changed_pointers: tuple[PolicySemanticPointer, ...] = Field(
+        max_length=MAX_PREVIEW_CHANGED_POINTERS
+    )
+    diff_hash: LowercaseSha256Hex | None
+
+    @model_validator(mode="after")
+    def diff_state_binds_its_projection(self) -> Self:
+        if (self.diff_state == "complete") != (self.diff_hash is not None):
+            raise ValueError("only a complete preview diff carries its hash")
+        if self.diff_state == "limit_exceeded" and self.changed_pointers:
+            raise ValueError("an over-limit preview diff publishes no pointers")
+        return self
 
 
 class ConfigControlErrorBody(ResponseModel):

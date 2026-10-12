@@ -295,7 +295,7 @@ test("real rollback admission notifies the snapshot owner with literal B/2; regi
 test("shared and local configuration read revisions remain independent, including hidden reads", async () => {
   const fetch = vi.fn(async () =>
     configJson({
-      schemaVersion: "ci-config-epoch-status/v1",
+      schemaVersion: "ci-config-epoch-status/v2",
       installationId: 1,
       repositoryId: 1,
       active: B2,
@@ -379,7 +379,7 @@ test("an activation finishing under Configuration invalidates its independent st
       if (path.endsWith("/status")) {
         reads++;
         return configJson({
-          schemaVersion: "ci-config-epoch-status/v1",
+          schemaVersion: "ci-config-epoch-status/v2",
           installationId: 1,
           repositoryId: 1,
           active,

@@ -179,11 +179,24 @@ test("a confirmed rollback receipt prevents a later lower status revision from b
   expect(mutations).toBe(1);
 });
 
-test("configure without activate can inspect epochs but cannot review rollback", async () => {
+test("configure without read cannot list epochs because status admits only the read role", async () => {
   const fetch = vi.fn(async () => configJson(configStatus()));
   vi.stubGlobal("fetch", fetch);
   const base = props();
   render(<ConfigurationPage {...base} session={{ ...base.session, roles: ["configure"] }} />);
+  expect(screen.getByRole("textbox", { name: "Source" })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("tab", { name: "Retained epochs" }));
+  expect(screen.getByText("Read role required to list retained epochs.")).toBeVisible();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test("configure and read without activate can inspect epochs but cannot review rollback", async () => {
+  const fetch = vi.fn(async () => configJson(configStatus()));
+  vi.stubGlobal("fetch", fetch);
+  const base = props();
+  render(
+    <ConfigurationPage {...base} session={{ ...base.session, roles: ["configure", "read"] }} />,
+  );
   await userEvent.click(screen.getByRole("tab", { name: "Retained epochs" }));
   await userEvent.click(
     await screen.findByRole("button", {
