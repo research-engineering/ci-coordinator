@@ -482,6 +482,22 @@
         "authorityRefs": ["REQ-CI-PROOFKIT-007", "REQ-CI-RELEASE-001"],
         "rationale": "CPython 3.13.16 contains every retired tarfile, stringprep, urllib.request and zipfile repair hunk; its tarfile also carries an additional vendor PAX size change, so the module is not byte-identical to the former patched result. The runtime no longer applies these backports. The poplib and zlib repairs, the repair policy, the stdlib backport manifest and the vendor regression witnesses remain live release witnesses."
       }
+    },
+    {
+      "transitionId": "ci-coordinator.unused-reconciliation-publisher-retirement",
+      "baselineVariants": [
+        {
+          "bindingState": "bound",
+          "bindingSetSha256": "a95e776bf0c02926fccee56420daa96a4c8f5893c6892dd796c2bc3ccf49f2c0",
+          "affectedRequirementIds": ["REQ-CI-RUNTIME-003"]
+        }
+      ],
+      "paths": ["backend/src/ci_coordinator/reconciliation/check_summary.py"],
+      "disposition": {
+        "kind": "obsolete",
+        "authorityRefs": ["REQ-CI-PROOFKIT-007", "REQ-CI-RUNTIME-003"],
+        "rationale": "The check summary projection served only the unimplemented ReconciliationPublisher port; no runtime path, composition root or provider adapter consumed either. The non-enforcing runtime publishes no provider check, and any future provider-write effect needs its own generation-fenced design. Reconciliation state, persistence and terminal witnesses for REQ-CI-RUNTIME-003 remain live."
+      }
     }
   ]
 }

@@ -36,7 +36,6 @@ from ci_coordinator.reconciliation import (
     reconcile,
     record_result,
     register_subject,
-    summarize_check,
 )
 
 SUBJECT = ReconciliationSubject.create(
@@ -217,14 +216,6 @@ def test_empty_expected_contract_cannot_succeed() -> None:
     assert result.state == "failure"
     assert result.is_success is False
     assert result.findings[0].kind == "missing_expected_contract"
-
-
-def test_check_summary_never_promotes_non_success_result() -> None:
-    result = reconcile(reconciliation_input(()))
-    summary = summarize_check(result)
-
-    assert summary.conclusion == "pending"
-    assert "not observed" in summary.summary
 
 
 def test_observation_contracts_are_immutable() -> None:
