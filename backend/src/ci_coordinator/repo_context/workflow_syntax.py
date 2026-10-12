@@ -307,7 +307,8 @@ def _local_reusable_workflow_paths(jobs: dict[str, Node]) -> tuple[str, ...]:
             if not _is_immutable_external_reusable_workflow(uses.value):
                 raise ValueError("external reusable workflow target must use an immutable revision")
             continue
-        if not is_workflow_path(path):
+        # GitHub rejects any `@` in a same-repository call; a filename cannot carry it.
+        if "@" in path or not is_workflow_path(path):
             raise ValueError("local reusable workflow target is invalid")
         paths.add(path)
     return tuple(sorted(paths, key=utf16_sort_key))

@@ -134,11 +134,14 @@ class CallEdgeResponse(ProjectedResponseModel):
     status: Literal[
         "resolved",
         "missing",
+        "not_callable",
+        "callability_unknown",
         "remote",
         "dynamic",
         "invalid",
         "cycle",
         "depth_exceeded",
+        "callee_limit_exceeded",
     ]
     target_path: str | None
     remote_ref: str | None

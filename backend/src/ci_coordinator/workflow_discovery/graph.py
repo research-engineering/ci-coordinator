@@ -16,6 +16,7 @@ from ci_coordinator.workflow_discovery.graph_model import (
 from ci_coordinator.workflow_discovery.summary import ParsedWorkflow
 
 _MAX_LOCAL_CALL_DEPTH = 10
+_MAX_UNIQUE_CALLED_WORKFLOWS = 50
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,7 +33,7 @@ class _EdgeDraft:
 
 
 def analyze_call_graph(workflows: tuple[ParsedWorkflow, ...]) -> GraphAnalysis:
-    paths = frozenset(workflow.summary.path for workflow in workflows)
+    target_triggers = {workflow.summary.path: workflow.summary.triggers for workflow in workflows}
     evidence = _uses_provenance(workflows)
     drafts = [
         _edge_draft(
@@ -40,7 +41,7 @@ def analyze_call_graph(workflows: tuple[ParsedWorkflow, ...]) -> GraphAnalysis:
             job.job_id,
             job.uses,
             job.uses_dynamic,
-            paths,
+            target_triggers,
             evidence[job.subject_id],
         )
         for workflow in workflows
@@ -53,12 +54,16 @@ def analyze_call_graph(workflows: tuple[ParsedWorkflow, ...]) -> GraphAnalysis:
         if draft.kind == "local" and draft.status == "resolved" and draft.target_path is not None
     }
     cycle_pairs = _cycle_pairs(local_pairs)
-    depth_exceeded_pairs = _depth_exceeded_pairs(local_pairs - cycle_pairs)
+    acyclic_pairs = local_pairs - cycle_pairs
+    depth_exceeded_pairs = _depth_exceeded_pairs(acyclic_pairs)
+    callee_limit_pairs = _callee_limit_exceeded_pairs(acyclic_pairs)
     classified = [
         replace(draft, status="cycle")
         if (draft.caller_path, draft.target_path) in cycle_pairs
         else replace(draft, status="depth_exceeded")
         if (draft.caller_path, draft.target_path) in depth_exceeded_pairs
+        else replace(draft, status="callee_limit_exceeded")
+        if (draft.caller_path, draft.target_path) in callee_limit_pairs
         else draft
         for draft in drafts
     ]
@@ -106,7 +111,7 @@ def _edge_draft(
     job_id: str,
     uses: str,
     uses_dynamic: bool,
-    paths: frozenset[str],
+    target_triggers: dict[str, tuple[str, ...] | None],
     provenance: Provenance,
 ) -> _EdgeDraft:
     if uses_dynamic:
@@ -130,7 +135,7 @@ def _edge_draft(
             job_id,
             uses,
             "local",
-            "resolved" if target in paths else "missing",
+            _local_target_status(target, target_triggers),
             target,
             None,
             None,
@@ -160,6 +165,20 @@ def _edge_draft(
     return _EdgeDraft(caller_path, job_id, uses, "unknown", "invalid", None, None, None, provenance)
 
 
+def _local_target_status(
+    target: str,
+    target_triggers: dict[str, tuple[str, ...] | None],
+) -> CallStatus:
+    # GitHub runs a same-repository callee only when it declares `on: workflow_call`;
+    # unknown triggers cannot prove callability and are not reported as absent.
+    if target not in target_triggers:
+        return "missing"
+    triggers = target_triggers[target]
+    if triggers is None:
+        return "callability_unknown"
+    return "resolved" if "workflow_call" in triggers else "not_callable"
+
+
 def _graph_evidence(edges: tuple[CallEdge, ...]) -> tuple[tuple[Fact, ...], tuple[Unknown, ...]]:
     facts: list[Fact] = []
     unknowns: list[Unknown] = []
@@ -178,11 +197,14 @@ def _graph_evidence(edges: tuple[CallEdge, ...]) -> tuple[tuple[Fact, ...], tupl
             )
             continue
         reason = {
+            "callability_unknown": "local_call_target_callability_unknown",
+            "callee_limit_exceeded": "local_call_unique_callee_limit_exceeded",
             "cycle": "local_call_cycle",
             "depth_exceeded": "local_call_depth_exceeded",
             "dynamic": "dynamic_call_target",
             "invalid": "invalid_call_coordinate",
             "missing": "local_call_target_missing",
+            "not_callable": "local_call_target_not_callable",
             "remote": "remote_call_not_fetched",
         }[edge.status]
         unknowns.append(
@@ -271,4 +293,35 @@ def _depth_exceeded_pairs(edges: set[tuple[str, str]]) -> set[tuple[str, str]]:
         (source, destination)
         for source, destination in edges
         if prefix(source) + suffix(destination) > _MAX_LOCAL_CALL_DEPTH
+    }
+
+
+def _callee_limit_exceeded_pairs(edges: set[tuple[str, str]]) -> set[tuple[str, str]]:
+    """Return acyclic edges inside any call tree with too many unique called workflows."""
+
+    successors: dict[str, set[str]] = {}
+    for source, destination in edges:
+        successors.setdefault(source, set()).add(destination)
+        successors.setdefault(destination, set())
+    bits = {node: 1 << index for index, node in enumerate(successors)}
+
+    # Each workflow may be a top-level caller. Bitset reachability visits every edge
+    # once; the root itself is not one of its own called workflows.
+    callee_memo: dict[str, int] = {}
+
+    def callees(node: str) -> int:
+        if node not in callee_memo:
+            reached = 0
+            for child in successors[node]:
+                reached |= bits[child] | callees(child)
+            callee_memo[node] = reached
+        return callee_memo[node]
+
+    exceeding_trees = 0
+    for node in successors:
+        reached = callees(node)
+        if reached.bit_count() > _MAX_UNIQUE_CALLED_WORKFLOWS:
+            exceeding_trees |= bits[node] | reached
+    return {
+        (source, destination) for source, destination in edges if exceeding_trees & bits[source]
     }

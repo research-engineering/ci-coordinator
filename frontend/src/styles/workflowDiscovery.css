@@ -198,6 +198,14 @@
   overflow-wrap: anywhere;
   white-space: normal;
 }
+.workflow-call-list {
+  min-width: 220px;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  list-style: none;
+}
 .compact-facts {
   min-width: 180px;
   margin: 0;
