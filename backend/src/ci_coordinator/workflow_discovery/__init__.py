@@ -3,8 +3,10 @@
 from ci_coordinator.workflow_discovery.adoption import (
     ADOPTION_NON_CLAIMS,
     AdoptionAssessment,
+    AdoptionRequiredChange,
     AdoptionState,
     RecommendedAdapter,
+    SupportProfileId,
     assess_workflow_adoption,
 )
 from ci_coordinator.workflow_discovery.adoption_target import (
@@ -38,6 +40,7 @@ from ci_coordinator.workflow_discovery.summary import JobSummary, WorkflowSummar
 __all__ = [
     "ADOPTION_NON_CLAIMS",
     "AdoptionAssessment",
+    "AdoptionRequiredChange",
     "AdoptionState",
     "AdoptionTargetJob",
     "AdoptionTargetProjection",
@@ -52,6 +55,7 @@ __all__ = [
     "RecommendedAdapter",
     "RepositoryIdentity",
     "RepositoryWorkflowSnapshot",
+    "SupportProfileId",
     "Unknown",
     "WorkflowDiscoveryCompleted",
     "WorkflowDiscoveryForbidden",

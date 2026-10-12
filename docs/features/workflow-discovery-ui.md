@@ -174,6 +174,18 @@ paged assertion and unknown ledgers with category and provenance.
 Safety-critical unknowns keep dynamic planning disabled. An unknown that affects
 provider signal identity also blocks policy bytes.
 
+The adoption readiness table additionally shows, per workflow, its
+[support profile](universal-workflow-adoption.md#91-support-profile) or an
+unadmitted-profile warning, the unknowns whose provenance path is that exact
+workflow (field and reason, revealed on demand), and the computed
+[consumer changes](universal-workflow-adoption.md#92-unknown-semantics-and-minimal-consumer-changes)
+as inert text. The browser rejects an assessment whose unknowns differ from the
+exact-path report unknowns, whose consumer changes do not equal its
+consumer-actionable blockers, whose invocation-classifier change names an id
+other than the registry-fixed `ci-invocation`, or whose null profile lacks the
+explicit `support_profile_unknown` blocker. Owner-chosen control identities are
+shown by role, never as a concrete job id.
+
 ## Proposal Contract
 
 Generate a `ci-repository-policy/v1` source only when one workflow and one
@@ -352,6 +364,7 @@ transport module, not by workflow discovery.
 | Bounded parser and exact-commit GitHub acquisition | Source capability; exact-source witnesses required. |
 | Inventory, graph, unknown and proposal UI without activation controls | Source capability; browser evidence remains target-bound. |
 | Entrypoint/component projection from triggers and call edges | Source capability; native frontend and browser witnesses remain to run. |
+| Adoption support profile, exact-path unknowns and computed consumer changes | Source capability; native backend, frontend and browser witnesses remain to run. |
 | Application, extension-service and reporting-service synthetic archetype replays | Required coverage; no former private replay receipt or executed synthetic run is claimed. |
 | Durable scan history | Deferred; current discovery remains request-scoped. |
 | Semantic diff and affirmative review handoff to epoch registration | Non-activating source capability. |

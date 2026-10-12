@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Literal, Self
+from typing import Final, Literal, Self
 
 from ci_coordinator.kernel import utf16_sort_key
 from ci_coordinator.workflow_discovery._validation import (
@@ -16,6 +16,9 @@ from ci_coordinator.workflow_discovery._validation import (
 type AdoptionTargetProjectionStatus = Literal["absent", "available", "invalid", "unavailable"]
 
 _JOB_ID = re.compile(r"[A-Za-z_][A-Za-z0-9_-]{0,127}")
+# The target registry fixes the invocation classifier identity; workflow
+# discovery may not import that owner, so a test pins this value to it.
+INVOCATION_CLASSIFIER_JOB_ID: Final = "ci-invocation"
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,7 +64,8 @@ class AdoptionTargetWorkflow:
             sorted(set(execution_job_ids), key=utf16_sort_key)
         ):
             raise ValueError("adoption target execution jobs must be non-empty and canonical")
-        _require_job_id(self.invocation_job_id, "adoption target invocation classifier job")
+        if self.invocation_job_id != INVOCATION_CLASSIFIER_JOB_ID:
+            raise ValueError("adoption target invocation classifier job must use the fixed id")
         _require_job_id(self.plan_request_job_id, "adoption target plan request job")
         _require_job_id(self.plan_job_id, "adoption target plan job")
         _require_job_id(self.gate_job_id, "adoption target gate job")
