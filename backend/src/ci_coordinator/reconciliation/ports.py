@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Protocol
 
 from ci_coordinator.execution_orchestration import ProviderSignal
-from ci_coordinator.reconciliation.check_summary import CheckSummary
 from ci_coordinator.reconciliation.contract import ReconciliationContract
 from ci_coordinator.reconciliation.convergence import (
     ReconciliationAttemptClaim,
@@ -59,10 +58,6 @@ class ReconciliationPersistence(Protocol):
     ) -> (
         ReconciliationConvergenceState | ReconciliationClaimLost | ReconciliationTerminalRequired
     ): ...
-
-
-class ReconciliationPublisher(Protocol):
-    async def publish(self, summary: CheckSummary, *, revision: int) -> None: ...
 
 
 class ReconciliationPoller(Protocol):

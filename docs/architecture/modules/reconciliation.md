@@ -232,6 +232,12 @@ gate. Missing shard manifest or capacity evidence does not erase an already
 proved fallback gate. If target authority is unavailable, the runtime records
 no reconciliation subject rather than inventing a provider identity.
 
+The reconciliation package declares no provider-write port. By provisional
+owner decision (2026-10-11), CI-056 removed the unconsumed
+`ReconciliationPublisher` protocol and its `CheckSummary` projection. A future
+provider check write needs its own generation-fenced effect design under
+CI-038/CI-047 rather than this retired port.
+
 The scheduler is process-local single-flight. A later interval starts only
 after the accepted round terminates. Startup readiness succeeds only after one
 successful round; a later failed round makes readiness false until recovery.
