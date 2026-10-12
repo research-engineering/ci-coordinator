@@ -288,6 +288,94 @@ def test_history_projection_prefix_never_acquires_exception_ownership(
     )
 
 
+# Built from parts so this source never contains the path shape the policy rejects.
+_WORKSTATION_RULE = "workstation-home-path"
+_MACOS_HOME = "/" + "Users"
+_WINDOWS_HOME = "C:" + "\\" + "Users" + "\\"
+_GRYPE_STATUS_OWNER = "scripts/tests/test_release_grype_db_status.json"
+
+
+def _workstation_findings(result: ScanSummary, file: str) -> list[dict[str, int | str]]:
+    return [
+        item
+        for item in result["locations"]
+        if item["file"] == file and item["rule"] == _WORKSTATION_RULE
+    ]
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        f'cache = "{_MACOS_HOME}/alice/Library/Caches/tool"\n',
+        f"file://{_MACOS_HOME}/alice/report.json\n",
+        f"C:{_MACOS_HOME}/alice/work\n",
+        _WINDOWS_HOME + "Alice Example\\AppData\n",
+        json.dumps({"path": _WINDOWS_HOME + "alice\\work"}) + "\n",
+    ],
+)
+def test_workstation_home_path_with_user_segment_is_rejected(
+    tmp_path: Path, binary: Path, content: str
+) -> None:
+    root, _ = _repository(tmp_path / "source")
+    (root / "notes.txt").write_text(content, encoding="utf-8")
+    assert _workstation_findings(_scan(root, binary), "notes.txt")
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "HOME=/home/alice\nmount: /home/vscode/.local/share/mise\n",
+        f"https://docs.example.test{_MACOS_HOME}/alice/guide\n",
+        f"GET {_MACOS_HOME.lower()}/alice/repos\n",
+        f"the macOS {_MACOS_HOME} directory and {_MACOS_HOME}/\n",
+    ],
+)
+def test_linux_url_and_userless_paths_are_not_workstation_homes(
+    tmp_path: Path, binary: Path, content: str
+) -> None:
+    root, _ = _repository(tmp_path / "source")
+    (root / "notes.txt").write_text(content, encoding="utf-8")
+    assert _scan(root, binary)["findings"] == 0
+
+
+def test_grype_cache_placeholder_is_admitted_only_unchanged_in_its_owner(
+    tmp_path: Path, binary: Path
+) -> None:
+    root, _ = _repository(tmp_path / "source")
+    payload = (secret_scan.ACTION_ROOT.parents[2] / _GRYPE_STATUS_OWNER).read_bytes()
+    owner = root / _GRYPE_STATUS_OWNER
+    owner.parent.mkdir(parents=True)
+    owner.write_bytes(payload)
+    assert _scan(root, binary)["findings"] == 0
+    foreign = root / "foreign" / _GRYPE_STATUS_OWNER
+    foreign.parent.mkdir(parents=True)
+    foreign.write_bytes(payload)
+    result = _scan(root, binary)
+    assert _workstation_findings(result, "foreign/" + _GRYPE_STATUS_OWNER)
+    assert not _workstation_findings(result, _GRYPE_STATUS_OWNER)
+    foreign.unlink()
+    changed = payload.replace(b"/test/", b"/alice/")
+    assert changed != payload
+    owner.write_bytes(changed)
+    assert _workstation_findings(_scan(root, binary), _GRYPE_STATUS_OWNER)
+
+
+def test_removed_workstation_home_path_remains_visible_in_required_history(
+    tmp_path: Path, binary: Path
+) -> None:
+    root, base = _repository(tmp_path / "source")
+    (root / "report.txt").write_text(f"{_MACOS_HOME}/alice/report\n", encoding="utf-8")
+    _commit(root, "add workstation path fixture")
+    (root / "report.txt").unlink()
+    head = _commit(root, "remove workstation path fixture")
+    assert _scan(root, binary)["findings"] == 0
+    result = _scan(root, binary, history=True, base=base, head=head)
+    assert any(
+        item["rule"] == _WORKSTATION_RULE and item["scope"] == "history"
+        for item in result["locations"]
+    )
+
+
 @pytest.mark.parametrize("base,head", [("", ""), ("bad", "bad"), ("0" * 40, "1" * 40)])
 def test_missing_bad_or_zero_required_history_cannot_be_clean(
     tmp_path: Path, binary: Path, base: str, head: str

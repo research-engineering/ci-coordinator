@@ -13,3 +13,11 @@ materials that retain their own licenses:
   The local copy escapes two description characters and adds a final newline;
   validation semantics are unchanged. See docs/specs/ci-coordinator-release/
   overview.md and SPDX-LICENSE.txt for provenance and license terms.
+
+Container images built from the Dockerfile also redistribute third-party
+software under its own licenses: Ubuntu packages (copyright files under
+/usr/share/doc and /usr/share/common-licenses), the CPython runtime, installed
+Python distributions with their package metadata, and JavaScript dependencies
+compiled into the operator-UI bundle. The SPDX SBOM attested for a published
+image lists the packages its scanner identifies; it is not a complete
+license-obligation inventory.
