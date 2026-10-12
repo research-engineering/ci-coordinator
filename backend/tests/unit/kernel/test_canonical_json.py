@@ -89,9 +89,12 @@ def test_recursive_object_order_is_invariant_across_deterministic_permutations()
 
 
 def test_orders_keys_by_unicode_codepoint() -> None:
-    value = {"\u00e4": 3, "\U0001f600": 4, "z": 2, "a": 1}
+    # U+E000 precedes astral keys by code point but follows them under UTF-16 order.
+    value = {"\u00e4": 3, "\U0001f600": 4, "\ue000": 5, "z": 2, "a": 1}
 
-    assert canonical_json(value) == '{"a":1,"z":2,"\u00e4":3,"\U0001f600":4}'.encode("utf8")
+    expected = '{"a":1,"z":2,"\u00e4":3,"\ue000":5,"\U0001f600":4}'.encode("utf8")
+
+    assert canonical_json(value) == expected
 
 
 @pytest.mark.parametrize(

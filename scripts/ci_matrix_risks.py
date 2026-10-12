@@ -44,9 +44,14 @@ CLASS_IDS = frozenset(
     for number in range(1, count + 1)
 )
 PROPERTY_IDS = frozenset(f"CI{number:02d}" for number in range(1, 26))
+# Unnumbered blueprint sections outside the 89-class denominator: Make, deep assurance, ecosystems.
+SECTION_IDS = frozenset({"8.1", "9.2", "9.3"})
 Text = Annotated[str, Field(min_length=1, max_length=2048)]
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Mode = Literal["pull-request", "merge-group", "manual", "scheduled", "release"]
+# ROADMAP CI-057 vocabulary; `applicability` keeps the finer evidence state.
+Disposition = Literal["covered", "confirmed-gap", "not-applicable", "unresolved"]
+ClosureCost = Literal["none", "small", "medium", "large", "external", "unknown"]
 
 
 class Record(BaseModel):
@@ -72,6 +77,11 @@ class RiskBinding(Record):
         return self
 
 
+class RiskCost(Record):
+    closure: ClosureCost
+    basis: Text
+
+
 class RiskCandidate(Record):
     candidateId: Text
     family: Literal["tool-class", "property"]
@@ -79,9 +89,11 @@ class RiskCandidate(Record):
     blueprintLine: Annotated[int, Field(ge=1, le=1031)]
     risk: Text
     applicability: Literal["covered", "partial", "deferred", "not-applicable", "unknown"]
+    disposition: Disposition
     rationale: Text
     ownerPath: Text
     revisitWhen: Text
+    cost: RiskCost
     bindings: list[RiskBinding]
 
     @model_validator(mode="after")
@@ -90,10 +102,27 @@ class RiskCandidate(Record):
             raise ValueError("covered or partial risk needs an existing requirement assertion")
         if self.applicability == "not-applicable" and self.bindings:
             raise ValueError("inapplicable risk cannot advertise configured proof")
+        terminal = self.applicability in {"covered", "not-applicable"}
+        admitted = {self.applicability} if terminal else {"confirmed-gap", "unresolved"}
+        if self.disposition not in admitted:
+            raise ValueError("ROADMAP disposition must project the admitted evidence state")
+        if (self.cost.closure == "none") != terminal:
+            raise ValueError("only covered or inapplicable risks have no closure cost")
+        if self.disposition == "confirmed-gap" and self.cost.closure == "unknown":
+            raise ValueError("a confirmed gap needs a sized closure cost")
         identities = [(row.requirementId, row.witnessPath, row.assertion) for row in self.bindings]
         if len(identities) != len(set(identities)):
             raise ValueError("risk assertion bindings must be unique")
         return self
+
+
+class SectionDisposition(Record):
+    section: Text
+    title: Text
+    blueprintLine: Annotated[int, Field(ge=1, le=1031)]
+    disposition: Literal["confirmed-gap", "not-applicable", "unresolved"]
+    rationale: Text
+    revisitWhen: Text
 
 
 class RiskCoverage(Record):
@@ -101,13 +130,16 @@ class RiskCoverage(Record):
     blueprintSha256: Literal["a5c4d775207a6de30ab392bbd7ed9c70c427f596a5d5c849889dd6e83d05556f"]
     candidateRows: Annotated[list[RiskCandidate], Field(min_length=114, max_length=114)]
     executionInputs: dict[Text, Digest]
-    unresolvedScope: Annotated[list[Text], Field(min_length=1)]
+    sectionDispositions: Annotated[list[SectionDisposition], Field(min_length=3, max_length=3)]
     nonClaims: Annotated[list[Text], Field(min_length=1)]
 
     @model_validator(mode="after")
     def complete_candidates(self) -> Self:
         if set(self.executionInputs) != EXECUTION_INPUTS:
             raise ValueError("risk execution inputs must bind the complete native consumer chain")
+        sections = [row.section for row in self.sectionDispositions]
+        if len(sections) != len(set(sections)) or set(sections) != SECTION_IDS:
+            raise ValueError("risk projection must disposition each unnumbered blueprint section")
         identities = [row.candidateId for row in self.candidateRows]
         if len(identities) != len(set(identities)) or set(identities) != CLASS_IDS | PROPERTY_IDS:
             raise ValueError("risk projection must retain all 89 classes and 25 properties")
@@ -223,15 +255,25 @@ def check(root: Path) -> dict[str, object]:
         "profileSha256": hashlib.sha256(raw).hexdigest(),
         "status": "admitted",
         "dispositions": dict(
+            sorted(Counter(row.disposition for row in profile.candidateRows).items())
+        ),
+        "evidenceStates": dict(
             sorted(Counter(row.applicability for row in profile.candidateRows).items())
         ),
         "assertionBindingCount": binding_count,
         "openCandidates": [
-            {"candidateId": row.candidateId, "disposition": row.applicability}
+            {
+                "candidateId": row.candidateId,
+                "disposition": row.disposition,
+                "evidenceState": row.applicability,
+                "closureCost": row.cost.closure,
+            }
             for row in profile.candidateRows
-            if row.applicability in {"partial", "deferred", "unknown"}
+            if row.disposition in {"confirmed-gap", "unresolved"}
         ],
         "semanticCompleteness": "not-established",
         "executionEvidence": "not-observed-by-static-admission",
-        "unresolvedScope": profile.unresolvedScope,
+        "sectionDispositions": {
+            row.section: row.disposition for row in profile.sectionDispositions
+        },
     }

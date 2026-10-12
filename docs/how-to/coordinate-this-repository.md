@@ -146,6 +146,9 @@ its registered command and its native execution modes, or explicitly records
 a partial, deferred, unknown or inapplicable disposition. Review the reason and
 revision trigger before treating a candidate as sufficiently covered. The
 89 tool classes and 25 domain properties are separate bounded inventories.
+Each row also carries its ROADMAP disposition and closure-cost class, and the
+three unnumbered blueprint sections have their own dispositions; the report
+lists every unresolved row and confirmed gap with its closure class.
 
 Input membership describes the predicate actually owned by the consumer: JSON
 syntax does not prove domain schemas; generated parity does not prove runtime

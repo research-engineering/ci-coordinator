@@ -9,9 +9,14 @@
       "blueprintLine": 316,
       "risk": "Required static checks are omitted or their effective source scope drifts",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The existing requirement-command admission rejects a missing exact tuple. Ruff is a configured native baseline; this assertion proves binding retention, not completeness of Ruff rules or their actual input set.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Rule-level adequacy needs a selected Ruff rule corpus with positive and negative fixtures plus an effective-input inventory under python.lint; no new tool."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-003",
@@ -38,9 +43,14 @@
       "blueprintLine": 317,
       "risk": "Type configuration or runtime scalar admission diverges from its owner",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Mypy configuration is present and its Python target is checked against the toolchain; runtime request-model tests reject noncanonical names and wrong scalar types. Neither is proof of arbitrary dynamic effects.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Bind rule-specific negative fixtures for mypy strictness and model construction; dynamic-effect closure remains a review limit."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-029",
@@ -83,9 +93,14 @@
       "blueprintLine": 318,
       "risk": "Installation uses undeclared dependencies or loses hash admission",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The native install witness assertion requires hash-checked strict synchronization and an offline no-dependency editable project install.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-006",
@@ -112,9 +127,14 @@
       "blueprintLine": 319,
       "risk": "Built distribution omits or changes requirement-owned resources",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Package inspection rejects missing or incorrect owned-resource cardinality. Runtime import, package surface and final-container startup remain separate native witnesses.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "small",
+        "basis": "Review and bind the existing runtime-import and final-container startup witnesses to this row; no new command."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-038",
@@ -141,9 +161,14 @@
       "blueprintLine": 320,
       "risk": "A legal-looking plan omits a required witness or weaker depth is accepted",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The existing planner asserts shared witnesses take the maximum required depth. This is one concrete domain law; the full domain assertion denominator is not derived from one test.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Derive the domain-law denominator from the core requirements and bind one assertion per independent law under python.test."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-009",
@@ -170,9 +195,14 @@
       "blueprintLine": 321,
       "risk": "Coverage execution silently narrows the declared backend population",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The coverage-wrapper assertion preserves complete pytest selection and branch measurement under the declared process bound. Coverage remains an observation, not adequacy proof.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-006",
@@ -199,9 +229,14 @@
       "blueprintLine": 322,
       "risk": "Application code imports forbidden transport or runtime authority",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Existing negative import probes reject infrastructure and maintained HTTP-client authority at the application boundary. Architecture semantic decomposition still needs its repository-owned proof.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Semantic decomposition proof belongs to CI-056 under the module-ownership profile; the import-boundary command already exists."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-002",
@@ -244,9 +279,14 @@
       "blueprintLine": 323,
       "risk": "Selected examples fail to expose a domain counterexample",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "An existing Hypothesis-backed API generator and independently falsified response oracle cover three named operations. This is not general property coverage of planning, canonicalization, leases or all inputs.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Revisit on a named independent law or state-machine counterexample outside the admitted generated API corpus.",
+      "cost": {
+        "closure": "large",
+        "basis": "General planning, canonicalization and lease properties need new Hypothesis state machines with an independent oracle per law."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-003",
@@ -273,9 +313,14 @@
       "blueprintLine": 324,
       "risk": "Producer and generated client contract drift",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The native assertion changes generated bytes and requires stale-contract rejection; coverage is the declared operator API projection, not all backend routes.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Requalify on route, DTO, generator, runtime or projection-scope changes.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-004",
@@ -302,9 +347,14 @@
       "blueprintLine": 325,
       "risk": "Invalid identity, role or scope reaches an effect-capable port",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Native controls assert unauthorized and invalid-scope requests are typed and effect-free. Full route/credential-plane closure remains a separate assertion inventory.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Reopen when any route, credential plane, request policy or port authority changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Complete the route and credential-plane assertion inventory under the existing runtime requirements and python.test."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-021",
@@ -331,9 +381,14 @@
       "blueprintLine": 326,
       "risk": "Generated requests satisfy the schema but violate request-to-port binding",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Schemathesis/Hypothesis already exercise exactly three declared operations. The independent oracle rejects consistently corrupted scope, actor, limit or call multiplicity. This does not cover every public endpoint.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Reopen when profile.OPERATIONS, schema, harness ports, generator or independent response oracle changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Each further schema-generated operation needs its own independent response oracle and fixture ports in the existing API exploration job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-003",
@@ -360,9 +415,14 @@
       "blueprintLine": 327,
       "risk": "Published request or response semantics change without an admitted version boundary",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "CORE-010 owns immutable published domains; UI-004 parity and CONTROL-009 exact route/profile guards exist. Those assertions do not compare every released consumer against the candidate API; no whole-API backward-compatibility claim is made. A release baseline and consumer compatibility policy remain to be admitted.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Revisit on public API/schema version changes or admission of a supported consumer baseline.",
+      "cost": {
+        "closure": "unknown",
+        "basis": "No owner-admitted release baseline or consumer compatibility policy exists; a comparison witness cannot be sized before that decision."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CONTROL-009",
@@ -405,9 +465,14 @@
       "blueprintLine": 328,
       "risk": "Upgrade or downgrade changes retained capability lineage or destroys retained data",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Real-PostgreSQL tests verify expand upgrade/downgrade and replay preserve the exact declaration chain. Full data-preservation and predecessor artifact rollback remain their own required witnesses.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Add existing-data preservation and predecessor-artifact rollback witnesses on real PostgreSQL; restore evidence remains CI-067."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-007",
@@ -434,9 +499,14 @@
       "blueprintLine": 329,
       "risk": "Expired issuance survives a database wait or excess privileges become available",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "A real PostgreSQL lock/deadline witness rejects expired issuance and asserts no plan or audit insert. This does not exhaust every transaction or privilege combination.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining transaction and privilege combinations into real-PostgreSQL witnesses under the existing persistence command."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-030",
@@ -463,9 +533,14 @@
       "blueprintLine": 330,
       "risk": "SQLAlchemy metadata changes without the corresponding migration",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "The Alembic environment supplies target_metadata and native compatibility/attestation witnesses already own live schema truth. A distinct autogenerate/check predicate requires proving incremental value and a disposable database profile; no absence of migration checks is claimed.",
       "ownerPath": "backend/alembic/env.py",
       "revisitWhen": "Revisit on a metadata/migration divergence not rejected by current attestation or when the schema owner admits an autogenerate parity gate.",
+      "cost": {
+        "closure": "medium",
+        "basis": "An Alembic autogenerate parity check needs a disposable database profile and proof of value beyond current attestation; not adopted."
+      },
       "bindings": []
     },
     {
@@ -475,9 +550,14 @@
       "blueprintLine": 331,
       "risk": "Handwritten SQL is syntactically wrong or violates an admitted style rule",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "The bootstrap SQL includes psql-specific commands and live provisioning has a native owner. A separate SQLFluff grammar and style policy are not admitted by this candidate mapping.",
       "ownerPath": "scripts/dev_environment/bootstrap_database.sql",
       "revisitWhen": "Revisit when handwritten SQL expands or an independently reproducible dialect/style gap is shown.",
+      "cost": {
+        "closure": "large",
+        "basis": "SQLFluff would add a tool and dialect policy for one psql bootstrap file; no counterexample is shown."
+      },
       "bindings": []
     },
     {
@@ -487,9 +567,14 @@
       "blueprintLine": 332,
       "risk": "Valid database operations exceed admitted latency, lock or capacity budgets",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "RUNTIME-036 has independent complete-metric and budget admission falsifiers. These consume synthetic signed measurements and do not measure EXPLAIN plans, query scale or migration lock duration. A representative disposable PostgreSQL performance corpus remains unqualified.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Revisit on measured hot-query or migration-lock risk, capacity-profile changes or admission of a representative performance fixture.",
+      "cost": {
+        "closure": "medium",
+        "basis": "CI-058 owns native EXPLAIN and cardinality witnesses. Five persistence integration files hold plan witnesses not bound here, and the logout-fence paths have none. Bind or add them under persistence requirements; tune only measured counterexamples."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-036",
@@ -532,9 +617,14 @@
       "blueprintLine": 340,
       "risk": "Promise ownership is missed by generic compilation or lint",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The static Promise corpus verifies the exact typed rule and severity on imported React overloads, thenables and socket promises. Other Biome/type/test predicates retain their native command owners; this is not complete async-lifetime proof.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "small",
+        "basis": "Bind the remaining Biome, type and unit predicates to their existing frontend.quality assertions."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-006",
@@ -561,9 +651,14 @@
       "blueprintLine": 341,
       "risk": "Production bundle serves changed or unlisted assets",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The existing manifest falsifier rejects changed or extra assets independently of filename shape; browser runtime and container startup are separate witnesses.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-014",
@@ -590,9 +685,14 @@
       "blueprintLine": 342,
       "risk": "A late response replaces the current UI generation or a collection failure is misreported as a killed mutant",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The current-snapshot test completes the new response before the abandoned response and requires object-identical preserved state for scope, limit, authority and refresh changes. The mutation-report falsifier distinguishes actual assertion failure from collection failure. Full mutation adequacy is not inferred.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Mutation adequacy needs per-oracle frontend mutants in the existing governed mutation route."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-015",
@@ -635,9 +735,14 @@
       "blueprintLine": 343,
       "risk": "UI controls or evidence views fail accessible navigation or layout",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Playwright exercises the assembled UI with intercepted API fixtures and asserts no axe violations. Automated accessibility is not full WCAG or connected-backend proof.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "large",
+        "basis": "Full WCAG conformance needs assistive-technology evaluation and connected-backend browser fixtures beyond automated axe checks."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-005",
@@ -664,9 +769,14 @@
       "blueprintLine": 344,
       "risk": "Browser recovery or mutation behavior diverges across identity, API and persistence boundaries",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The required disposable Keycloak/browser/application/PostgreSQL budget-policy witness checks a real authenticated mutation, reload, independently read persisted bytes and audit, exact replay and rejected effects. Other administrator operations and production identity integration remain separate obligations. Source binding is configured, not execution proof.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Revisit when a controlled connected administrator fixture and its environment authority are admitted.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Further administrator operations reuse the admitted connected Keycloak, browser and PostgreSQL fixture; production identity integration is CI-062."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-024",
@@ -709,9 +819,14 @@
       "blueprintLine": 345,
       "risk": "Dynamic entrypoints are incorrectly deleted or unused code hides ownership drift",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "A reliable Knip entry graph must include generated contracts, browser, dev and build roots. No standalone unused-code contract is admitted; tool absence is not treated as a production defect.",
       "ownerPath": "frontend/package.json",
       "revisitWhen": "Revisit when an owner identifies an unused-code risk and supplies complete entrypoint and dynamic-reference dispositions.",
+      "cost": {
+        "closure": "large",
+        "basis": "Knip needs a complete entrypoint graph for generated contracts, browser, development and build roots; new tool."
+      },
       "bindings": []
     },
     {
@@ -721,9 +836,14 @@
       "blueprintLine": 346,
       "risk": "A generic cycle signal is promoted to an unauthorized architecture failure",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "Repository-owned capability isolation and decomposition policy already decide forbidden co-ownership. A dependency-cruiser profile requires a unique forbidden-edge predicate and independent counterexample.",
       "ownerPath": "docs/architecture/cross-cutting/module-ownership-and-decomposition.md",
       "revisitWhen": "Revisit when a frontend dependency rule cannot be enforced by the current owner and a safe rule-specific corpus is available.",
+      "cost": {
+        "closure": "large",
+        "basis": "dependency-cruiser needs a rule-specific forbidden-edge predicate and corpus; new tool."
+      },
       "bindings": []
     },
     {
@@ -733,9 +853,14 @@
       "blueprintLine": 347,
       "risk": "Valid assets are changed or missing, or rendering exceeds an unadmitted budget",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "UI-014 tests bind every served asset to the generated manifest and reject changed or extra assets. CSS static coverage and browser correctness do not establish a bundle-size or user-perceived performance budget; those operands remain owner decisions.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Revisit when UI owners admit bundle/performance limits or expose a CSS rule gap.",
+      "cost": {
+        "closure": "unknown",
+        "basis": "UI owners have not admitted bundle or user-perceived performance limits; cost follows that decision."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-014",
@@ -762,9 +887,14 @@
       "blueprintLine": 382,
       "risk": "Extensionless or nested shell inputs escape lint admission",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The repository test requires every tracked shell/shebang source to be admitted by the standalone dialect inventory; native ShellCheck is already part of workflow.lint.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-011",
@@ -791,9 +921,14 @@
       "blueprintLine": 383,
       "risk": "An unowned formatting convention generates noise or rewrites intentional shell layout",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "Dialect-aware ShellCheck exists; a separate shfmt formatting policy and accepted authored-source corpus are not admitted by this row.",
       "ownerPath": "scripts/workflow_lint.py",
       "revisitWhen": "Revisit when the shell owner adopts a precise formatting convention with a check-only migration plan.",
+      "cost": {
+        "closure": "large",
+        "basis": "shfmt is absent from the pinned workflow-lint image; adoption needs a new pinned tool and an owner formatting policy for two shell sources."
+      },
       "bindings": []
     },
     {
@@ -803,9 +938,14 @@
       "blueprintLine": 384,
       "risk": "Distributed or fixture workflows are missing from syntax analysis",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "Native workflow wrapper tests reject incomplete and nonregular workflow/shell inputs and preserve the locked actionlint/zizmor closure.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-011",
@@ -832,9 +972,14 @@
       "blueprintLine": 385,
       "risk": "Workflow analysis loses its pinned analyzer or least-privilege control scope",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Existing tests require exact linters in the provider quality gate. Offline analyzer success does not establish transitive action download safety or every provider security property.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "external",
+        "basis": "Transitive action download safety and online provider properties need online audits or provider evidence; the offline analyzer already runs."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-011",
@@ -861,9 +1006,14 @@
       "blueprintLine": 386,
       "risk": "Duplicate keys or nonfinite values yield ambiguous configuration",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "Native JSON admission has negative ambiguous-value cases under the existing quality owner; domain schema predicates remain separate.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-006",
@@ -890,9 +1040,14 @@
       "blueprintLine": 387,
       "risk": "Configuration files are omitted or interpreted under an unintended YAML contract",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The utility selects hidden and nested YAML and invokes the strict pinned parser. The selected assertion proves command/input selection; effective parser coverage is a separate correction concern and not inferred from suffix membership.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Revisit when YAML source roots, dialect, anchors, parser rules or effective-input policy change.",
+      "cost": {
+        "closure": "small",
+        "basis": "Bind an effective-parser assertion for hidden and nested YAML and the Actions `on` key in the existing yaml utility."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-012",
@@ -919,9 +1074,14 @@
       "blueprintLine": 388,
       "risk": "Untrusted or stale schema references change the admitted input language",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Pinned offline bundles and local reference checks are present. The selected negative assertion independently rejects changed provenance and remote references; this covers admitted schema families, not every vendor schema.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Requalify when a vendor schema, dialect, reference closure or configuration family changes.",
+      "cost": {
+        "closure": "small",
+        "basis": "Admit each further vendor schema family with a pinned offline bundle in the existing schemas utility."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-012",
@@ -948,9 +1108,14 @@
       "blueprintLine": 389,
       "risk": "TOML files are parseable but disagree with locked toolchain identity",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The toolchain-owner assertion parses authored mise configuration and lock data and enforces exact versions/platform identities. Arbitrary new TOML roots are not thereby proved consumed.",
       "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "small",
+        "basis": "Bind a rejection witness for an unconsumed TOML root to the existing configuration input admission."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-DEV-001",
@@ -977,9 +1142,14 @@
       "blueprintLine": 390,
       "risk": "Formatter policy is applied to generated lock data without an owner",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "Syntax and toolchain coherence have native owners. A separate Taplo formatting policy needs an authored-file scope and incremental benefit; generated locks are excluded from manual formatting.",
       "ownerPath": "mise.toml",
       "revisitWhen": "Revisit when an authored TOML formatting policy is adopted; preserve native lock bytes.",
+      "cost": {
+        "closure": "large",
+        "basis": "Taplo formatting is a new tool and authored-file policy; generated locks stay excluded."
+      },
       "bindings": []
     },
     {
@@ -989,9 +1159,14 @@
       "blueprintLine": 391,
       "risk": "A second task facade changes commands or versions silently",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The exact mise/lock assertion verifies installation and task projections, required dependency edges and supported platform sets.",
       "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-DEV-001",
@@ -1018,9 +1193,14 @@
       "blueprintLine": 392,
       "risk": "A Dockerfile is missed or native build-check warnings do not fail",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The native wrapper test requires all Dockerfile naming forms, the fixed builder and error=true. Builder execution/metadata/network behavior requires its actual provider run.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Revisit when Dockerfile inventory, context, frontend, builder or BuildKit output contract changes.",
+      "cost": {
+        "closure": "small",
+        "basis": "Candidate upgrade: the wrapper configuration is bound; review the native utility-docker build-check result before reclassifying."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-012",
@@ -1047,9 +1227,14 @@
       "blueprintLine": 393,
       "risk": "A scoped exception suppresses an unrelated Dockerfile finding",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Hadolint is already configured and its source-bound exception falsifier rejects changed source and unrelated warnings. Whole rule adequacy and actual execution remain distinct.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Revisit when Dockerfiles, Hadolint rules, version or exception bytes change.",
+      "cost": {
+        "closure": "small",
+        "basis": "Review rule-level uniqueness against Build checks and ShellCheck within the existing Hadolint configuration."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-012",
@@ -1076,9 +1261,14 @@
       "blueprintLine": 394,
       "risk": "Build assets or dependency artifacts differ from intended production inputs",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Frontend manifest tests independently reject nonproduction evidence; runtime container witnesses retain their separate provider authority. Docker context closure is not inferred from this asset assertion.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Docker build-context closure needs a context manifest assertion for ignore rules, stages and platform beside container.smoke."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-006",
@@ -1105,9 +1295,14 @@
       "blueprintLine": 395,
       "risk": "Malformed Compose/provider configuration reaches mutation",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The native Compose test rejects unsupported or malformed Compose before mutation; early offline schema checks supplement it and do not establish successful startup.",
       "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "small",
+        "basis": "Bind a synthetic-environment Compose resolution assertion; startup remains CF15."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-DEV-003",
@@ -1134,9 +1329,14 @@
       "blueprintLine": 396,
       "risk": "Failed admission or shutdown is crossed by later provider mutations",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Native lifecycle tests require up to stop at failed admission/runtime boundaries. Real stack health, roles, watch and cleanup still require their explicit service witnesses.",
       "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Bind explicit health, role, watch and cleanup assertions from the native development stack job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-DEV-003",
@@ -1163,9 +1363,14 @@
       "blueprintLine": 397,
       "risk": "Devcontainer configuration gains host Docker authority or unpinned tool state",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The existing configuration assertion forbids host Docker authority and pins dependencies. This source witness is distinct from the provider-backed devcontainer verification.",
       "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Review and bind the provider-backed devcontainer verification assertions to this row."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-DEV-007",
@@ -1192,9 +1397,14 @@
       "blueprintLine": 398,
       "risk": "Documents or local links escape the rooted authority graph",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The native graph falsifier rejects unreachable Markdown; other graph tests retain strict URL, symlink, UTF-8 and resource boundaries.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-009",
@@ -1221,9 +1431,14 @@
       "blueprintLine": 399,
       "risk": "Style findings become an unauthorized semantic or historical-document rewrite",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "Documentation graph, diagrams and spelling are existing independent owners. A Markdown formatting/style subset requires an owner-approved policy and historical/generated exclusions.",
       "ownerPath": "docs/architecture/cross-cutting/documentation-authority.md",
       "revisitWhen": "Revisit when a concrete readability/style rule is adopted with a source-preserving remediation path.",
+      "cost": {
+        "closure": "large",
+        "basis": "markdownlint would add a tool with executable configuration; it needs an owner-approved style subset and historical or generated exclusions."
+      },
       "bindings": []
     },
     {
@@ -1233,9 +1448,14 @@
       "blueprintLine": 400,
       "risk": "Temporary network errors are mistaken for permanently broken authoritative references",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "The documentation owner syntax-admits external HTTPS links without fetching in the deterministic gate. A scheduled reachability lane requires bounded egress and a retry/unknown policy.",
       "ownerPath": "docs/architecture/cross-cutting/documentation-authority.md",
       "revisitWhen": "Revisit when external-link freshness is owner-required and scheduled egress plus non-actionable failure handling are admitted.",
+      "cost": {
+        "closure": "large",
+        "basis": "A scheduled lychee lane needs bounded egress plus retry and unknown-result policy; new tool and job."
+      },
       "bindings": []
     },
     {
@@ -1245,9 +1465,14 @@
       "blueprintLine": 401,
       "risk": "Rule syntax or alert fixtures drift from the admitted Prometheus runtime",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The wrapper test binds immutable promtool, read-only inputs and no network. Expected-alert semantics require the native promtool fixture execution; YAML validity is not a substitute.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "small",
+        "basis": "Bind the native promtool expected-alert fixture assertion to this row."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-015",
@@ -1274,9 +1499,14 @@
       "blueprintLine": 402,
       "risk": "Version projection drift is hidden by coincidental text equality",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Native toolchain tests distinguish Python minor-target projection from exact patch pins. This is a named-value relation and does not grep historical prose into one version.",
       "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Each further named-value relation needs its own authoritative-operand comparison."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-DEV-001",
@@ -1303,9 +1533,14 @@
       "blueprintLine": 403,
       "risk": "Input identity or file kind changes without renewed admission",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Native input falsifiers reject leaf/parent symlinks, missing files, directories and binary data. The 8e50b717 review epoch still leaves the separate early mode-change fallback concern for the correction batch; this row does not declare that correction proven.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Revisit when index path/mode identity, source roots, generated provenance or effective-input admission changes.",
+      "cost": {
+        "closure": "small",
+        "basis": "Re-adjudicate the early mode-change concern against the current self-consumer path-and-mode qualification (CI01), then bind executable-bit and ignore-pattern assertions."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-012",
@@ -1332,9 +1567,14 @@
       "blueprintLine": 415,
       "risk": "One supported runtime or dependency lock is absent from the advisory scan",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The native command assertion covers supported Python versions and the frontend lock. Fresh-on-execution is not a periodic deployed-artifact requalification claim.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Revisit when supported runtime/platform/package scopes, feed contracts or freshness cadence change.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Deployed-artifact periodic requalification is the separate advisory workflow; binding it needs a scheduled execution mode admitted by this ledger."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-006",
@@ -1361,9 +1601,14 @@
       "blueprintLine": 416,
       "risk": "PR dependency changes bypass their immutable provider action",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The tracked workflow assertion binds dependency-review to its immutable action. Entitlement, provider graph completeness and live run evidence were not read in this lane.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "external",
+        "basis": "Dependency-review entitlement, provider graph completeness and live runs need provider or administrator evidence."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-011",
@@ -1390,9 +1635,14 @@
       "blueprintLine": 417,
       "risk": "Configured provider security analysis is mistaken for current complete results",
       "applicability": "unknown",
+      "disposition": "unresolved",
       "rationale": "The matrix delegates this check to provider-owned default setup. No source test can establish its current languages, query suite, trigger outcomes or alert completeness.",
       "ownerPath": "proofkit/ci-matrix.v1.json",
       "revisitWhen": "Revisit using an exact provider configuration and analysis snapshot bound to source/run/query identities.",
+      "cost": {
+        "closure": "external",
+        "basis": "The exact CodeQL default-setup configuration and analysis snapshot need provider or administrator evidence (CI-064)."
+      },
       "bindings": []
     },
     {
@@ -1402,9 +1652,14 @@
       "blueprintLine": 418,
       "risk": "Provider or offline scanning is assumed to cover unobserved patterns and history",
       "applicability": "unknown",
+      "disposition": "unresolved",
       "rationale": "The matrix names provider secret scanning and push protection. This read-only source lane does not requalify provider pattern/history coverage or an offline custom-rule delta. Scanner absence is not an absence-of-checks claim.",
       "ownerPath": "proofkit/ci-matrix.v1.json",
       "revisitWhen": "Revisit with authorized provider evidence and a same-corpus assessment of any proposed offline incremental scope.",
+      "cost": {
+        "closure": "external",
+        "basis": "Provider secret scanning and push protection need administrator evidence (CI-064). The repository-owned Gitleaks source and history action is not bound to a requirement assertion in this ledger; binding it is a separate small step."
+      },
       "bindings": []
     },
     {
@@ -1414,9 +1669,14 @@
       "blueprintLine": 419,
       "risk": "A fresh scan belongs to another image or silently suppresses actionable vulnerabilities",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The existing release owner binds image/index/child/platform, pinned scanner and database, and rejects effective caller suppressions. Covered means the named admission predicate has configured negative assertions; release execution and unknown-vulnerability absence are not claimed. Periodic rechecks discover the latest successful release, bind its immutable image to verified source and run certificates, and reuse the current image vulnerability policy. This does not inventory every deployed or retained historical image.",
       "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
       "revisitWhen": "Requalify scanner, database schema, distro, platform, image relation or suppression defaults.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RELEASE-001",
@@ -1475,9 +1735,14 @@
       "blueprintLine": 420,
       "risk": "Foreign or structurally vacuous attestations are accepted as release evidence",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "Native predicate admission rejects invalid provenance dimensions and non-meaningful SPDX package evidence. Source assertions are executed by Full Check; real attestations remain owned by the separate release workflow.",
       "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
       "revisitWhen": "Revisit on signer, workflow, subject, predicate schema or release generation changes.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RELEASE-001",
@@ -1504,9 +1769,14 @@
       "blueprintLine": 421,
       "risk": "A second SBOM or scanner duplicates the admitted release baseline without new evidence",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "The release owner already supplies BuildKit SPDX and Grype. Additional Syft/inventory diversity requires a concrete omitted package/source predicate; schema validity does not prove inventory completeness.",
       "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
       "revisitWhen": "Revisit when release package evidence exposes a specific inventory gap or independent inventory requirement.",
+      "cost": {
+        "closure": "large",
+        "basis": "Additional Syft and Grype inventory is a new tool without a demonstrated omitted-package predicate."
+      },
       "bindings": []
     },
     {
@@ -1516,9 +1786,14 @@
       "blueprintLine": 422,
       "risk": "Generic SAST duplicates current rules or loses a repository-specific boundary",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "Repository-owned import gates and provider CodeQL already supply distinct predicates. A Semgrep rulepack needs a named uncovered pattern and independent positive/negative corpus.",
       "ownerPath": "docs/architecture/cross-cutting/module-ownership-and-decomposition.md",
       "revisitWhen": "Revisit upon a concrete rule-level gap in existing static or native witnesses.",
+      "cost": {
+        "closure": "large",
+        "basis": "A Semgrep rulepack is a new tool requiring a named uncovered pattern and an independent corpus."
+      },
       "bindings": []
     },
     {
@@ -1528,9 +1803,14 @@
       "blueprintLine": 423,
       "risk": "The owned Go helper dependency universe is omitted or build-selected files are lost",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Go vet, Staticcheck and govulncheck are already configured for each owned Go module and test sources. The frozen baseline still contains the separately reviewed cgo effective-input admission gap; correction evidence must be rebound. Native Go source discovery now rejects cgo and excluded or mismatched source cohorts before each analyzer; native import variants have a separate GitHub witness.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Revisit on Go modules, build constraints, cgo, platforms, advisory inputs or the current admission correction.",
+      "cost": {
+        "closure": "small",
+        "basis": "Native Go discovery now rejects cgo before analysis; rebind that correction evidence after reviewing the native Go utility run."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-012",
@@ -1573,9 +1853,14 @@
       "blueprintLine": 424,
       "risk": "A structurally valid SBOM is mistaken for license approval",
       "applicability": "unknown",
+      "disposition": "unresolved",
       "rationale": "Release SBOM requirements validate structure and provenance. The finite admitted requirement sources do not establish a license allow/deny policy or an authorized legal decision owner; no legal permissibility is inferred. Selecting ScanCode cannot supply that missing policy.",
       "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
       "revisitWhen": "Revisit when an authorized owner admits license obligations, unknown-license disposition and the dependency/source distribution scope.",
+      "cost": {
+        "closure": "unknown",
+        "basis": "Needs an authorized legal-owner license policy (CI-064); no scanner choice can supply it."
+      },
       "bindings": []
     },
     {
@@ -1585,9 +1870,14 @@
       "blueprintLine": 425,
       "risk": "Valid attestations belong to a foreign signer workflow or image",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The existing release verifier architecture uses a no-checkout job and never executes the image. Exact provider verification requires the separate release run and is not replaced by local structural assertions.",
       "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
       "revisitWhen": "Requalify on changes to the named owner, assertion, source scope, command or dependency epoch.",
+      "cost": {
+        "closure": "external",
+        "basis": "Exact provider attestation verification is the separate release run."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RELEASE-001",
@@ -1614,9 +1904,14 @@
       "blueprintLine": 426,
       "risk": "A suppression or VEX statement erases an unresolved vulnerability",
       "applicability": "deferred",
+      "disposition": "unresolved",
       "rationale": "Current release policy intentionally rejects caller VEX/ignore/exclusion suppressions. A positive waiver lifecycle is not admitted; adding one requires a separate owner decision and exact artifact/rule/expiry binding. The separate scheduled advisory workflow rechecks unchanged lock and released-image subjects; receipt acceptance binds source, every required scope and a 36-hour maximum observation age. Missed scheduler execution and notification subscriptions remain operational obligations.",
       "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
       "revisitWhen": "Revisit only when the release owner admits a concrete exception workflow; retain unsuppressed raw verdicts meanwhile.",
+      "cost": {
+        "closure": "unknown",
+        "basis": "A positive waiver lifecycle needs a release-owner decision; current policy rejects suppressions."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RELEASE-001",
@@ -1659,9 +1954,14 @@
       "blueprintLine": 476,
       "risk": "Missing stage, stack or asset in a synthesized cloud assembly",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The admitted product/build surface owns a Python service, React UI, OCI images and Compose development resources; AWS CDK cloud-assembly synthesis is not an adopted coordinator capability. This disposition is specific to CDK assembly, not generic build correctness.",
       "ownerPath": "README.md",
       "revisitWhen": "An admitted CDK stage/stack/asset assembly or infrastructure source root is added.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1671,9 +1971,14 @@
       "blueprintLine": 477,
       "risk": "Valid infrastructure syntax hides forbidden IAM or network authority",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The frozen coordinator capability and build inventory has no adopted CloudFormation/CDK deployment contract. Docker, GitHub and runtime authorization remain separately applicable.",
       "ownerPath": "README.md",
       "revisitWhen": "A repository-owned synthesized CloudFormation or AWS policy surface is adopted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1683,9 +1988,14 @@
       "blueprintLine": 478,
       "risk": "Runtime or browser configuration exposes secrets or bypasses authentication",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Native development image assertions require owner-only secret files to be copied into private tmpfs and constrain runtime identity. This does not prove a deployment proxy or protected-stage end-to-end configuration.",
       "ownerPath": "docs/specs/ci-coordinator-developer-environment/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "external",
+        "basis": "Deployment proxy and protected-stage configuration need an authorized environment (CI-062)."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-DEV-009",
@@ -1712,9 +2022,14 @@
       "blueprintLine": 479,
       "risk": "A workflow publishes or verifies a foreign source/image generation",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Release assertions bind exact source and registry digest; deployment rollout, startup and rollback are separate environment-specific witnesses and are not inferred from build success.",
       "ownerPath": "docs/specs/ci-coordinator-release/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "external",
+        "basis": "Rollout, startup and rollback evidence are environment-specific (CI-062, CI-068)."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RELEASE-001",
@@ -1741,9 +2056,14 @@
       "blueprintLine": 480,
       "risk": "Telemetry labels or missing data misrepresent authority or leak sensitive values",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Prometheus has a pinned native rule/test command. CloudWatch/OTel-specific dimensions are not inherited; exact runtime telemetry and redaction retain their current owners.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Runtime telemetry units and redaction need assertions under the observability owner (CI-066)."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-015",
@@ -1770,9 +2090,14 @@
       "blueprintLine": 481,
       "risk": "A restored dataset exposes PII or breaks foreign-key closure",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The admitted database lifecycle owns coordinator evidence and migrations; it does not admit a production-data anonymization/restore transformation. Migration retention requirements remain applicable under DB01/CI13.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "A database-copy or anonymization product/operations capability is admitted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1782,9 +2107,14 @@
       "blueprintLine": 482,
       "risk": "A backup restore drops retained evidence or publishes a partial database",
       "applicability": "unknown",
+      "disposition": "confirmed-gap",
       "rationale": "Migration rollback/retention is admitted, but it does not itself prove backup restore or an operational recovery-point/time contract. This bounded lane has no environment-bound restore evidence and does not claim the operation is absent.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Revisit when the persistence/operations owner identifies the supported backup/restore procedure and exact recovery/cutover witnesses.",
+      "cost": {
+        "closure": "external",
+        "basis": "CI-067 makes backup, restore and RPO/RTO evidence a production-admission obligation. Capacity-qualification tests admit restore receipts, but no environment-bound restore witness exists; a fresh database or downgrade is not restore proof."
+      },
       "bindings": []
     },
     {
@@ -1794,9 +2124,14 @@
       "blueprintLine": 483,
       "risk": "A database surrogate or different dialect is mistaken for PostgreSQL authority",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The coordinator owns PostgreSQL and real privilege tests reject PUBLIC/schema/append-only violations. Other consumers SQL Server/Oracle/Fabric/BigQuery clauses are outside the adopted backend runtime.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining PostgreSQL privilege combinations under the existing real-privilege tests."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-015",
@@ -1823,9 +2158,14 @@
       "blueprintLine": 484,
       "risk": "A read operation changes actor, repository, cursor or query scope",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The request oracle rejects a consistently changed port and response scope. This is a fixed repository-query contract, not admission of arbitrary untrusted SQL or generic query rewriting.",
       "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Each further fixed repository query needs its own scope oracle."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-003",
@@ -1852,9 +2192,14 @@
       "blueprintLine": 485,
       "risk": "Tabular import/export changes decimals, dates, encoding or inert text",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The current finite versioned API/configuration contracts exchange strict JSON and retained JSON/YAML source, not CSV/XLSX conversion. This disposition is scoped to tabular conversion, not all exports.",
       "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
       "revisitWhen": "A CSV/XLSX import/export operation or spreadsheet artifact is admitted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1864,9 +2209,14 @@
       "blueprintLine": 486,
       "risk": "Provider-only or uploaded facts acquire an unsupported provenance class",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The measurement falsifier rejects provider-only facts masquerading as webhook evidence. Complete source/report-pointer lifecycle coverage requires its own relation and retention assertions.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Source and report-pointer lifecycle needs relation and retention assertions under the existing runtime requirements."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-038",
@@ -1893,9 +2243,14 @@
       "blueprintLine": 487,
       "risk": "Retry or partial ingestion changes business keys or falsely advances freshness",
       "applicability": "unknown",
+      "disposition": "unresolved",
       "rationale": "Current archive requirements RUNTIME-046 through RUNTIME-055 own generation, keys, quotas and progress. This candidate spans several independently owned ingestion relations; one batch-function name or generic DB test cannot close it. The lane has not completed their assertion partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Revisit with an explicit partition of archive batch, generation, source-key and retry assertions under their existing requirements.",
+      "cost": {
+        "closure": "unknown",
+        "basis": "Partition the RUNTIME-046 to RUNTIME-055 archive assertions first; cost follows that partition."
+      },
       "bindings": []
     },
     {
@@ -1905,9 +2260,14 @@
       "blueprintLine": 488,
       "risk": "Encoded archives expand beyond resource limits or escape the output root",
       "applicability": "unknown",
+      "disposition": "unresolved",
       "rationale": "Current bounded source/report and package readers have distinct owners. The specialized ZIP/MIME/MSG/OOXML decompression surface is not established or disproved by the tool inventory; no archive-safety coverage is inferred from JSON bounds.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Revisit when a concrete archive producer/consumer and its decode/materialization boundary are identified.",
+      "cost": {
+        "closure": "unknown",
+        "basis": "No concrete archive producer or consumer is identified; decide applicability before sizing."
+      },
       "bindings": []
     },
     {
@@ -1917,9 +2277,14 @@
       "blueprintLine": 489,
       "risk": "PDF/OCR/image/slide conversion loses visible content or geometry",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The coordinator owns web assets and documentation diagrams, not an admitted document-conversion or OCR pipeline. Diagram and frontend asset contracts are accounted separately.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "A PDF/OCR/image/slide ingestion or transformation capability is adopted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1929,9 +2294,14 @@
       "blueprintLine": 490,
       "risk": "Namespaces, encodings or financial sums violate an XML consumer contract",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The admitted public transport surface is JSON/HTTP with exact generated contracts; it has no SOAP/XML invoice conformance capability. JSON wire tests are not substituted for XML proof.",
       "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
       "revisitWhen": "An XML/SOAP or electronic-invoice consumer contract is adopted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1941,9 +2311,14 @@
       "blueprintLine": 491,
       "risk": "An agent tool call expands approval, tenant or effect authority",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The adopted agent capability supplies bounded risk advice and may not name execution authority. It is not an executable agent tool registry. Advice monotonicity is independently applicable under CI05.",
       "ownerPath": "docs/architecture/modules/agent-risk-advice.md",
       "revisitWhen": "An executable tool registry or agent-driven provider write is admitted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1953,9 +2328,14 @@
       "blueprintLine": 492,
       "risk": "Agent memory replay or checkpoint recovery changes conversation state",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "Coordinator policy/audit persistence does not create an agent conversation, WAL or memory-session capability. General durable-state requirements are separately applicable under CI12-CI16.",
       "ownerPath": "docs/architecture/modules/agent-risk-advice.md",
       "revisitWhen": "Durable agent sessions, checkpoints or memory replay enter the product contract.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1965,9 +2345,14 @@
       "blueprintLine": 493,
       "risk": "Streaming chunks violate framing, cancellation or conversation scope",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The admitted product API/UI contract does not define an SSE/WebSocket/NDJSON conversation protocol. HTTP body bounds and development-server sockets do not establish that product surface.",
       "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
       "revisitWhen": "A product streaming protocol or reconnect contract is added.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1977,9 +2362,14 @@
       "blueprintLine": 494,
       "risk": "Search returns another tenant corpus or unsupported citations",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The product evidence queries are bounded authoritative repository projections; no retrieval/vector corpus or citation-quality subsystem is adopted. SQL read authorization remains independently applicable.",
       "ownerPath": "docs/architecture/01-meta-specification.md",
       "revisitWhen": "A retrieval corpus, search index with tenant ACL, or generated citation capability is adopted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -1989,9 +2379,14 @@
       "blueprintLine": 495,
       "risk": "Advice without accepted independent evaluation is mistaken for trustworthy guidance",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Risk-advice admission rejects otherwise valid advice when its independent evaluation fails. This proves an admission predicate, not held-out model quality, calibration, grounding or cost performance.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "large",
+        "basis": "Held-out model quality and calibration need an evaluation dataset and advisory-service evidence."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-001",
@@ -2018,9 +2413,14 @@
       "blueprintLine": 496,
       "risk": "Cancelled audio is applied to another conversation or media resources leak",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "No voice recording/transcription/STT operation exists in the admitted finite product API and browser capability contracts.",
       "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
       "revisitWhen": "An audio/media capture, transcription or STT provider boundary is adopted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -2030,9 +2430,14 @@
       "blueprintLine": 497,
       "risk": "Background work redelivery repeats an effect or falsely records progress",
       "applicability": "unknown",
+      "disposition": "unresolved",
       "rationale": "The coordinator has native PostgreSQL-backed collection/reconciliation lanes, not the blueprint consumers Celery stack. Existing RUNTIME-048/054 lifecycle owners apply; the complete scheduler/lease/crash assertion partition remains unresolved in this bounded mapping.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Revisit with lane-specific acknowledgement, lease, idempotency, crash and shutdown witnesses rather than adding a broker plugin by name.",
+      "cost": {
+        "closure": "unknown",
+        "basis": "Partition lane-specific acknowledgement, lease, crash and shutdown witnesses under RUNTIME-048 and RUNTIME-054 first; composed crash evidence is CI-069."
+      },
       "bindings": []
     },
     {
@@ -2042,9 +2447,14 @@
       "blueprintLine": 498,
       "risk": "Offline queued writes cross identity or replay in the wrong order",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The current operator UI is an online projection with explicit unavailable/unknown outcomes; no service-worker/IndexedDB/native offline-write queue is admitted. Retry of one retained operation is covered by the existing online command contract.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "An offline write queue, service worker or native bridge gains product authority.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -2054,9 +2464,14 @@
       "blueprintLine": 499,
       "risk": "The assembled UI references missing changed or extra served assets",
       "applicability": "covered",
+      "disposition": "covered",
       "rationale": "The production asset manifest has a native mutation falsifier binding exact bytes independent of filenames. Jinja and embedded report host-specific clauses activate only with such a consumer.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "none",
+        "basis": "Covered by the bound native assertion; no closure work. Recurring cost is the bound command's native witness time, not a new job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-014",
@@ -2083,9 +2498,14 @@
       "blueprintLine": 500,
       "risk": "A response looks coherent after the request cursor or filter was changed",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The status oracle independently rejects cursor substitution even when returned rows are unchanged. Locale/DST and every analytics pagination contract require separate owner-specific assertions.",
       "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Locale, DST and the remaining pagination contracts need owner-specific assertions."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-003",
@@ -2112,9 +2532,14 @@
       "blueprintLine": 501,
       "risk": "Coordinates, units or routing constraints produce an invalid optimum",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "CI scheduling optimization does not own geographic coordinates, vehicle-routing constraints or a geospatial solver. Its separate coverage/capacity laws remain applicable.",
       "ownerPath": "docs/architecture/01-meta-specification.md",
       "revisitWhen": "A geospatial planning or physical routing domain becomes an adopted capability.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -2124,9 +2549,14 @@
       "blueprintLine": 502,
       "risk": "Rounding, tax allocation or booking retries change monetary ledger totals",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "CI runner-time economics and budget projections do not establish invoice, tax, payment or financial booking authority. Audit ledger terminology is not a financial-ledger surface.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Financial amounts, tax allocation, invoicing or payment/booking semantics are adopted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -2136,9 +2566,14 @@
       "blueprintLine": 503,
       "risk": "A provider request is replayed under another operation or identity scope",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Native GitHub request-binding tests reject each independent identity substitution. Current App permission policy and reconciliation decide permitted effects; no synthetic call proves remote delivery or atomicity.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on any change to the named owner, requirement, source scope, assertion or command.",
+      "cost": {
+        "closure": "unknown",
+        "basis": "Remote delivery and retry ambiguity need target-changing provider effects, which the read-only coordinator does not issue; activation follows the authority-transition contract."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-008",
@@ -2165,9 +2600,14 @@
       "blueprintLine": 504,
       "risk": "A valid manifest requires unavailable Office host capability",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The product exposes a browser operator workbench and API, not an Office/Outlook add-in manifest or Office.js host lifecycle.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "An Office add-in package, manifest or supported Office host matrix is adopted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -2177,9 +2617,14 @@
       "blueprintLine": 505,
       "risk": "Challenge, RP ID or user-verification policy accepts a replayed assertion",
       "applicability": "not-applicable",
+      "disposition": "not-applicable",
       "rationale": "The adopted administrator identity delegates authentication to the exact Keycloak OIDC/BFF contract. The coordinator does not implement a WebAuthn relying-party registration/assertion capability.",
       "ownerPath": "docs/specs/ci-coordinator-control-plane/requirements.v1.json",
       "revisitWhen": "A coordinator-owned WebAuthn registration, assertion or recovery endpoint is adopted.",
+      "cost": {
+        "closure": "none",
+        "basis": "No admitted surface; no closure work until the revision trigger activates."
+      },
       "bindings": []
     },
     {
@@ -2189,9 +2634,14 @@
       "blueprintLine": 540,
       "risk": "Violation of the following protected observation: Unknown and incomplete diff evidence must invalidate selective planning.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Unknown and incomplete diff evidence must invalidate selective planning. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition. The self-consumer additionally qualifies exact head path/mode inventory through authenticated recursive Git objects before permitting omission; stale mode/deletion fixtures require planner and verifier FullCI.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-004",
@@ -2234,9 +2684,14 @@
       "blueprintLine": 541,
       "risk": "Violation of the following protected observation: Two obligations sharing one witness require the maximum of their independent depths.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Two obligations sharing one witness require the maximum of their independent depths. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-009",
@@ -2263,9 +2718,14 @@
       "blueprintLine": 542,
       "risk": "Violation of the following protected observation: An unknown path must select every obligation at full depth.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "An unknown path must select every obligation at full depth. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-009",
@@ -2292,9 +2752,14 @@
       "blueprintLine": 543,
       "risk": "Violation of the following protected observation: A deliberately defective planner replay must still be rejected independently.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "A deliberately defective planner replay must still be rejected independently. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-004",
@@ -2321,9 +2786,14 @@
       "blueprintLine": 544,
       "risk": "Violation of the following protected observation: Adding an obligation must not expand service or execution authority.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Adding an obligation must not expand service or execution authority. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-004",
@@ -2350,9 +2820,14 @@
       "blueprintLine": 545,
       "risk": "Violation of the following protected observation: Profile-homogeneous shards must execute each selected test exactly once.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Profile-homogeneous shards must execute each selected test exactly once. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-005",
@@ -2379,9 +2854,14 @@
       "blueprintLine": 546,
       "risk": "Violation of the following protected observation: An empty or ambiguous signing-key domain must be rejected before identity is trusted.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "An empty or ambiguous signing-key domain must be rejected before identity is trusted. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-006",
@@ -2408,9 +2888,14 @@
       "blueprintLine": 547,
       "risk": "Violation of the following protected observation: Duplicate keys, surrogates, nonfinite constants and wrong top-level shape cannot produce a partial trusted event.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Duplicate keys, surrogates, nonfinite constants and wrong top-level shape cannot produce a partial trusted event. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-001",
@@ -2437,9 +2922,14 @@
       "blueprintLine": 548,
       "risk": "Violation of the following protected observation: Cancelled requests must release scarce work-class admission capacity.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Cancelled requests must release scarce work-class admission capacity. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-035",
@@ -2466,9 +2956,14 @@
       "blueprintLine": 549,
       "risk": "Violation of the following protected observation: Canonical bytes and identity must match independently authored requirement vectors.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Canonical bytes and identity must match independently authored requirement vectors. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-009",
@@ -2484,7 +2979,7 @@
           ],
           "nativeWorkflowPath": ".github/workflows/python-persistence.yml",
           "evidenceState": "configured-not-executed",
-          "sourceSha256": "b615616869847a90f68949ce614523d638f350deccbce491d2fbddab8cff1475"
+          "sourceSha256": "b5032667e7a8f3e0c0d41578205dca95cb43a0adf4f03be06ebcee4c93091e88"
         }
       ]
     },
@@ -2495,9 +2990,14 @@
       "blueprintLine": 550,
       "risk": "Violation of the following protected observation: Browser context must not bypass the real machine mutation guard.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Browser context must not bypass the real machine mutation guard. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-021",
@@ -2524,9 +3024,14 @@
       "blueprintLine": 551,
       "risk": "Violation of the following protected observation: Concurrent activation for the same expected revision must have at most one successful transaction.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Concurrent activation for the same expected revision must have at most one successful transaction. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-016",
@@ -2553,9 +3058,14 @@
       "blueprintLine": 552,
       "risk": "Violation of the following protected observation: PUBLIC cannot gain application schema authority and history must remain append-only.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "PUBLIC cannot gain application schema authority and history must remain append-only. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-015",
@@ -2582,9 +3092,14 @@
       "blueprintLine": 553,
       "risk": "Violation of the following protected observation: A lock-blocked plan that expires must be rejected with no plan or audit insertion.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "A lock-blocked plan that expires must be rejected with no plan or audit insertion. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-030",
@@ -2611,9 +3126,14 @@
       "blueprintLine": 554,
       "risk": "Violation of the following protected observation: Hidden events must be verified in bounded order before a filtered view is interpreted.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Hidden events must be verified in bounded order before a filtered view is interpreted. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-core/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-CORE-007",
@@ -2640,9 +3160,14 @@
       "blueprintLine": 555,
       "risk": "Violation of the following protected observation: An observation from another run attempt cannot enter the current snapshot.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "An observation from another run attempt cannot enter the current snapshot. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-003",
@@ -2669,9 +3194,14 @@
       "blueprintLine": 556,
       "risk": "Two execution profiles alias the same static job identity",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "The registry falsifier requires rejection of two profiles bound to one static job. The exact existing RUNTIME-026 route invokes the file through runtime026.test; this does not establish provider DAG execution.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on registry, profile, job identity, native-workflow or targeted-witness selection changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Bind the native provider DAG execution assertion to this row; the static registry falsifier is bound."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-026",
@@ -2698,9 +3228,14 @@
       "blueprintLine": 557,
       "risk": "Violation of the following protected observation: A signed fallback for another authenticated repository must remain invalid.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "A signed fallback for another authenticated repository must remain invalid. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-007",
@@ -2759,9 +3294,14 @@
       "blueprintLine": 558,
       "risk": "Candidate output or descendants escape bounded laboratory execution",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Native process assertions establish combined output bounds, exact environment projection and child cleanup. They do not prove an OS sandbox or network isolation. Consumer receipts remain synthetic.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Revisit on process runtime, child lifecycle, decoder, environment or laboratory authority changes.",
+      "cost": {
+        "closure": "large",
+        "basis": "OS sandbox and network isolation are not claimed; proving them needs an admitted sandbox profile."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-008",
@@ -2804,9 +3344,14 @@
       "blueprintLine": 559,
       "risk": "A retry changes operation bytes or stale UI state overwrites current evidence",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Native UI assertions preserve the current generation after a late abandoned response and require identical serialized registration retries. Browser API interception does not establish server authorization or database effects.",
       "ownerPath": "docs/specs/ci-coordinator-operator-ui/requirements.v1.json",
       "revisitWhen": "Revisit on UI state transitions, API contracts or admission of a connected browser fixture.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Server authorization and database effects need the connected browser fixture used by FE05."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-UI-024",
@@ -2849,9 +3394,14 @@
       "blueprintLine": 560,
       "risk": "Violation of the following protected observation: Independent request-coordinate substitutions must be rejected.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Independent request-coordinate substitutions must be rejected. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-008",
@@ -2878,9 +3428,14 @@
       "blueprintLine": 561,
       "risk": "Violation of the following protected observation: Readiness needs active resources, an admitted database and healthy background processing.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Readiness needs active resources, an admitted database and healthy background processing. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-008",
@@ -2907,9 +3462,14 @@
       "blueprintLine": 562,
       "risk": "Violation of the following protected observation: Changing a source measurement must invalidate every aggregate that depends on it.",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Changing a source measurement must invalidate every aggregate that depends on it. The cited source assertion is configured, not executed here. The complete multi-clause property still requires its independent operand and environment-specific witness partition.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Requalify on requirement, oracle operands, fixture assumptions, runtime, source scope or execution changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-038",
@@ -2936,9 +3496,14 @@
       "blueprintLine": 563,
       "risk": "A valid signature authenticates foreign or incomplete performance evidence",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Capacity admission requires the complete metric domain and rejects over-budget values; release predicate tests bind source and artifact separately. Synthetic capacity fixtures do not qualify a real environment.",
       "ownerPath": "docs/specs/ci-coordinator-runtime/requirements.v1.json",
       "revisitWhen": "Revisit on required metric domains, environment profile, measurement provenance or artifact identity changes.",
+      "cost": {
+        "closure": "external",
+        "basis": "Real-environment capacity evidence is CI-069; synthetic fixtures do not qualify an environment."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-RUNTIME-036",
@@ -2981,9 +3546,14 @@
       "blueprintLine": 564,
       "risk": "A path or report name is mistaken for admitted requirement evidence",
       "applicability": "partial",
+      "disposition": "unresolved",
       "rationale": "Proofkit rejects missing exact requirement-path-command tuples. This projection adds source-bound assertion selectors; it does not make source presence or a configured function a runtime pass or complete semantics.",
       "ownerPath": "docs/specs/ci-coordinator-proofkit-adoption/requirements.v1.json",
       "revisitWhen": "Revisit on requirement lifecycle, route identities, assertions, commands or projection schema changes.",
+      "cost": {
+        "closure": "medium",
+        "basis": "Partition the remaining clauses into independent operand witnesses under the named requirement and its existing native command; no new tool or job."
+      },
       "bindings": [
         {
           "requirementId": "REQ-CI-PROOFKIT-003",
@@ -3004,16 +3574,39 @@
       ]
     }
   ],
-  "unresolvedScope": [
-    "The unnumbered Make assurance dimensions in section 8.1 are not part of the numbered 89-class denominator.",
-    "The unnumbered deep-assurance rows in section 9.2 require separate admission.",
-    "The unnumbered optional ecosystem rows in section 9.3 require separate admission."
+  "sectionDispositions": [
+    {
+      "section": "8.1",
+      "title": "Makefile assurance dimensions",
+      "blueprintLine": 357,
+      "disposition": "not-applicable",
+      "rationale": "The blueprint marks its Make adapter NOT_APPLICABLE for this repository. The Git inventory has no GNUmakefile, makefile, Makefile, Makefile.* or *.mk source and no `make -f` entrypoint; the mise, uv, pnpm and GitHub task chain is accounted under CF10.",
+      "revisitWhen": "A Make source or explicit make entrypoint enters the Git inventory."
+    },
+    {
+      "section": "9.2",
+      "title": "Deep assurance by need",
+      "blueprintLine": 432,
+      "disposition": "unresolved",
+      "rationale": "The six conditional rows map to existing owners without a new tool. Load and throughput belong to CI-069 capacity qualification; stronger mutation oracles to the governed mutation suites; untrusted-input robustness to the Hypothesis witnesses of PY08 and API03, with no admitted native parser surface for libFuzzer-class fuzzing; deterministic artifact comparison to the CI-060 reproducible-rebuild qualification; and container or process failure recovery to native fault witnesses and CI-069. No bounded owner model requests TLA+ or Alloy. The load, rebuild and failure rows remain open, so the section is unresolved.",
+      "revisitWhen": "An owner admits an SLO, a bounded formal model, a native parser surface or a byte-reproducibility claim, or CI-060 or CI-069 qualification changes a row."
+    },
+    {
+      "section": "9.3",
+      "title": "Optional ecosystem profiles",
+      "blueprintLine": 443,
+      "disposition": "not-applicable",
+      "rationale": "These profiles activate only for discovered files with an admitted owner. Go, the only present ecosystem (tooling/actionlint), is already counted under SC09 with vet, Staticcheck, govulncheck and native source discovery, and handwritten SQL under DB04. The Git inventory has no Rust, JVM, .NET, C/C++/CMake, Terraform/OpenTofu, Kubernetes/Helm/Kustomize, Ansible, Protobuf, GraphQL, dbt or notebook surface.",
+      "revisitWhen": "Another ecosystem manifest or source root enters the Git inventory, or the Go module set changes."
+    }
   ],
   "nonClaims": [
     "Candidate disposition closure is not semantic requirement completeness.",
     "A configured assertion was read, not executed in this research.",
     "No provider execution or current service state is proved.",
-    "Existing Proofkit requirements, route bindings and command catalogs retain authority."
+    "Existing Proofkit requirements, route bindings and command catalogs retain authority.",
+    "Closure cost classes are owner estimates, not measured CI time.",
+    "A ROADMAP disposition never upgrades a configured assertion to executed evidence."
   ],
   "executionInputs": {
     ".github/workflows/python-persistence.yml": "d09766c07e0e0517a111c17d14d0c3c431163c0695d83b71ec8f64cddfd9b9a0",
