@@ -15,6 +15,31 @@ def _record(args: list[str]) -> None:
         output.write("\n")
 
 
+_BUILD_PROGRESS = (
+    '#0 building with "default" instance using docker driver\n'
+    "\n"
+    "#1 [internal] load build definition from Dockerfile\n"
+    "#1 transferring dockerfile: 4.12kB done\n"
+    "#1 DONE 0.1s\n"
+    "\n"
+    "#2 [interpreter 1/5] FROM docker.io/library/ubuntu:26.04\n"
+    "#2 CACHED\n"
+    "\n"
+    "#3 [security-repairs 2/3] RUN /bin/bash /security/build.sh\n"
+    "#3 0.512 compiling zlib\n"
+    "#3 241.250 repaired\n"
+    "#3 DONE 241.3s\n"
+)
+_FAILED_BUILD_PROGRESS = (
+    "#1 [internal] load build definition from Dockerfile\n"
+    "#1 DONE 0.1s\n"
+    "\n"
+    "#2 [security-repairs 2/3] RUN /bin/bash /security/build.sh\n"
+    "#2 3.004 compiling zlib\n"
+    "#2 ERROR: process did not complete successfully: exit code: 2\n"
+)
+
+
 def _inspect_status(scenario: str) -> str:
     if scenario == "unhealthy_cleanup_failure":
         return "unhealthy"
@@ -36,6 +61,10 @@ def main() -> int:
         if scenario == "build_failure":
             sys.stdout.write("  build failed on stdout  \n")
             return 17
+        if scenario == "build_progress_failure":
+            sys.stderr.write(_FAILED_BUILD_PROGRESS)
+            return 1
+        sys.stderr.write(_BUILD_PROGRESS)
         return 0
 
     if command == "run":

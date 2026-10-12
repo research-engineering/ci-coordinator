@@ -128,6 +128,68 @@ Docker daemon instead. Each of those needs its own investigation, not a larger
 budget. This observation makes no claim about native amd64 shutdown latency,
 production stop duration or emulator internals.
 
+## Open Build-Cost Observation R-2
+
+Status: open, classified `unknown`; no root cause, budget change or build-cost
+reduction is claimed.
+
+The `Build and verify the runtime image` step of the `Container runtime smoke`
+job took about 8 minutes on PR #55 (2026-09-30) and 10.5-11 minutes on the
+stacked chain ending at `62d7765`. On some PRs the image build exceeded its
+600-second command bound: four times on PR #57 and three times on PR #62. The
+step builds the amd64 runtime image under QEMU on the ARM runner with
+`--platform linux/amd64 --pull` and no build cache from earlier runs. Until
+now the smoke printed only its final JSON report, and a timeout reported only
+the expired bound, so no build stage could be attributed.
+
+Source validation: `scripts.container_runtime_smoke` builds through
+`scripts.container_smoke_runner`, which calls the finite captured-command
+executor directly. It does not use the proof command sequence or its
+environment projection. The child inherits the step environment, its output
+capture is bounded to 10,000,000 bytes, and the executor's 600-second default
+bound is now passed explicitly with the same value.
+
+The build argv adds `--progress=plain`, as the same job's build-input witness
+already does. This pins BuildKit's client-side rendering to the plain format
+that the non-terminal capture selects unless `BUILDKIT_PROGRESS` overrides it.
+It does not change the Dockerfile, context, platform, `--pull`, cache use or
+produced image. After the build command returns, whether it passed, failed,
+timed out or exceeded its output bound, the runner parses the captured stderr
+progress and appends one bounded JSON record to the step summary. It then
+applies the unchanged failure handling. The record contains:
+
+- the outcome (`passed`, `failed` or the executor failure kind such as
+  `timeout`), exit code, measured elapsed seconds and the 600-second bound;
+- vertex counts by state: `done`, `cached`, `error`, `canceled` and
+  `unfinished`; and
+- at most 64 vertices with their BuildKit name (at most 160 characters), the
+  reported `DONE` seconds and the latest log offset. Unfinished, failed and
+  canceled vertices are retained first, then the slowest completed ones; the
+  omitted count is explicit.
+
+The success report, stderr text, exit status and failure messages are
+unchanged. As with R-1, the record is diagnostic: an unwritable summary emits
+one stderr line and never changes the outcome. Outside GitHub Actions no
+summary path exists and no record is written.
+
+BuildKit runs stages concurrently, so vertex seconds do not sum to elapsed
+time. `DONE` seconds are BuildKit's rounded report. For an unfinished vertex
+the latest log offset is only a lower bound, and a silent vertex has none.
+The record cannot separate emulation overhead from the work itself.
+
+Revise the 600-second bound only with records from successful and timed-out
+runs on the same runner profile. They must show the same vertices still
+progressing at expiry, with no `error` or `canceled` vertex and no unfinished
+vertex whose log stopped advancing. Successful elapsed times must also approach
+the bound, and the growth since PR #55 must be attributed to named vertices.
+A cost reduction under CI-006 needs the dominant vertices across several runs.
+If emulated compilation or dependency installation dominates, each candidate
+such as cache reuse, prebuilt repair artifacts or native cross-compilation
+needs its own decision under the repair, provenance and release contracts.
+A stalled vertex, a dominant base-image resolution or large variance between
+runs of identical source points to the runner, registry or emulator instead.
+None of these justifies a larger budget.
+
 ## Acceptance And Revision Conditions
 
 Scanner execution and severity admission are separate predicates. The pinned

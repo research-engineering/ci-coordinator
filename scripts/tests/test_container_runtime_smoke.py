@@ -68,6 +68,15 @@ EXPECTED_STDERR = {
         "runtime build-tool absence failed: runtime contains build tools\n"
     ),
     "build_failure": "Python runtime container image build failed: build failed on stdout\n",
+    "build_progress_failure": (
+        "Python runtime container image build failed: "
+        "#1 [internal] load build definition from Dockerfile\n"
+        "#1 DONE 0.1s\n"
+        "\n"
+        "#2 [security-repairs 2/3] RUN /bin/bash /security/build.sh\n"
+        "#2 3.004 compiling zlib\n"
+        "#2 ERROR: process did not complete successfully: exit code: 2\n"
+    ),
     "startup_failure": "Python runtime container startup failed: startup failed\n",
     "unhealthy_cleanup_failure": (
         "container log stdout\n"
@@ -128,6 +137,7 @@ class Invocation:
 class SmokeRun:
     process: subprocess.CompletedProcess[str]
     invocations: tuple[Invocation, ...]
+    step_summary: str
 
 
 def _read_invocations(path: Path) -> tuple[Invocation, ...]:
@@ -162,6 +172,7 @@ def _run_smoke(
             "CI_COORDINATOR_DOCKER_BIN": str(FAKE_DOCKER),
             "FAKE_DOCKER_SCENARIO": scenario,
             "FAKE_DOCKER_STATE_DIR": str(state_dir),
+            "GITHUB_STEP_SUMMARY": str(state_dir / "step-summary.md"),
             "PYTHONDONTWRITEBYTECODE": "1",
         }
     )
@@ -175,10 +186,21 @@ def _run_smoke(
         timeout=15,
         check=False,
     )
+    summary = state_dir / "step-summary.md"
     return SmokeRun(
         process=process,
         invocations=_read_invocations(state_dir / "calls.jsonl"),
+        step_summary=summary.read_text(encoding="utf-8") if summary.exists() else "",
     )
+
+
+def _build_timing(step_summary: str) -> dict[str, object]:
+    heading = "### Python runtime container image build timing\n\n```json\n"
+    assert step_summary.startswith(heading)
+    assert step_summary.endswith("\n```\n")
+    value: object = json.loads(step_summary[len(heading) : -len("\n```\n")])
+    assert isinstance(value, dict)
+    return cast(dict[str, object], value)
 
 
 def _normalize(invocations: tuple[Invocation, ...]) -> tuple[Invocation, ...]:
@@ -197,6 +219,7 @@ def _normalize(invocations: tuple[Invocation, ...]) -> tuple[Invocation, ...]:
         "success",
         "runtime_build_tool_present",
         "build_failure",
+        "build_progress_failure",
         "startup_failure",
         "unhealthy_cleanup_failure",
         "wrong_version",
@@ -290,6 +313,7 @@ def test_python_entrypoint_preserves_docker_and_http_argv(tmp_path: Path) -> Non
     expected_args = (
         (
             "build",
+            "--progress=plain",
             "--platform",
             "linux/amd64",
             "--pull",
@@ -338,6 +362,114 @@ def test_python_entrypoint_preserves_docker_and_http_argv(tmp_path: Path) -> Non
     assert result.process.stdout == EXPECTED_SUCCESS_STDOUT
     assert result.process.stderr == ""
     assert result.process.returncode == 0
+
+
+def test_python_entrypoint_records_plain_build_progress_timing_on_success(
+    tmp_path: Path,
+) -> None:
+    run = _run_smoke(
+        [sys.executable, *PYTHON_ENTRYPOINT],
+        scenario="success",
+        state_dir=tmp_path / "python",
+    )
+
+    record = _build_timing(run.step_summary)
+    assert isinstance(record["elapsedSeconds"], float)
+    assert record | {"elapsedSeconds": 0.0} == {
+        "elapsedSeconds": 0.0,
+        "exitCode": 0,
+        "label": "Python runtime container image build",
+        "omittedStepCount": 0,
+        "outcome": "passed",
+        "reportId": "ci-coordinator.container-build-timing",
+        "schemaVersion": 1,
+        "stepCount": 3,
+        "stepStates": {
+            "canceled": 0,
+            "error": 0,
+            "unfinished": 0,
+            "done": 2,
+            "cached": 1,
+        },
+        "steps": [
+            {
+                "id": 1,
+                "lastLogSeconds": None,
+                "name": "[internal] load build definition from Dockerfile",
+                "seconds": 0.1,
+                "state": "done",
+            },
+            {
+                "id": 2,
+                "lastLogSeconds": None,
+                "name": "[interpreter 1/5] FROM docker.io/library/ubuntu:26.04",
+                "seconds": None,
+                "state": "cached",
+            },
+            {
+                "id": 3,
+                "lastLogSeconds": 241.25,
+                "name": "[security-repairs 2/3] RUN /bin/bash /security/build.sh",
+                "seconds": 241.3,
+                "state": "done",
+            },
+        ],
+        "timeoutSeconds": 600,
+    }
+    assert run.process.stdout == EXPECTED_SUCCESS_STDOUT
+    assert run.process.stderr == ""
+
+
+@pytest.mark.parametrize(
+    ("scenario", "step_states", "steps"),
+    [
+        (
+            "build_failure",
+            {"canceled": 0, "error": 0, "unfinished": 0, "done": 0, "cached": 0},
+            [],
+        ),
+        (
+            "build_progress_failure",
+            {"canceled": 0, "error": 1, "unfinished": 0, "done": 1, "cached": 0},
+            [
+                {
+                    "id": 1,
+                    "lastLogSeconds": None,
+                    "name": "[internal] load build definition from Dockerfile",
+                    "seconds": 0.1,
+                    "state": "done",
+                },
+                {
+                    "id": 2,
+                    "lastLogSeconds": 3.004,
+                    "name": "[security-repairs 2/3] RUN /bin/bash /security/build.sh",
+                    "seconds": None,
+                    "state": "error",
+                },
+            ],
+        ),
+    ],
+)
+def test_python_entrypoint_records_build_timing_before_build_failure(
+    tmp_path: Path,
+    scenario: str,
+    step_states: dict[str, int],
+    steps: list[dict[str, object]],
+) -> None:
+    run = _run_smoke(
+        [sys.executable, *PYTHON_ENTRYPOINT],
+        scenario=scenario,
+        state_dir=tmp_path / "python",
+    )
+
+    record = _build_timing(run.step_summary)
+    assert record["outcome"] == "failed"
+    assert record["exitCode"] == (17 if scenario == "build_failure" else 1)
+    assert record["stepStates"] == step_states
+    assert record["steps"] == steps
+    assert run.process.stderr == EXPECTED_STDERR[scenario]
+    assert run.process.returncode == 1
+    assert [call.args[0] for call in run.invocations] == ["build"]
 
 
 def test_old_smoke_keeps_its_own_profile_without_qualification(
