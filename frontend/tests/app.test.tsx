@@ -97,7 +97,7 @@ test("paginates organizations without carrying repository authority across pages
   await user.click(screen.getByRole("button", { name: "Next organization page" }));
   expect(await screen.findByText("sample-service")).toBeVisible();
   expect(screen.queryByText("ci-coordinator")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Open" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Open another-org/sample-service" })).toBeDisabled();
   await user.click(screen.getByText("Restricted by deployment policy"));
   expect(screen.getByText("2:22")).toBeVisible();
   expect(screen.getByRole("link", { name: "Repository access configuration" })).toHaveAttribute(
@@ -116,7 +116,7 @@ test("discovers the organization and repository before opening exact evidence", 
   expect(await screen.findByRole("option", { name: "example-org" })).toBeVisible();
   expect(await screen.findByText("ci-coordinator")).toBeVisible();
   expect(screen.getByRole("spinbutton", { name: "Installation", hidden: true })).not.toBeVisible();
-  await user.click(screen.getByRole("button", { name: "Open" }));
+  await user.click(screen.getByRole("button", { name: "Open example-org/ci-coordinator" }));
 
   expect(await screen.findByText("Ledger revision")).toBeVisible();
   expect(screen.getByText("No plans in this snapshot.")).toBeVisible();
@@ -129,7 +129,7 @@ test("discovers the organization and repository before opening exact evidence", 
 test("scans the selected repository and discloses evidence before policy source", async () => {
   const user = userEvent.setup();
   renderApp();
-  await user.click(await screen.findByRole("button", { name: "Open" }));
+  await user.click(await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }));
   await user.click(screen.getByRole("link", { name: "Workflows" }));
 
   expect(await screen.findByRole("heading", { name: "Workflow discovery" })).toBeVisible();
@@ -148,7 +148,9 @@ test("only visited tasks load and same-scope navigation preserves discovery inpu
     requests.push(request);
     return admittedResponse(request);
   });
-  await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+  );
   await screen.findByText("Ledger revision");
   expect(
     requests.some((request) =>
@@ -190,7 +192,9 @@ test.each([
       requests.push(request);
       return admittedResponse(request);
     });
-    await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+    );
     await screen.findByText("Ledger revision");
     expect(requests.some((request) => requestUrl(request).pathname === path)).toBe(false);
     await userEvent.click(screen.getByRole("link", { name: view }));
@@ -244,7 +248,9 @@ test.each(["logout", "expiry"] as const)(
         }
         return admittedResponse(request);
       });
-      await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+      );
       await userEvent.click(screen.getByRole("link", { name: "Workflows" }));
       await screen.findByText("Observe-only policy admitted");
       await userEvent.type(screen.getByRole("textbox", { name: "Revision" }), "hidden-draft");
@@ -332,15 +338,15 @@ test("catalog filtering survives visiting and leaving the selected repository", 
   await screen.findByText("ci-coordinator");
   const search = screen.getByRole("searchbox", { name: "Search loaded page" });
   await userEvent.type(search, "coordinator");
-  await userEvent.click(screen.getByRole("button", { name: "Open" }));
+  await userEvent.click(screen.getByRole("button", { name: "Open example-org/ci-coordinator" }));
   await userEvent.click(screen.getByRole("link", { name: "Repositories" }));
   expect(screen.getByRole("searchbox", { name: "Search loaded page" })).toHaveValue("coordinator");
-  expect(screen.getByRole("button", { name: "Open" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Open example-org/ci-coordinator" })).toBeVisible();
 });
 
 test("sidebar defaults follow the task without changing catalog or workspace state", async () => {
   renderApp();
-  const open = await screen.findByRole("button", { name: "Open" });
+  const open = await screen.findByRole("button", { name: "Open example-org/ci-coordinator" });
   expect(screen.getByRole("button", { name: "Expand sidebar" })).toHaveAttribute(
     "aria-expanded",
     "false",
@@ -363,7 +369,9 @@ test.each([true, false])(
       requests.push(request);
       return admittedResponse(request);
     });
-    await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+    );
     await screen.findByText("Ledger revision");
     const before = requests.length;
     const url = location.href;
@@ -378,7 +386,7 @@ test.each([true, false])(
       "aria-expanded",
       String(!compact),
     );
-    await userEvent.click(screen.getByRole("button", { name: "Open" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open example-org/ci-coordinator" }));
     expect(screen.getByRole("button", { name: action })).toHaveAttribute(
       "aria-expanded",
       String(!compact),
@@ -410,7 +418,9 @@ test.each([false, true])(
       }
       return admittedResponse(request);
     });
-    await user.click(await screen.findByRole("button", { name: "Open" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+    );
     await user.click(screen.getByRole("link", { name: "Governance" }));
 
     expect(await screen.findByRole("heading", { name: "Effective governance" })).toBeVisible();
@@ -477,7 +487,9 @@ test("binds an approved governance receipt to the current authority revision", a
     return admittedResponse(request);
   });
 
-  await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+  );
   await userEvent.click(screen.getByRole("link", { name: "Governance" }));
   await userEvent.type(
     await screen.findByRole("textbox", { name: "Approval reason" }),
@@ -546,7 +558,9 @@ test("re-reads the active baseline after an historical operation replay", async 
     return admittedResponse(request);
   });
 
-  await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+  );
   await userEvent.click(screen.getByRole("link", { name: "Governance" }));
   await userEvent.type(
     await screen.findByRole("textbox", { name: "Approval reason" }),
@@ -603,7 +617,9 @@ test("aborts and discards an approval from an older comparison generation", asyn
     return admittedResponse(request);
   });
 
-  await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+  );
   await userEvent.click(screen.getByRole("link", { name: "Governance" }));
   await userEvent.type(
     await screen.findByRole("textbox", { name: "Approval reason" }),
@@ -669,7 +685,9 @@ test("requires repository authority before activating the observed proposal", as
   });
 
   expect(await screen.findByText("Bart Simpson")).toBeVisible();
-  await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+  );
   await userEvent.click(screen.getByRole("link", { name: "Workflows" }));
   await userEvent.click(await screen.findByRole("button", { name: "Verify authority" }));
   await userEvent.click(await screen.findByRole("button", { name: "Activate proposal" }));
@@ -719,7 +737,9 @@ test("does not treat a forged repository callback query as retained authority", 
       return admittedResponse(request);
     });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+    );
     await userEvent.click(screen.getByRole("link", { name: "Workflows" }));
 
     expect(
@@ -759,7 +779,9 @@ test("replays the exact callback operation before exposing retained authority", 
       return admittedResponse(request);
     });
 
-    await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+    );
     await userEvent.click(screen.getByRole("link", { name: "Workflows" }));
     await userEvent.click(await screen.findByRole("button", { name: "Confirm review" }));
 
@@ -854,7 +876,7 @@ test("admits only an exact lowercase revision before rescanning", async () => {
   const user = userEvent.setup();
   const fetchMock = vi.fn(admittedResponse);
   renderApp(fetchMock);
-  await user.click(await screen.findByRole("button", { name: "Open" }));
+  await user.click(await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }));
   await user.click(screen.getByRole("link", { name: "Workflows" }));
   await screen.findByText("Observe-only policy admitted");
   const revision = screen.getByRole("textbox", { name: "Revision" });

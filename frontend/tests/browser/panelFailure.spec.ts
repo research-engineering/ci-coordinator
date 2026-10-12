@@ -84,9 +84,13 @@ for (const [panel, module] of [
         "src",
         /^\/assets\/_bundle\/[a-f0-9]{64}\//,
       );
-      await expect(page.getByRole("button", { name: "Open", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Open example-org/ci-coordinator", exact: true }),
+      ).toBeVisible();
       await page.getByRole("searchbox", { name: "Search loaded page" }).fill("ci-coordinator");
-      await page.getByRole("button", { name: "Open", exact: true }).click();
+      await page
+        .getByRole("button", { name: "Open example-org/ci-coordinator", exact: true })
+        .click();
       await navigate(page, "Configuration");
       const source = page.getByRole("textbox", { name: "Source", exact: true });
       const draft = '{"unsubmitted": "preserve until explicit reload"}';

@@ -1,6 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, test } from "@playwright/test";
-import { installationCatalogFixture, installationFixture, repositoryPageFixture } from "../fixture";
+import {
+  installationCatalogFixture,
+  installationFixture,
+  repositoryFixture,
+  repositoryPageFixture,
+} from "../fixture";
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/v1/auth/session", (route) =>
@@ -126,6 +131,78 @@ test("single-page long-label native selector reserves chevron geometry and resto
   await expect(select).toHaveValue("1");
   await expect(page.getByText("No repositories.", { exact: true })).toBeVisible();
   await witness(page, "catalog-forced-colors-native-selection");
+});
+
+test("similar long repository identities stay whole beside their own named actions", async ({
+  page,
+}) => {
+  const stem = `example-org/${"very-long-repository-name-".repeat(3)}`;
+  const repositories = [
+    { id: 7, suffix: "alpha", authorized: true },
+    { id: 8, suffix: "beta", authorized: false },
+  ].map(({ id, suffix, authorized }) =>
+    repositoryFixture({
+      scope: { installationId: 1, repositoryId: id },
+      nodeId: `R_${id}`,
+      name: `${stem.slice("example-org/".length)}${suffix}`,
+      fullName: `${stem}${suffix}`,
+      workbenchAuthorized: authorized,
+    }),
+  );
+  await page.route("**/api/v1/workbench/installations?*", (route) =>
+    route.fulfill({ json: installationCatalogFixture() }),
+  );
+  await page.route("**/api/v1/workbench/installations/1/repositories?*", (route) =>
+    route.fulfill({ json: repositoryPageFixture({ repositories, totalCount: 2 }) }),
+  );
+  await page.goto(catalogUrl());
+  for (const repository of repositories) {
+    const action = page.getByRole("button", { name: `Open ${repository.fullName}`, exact: true });
+    await expect(action).toBeVisible();
+    await expect(action).toHaveText("Open");
+    if (repository.workbenchAuthorized) await expect(action).toBeEnabled();
+    else await expect(action).toBeDisabled();
+    const geometry = await action.evaluate((button) => {
+      const cell = button.closest("td");
+      const scroller = button.closest(".table-scroll");
+      const name = cell?.querySelector(".repository-name");
+      if (!cell || !scroller || !name) throw new Error("Action must share its identity cell");
+      const nameBox = name.getBoundingClientRect();
+      const actionBox = button.getBoundingClientRect();
+      const visible = scroller.getBoundingClientRect();
+      return {
+        cellIndex: cell.cellIndex,
+        texts: [...name.children].map((element) => ({
+          text: element.textContent,
+          whole: element.scrollWidth <= element.clientWidth,
+        })),
+        beside:
+          actionBox.left >= nameBox.right - 0.5 &&
+          actionBox.top < nameBox.bottom &&
+          actionBox.bottom > nameBox.top,
+        visibleWithoutScrolling:
+          scroller.scrollLeft === 0 &&
+          nameBox.left >= visible.left - 0.5 &&
+          actionBox.right <= visible.right + 0.5 &&
+          actionBox.right <= document.documentElement.clientWidth,
+      };
+    });
+    expect(geometry.cellIndex).toBe(0);
+    expect(geometry.texts).toEqual([
+      { text: repository.name, whole: true },
+      { text: repository.ownerLogin, whole: true },
+    ]);
+    expect(geometry.beside).toBe(true);
+    expect(geometry.visibleWithoutScrolling).toBe(true);
+  }
+  const alpha = page.getByRole("button", { name: `Open ${stem}alpha`, exact: true });
+  await page.getByRole("searchbox", { name: "Search loaded page" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("region", { name: "repositories. table" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(alpha).toBeFocused();
+  await expect(alpha).toHaveCSS("outline-style", "solid");
+  await witness(page, "catalog-similar-long-identities");
 });
 
 for (const kind of ["organization", "repository"] as const) {

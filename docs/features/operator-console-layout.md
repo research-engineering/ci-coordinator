@@ -57,12 +57,51 @@ protected. Revisit the preference lifetime only after an explicit cross-visit
 personalization requirement; add a custom select only for a proved interaction
 need that native selection cannot satisfy.
 
+## Catalog Identity Beside Its Action
+
+The capability plan's acceptance discipline requires narrow catalog screens to
+retain target identity alongside its action. At base `b92f95d` the catalog
+rendered `Open` in a trailing Action column with only that word as its
+accessible name, and ellipsized owner and repository names at 320px. Two long
+names differing only in their suffix could therefore render identically. On
+narrow and touch viewports the table's 760px minimum width placed the action
+beyond the initially visible part of its horizontal scroll region. Both follow
+from source geometry; neither was observed in a native browser run.
+
+The repository cell now owns the action. It uses the existing fixed-width
+identity column presentation; names wrap at any character instead of
+ellipsizing, and the button keeps its visible `Open` text while its
+accessible name is `Open owner/name`. Disabled catalog-only rows keep the same
+identity-bearing name and their restriction title. The change is local to the
+catalog row: the shared table component, catalog request lifetimes, disabled
+states, `Catalog only` disclosure and sidebar preference algebra are unchanged.
+
+| Alternative                                    | Disposition                                                                  |
+|------------------------------------------------|------------------------------------------------------------------------------|
+| Accessible name only                           | Fixes assistive naming but leaves the visible action away from its identity. |
+| Repeat the name in the Action cell below 901px | Duplicates identity text and adds a breakpoint-only rendering path.          |
+| Middle truncation or disclosure on focus       | Hides part of the identity until interaction; needs measurement or state.    |
+| Sticky identity column                         | Adds scroll-coupled layering to the shared table without a second consumer.  |
+| Action inside the wrapping identity cell       | Selected: one rendering at every width, no new state or shared abstraction.  |
+
+The cost is a narrower repository column on desktop, where long names wrap.
+Falsifiers: a viewport where the full name or its action leaves the initially
+visible table area, two similar names rendering identical visible text, or an
+action name without the exact `owner/name`. Revisit if a second table needs
+row actions with identity, which would justify a shared table option.
+
+Main-area inline gutters were already symmetric and witnessed by the visual
+system browser test in compact and expanded sidebar states. Named navigation
+links keep a fixed icon-to-label gap; the new browser witness also checks
+vertical centering and compact icon centering. Neither required a style change.
+
 ## Evidence Boundary
 
 Native component tests cover defaults, both explicit choices, navigation
 persistence and absence of request effects. Native Chromium tests cover icon
 names, keyboard traversal, native selection, viewport bounds, accessible
-navigation in both modes and crossing the mobile breakpoint. Keep screenshot
-evidence synthetic. Source and static checks do not establish rendering or
-deployment success. After exact native CI and release, inspect the real Swarm
+navigation in both modes and crossing the mobile breakpoint, icon-to-label
+spacing, and similar long catalog identities beside their named actions at
+desktop, Pixel 7 and 320px widths. Keep screenshot evidence synthetic. Source
+and static checks do not establish rendering or deployment success. After exact native CI and release, inspect the real Swarm
 login and changed controls separately; do not infer untested browser support.

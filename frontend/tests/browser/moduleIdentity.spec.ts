@@ -99,9 +99,13 @@ test("the mounted production bundle evaluates its entry once and retains drafts 
     expect(namespace).toBeDefined();
     const entryName = new URL(entry).pathname.split("/").at(-1);
     const filter = page.getByRole("searchbox", { name: "Search loaded page" });
-    await expect(page.getByRole("button", { name: "Open", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Open example-org/ci-coordinator", exact: true }),
+    ).toBeVisible();
     await filter.fill("ci-coordinator");
-    await page.getByRole("button", { name: "Open", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Open example-org/ci-coordinator", exact: true })
+      .click();
     await navigate(page, "Configuration");
     const draft = '{"unsubmitted": "keep across lazy navigation"}';
     await page.getByRole("textbox", { name: "Source", exact: true }).fill(draft);

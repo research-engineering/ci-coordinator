@@ -143,10 +143,61 @@ test("repository selection carries admitted creation metadata without changing s
     ),
   );
   render(<RepositoryCatalog itemLimit={10} onSelect={onSelect} />);
-  await userEvent.click(await screen.findByRole("button", { name: "Open" }));
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Open example-org/ci-coordinator" }),
+  );
   expect(onSelect).toHaveBeenCalledWith(
     { installationId: 1, repositoryId: 1, limit: 10 },
     "example-org/ci-coordinator",
+    "2020-01-01T00:00:00Z",
+  );
+});
+
+test("similar long repository identities stay beside their own named actions", async () => {
+  const stem = `example-org/${"very-long-repository-name-".repeat(3)}`;
+  const rows = [
+    { id: 7, suffix: "alpha", authorized: true },
+    { id: 8, suffix: "beta", authorized: false },
+  ].map(({ id, suffix, authorized }) =>
+    repositoryFixture({
+      scope: { installationId: 1, repositoryId: id },
+      nodeId: `R_${id}`,
+      name: `${stem.slice("example-org/".length)}${suffix}`,
+      fullName: `${stem}${suffix}`,
+      workbenchAuthorized: authorized,
+    }),
+  );
+  const onSelect = vi.fn();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) =>
+      Response.json(
+        new URL(request.url).pathname.endsWith("/installations")
+          ? installationCatalogFixture()
+          : repositoryPageFixture({ repositories: rows, totalCount: 2 }),
+      ),
+    ),
+  );
+  render(<RepositoryCatalog itemLimit={10} onSelect={onSelect} />);
+  const alpha = await screen.findByRole("button", { name: `Open ${stem}alpha` });
+  const beta = screen.getByRole("button", { name: `Open ${stem}beta` });
+  expect(screen.queryByRole("columnheader", { name: "Action" })).not.toBeInTheDocument();
+  for (const [button, row] of [
+    [alpha, rows[0]],
+    [beta, rows[1]],
+  ] as const) {
+    const cell = button.closest("td");
+    if (!cell || !row) throw new Error("Each action must belong to a repository cell");
+    expect(within(cell).getByText(row.name, { exact: true })).toBeVisible();
+    expect(cell).toHaveClass("column-identity");
+    expect(button).toHaveTextContent(/^Open$/);
+  }
+  expect(alpha).toBeEnabled();
+  expect(beta).toBeDisabled();
+  await userEvent.click(alpha);
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith(
+    { installationId: 1, repositoryId: 7, limit: 10 },
+    `${stem}alpha`,
     "2020-01-01T00:00:00Z",
   );
 });
@@ -252,7 +303,7 @@ test.each([
     }
     expect(previous()).toBeEnabled();
     expect(next()).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Open / })).not.toBeInTheDocument();
     if (kind === "organization" && emptyLast) {
       expect(screen.getByRole("combobox", { name: "Organization" })).toBeDisabled();
     } else if (kind === "repository") {
@@ -421,7 +472,7 @@ test.each(["organization", "repository"] as const)(
       }),
     ).toBeVisible();
     expect(screen.queryByRole("navigation", { name })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Open / })).not.toBeInTheDocument();
     await act(async () =>
       pending.resolve(
         Response.json(

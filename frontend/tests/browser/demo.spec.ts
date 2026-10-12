@@ -30,7 +30,7 @@ for (const name of Object.keys(SCENARIOS).map(scenarioName)) {
           await expect(
             page.getByText("Repositories authentication required.", { exact: true }),
           ).toBeVisible();
-          await expect(page.getByRole("button", { name: "Open", exact: true })).toHaveCount(0);
+          await expect(page.getByRole("button", { name: /^Open / })).toHaveCount(0);
         } else if (name === "provider-failure-retry") {
           await expect(page.getByText("Repositories unavailable.", { exact: true })).toBeVisible();
           const retried = page.waitForResponse(
@@ -39,7 +39,7 @@ for (const name of Object.keys(SCENARIOS).map(scenarioName)) {
           );
           await page.getByRole("button", { name: "Retry", exact: true }).click();
           expect((await retried).status()).toBe(200);
-          await expect(page.getByRole("button", { name: "Open", exact: true })).toHaveCount(2);
+          await expect(page.getByRole("button", { name: /^Open / })).toHaveCount(2);
         } else if (name === "runs") {
           await expect(page.getByRole("tab", { name: "Runs", selected: true })).toBeVisible();
           await expect(page.getByRole("cell", { name: "success", exact: true })).toBeVisible();
@@ -59,7 +59,7 @@ for (const name of Object.keys(SCENARIOS).map(scenarioName)) {
           ).toHaveCount(0);
         } else {
           await expect(page.getByRole("heading", { name: "Repositories", level: 1 })).toBeVisible();
-          await expect(page.getByRole("button", { name: "Open", exact: true })).toHaveCount(2);
+          await expect(page.getByRole("button", { name: /^Open / })).toHaveCount(2);
         }
         const dimensions = await page.evaluate(() => ({
           width: document.documentElement.clientWidth,
@@ -138,7 +138,7 @@ test.describe("synthetic economics and late delivery", () => {
     await page
       .getByRole("row")
       .filter({ hasText: "synthetic-service" })
-      .getByRole("button", { name: "Open", exact: true })
+      .getByRole("button", { name: "Open example-org/synthetic-service", exact: true })
       .click();
     await navigate(page, "CI economics");
     await expect(page.getByRole("button", { name: "Inspect run 9002, attempt 2" })).toBeVisible();
