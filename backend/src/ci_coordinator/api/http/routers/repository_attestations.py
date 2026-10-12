@@ -52,6 +52,7 @@ REPOSITORY_ATTESTATION_PUBLIC_REQUEST_LIMITS = (
         burst=16,
         refill_rate_per_second=4.0,
         rejection_response={"ok": False, "error": "rate_limited"},
+        route_class="repository_attestation_callback",
     ),
 )
 

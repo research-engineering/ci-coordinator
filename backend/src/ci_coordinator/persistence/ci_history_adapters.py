@@ -189,12 +189,16 @@ class TransactionalHistoryStore:
             return await list_history_delivery_scopes(transaction.history_connection)
 
     async def claim_recheck(
-        self, *, worker_id: str, source: HistoryRecheckSource
+        self,
+        *,
+        worker_id: str,
+        source: HistoryRecheckSource,
+        after_scope: RepositoryScope | None = None,
     ) -> ClaimedHistoryRecheck:
         try:
             async with self._transaction() as transaction:
                 result = await claim_history_recheck(
-                    transaction.history_connection, worker_id, source
+                    transaction.history_connection, worker_id, source, after_scope=after_scope
                 )
                 if isinstance(result, HistoryRecheckClaim) or result == "recovered":
                     await transaction.commit()

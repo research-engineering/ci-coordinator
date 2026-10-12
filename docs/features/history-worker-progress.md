@@ -66,9 +66,17 @@ Cancellation cooperation is a prerequisite for prompt settling: timeout is not
 proof that a cancellation-suppressing dependency has stopped. An unsettled
 operation retains its lane; no replacement starts concurrently.
 
-Workers claim through the existing due-time ordering and scoped database locks.
-They retain no private in-memory work queue, transaction or connection between
-items. Cross-repository progress remains conditional on finite admitted backlog,
+Workers claim through a per-lane order and scoped database locks. Backfill and
+discovery keep due-time order over one scan row per scope,
+`(next_attempt_at, installation_id, repository_id)`. The recent and repair
+recheck lanes visit due scopes cyclically in key order, starting after one
+process cursor per lane: the scope key of that lane's last claim. Inside a
+scope, rows keep `(next_attempt_at, workflow_run_id)` order. A busy scope is
+skipped by its try-lock. With `S` due scopes, a scope waits at most `S - 1`
+claims of its lane in one process; a globally older row in another scope can
+wait as long. Cursors are process-local, so replicas rotate independently. The
+cursor is a scope key, not work, a transaction or a connection. Workers retain no
+private in-memory work queue, transaction or connection between items. Cross-repository progress remains conditional on finite admitted backlog,
 eligible work, dependency recovery and the existing fair-claim contract.
 One explicit cooperative yield after progress prevents an immediately returning
 adapter from starving other tasks.

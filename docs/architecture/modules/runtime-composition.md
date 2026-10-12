@@ -47,6 +47,8 @@ and restart behavior contradict its idempotency contract.
 | `runtime/environment.py`               | the sole source-level read of process environment values and immutable mapping snapshot                                   |
 | `runtime/application.py`               | entrypoint-evidence validation, mode selection, redacted composition-failure projection                                   |
 | `runtime/composition.py`               | production-admission preflight, durable authority registration, and the shared connected dependency graph                 |
+| `runtime/connection_shares.py`         | source-counted PostgreSQL connection shares of the webhook pool, background populations and foreground reserve            |
+| `runtime/webhook_admission.py`         | bounded no-queue webhook verifier pool held from verification through the commit result                                   |
 | `runtime/control_plane_composition.py` | optional Keycloak human and workload identity, opaque-session persistence, role admission, and mutation integrity closure |
 | `runtime/readiness.py`                 | single-flight inductive database, background-service, and JWKS dependency probes                                          |
 | `runtime/reconciliation_service.py`    | periodic single-flight reconciliation ownership                                                                           |
@@ -138,6 +140,21 @@ its first await. It joins startup, the runtime wave and its direct probe
 children, then the database worker and retained public connection finalizer,
 before background drain or external resource closure. A failed connection close
 blocks this mandatory barrier, including repeated cleanup attempts.
+
+Composition wires one webhook admission instance with `N = 4` verifier
+permits; the permit is held through the commit, so webhook database work is
+bounded by `N`. All runtime work still shares one engine. The connection-share
+inventory counts `B = 22` concurrent connections from source, assuming each
+task holds at most one pooled connection at a time: the maintenance round runs
+reconciliation and all nine bounded operations concurrently (reconciliation 1,
+economics collection 4, archive delivery 4, observation discovery 2, six
+single-connection cleanups), the four history lanes hold 4 and preparation
+holds 1. With `F_min = 4`, the design's `N + B + F_min <= database_pool_size`
+requires a pool of 30, so the example pool of 16 does not satisfy the declared
+foreground reservation. Composition does not enforce the sum and adds no pool
+or engine; foreground contention under background and webhook load stays a
+recorded residual and a design revision trigger measured by CI-069
+(provisional owner decision, 2026-10-11).
 
 Readiness retains one demand-driven wave with at most eight runtime waiters and
 sixteen database waiters. Cancelling an individual waiter leaves shared work

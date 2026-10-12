@@ -41,6 +41,8 @@ from ci_coordinator.observability import logging as event_logging
 from ci_coordinator.observability.runtime_metrics import (
     CI_ECONOMICS_COLLECTION_METRIC_OUTCOMES,
     CiEconomicsCollectionItemMetricOutcome,
+    PublicRouteClass,
+    WebhookAdmissionOutcome,
 )
 
 _ACTIVATION_STATES = (
@@ -1711,3 +1713,44 @@ def test_dedicated_test_logger_isolated_from_real_pytest_capture(
         "first",
         "second",
     ]
+
+
+def test_webhook_ingress_series_have_closed_zero_baselines_and_bounded_labels() -> None:
+    """M1: kills free-form outcome or route-class labels and a missing zero baseline."""
+    metrics = RuntimeMetrics()
+    baseline = prometheus_samples(metrics)
+    assert {
+        dict(labels)["outcome"]
+        for (name, labels), value in baseline.items()
+        if name == "ci_coordinator_webhook_admission_total" and value == 0
+    } == set(get_args(WebhookAdmissionOutcome.__value__))
+    assert {
+        dict(labels)["route_class"]
+        for (name, labels), value in baseline.items()
+        if name == "ci_coordinator_public_request_limited_total" and value == 0
+    } == set(get_args(PublicRouteClass.__value__))
+
+    metrics.webhook_admission("installation-1001/repository-2002")
+    metrics.public_request_limited("/webhooks/github?delivery=secret")
+    metrics.webhook_permit_held(0.5)
+
+    samples = prometheus_samples(metrics)
+    assert samples[("ci_coordinator_webhook_admission_total", (("outcome", "other"),))] == 1
+    assert (
+        samples[("ci_coordinator_public_request_limited_total", (("route_class", "other"),))] == 1
+    )
+    assert samples[("ci_coordinator_webhook_permit_hold_seconds_count", ())] == 1
+    assert not any("1001" in value or "secret" in value for key in samples for _, value in key[1])
+
+
+@pytest.mark.parametrize("seconds", [float("nan"), float("inf"), -0.5, 1])
+def test_invalid_permit_hold_is_an_instrumentation_failure_not_an_observation(
+    seconds: float,
+) -> None:
+    metrics = RuntimeMetrics()
+
+    metrics.webhook_permit_held(seconds)
+
+    samples = prometheus_samples(metrics)
+    assert samples[("ci_coordinator_webhook_permit_hold_seconds_count", ())] == 0
+    assert metrics.instrumentation_failure_count == 1

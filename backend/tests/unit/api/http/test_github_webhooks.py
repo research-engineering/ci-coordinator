@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import hmac
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from hashlib import sha256
 
 import pytest
+from anyio import to_process
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.types import Message, Scope
 
 from ci_coordinator.api.http.app import create_app
 from ci_coordinator.api.http.dependencies import (
@@ -105,16 +109,9 @@ def test_admitted_media_invokes_ingress_once_with_exact_headers_and_body() -> No
     assert ingress.commands[0].raw_body == raw_body
 
 
-def test_duplicate_signature_lines_are_preserved_for_identity_admission() -> None:
+def test_duplicate_signature_lines_are_rejected_before_the_body_or_ingress() -> None:
     raw_body = b'{"secret":"must-not-enter-ingestion"}'
-    app, ingress = mounted_app(
-        RejectedIdentity(
-            reason_code="ambiguous_webhook_signature",
-            message="redacted",
-            verified_at=NOW,
-            verifier_version="test",
-        )
-    )
+    app, ingress = mounted_app(seed_result(raw_body))
     signature = webhook_signature(raw_body)
     headers = [
         ("content-type", "application/json"),
@@ -129,13 +126,178 @@ def test_duplicate_signature_lines_are_preserved_for_identity_admission() -> Non
 
     assert response.status_code == 401
     assert response.json() == {"ok": False, "error": "invalid signature"}
-    assert len(ingress.commands) == 1
-    assert ingress.commands[0].headers[-1] == (
-        "x-hub-signature-256",
-        (signature, signature),
-    )
+    assert ingress.commands == []
     assert signature not in response.text
     assert "must-not-enter-ingestion" not in response.text
+
+
+def test_worker_identity_rejection_after_header_admission_is_redacted_401() -> None:
+    raw_body = b'{"secret":"must-not-enter-ingestion"}'
+    app, ingress = mounted_app(
+        RejectedIdentity(
+            reason_code="invalid_webhook_signature",
+            message="redacted",
+            verified_at=NOW,
+            verifier_version="test",
+        )
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/webhooks/github", content=raw_body, headers=signed_headers(raw_body)
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"ok": False, "error": "invalid signature"}
+    assert len(ingress.commands) == 1
+    assert "must-not-enter-ingestion" not in response.text
+
+
+@pytest.mark.parametrize(
+    "signature_headers",
+    ((), (("x-hub-signature-256", "sha256=ABC"),), (("x-hub-signature-256", "sha1=" + "0" * 64),)),
+)
+def test_missing_or_malformed_signature_header_is_401_before_ingress(
+    signature_headers: tuple[tuple[str, str], ...],
+) -> None:
+    raw_body = b"{}"
+    app, ingress = mounted_app(seed_result(raw_body))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/webhooks/github",
+            content=raw_body,
+            headers=[*signed_headers(raw_body)[:3], *signature_headers],
+        )
+
+    assert response.status_code == 401
+    assert response.json() == {"ok": False, "error": "invalid signature"}
+    assert ingress.commands == []
+
+
+class _VirtualTimeLoop(asyncio.SelectorEventLoop):
+    """Loop clock that a test advances without sleeping; selector waits stay real."""
+
+    offset = 0.0
+
+    def time(self) -> float:
+        return super().time() + self.offset
+
+
+def test_webhook_deadline_cuts_a_blocked_commit_and_releases_its_permit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D1: kills a webhook policy without its own deadline and a permit leaked at the cut."""
+    entered = [asyncio.Event(), asyncio.Event()]
+    release_second = asyncio.Event()
+    claims: list[str] = []
+
+    class BlockedStore:
+        async def commit(
+            self, key: PreparedDeliveryClaim, observation: DurableWorkflowObservation | None
+        ) -> DeliveryIdempotencyResult:
+            del observation
+            claims.append(key.key.delivery_id)
+            if len(claims) == 1:
+                entered[0].set()
+                await asyncio.Event().wait()
+            if len(claims) == 2:
+                entered[1].set()
+                await release_second.wait()
+            return DeliveryClaimed(key.key)
+
+    async def run_sync(function: Callable[..., object], *args: object, **_: object) -> object:
+        return function(*args)
+
+    monkeypatch.setattr(to_process, "run_sync", run_sync)
+    app = create_app(
+        HttpRouteDependencies(
+            webhook=GitHubWebhookRouteDependencies(
+                webhook_ingress=ProcessWebhookAdmission(
+                    secret=SECRET,
+                    profile=load_bundled_profile(),
+                    ingestion_store=BlockedStore(),
+                    clock=FixedClock(NOW),
+                    verifier_permits=2,
+                )
+            )
+        ),
+        request_timeout_seconds=15,
+    )
+    unavailable = (503, b'{"ok":false,"error":"webhook ingestion unavailable"}')
+
+    async def scenario() -> None:
+        loop = asyncio.get_running_loop()
+        assert isinstance(loop, _VirtualTimeLoop)
+        cut = asyncio.create_task(_post_push(app, "delivery-cut"))
+        await entered[0].wait()
+        loop.offset = 6.0
+        early, _ = await asyncio.wait({cut}, timeout=0.05)
+        assert early == set()
+        loop.offset = 7.5
+        done, _ = await asyncio.wait({cut}, timeout=1.0)
+        assert cut in done
+        assert cut.result() == unavailable
+        held = asyncio.create_task(_post_push(app, "delivery-held"))
+        await entered[1].wait()
+        assert (await _post_push(app, "delivery-after-cut"))[0] == 200
+        release_second.set()
+        assert (await held)[0] == 200
+
+    with asyncio.Runner(loop_factory=_VirtualTimeLoop) as runner:
+        runner.run(scenario())
+    assert claims == ["delivery-cut", "delivery-held", "delivery-after-cut"]
+
+
+async def _post_push(app: FastAPI, delivery_id: str) -> tuple[int, bytes]:
+    body = (
+        b'{"installation":{"id":1},"repository":{"id":2,"name":"ci",'
+        b'"owner":{"login":"example"}},"ref":"refs/heads/main","before":"'
+        + BASE_SHA.encode()
+        + b'","after":"'
+        + HEAD_SHA.encode()
+        + b'","deleted":false}'
+    )
+    headers = [
+        (b"content-length", str(len(body)).encode()),
+        (b"content-type", b"application/json"),
+        (b"x-github-delivery", delivery_id.encode()),
+        (b"x-github-event", b"push"),
+        (b"x-hub-signature-256", webhook_signature(body).encode()),
+    ]
+    sent: list[Message] = []
+    delivered = False
+
+    async def receive() -> Message:
+        nonlocal delivered
+        if not delivered:
+            delivered = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    async def send(message: Message) -> None:
+        sent.append(message)
+
+    scope: Scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "https",
+        "path": "/webhooks/github",
+        "raw_path": b"/webhooks/github",
+        "root_path": "",
+        "query_string": b"",
+        "headers": headers,
+        "client": ("127.0.0.1", 1),
+        "server": ("testserver", 443),
+    }
+    await app(scope, receive, send)
+    start = next(message for message in sent if message["type"] == "http.response.start")
+    return start["status"], b"".join(
+        message.get("body", b"") for message in sent if message["type"] == "http.response.body"
+    )
 
 
 @pytest.mark.parametrize(

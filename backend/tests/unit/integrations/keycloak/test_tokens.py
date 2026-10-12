@@ -337,3 +337,66 @@ def test_expected_nonce_is_admitted_before_token_work(value: str) -> None:
 
     with pytest.raises(ValueError, match="expected nonce"):
         asyncio.run(verifier.verify_browser_id_token(token("id"), expected_nonce=value))
+
+
+class _CountingKeys(_StaticKeys):
+    def __init__(self) -> None:
+        super().__init__()
+        self.requested: list[str] = []
+
+    async def get_key(self, kid: str) -> KeycloakSigningKey | None:
+        self.requested.append(kid)
+        return await super().get_key(kid)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda value: replace(value, "jku", "https://attacker.example.test/jwks"),
+        lambda value: replace(value, "alg", "HS256"),
+        lambda value: replace(value, "alg", "none"),
+        lambda value: replace(value, "typ", "JWT"),
+        lambda value: remove(value, "typ"),
+        lambda value: replace(value, "kid", ""),
+        lambda value: replace(value, "kid", "k" * 257),
+        lambda value: replace(value, "kid", 7),
+    ],
+    ids=(
+        "extra-field",
+        "symmetric-algorithm",
+        "none-algorithm",
+        "browser-type",
+        "missing-type",
+        "empty-key-id",
+        "oversized-key-id",
+        "numeric-key-id",
+    ),
+)
+def test_logout_header_shape_is_rejected_before_any_key_lookup(mutation: HeaderMutation) -> None:
+    """L3: kills a key fetch moved before the logout header shape checks."""
+    keys = _CountingKeys()
+    verifier = KeycloakTokenVerifier(
+        issuer=ISSUER,
+        browser_client_id=BROWSER_CLIENT_ID,
+        api_client_id=API_CLIENT_ID,
+        keys=cast(KeycloakJwksCache, keys),
+    )
+
+    with pytest.raises(KeycloakEvidenceRejected):
+        asyncio.run(verifier.verify_logout_token(token("logout", header_mutation=mutation)))
+
+    assert keys.requested == []
+
+
+def test_well_formed_logout_header_performs_exactly_one_key_lookup() -> None:
+    keys = _CountingKeys()
+    verifier = KeycloakTokenVerifier(
+        issuer=ISSUER,
+        browser_client_id=BROWSER_CLIENT_ID,
+        api_client_id=API_CLIENT_ID,
+        keys=cast(KeycloakJwksCache, keys),
+    )
+
+    asyncio.run(verifier.verify_logout_token(token("logout")))
+
+    assert keys.requested == [KID]

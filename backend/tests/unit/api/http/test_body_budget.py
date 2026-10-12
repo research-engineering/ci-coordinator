@@ -56,8 +56,14 @@ async def test_two_idle_unauthenticated_bodies_do_not_reserve_the_shared_byte_bu
     middleware = RequestBodyLimitMiddleware(
         downstream, policies=(webhook, config, PLAN_REQUEST_BODY_LIMIT)
     )
+    webhook_scope = body_scope(GITHUB_WEBHOOK_PATH)
+    # Only header-valid webhooks reach the body read; the defect stage reads nothing.
+    webhook_scope["headers"] = [
+        (b"content-type", b"application/json"),
+        (b"x-hub-signature-256", b"sha256=" + b"0" * 64),
+    ]
     async with (
-        running_request(middleware, body_scope(GITHUB_WEBHOOK_PATH), webhook_receive) as first,
+        running_request(middleware, webhook_scope, webhook_receive) as first,
         running_request(
             middleware, body_scope(CONFIG_VALIDATIONS_PATH, b"7340032"), config_receive
         ) as second,

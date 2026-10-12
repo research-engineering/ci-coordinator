@@ -24,6 +24,7 @@ from ci_coordinator.api.http.dependencies import (
     HttpRouteDependencies,
 )
 from ci_coordinator.api.http.routers.control_plane_identity import (
+    BACK_CHANNEL_LOGOUT_REQUEST_BURST,
     CONTROL_PLANE_SESSION_PATH,
     KEYCLOAK_BACK_CHANNEL_LOGOUT_PATH,
     KEYCLOAK_LOGIN_CALLBACK_PATH,
@@ -449,6 +450,32 @@ def test_back_channel_logout_preserves_failure_algebra(
         {"ok": False, "error": error},
     )
     assert response.headers["cache-control"] == "no-store"
+
+
+class _ForgeryAwareLogoutVerifier(_LogoutVerifier):
+    async def verify_back_channel_logout(self, token: str) -> BackChannelLogoutEvidence:
+        self.calls.append(token)
+        if token != "valid-token":
+            raise KeycloakEvidenceRejected("forged")
+        return _logout_evidence()
+
+
+def test_forged_logout_tokens_within_the_envelope_do_not_block_a_valid_logout() -> None:
+    """L1: kills the retained 16/4 bucket and a store call before token verification."""
+    identity, verifier = _Identity(), _ForgeryAwareLogoutVerifier()
+    client = _client(identity, verifier=verifier)
+    forged = [
+        client.post(KEYCLOAK_BACK_CHANNEL_LOGOUT_PATH, data={"logout_token": f"forged-{index}"})
+        for index in range(BACK_CHANNEL_LOGOUT_REQUEST_BURST - 1)
+    ]
+
+    valid = client.post(KEYCLOAK_BACK_CHANNEL_LOGOUT_PATH, data={"logout_token": "valid-token"})
+
+    assert {response.status_code for response in forged} == {400}
+    assert valid.status_code == 204
+    assert verifier.calls[-1] == "valid-token"
+    assert len(verifier.calls) == BACK_CHANNEL_LOGOUT_REQUEST_BURST
+    assert identity.calls == [("back-channel", _logout_evidence())]
 
 
 @pytest.mark.parametrize(

@@ -1,14 +1,15 @@
-"""Bounded process isolation for GitHub webhook identity and payload admission."""
+"""Bounded no-queue verifier pool for GitHub webhook identity and payload admission."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
-from threading import Lock
+from typing import Final
 
 from anyio import BrokenWorkerProcess, CapacityLimiter
 from anyio import to_process as _to_process
 
+from ci_coordinator.api.http.body_limits import MAX_CONCURRENT_BODY_REQUESTS
 from ci_coordinator.api.http.webhook_ingress import (
     WebhookAdmissionUnavailable,
     WebhookHeaderLines,
@@ -17,7 +18,10 @@ from ci_coordinator.api.http.webhook_ingress import (
     WebhookPreparationOffered,
 )
 from ci_coordinator.github_ingestion import (
+    DeliveryUnavailable,
+    DuplicateDelivery,
     IngestionRejection,
+    IngestionResult,
     PreparedWebhookIngestion,
     SeedIngestion,
     WebhookIngestionProfile,
@@ -27,9 +31,11 @@ from ci_coordinator.github_ingestion import (
 )
 from ci_coordinator.github_ingestion.seeds import DynamicCiSeed
 from ci_coordinator.identity_admission import RejectedIdentity, verify_webhook_at
-from ci_coordinator.kernel import Clock
+from ci_coordinator.kernel import Clock, MonotonicClock, NoQueueAdmission, SystemMonotonicClock
+from ci_coordinator.observability import RuntimeMetrics, WebhookAdmissionOutcome
 
-_PROCESS_ADMISSION_GATE = Lock()
+WEBHOOK_VERIFIER_PERMITS: Final = 4
+MINIMUM_WEBHOOK_VERIFIER_PERMITS: Final = 2
 
 
 def _prepare_webhook_in_worker(
@@ -51,7 +57,7 @@ def _prepare_webhook_in_worker(
 
 
 class ProcessWebhookAdmission:
-    """Run at most one cancellable webhook admission per backend process."""
+    """Admit at most N cancellable webhook verifications and commits per instance."""
 
     def __init__(
         self,
@@ -61,19 +67,39 @@ class ProcessWebhookAdmission:
         ingestion_store: WebhookIngestionStore,
         clock: Clock,
         offer_preparation: Callable[[DynamicCiSeed], bool] | None = None,
+        verifier_permits: int = WEBHOOK_VERIFIER_PERMITS,
+        metrics: RuntimeMetrics | None = None,
+        monotonic_clock: MonotonicClock | None = None,
     ) -> None:
         if type(secret) is not str or not secret:
             raise ValueError("webhook admission requires a non-empty secret")
+        if (
+            type(verifier_permits) is not int
+            or not MINIMUM_WEBHOOK_VERIFIER_PERMITS
+            <= verifier_permits
+            <= MAX_CONCURRENT_BODY_REQUESTS
+        ):
+            raise ValueError("webhook verifier permits must fit the body admission width")
         self._secret = secret
         self._profile = profile
         self._ingestion_store = ingestion_store
         self._clock = clock
-        self._worker_capacity = CapacityLimiter(1)
+        # The permit is the only waiter-free admission point; the limiter never queues
+        # because it has exactly as many tokens as there are permits.
+        self._permits = NoQueueAdmission(verifier_permits)
+        self._worker_capacity = CapacityLimiter(verifier_permits)
         self._offer_preparation = offer_preparation
+        self._metrics = metrics
+        self._monotonic_clock = (
+            SystemMonotonicClock() if monotonic_clock is None else monotonic_clock
+        )
 
     async def __call__(self, command: WebhookIngressCommand, /) -> WebhookIngressResult:
-        if not _PROCESS_ADMISSION_GATE.acquire(blocking=False):
+        permit = self._permits.try_acquire()
+        if permit is None:
+            self._observe("permit_refused")
             return WebhookAdmissionUnavailable()
+        acquired_at = self._monotonic_clock.now()
         try:
             try:
                 prepared = await _to_process.run_sync(
@@ -87,15 +113,28 @@ class ProcessWebhookAdmission:
                     limiter=self._worker_capacity,
                 )
             except (BrokenWorkerProcess, OSError):
+                self._observe("worker_unavailable")
                 return WebhookAdmissionUnavailable()
+            if isinstance(prepared, RejectedIdentity):
+                self._observe("signature_rejected")
+                return prepared
+            if isinstance(prepared, IngestionRejection):
+                self._observe("body_rejected")
+                return prepared
+            if not isinstance(prepared, PreparedWebhookIngestion):
+                raise RuntimeError("webhook worker returned an unsupported admission result")
+            result = await complete_webhook_ingestion(prepared, self._ingestion_store)
+            outcome = _committed_outcome(result)
+            if outcome is not None:
+                self._observe(outcome)
         finally:
-            _PROCESS_ADMISSION_GATE.release()
-
-        if isinstance(prepared, RejectedIdentity | IngestionRejection):
-            return prepared
-        if not isinstance(prepared, PreparedWebhookIngestion):
-            raise RuntimeError("webhook worker returned an unsupported admission result")
-        result = await complete_webhook_ingestion(prepared, self._ingestion_store)
+            try:
+                permit.release()
+            finally:
+                if self._metrics is not None:
+                    self._metrics.webhook_permit_held(
+                        max(0.0, float(self._monotonic_clock.now() - acquired_at))
+                    )
         if (
             isinstance(result, SeedIngestion)
             and self._offer_preparation is not None
@@ -103,3 +142,24 @@ class ProcessWebhookAdmission:
         ):
             return WebhookPreparationOffered()
         return result
+
+    def _observe(self, outcome: WebhookAdmissionOutcome) -> None:
+        if self._metrics is not None:
+            self._metrics.webhook_admission(outcome)
+
+
+def _committed_outcome(result: IngestionResult) -> WebhookAdmissionOutcome | None:
+    if isinstance(result, DeliveryUnavailable):
+        return "store_unavailable"
+    if isinstance(result, DuplicateDelivery):
+        return "duplicate"
+    if isinstance(result, IngestionRejection):
+        if result.code == "delivery_id_conflict":
+            return "conflict"
+        if result.code == "delivery_idempotency_unavailable":
+            return "store_unavailable"
+        if result.code == "delivery_idempotency_contract_violation":
+            # An unclassified defect maps to a redacted 500, not an admission outcome.
+            return None
+        return "body_rejected"
+    return "claimed"

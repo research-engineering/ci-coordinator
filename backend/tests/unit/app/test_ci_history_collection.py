@@ -433,3 +433,24 @@ async def test_unadmitted_lane_is_rejected_before_collection_effects(lane: objec
     with pytest.raises(ValueError, match="admitted lane"):
         await boundary.service().collect_next(cast(HistoryWorkLane, lane), asyncio.Event())
     assert boundary.calls == []
+
+
+async def test_recheck_lanes_keep_independent_scope_cursors_after_each_claim() -> None:
+    """F1: kills an unadvanced cursor and one cursor shared by the recent and repair lanes."""
+    boundary = CollectionBoundary(history=None, rechecks={"recent": recheck_claim("recent")})
+    service = boundary.service()
+
+    assert await service.collect_next("recent", asyncio.Event()) == "applied"
+    assert await service.collect_next("repair", asyncio.Event()) == "none_due"
+    assert await service.collect_next("recent", asyncio.Event()) == "applied"
+    boundary.rechecks = {}
+    assert await service.collect_next("recent", asyncio.Event()) == "none_due"
+    assert await service.collect_next("recent", asyncio.Event()) == "none_due"
+
+    assert boundary.recheck_cursors == [
+        ("recent", None),
+        ("repair", None),
+        ("recent", DATASET.scope),
+        ("recent", DATASET.scope),
+        ("recent", DATASET.scope),
+    ]

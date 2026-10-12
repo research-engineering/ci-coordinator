@@ -47,6 +47,7 @@ def test_callback_cookie_cleanup_precedes_public_rate_rejection() -> None:
                 burst=1,
                 refill_rate_per_second=1.0,
                 rejection_response={"ok": False, "error": "rate_limited"},
+                route_class="login_callback",
             ),
         ),
         clock=lambda: 0.0,

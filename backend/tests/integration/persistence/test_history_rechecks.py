@@ -11,7 +11,7 @@ from ci_economics.archive_factories import (
     history_dataset,
 )
 from sqlalchemy import func, insert, select, update
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 from tests.integration.persistence._ci_economics_support import database_now
 from tests.integration.persistence._temporal_lock_support import wait_for_database_deadline
 
@@ -25,6 +25,7 @@ from ci_coordinator.ci_economics.history_rechecks import (
     HistoryRecheckSource,
     HistoryRecheckState,
 )
+from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.persistence import ci_history_recheck_completion
 from ci_coordinator.persistence.ci_history_codec import encode_archive_statistics
 from ci_coordinator.persistence.ci_history_control_codec import encode_history_dataset
@@ -35,7 +36,10 @@ from ci_coordinator.persistence.ci_history_recheck_rows import (
     write_history_recheck,
 )
 from ci_coordinator.persistence.ci_history_retention_codec import decode_history_retention
-from ci_coordinator.persistence.ci_history_state_store import load_history_dataset
+from ci_coordinator.persistence.ci_history_state_store import (
+    load_history_dataset,
+    lock_history_scope,
+)
 from ci_coordinator.persistence.connection import create_postgres_engine
 from ci_coordinator.persistence.schema import (
     ci_history_attempts,
@@ -424,6 +428,115 @@ def test_crashes_consume_budget_and_recovery_advances_once_with_durable_gap(
             else:
                 assert isinstance(followup, HistoryRecheckClaim)
                 assert followup.state.next_attempt == 2 and followup.state.acquisition_count == 1
+        finally:
+            await engine.dispose()
+            await admin.dispose()
+
+    asyncio.run(scenario())
+
+
+async def _seed_two_scope_recent_rechecks(
+    engine: AsyncEngine, admin: AsyncEngine
+) -> tuple[RepositoryScope, RepositoryScope]:
+    """Scope A holds rows 301 and 302, due before row 401 of the higher-keyed scope B."""
+    store = history_store(engine)
+    command = history_command()
+    other = ConfigureHistory.model_validate(
+        {**command.model_dump(), "repositoryId": 303, "operationId": "configure-303"}
+    )
+    for configured in (command, other):
+        assert isinstance(await store.configure_history(configured), HistoryConfigured)
+    for scope, run_id, age_seconds in (
+        (command.scope, 301, 30),
+        (command.scope, 302, 20),
+        (other.scope, 401, 10),
+    ):
+        hint = HistoryRecheckHint(
+            HistoryAttemptCursor(scope, run_id, 1), 404, ARCHIVE_TIME, "recent"
+        )
+        assert await store.enqueue_recheck(hint) == "admitted"
+        async with engine.connect() as connection:
+            state = await load_history_recheck(connection, scope, 1, run_id)
+        assert state is not None and state.lease is None
+        aged = replace(
+            state, next_attempt_at=state.next_attempt_at - timedelta(seconds=age_seconds)
+        )
+        async with admin.begin() as connection:
+            await connection.execute(
+                update(ci_history_rechecks)
+                .where(
+                    ci_history_rechecks.c.installation_id == scope.installation_id,
+                    ci_history_rechecks.c.repository_id == scope.repository_id,
+                    ci_history_rechecks.c.workflow_run_id == run_id,
+                )
+                .values(**encode_history_recheck(aged))
+            )
+    assert (command.installation_id, command.repository_id) < (
+        other.installation_id,
+        other.repository_id,
+    )
+    return command.scope, other.scope
+
+
+def test_recent_claims_rotate_due_scopes_after_the_lane_cursor(
+    runtime_postgres_database_url: str,
+    postgres_database_url: str,
+) -> None:
+    """F1: kills the oldest-due-row scope order, which claims 301, 302, then 401."""
+
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        admin = create_postgres_engine(postgres_database_url)
+        store = history_store(engine)
+        try:
+            await _seed_two_scope_recent_rechecks(engine, admin)
+            claimed: list[int] = []
+            cursor: RepositoryScope | None = None
+            for _ in range(3):
+                claim = await store.claim_recheck(
+                    worker_id="a" * 64, source="recent", after_scope=cursor
+                )
+                assert isinstance(claim, HistoryRecheckClaim)
+                cursor = claim.state.cursor.scope
+                claimed.append(claim.state.cursor.workflow_run_id)
+            assert claimed == [301, 401, 302]
+            assert await store.claim_recheck(worker_id="a" * 64, source="recent") is None
+        finally:
+            await engine.dispose()
+            await admin.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_recent_claim_skips_a_locked_scope_after_the_cursor_and_wraps(
+    runtime_postgres_database_url: str,
+    postgres_database_url: str,
+) -> None:
+    """F1: kills a claim that stops at a scope locked by another transaction."""
+
+    async def scenario() -> None:
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        admin = create_postgres_engine(postgres_database_url)
+        store = history_store(engine)
+        try:
+            first, second = await _seed_two_scope_recent_rechecks(engine, admin)
+            async with engine.begin() as locker:
+                assert await lock_history_scope(locker, second)
+                wrapped = await store.claim_recheck(
+                    worker_id="a" * 64, source="recent", after_scope=first
+                )
+            assert isinstance(wrapped, HistoryRecheckClaim)
+            assert wrapped.state.cursor.workflow_run_id == 301
+            rotated = await store.claim_recheck(
+                worker_id="a" * 64, source="recent", after_scope=first
+            )
+            assert isinstance(rotated, HistoryRecheckClaim)
+            assert rotated.state.cursor.workflow_run_id == 401
+            backlog = await store.claim_recheck(
+                worker_id="a" * 64, source="recent", after_scope=second
+            )
+            assert isinstance(backlog, HistoryRecheckClaim)
+            assert backlog.state.cursor.workflow_run_id == 302
         finally:
             await engine.dispose()
             await admin.dispose()

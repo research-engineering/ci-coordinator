@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 from urllib.parse import parse_qsl
 
 from fastapi import APIRouter, Request, Security, status
@@ -143,19 +143,33 @@ KEYCLOAK_IDENTITY_BODY_LIMITS = (
         timeout_response={"ok": False, "error": "unavailable"},
     ),
 )
-KEYCLOAK_PUBLIC_REQUEST_LIMITS = tuple(
+# Declared, unmeasured back-channel envelope of the webhook ingress design (CI-069 measures
+# it): forged and valid logout tokens share this path, and token verification happens after.
+BACK_CHANNEL_LOGOUT_REQUEST_BURST: Final = 64
+BACK_CHANNEL_LOGOUT_REFILL_PER_SECOND: Final = 32.0
+KEYCLOAK_PUBLIC_REQUEST_LIMITS = (
+    *(
+        PublicRequestLimitPolicy(
+            path=path,
+            methods=frozenset({"GET"}),
+            burst=16,
+            refill_rate_per_second=4.0,
+            rejection_response={"ok": False, "error": "rate_limited"},
+            route_class=route_class,
+        )
+        for path, route_class in (
+            (KEYCLOAK_LOGIN_START_PATH, "login_start"),
+            (KEYCLOAK_LOGIN_CALLBACK_PATH, "login_callback"),
+        )
+    ),
     PublicRequestLimitPolicy(
-        path=path,
-        methods=frozenset({method}),
-        burst=16,
-        refill_rate_per_second=4.0,
+        path=KEYCLOAK_BACK_CHANNEL_LOGOUT_PATH,
+        methods=frozenset({"POST"}),
+        burst=BACK_CHANNEL_LOGOUT_REQUEST_BURST,
+        refill_rate_per_second=BACK_CHANNEL_LOGOUT_REFILL_PER_SECOND,
         rejection_response={"ok": False, "error": "rate_limited"},
-    )
-    for path, method in (
-        (KEYCLOAK_LOGIN_START_PATH, "GET"),
-        (KEYCLOAK_LOGIN_CALLBACK_PATH, "GET"),
-        (KEYCLOAK_BACK_CHANNEL_LOGOUT_PATH, "POST"),
-    )
+        route_class="back_channel_logout",
+    ),
 )
 
 

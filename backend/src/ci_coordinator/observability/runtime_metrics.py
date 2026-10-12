@@ -58,6 +58,25 @@ type CiEconomicsCollectionItemMetricOutcome = Literal[
     "terminal_conflict",
 ]
 type CiEconomicsCollectionMetricOutcome = CiEconomicsCollectionItemMetricOutcome | Literal["other"]
+type WebhookAdmissionOutcome = Literal[
+    "body_rejected",
+    "claimed",
+    "conflict",
+    "duplicate",
+    "header_rejected",
+    "permit_refused",
+    "preauth_limited",
+    "signature_rejected",
+    "store_unavailable",
+    "worker_unavailable",
+]
+type PublicRouteClass = Literal[
+    "back_channel_logout",
+    "login_callback",
+    "login_start",
+    "repository_attestation_callback",
+    "webhook",
+]
 
 _PLANNING_STAGES: Final[tuple[PlanningStage, ...]] = (
     "active_epoch",
@@ -292,6 +311,26 @@ _PREPARATION_OUTCOMES: Final = (
     "timed_out",
     "unavailable",
 )
+WEBHOOK_ADMISSION_OUTCOMES: Final[tuple[WebhookAdmissionOutcome, ...]] = (
+    "body_rejected",
+    "claimed",
+    "conflict",
+    "duplicate",
+    "header_rejected",
+    "permit_refused",
+    "preauth_limited",
+    "signature_rejected",
+    "store_unavailable",
+    "worker_unavailable",
+)
+PUBLIC_ROUTE_CLASSES: Final[tuple[PublicRouteClass, ...]] = (
+    "back_channel_logout",
+    "login_callback",
+    "login_start",
+    "repository_attestation_callback",
+    "webhook",
+)
+_WEBHOOK_PERMIT_HOLD_BUCKETS: Final = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 8)
 _INSTRUMENTATION_SURFACES: Final = (
     "background",
     "counter",
@@ -547,6 +586,24 @@ class RuntimeMetrics:
             ("outcome",),
             registry=prometheus,
         )
+        self._webhook_admissions = Counter(
+            "ci_coordinator_webhook_admission_total",
+            "Webhook admission stage outcomes; not provider-observed acknowledgement or capacity.",
+            ("outcome",),
+            registry=prometheus,
+        )
+        self._webhook_permit_hold = Histogram(
+            "ci_coordinator_webhook_permit_hold_seconds",
+            "Verifier permit hold from acquisition through the commit result; not CPU time.",
+            buckets=_WEBHOOK_PERMIT_HOLD_BUCKETS,
+            registry=prometheus,
+        )
+        self._public_request_limited = Counter(
+            "ci_coordinator_public_request_limited_total",
+            "Pre-authentication budget refusals by fixed public route class; not abuse volume.",
+            ("route_class",),
+            registry=prometheus,
+        )
         self._instrumentation_failure_count = 0
         self._instrumentation_failure_lock = Lock()
         self._terminal_failure_observed = False
@@ -566,6 +623,24 @@ class RuntimeMetrics:
     def planning_preparation(self, outcome: str) -> None:
         self._safe_increment(
             self._planning_preparation, _member(outcome, set(_PREPARATION_OUTCOMES))
+        )
+
+    def webhook_admission(self, outcome: str) -> None:
+        self._safe_increment(
+            self._webhook_admissions, _member(outcome, set(WEBHOOK_ADMISSION_OUTCOMES))
+        )
+
+    def webhook_permit_held(self, seconds: float) -> None:
+        try:
+            if type(seconds) is not float or not isfinite(seconds) or seconds < 0:
+                raise ValueError("webhook permit hold must be a finite non-negative duration")
+            self._webhook_permit_hold.observe(seconds)
+        except Exception:
+            self._record_instrumentation_failure("counter")
+
+    def public_request_limited(self, route_class: str) -> None:
+        self._safe_increment(
+            self._public_request_limited, _member(route_class, set(PUBLIC_ROUTE_CLASSES))
         )
 
     def full_ci_fallback(self, reason: str) -> None:
@@ -852,6 +927,8 @@ class RuntimeMetrics:
 
     def _initialize_bounded_series(self) -> None:
         _initialize(self._planning_preparation, _PREPARATION_OUTCOMES)
+        _initialize(self._webhook_admissions, WEBHOOK_ADMISSION_OUTCOMES)
+        _initialize(self._public_request_limited, PUBLIC_ROUTE_CLASSES)
         _initialize(self._plan_requests, _PLAN_RESULTS)
         _initialize(self._fallbacks, (*sorted(_FALLBACK_REASONS), "other"))
         _initialize(self._verifier_rejections, (*sorted(_FALLBACK_REASONS), "other"))

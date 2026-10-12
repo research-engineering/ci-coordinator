@@ -1,6 +1,7 @@
 # Webhook Ingress Scheduling Implementation Plan
 
-Status: implementation and validation plan; not started
+Status: implementation and validation plan; source delivered except the step 6
+startup check; native witnesses run in GitHub CI; CI-014 open
 Date: 2026-10-11
 
 Design: [webhook ingress scheduling](webhook-ingress-scheduling.md).
@@ -72,6 +73,13 @@ One source delivery, after design acceptance. Paths are relative to
    composition with a typed code when `N + B + F_min > database_pool_size`,
    where `F_min = 4`. A population without a per-item connection bound blocks
    this step until one is proved.
+
+   Delivered differently, as a provisional owner decision (2026-10-11). The
+   counted `B` is 22, so the check would reject the example pool of 16. Only
+   the inventory `runtime/connection_shares.py` and its witness
+   `unit/runtime/test_connection_shares.py` are delivered. They pin `B = 22`,
+   the required pool of 30, rejection at 29 and admission at equality. No
+   startup rejection is enforced; see the design's Source Delivery section.
 7. **Metrics.** In `observability/runtime_metrics.py`, add:
    - `ci_coordinator_webhook_admission_total{outcome}` with the closed outcomes
      `header_rejected`, `preauth_limited`, `permit_refused`, `worker_unavailable`,
@@ -154,6 +162,19 @@ restricted runtime principal.
 | R2 | Preparation is still offered only after a successful commit (existing witness) | offer before commit |
 
 Each mutant must fail the intended assertion, not setup, import or timeout.
+
+Delivered witness locations differ from the table in four places:
+
+- D1 composes the route in `unit/api/http/test_github_webhooks.py` under a
+  virtual loop clock;
+- L2 uses `unit/api/http/test_public_request_limits.py` with an injected clock;
+- M1 spans `unit/runtime/test_webhook_admission.py`,
+  `unit/api/http/test_body_limits.py`, `test_public_request_limits.py` and
+  `unit/observability/test_observability.py`;
+- P6 adds `unit/runtime/test_connection_shares.py`.
+
+A derived webhook policy that is not excluded fails app construction on the
+unique-policy check, not an assertion.
 
 ## Live-Only Evidence (CI-069)
 

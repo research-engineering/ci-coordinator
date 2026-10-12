@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, Protocol
 
 from anyio.lowlevel import checkpoint
 from starlette.routing import compile_path
@@ -25,6 +25,23 @@ _BODY_READ_CHECKPOINT_MESSAGES: Final = 64
 
 
 @dataclass(frozen=True, slots=True)
+class PreBodyRefusal:
+    status_code: int
+    payload: Mapping[str, object]
+
+
+class PreBodyAdmission(Protocol):
+    """Decide header-only defects and budgets before a path lease or body read."""
+
+    def __call__(
+        self,
+        headers: Sequence[tuple[bytes, bytes]],
+        declared_body_bytes: int | None,
+        /,
+    ) -> PreBodyRefusal | None: ...
+
+
+@dataclass(frozen=True, slots=True)
 class BodyLimitPolicy:
     path: str
     maximum_body_bytes: int
@@ -33,10 +50,13 @@ class BodyLimitPolicy:
     overload_response: Mapping[str, object]
     timeout_response: Mapping[str, object]
     methods: frozenset[str] = frozenset({"POST"})
+    pre_body_admission: PreBodyAdmission | None = None
 
     def __post_init__(self) -> None:
         if type(self.path) is not str or not self.path.startswith("/"):
             raise ValueError("body-limit path must be an absolute path")
+        if self.pre_body_admission is not None and not callable(self.pre_body_admission):
+            raise TypeError("pre-body admission must be callable")
         if type(self.maximum_body_bytes) is not int or self.maximum_body_bytes < 1:
             raise ValueError("body-limit maximum must be positive")
         if (
@@ -97,6 +117,11 @@ class RequestBodyLimitMiddleware:
         if content_length is not None and content_length > policy.maximum_body_bytes:
             await _send_json(send, 413, policy.too_large_response)
             return
+        if policy.pre_body_admission is not None:
+            refusal = policy.pre_body_admission(scope.get("headers", ()), content_length)
+            if refusal is not None:
+                await _send_json(send, refusal.status_code, refusal.payload)
+                return
         path_lease = self._admissions[policy.path].try_acquire()
         if path_lease is None:
             await _send_json(send, 503, policy.overload_response)

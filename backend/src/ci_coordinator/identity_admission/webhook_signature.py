@@ -68,7 +68,7 @@ def verify_webhook_at(
             verified_at,
             body_sha256,
         )
-    if not _is_canonical_signature(signature):
+    if not is_canonical_webhook_signature(signature):
         return _reject(
             "malformed_webhook_signature",
             "webhook signature must be canonical sha256",
@@ -130,7 +130,7 @@ def _sign(raw_body: bytes, secret: str) -> str:
     return f"{SIGNATURE_PREFIX}{digest}"
 
 
-def _is_canonical_signature(value: str) -> bool:
+def is_canonical_webhook_signature(value: str) -> bool:
     if len(value) != len(SIGNATURE_PREFIX) + _SIGNATURE_HEX_CHARACTERS:
         return False
     if not value.startswith(SIGNATURE_PREFIX):
