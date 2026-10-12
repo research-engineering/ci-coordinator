@@ -11,6 +11,7 @@ from ruamel.yaml import YAML
 from scripts.ci_matrix_risks import (
     CLASS_IDS,
     PROPERTY_IDS,
+    SECTION_IDS,
     RiskCoverage,
     admit_assertion,
 )
@@ -66,7 +67,65 @@ def test_risk_projection_accounts_for_classes_and_properties_separately() -> Non
         row.candidateId for row in profile.candidateRows if row.family == "property"
     } == PROPERTY_IDS
     assert any(row.applicability != "covered" for row in profile.candidateRows)
-    assert profile.unresolvedScope
+    assert {row.section for row in profile.sectionDispositions} == SECTION_IDS
+
+
+@pytest.mark.parametrize(
+    "applicability,disposition",
+    [
+        ("partial", "covered"),
+        ("deferred", "not-applicable"),
+        ("unknown", "covered"),
+        ("covered", "unresolved"),
+        ("not-applicable", "confirmed-gap"),
+    ],
+)
+def test_roadmap_disposition_cannot_upgrade_or_erase_the_evidence_state(
+    applicability: str, disposition: str
+) -> None:
+    payload = RiskCoverage.model_validate(_profile()).model_dump()
+    row = next(row for row in payload["candidateRows"] if row["applicability"] == applicability)
+    row["disposition"] = disposition
+    row["cost"] = {"closure": "none", "basis": "reclassified"}
+    with pytest.raises(ValidationError, match="project the admitted evidence state"):
+        RiskCoverage.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "applicability,disposition,closure,message",
+    [
+        ("covered", "covered", "small", "no closure cost"),
+        ("not-applicable", "not-applicable", "unknown", "no closure cost"),
+        ("partial", "unresolved", "none", "no closure cost"),
+        ("unknown", "confirmed-gap", "none", "no closure cost"),
+        ("deferred", "confirmed-gap", "unknown", "sized closure cost"),
+    ],
+)
+def test_open_risk_needs_a_closure_cost_and_a_confirmed_gap_is_sized(
+    applicability: str, disposition: str, closure: str, message: str
+) -> None:
+    payload = RiskCoverage.model_validate(_profile()).model_dump()
+    row = next(row for row in payload["candidateRows"] if row["applicability"] == applicability)
+    row["disposition"] = disposition
+    row["cost"] = {"closure": closure, "basis": "estimate"}
+    with pytest.raises(ValidationError, match=message):
+        RiskCoverage.model_validate(payload)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "duplicate", "foreign", "covered"])
+def test_each_unnumbered_blueprint_section_keeps_one_disposition(mutation: str) -> None:
+    payload = RiskCoverage.model_validate(_profile()).model_dump()
+    sections = payload["sectionDispositions"]
+    if mutation == "missing":
+        sections.pop()
+    elif mutation == "duplicate":
+        sections[-1] = deepcopy(sections[0])
+    elif mutation == "foreign":
+        sections[-1]["section"] = "9.4"
+    else:
+        sections[0]["disposition"] = "covered"
+    with pytest.raises(ValidationError):
+        RiskCoverage.model_validate(payload)
 
 
 @pytest.mark.parametrize("mutation", ["missing", "duplicate", "foreign", "family"])

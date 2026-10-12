@@ -91,3 +91,63 @@ Native witnesses must control the former race intervals independently and
 distinguish before/after histories. Source equality and sleeps alone do not
 prove causal ordering. Qualify post-migration admission, concurrent plan/audit
 coherence and unchanged typed projections under the actual runtime principal.
+
+## CI-058 Intake Conservation (2026-10-11)
+
+[ROADMAP CI-058](../../ROADMAP.md#8-next-work) owns completion. The confirmed
+countermodels above came from the 2026-09-14 PostgreSQL catalog intake. This
+section conserves that intake and maps it to its current owners on the local
+stacked head `a1966f616e370b8f4cd64190f26afb97d649c940`. That head is
+unmerged; rebind before closure. Nothing here was executed against
+PostgreSQL, and it is not a workload measurement or a readiness claim.
+
+### Conservation
+
+The intake covered an inventory of 225 scenarios against frozen source
+`25a4090f` and confirmed three mechanisms. The raw intake and its catalog
+inventory are no longer available: the private materials record their
+deletion. Provisional owner decision (2026-10-11): accept the three-mechanism
+conservation below and do not reconstruct the deleted input. Every scenario
+that is not attributable to one of these mechanisms stays
+`unknown (input deleted)`. That status is neither a pass nor a defect. The
+per-scenario mapping is not retained, so this section does not claim how many
+scenarios each mechanism absorbed.
+
+| Mechanism | Current owner | Source state on the frozen head | Remaining qualification |
+|-----------|---------------|---------------------------------|-------------------------|
+| Coherent database observations | This design and its [plan](database-observation-snapshots-plan.md) | Snapshot transactions use READ COMMITTED with a read-only statement in the bundled compatibility profile. Workbench interleaving witnesses exist in the persistence integration tests. | Native interleaving and projection witnesses on the merged head |
+| Total collection-state checks | [Total collection-state admission](total-collection-state-admission.md) and its [plan](total-collection-state-admission-plan.md) | Migration `20260915_0015` replaces the nullable predicates with `CHECK ((...) IS TRUE)` and rejects invalid retained rows without repair | Native forward-migration witnesses; the maintenance rollout is a separate step |
+| Unknown workload, plan, maintenance, memory and capacity evidence | CI-058 for native plan, cardinality and concurrency controls; CI-067 and CI-069 for deployment measurements | See the control inventory below | Measurements on an authorized environment; tune only measured counterexamples |
+
+### Native Control Inventory
+
+Plan witnesses that run `EXPLAIN` against real PostgreSQL exist in five
+persistence integration files: economics batch capacity, economics budget
+cost, observation cleanup cost, runtime principal cost and the Workbench
+repository. They are configured, not executed for this section.
+
+The logout fence of migration `20261011_0018` has real-PostgreSQL
+concurrency witnesses: lock-ordered waits for an in-flight fence writer, the
+floor raised by cleanup and a bounded erasure set. It has no `EXPLAIN` or
+cardinality witness for fence insertion, the generation check or cleanup.
+That is an open native-control question, not a confirmed performance defect.
+Adding an index or tuning without a plan regression at representative
+cardinality remains forbidden.
+
+The [own-CI risk ledger](../../proofkit/ci-risk-coverage.v1.json) records the
+same state under DB05 (unresolved) and backup and restore under DATA02
+(confirmed gap, owned by CI-067). Database-cohort dispositions of the audit
+intake remain in the CI-054 register.
+
+### Remaining Obligations
+
+1. Qualify the snapshot, total-state and logout-fence witnesses natively on the
+   merged head.
+2. Decide whether the logout-fence paths need a plan witness at representative
+   cardinality. A plan that flips to a sequential scan at a realistic size is
+   the falsifier.
+3. Leave deployment workload, maintenance, memory, restore and RPO/RTO evidence
+   with CI-067 and CI-069.
+
+This section closes no CI-058 clause. It makes the intake denominator explicit
+so a later qualification cannot silently treat deleted scenarios as covered.
