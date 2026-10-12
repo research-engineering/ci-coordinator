@@ -9,7 +9,9 @@ from ci_coordinator.app.ci_economics import (
 )
 from ci_coordinator.ci_economics.history_administration import (
     HistoryAdministrationStore,
+    HistoryRepositoryCreationReader,
     HistoryStatus,
+    RepositoryCreationObserved,
 )
 from ci_coordinator.ci_economics.history_commands import (
     ConfigureHistory,
@@ -17,6 +19,7 @@ from ci_coordinator.ci_economics.history_commands import (
     HistoryConfigurationInvalid,
     HistoryConfigurationResult,
     HistoryConfigured,
+    HistoryPopulationSourceRefused,
 )
 from ci_coordinator.ci_economics.history_gap_recovery import (
     HistoryGapRepairResult,
@@ -44,23 +47,34 @@ class CiHistoryAdministrationUseCase(Protocol):
 
 class CiHistoryAdministrationService:
     def __init__(
-        self, *, authorizer: CiEconomicsAuthorizer, store: HistoryAdministrationStore
+        self,
+        *,
+        authorizer: CiEconomicsAuthorizer,
+        store: HistoryAdministrationStore,
+        creation_reader: HistoryRepositoryCreationReader,
     ) -> None:
         self._authorizer = authorizer
         self._store = store
+        self._creation_reader = creation_reader
 
     async def configure(self, command: ConfigureHistory) -> HistoryConfigurationOutcome:
         if type(command) is not ConfigureHistory:
             raise TypeError("history configuration requires an exact command")
         command = ConfigureHistory.model_validate(command)
-        result = await self._authorized(
-            command.actor, command.scope, lambda: self._store.configure_history(command)
-        )
+        if command.population_bound_source is None:
+            result = await self._authorized(
+                command.actor, command.scope, lambda: self._store.configure_history(command)
+            )
+        else:
+            result = await self._authorized(
+                command.actor, command.scope, lambda: self._configure_catalog_bound(command)
+            )
         if type(result) in {
             CiEconomicsReadForbidden,
             CiEconomicsReadUnavailable,
             HistoryConfigurationConflict,
             HistoryConfigurationInvalid,
+            HistoryPopulationSourceRefused,
         }:
             return result
         if type(result) is HistoryConfigured and (
@@ -70,6 +84,25 @@ class CiHistoryAdministrationService:
         ):
             return result
         return CiEconomicsReadUnavailable()
+
+    async def _configure_catalog_bound(
+        self, command: ConfigureHistory
+    ) -> HistoryConfigurationResult | CiEconomicsReadUnavailable:
+        # A retained receipt classifies replay or conflict without a provider read.
+        receipt = await self._store.find_history_receipt(command)
+        if receipt is not None:
+            return receipt
+        source = command.population_bound_source
+        if source is None:
+            raise ValueError("catalog population verification requires its asserted source")
+        observed = await self._creation_reader.read_repository_created_at(command.scope)
+        if type(observed) is not RepositoryCreationObserved or observed.scope != command.scope:
+            return CiEconomicsReadUnavailable()
+        if observed.created_at is None:
+            return HistoryPopulationSourceRefused("creation_date_missing")
+        if observed.created_at != source.created_at:
+            return HistoryPopulationSourceRefused("creation_date_mismatch")
+        return await self._store.configure_history(command, verified_creation=observed)
 
     async def status(self, *, actor: str, scope: RepositoryScope) -> HistoryStatusOutcome:
         result = await self._authorized(actor, scope, lambda: self._store.history_status(scope))

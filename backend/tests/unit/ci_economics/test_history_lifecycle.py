@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -10,6 +10,10 @@ from ci_coordinator.ci_economics.history_configuration import (
     HistoryUsage,
 )
 from ci_coordinator.ci_economics.history_lifecycle import configure_history_state
+from ci_coordinator.ci_economics.history_population_bound import (
+    HistoryPopulationBound,
+    recorded_population_bound,
+)
 from ci_coordinator.ci_economics.history_scan import acquire_history_claim
 from ci_coordinator.ci_economics.model import AttemptIdentity
 from ci_coordinator.ci_economics.sources import ProviderRunCollectionSource
@@ -259,3 +263,115 @@ def test_configuration_cannot_overflow_its_revision_space() -> None:
             scan=history_scan(dataset),
             now=ARCHIVE_TIME,
         )
+
+
+@pytest.mark.parametrize("transition", ["initial", "expansion", "rescan", "selector", "pause"])
+def test_bound_record_is_produced_only_by_initial_or_expansion(transition: str) -> None:
+    # Kills: emitting a provenance row on rescan, selector change or pause, which would
+    # duplicate the primary key or move provenance for an unchanged bound.
+    dataset = history_dataset()
+    original = history_scan(dataset)
+    now = ARCHIVE_TIME + timedelta(days=2)
+    earlier = original.checkpoint.cursor.created_from - timedelta(days=30)
+    configuration = dataset.configuration
+    if transition == "selector":
+        configuration = HistoryConfiguration.model_validate(
+            {**configuration.model_dump(), "workflowIds": [7]}
+        )
+    if transition == "pause":
+        configuration = HistoryConfiguration.model_validate(
+            {**configuration.model_dump(), "enabled": False}
+        )
+    if transition == "initial":
+        successor, scan = configure_history_state(
+            dataset.scope,
+            configuration,
+            prior=None,
+            scan=None,
+            now=now,
+            initial_created_from=earlier,
+        )
+        prior_scan = None
+    else:
+        successor, scan = configure_history_state(
+            dataset.scope,
+            configuration,
+            prior=dataset,
+            scan=original,
+            now=now,
+            expand_created_from=earlier if transition == "expansion" else None,
+            rescan=transition == "rescan",
+        )
+        prior_scan = original
+    bound = recorded_population_bound(
+        prior_scan, successor, scan, repository_created_at=None, recorded_at=now
+    )
+    if transition in {"initial", "expansion"}:
+        assert bound == HistoryPopulationBound(
+            dataset.scope,
+            successor.generation,
+            earlier,
+            "explicit",
+            None,
+            successor.configuration_revision,
+            now,
+        )
+    else:
+        assert bound is None
+
+
+def test_rescan_preserves_bound_and_returns_no_new_provenance() -> None:
+    # Kills: resetting provenance on restart, or accepting a catalog source without a new bound.
+    dataset = history_dataset()
+    original = history_scan(dataset)
+    now = ARCHIVE_TIME + timedelta(days=2)
+    successor, scan = configure_history_state(
+        dataset.scope, dataset.configuration, prior=dataset, scan=original, now=now, rescan=True
+    )
+    assert scan.checkpoint.cursor.created_from == original.checkpoint.cursor.created_from
+    assert (
+        recorded_population_bound(
+            original, successor, scan, repository_created_at=None, recorded_at=now
+        )
+        is None
+    )
+    with pytest.raises(ValueError, match="requires a new lower bound"):
+        recorded_population_bound(
+            original,
+            successor,
+            scan,
+            repository_created_at=original.checkpoint.cursor.created_from,
+            recorded_at=now,
+        )
+
+
+@pytest.mark.parametrize(
+    "created_at,admitted",
+    [
+        (ARCHIVE_TIME - timedelta(days=30) + timedelta(hours=23, minutes=59), True),
+        (ARCHIVE_TIME - timedelta(days=30), True),
+        (ARCHIVE_TIME - timedelta(days=30) - timedelta(seconds=1), False),
+        (ARCHIVE_TIME - timedelta(days=29), False),
+        (ARCHIVE_TIME + timedelta(days=3), False),
+    ],
+)
+def test_catalog_bound_is_the_utc_day_of_its_recorded_creation_instant(
+    created_at: datetime, admitted: bool
+) -> None:
+    # Kills: a value type that admits a non-floor or future catalog instant.
+    def bound() -> HistoryPopulationBound:
+        return HistoryPopulationBound(
+            history_dataset().scope,
+            1,
+            ARCHIVE_TIME - timedelta(days=30),
+            "repository_created_at",
+            created_at,
+            1,
+            ARCHIVE_TIME + timedelta(days=2),
+        )
+
+    if admitted:
+        assert bound().repository_created_at == created_at
+    else:
+        with pytest.raises(ValueError):
+            bound()

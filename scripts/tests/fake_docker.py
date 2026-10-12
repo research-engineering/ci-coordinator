@@ -121,7 +121,7 @@ def main() -> int:
         head = {
             "migration_head_failure": "20991231_9999 (head)",
             "stale_migration_head": "20260915_0015 (head)",
-        }.get(scenario, "20261011_0019 (head)")
+        }.get(scenario, "20261012_0020 (head)")
         sys.stdout.write(f"{head}\n")
         return 0
 

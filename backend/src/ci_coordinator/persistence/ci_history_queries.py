@@ -1,4 +1,4 @@
-from sqlalchemy import Table, and_, func, select
+from sqlalchemy import Table, and_, func, select, true
 from sqlalchemy.engine import RowMapping
 from sqlalchemy.ext.asyncio import AsyncConnection
 
@@ -11,9 +11,15 @@ from ci_coordinator.persistence._schema_ci_history_control import (
     ci_history_rechecks,
     ci_history_scans,
 )
+from ci_coordinator.persistence._schema_ci_history_population_bound import (
+    ci_history_population_bounds,
+)
 from ci_coordinator.persistence.ci_history_control_codec import (
     decode_history_dataset,
     decode_history_scan,
+)
+from ci_coordinator.persistence.ci_history_population_bound_store import (
+    decode_population_bound,
 )
 from ci_coordinator.persistence.ci_history_retention_codec import decode_history_defaults
 from ci_coordinator.persistence.ci_history_state_store import history_scope_predicate
@@ -32,11 +38,24 @@ async def history_status(connection: AsyncConnection, scope: RepositoryScope) ->
         .subquery()
     )
     pending_count = select(func.count()).select_from(rechecks).scalar_subquery()
+    # Only the earliest current-generation row can describe the current cursor bound.
+    population_bound = (
+        select(ci_history_population_bounds)
+        .where(
+            history_scope_predicate(ci_history_population_bounds, scope),
+            ci_history_population_bounds.c.generation == ci_history_datasets.c.generation,
+        )
+        .order_by(ci_history_population_bounds.c.created_from)
+        .limit(1)
+        .correlate(ci_history_datasets)
+        .lateral("population_bound")
+    )
     sources = (
         ("defaults", ci_history_defaults),
         ("dataset", ci_history_datasets),
         ("scan", ci_history_scans),
         ("discovery", discovery),
+        ("bound", population_bound),
     )
     statement = (
         select(
@@ -67,6 +86,7 @@ async def history_status(connection: AsyncConnection, scope: RepositoryScope) ->
                     discovery.c.lane == "discovery",
                 ),
             )
+            .outerjoin(population_bound, true())
         )
         .where(ci_history_defaults.c.singleton.is_(True))
     )
@@ -87,6 +107,9 @@ async def history_status(connection: AsyncConnection, scope: RepositoryScope) ->
         None
         if row["discovery_installation_id"] is None
         else decode_history_scan(_columns(row, ci_history_scans, "discovery")),
+        None
+        if row["bound_installation_id"] is None
+        else decode_population_bound(_columns(row, ci_history_population_bounds, "bound")),
     )
 
 

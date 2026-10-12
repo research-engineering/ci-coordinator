@@ -39,6 +39,9 @@ from ci_coordinator.identity_admission import (
 )
 from ci_coordinator.integrations.github.ci_economics_sources import GitHubCiEconomicsSources
 from ci_coordinator.integrations.github.ci_history_provider import GitHubHistoryProvider
+from ci_coordinator.integrations.github.ci_history_repository_creation import (
+    GitHubHistoryRepositoryCreation,
+)
 from ci_coordinator.integrations.github.repository_membership import GitHubRepositoryAccess
 from ci_coordinator.kernel import Clock, SystemClock
 from ci_coordinator.observability import (
@@ -48,7 +51,9 @@ from ci_coordinator.observability import (
 )
 from ci_coordinator.operator_controls.auth import RepositoryAccessReader
 from ci_coordinator.persistence.activity_repository import PostgresActivityStore
-from ci_coordinator.persistence.ci_history_adapters import TransactionalHistoryStore
+from ci_coordinator.persistence.ci_history_adapters import (
+    TransactionalHistoryAdministrationStore,
+)
 from ci_coordinator.persistence.ci_observation_adapters import TransactionalObservationStore
 from ci_coordinator.persistence.errors import (
     CommitCancelledOutcomeUnknown,
@@ -230,12 +235,13 @@ def test_observation_composes_background_membership_and_independent_bounds(
     history_delivery = bounded["ci_history_delivery"][1]
     assert type(history_collection) is CiHistoryCollectionService
     assert type(history_delivery) is CiHistoryDeliveryService
-    assert type(history_collection._store) is TransactionalHistoryStore
+    assert type(history_collection._store) is TransactionalHistoryAdministrationStore
     assert history_collection._store is history_delivery._store
     assert routes.ci_history is not None
     administration = routes.ci_history.use_case
     assert type(administration) is CiHistoryAdministrationService
     assert administration._store is history_collection._store
+    assert type(administration._creation_reader) is GitHubHistoryRepositoryCreation
     assert routes.ci_observation is not None
     assert routes.ci_history.authenticator is routes.ci_observation.authenticator
     assert routes.ci_history.role_admission is routes.ci_observation.role_admission

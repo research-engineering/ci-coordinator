@@ -11,7 +11,7 @@ import {
 import { historyMutation, historyStatus } from "../historyFixture";
 import { observationWorkflows } from "../observationFixture";
 
-test("catalog creation date offers an explicit full-range shortcut without a write", async ({
+test("catalog creation date offers an explicit all-available choice without a write", async ({
   page,
 }) => {
   let writes = 0;
@@ -51,7 +51,8 @@ test("catalog creation date offers an explicit full-range shortcut without a wri
   await economics.click();
   await page.getByRole("tab", { name: "History", exact: true }).click();
   await expect(page.getByLabel("Import runs created since (UTC)")).toHaveValue("");
-  await page.getByRole("button", { name: "Use repository creation date (2020-01-01)" }).click();
+  await page.getByRole("radio", { name: "All available (from repository creation date)" }).check();
+  await expect(page.getByText(/GitHub may no longer retain the oldest runs/)).toBeVisible();
   await expect(page.getByLabel("Import runs created since (UTC)")).toHaveValue("2020-01-01");
   await expect(page.getByRole("button", { name: "Save history" })).toBeEnabled();
   await page.screenshot({
@@ -68,7 +69,8 @@ test("catalog creation date offers an explicit full-range shortcut without a wri
     dispatchEvent(new PopStateEvent("popstate"));
   });
   await expect(page.getByLabel("Import runs created since (UTC)")).toHaveValue("");
-  await expect(page.getByRole("button", { name: /Use repository creation date/ })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: /All available/ })).toBeDisabled();
+  await expect(page.getByText(/All available is unavailable/)).toBeVisible();
 });
 
 test("historical collection is explicit, replay-safe, accessible and responsive", async ({

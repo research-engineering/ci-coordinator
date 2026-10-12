@@ -32,6 +32,9 @@ from ci_coordinator.persistence import _schema_production_cutover as production_
 from ci_coordinator.persistence import (
     _schema_registered_epoch_reviews as registered_epoch_review_schema,
 )
+from ci_coordinator.persistence import (
+    _schema_ci_history_population_bound as history_population_bound_schema,
+)
 
 _EXPECTED_SCHEMA_EXPORTS = {
     "APPLICATION_SCHEMA",
@@ -50,6 +53,7 @@ _EXPECTED_SCHEMA_EXPORTS = {
     "ci_history_details",
     "ci_history_gaps",
     "ci_history_jobs",
+    "ci_history_population_bounds",
     "ci_history_rechecks",
     "ci_history_scans",
     "ci_job_measurement_reports",
@@ -299,6 +303,11 @@ _EXPECTED_TABLE_TOPOLOGY: tuple[tuple[str, str, Table], ...] = (
         "ci_coordinator.registered_epoch_reviews",
         "registered_epoch_reviews",
         registered_epoch_review_schema.registered_epoch_reviews,
+    ),
+    (
+        "ci_coordinator.ci_history_population_bounds",
+        "ci_history_population_bounds",
+        history_population_bound_schema.ci_history_population_bounds,
     ),
 )
 

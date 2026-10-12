@@ -105,6 +105,15 @@ export function historyStatus(snapshot: HistoryDataset | null = historyDataset()
             lastOutcome: "attempt_recorded",
             traversalComplete: false,
           },
+    populationBound:
+      snapshot === null
+        ? null
+        : {
+            createdFrom: "2020-01-01T00:00:00Z",
+            source: "explicit",
+            repositoryCreatedAt: null,
+            recordedAt: HISTORY_TIME,
+          },
     pendingRechecks: snapshot === null ? 0 : 2,
     discovery:
       snapshot === null

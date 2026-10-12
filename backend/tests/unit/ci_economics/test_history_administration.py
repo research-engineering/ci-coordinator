@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import cast
 
 import pytest
@@ -8,6 +8,7 @@ import pytest
 from ci_coordinator.ci_economics.archive_retention import DetailRetentionPolicy
 from ci_coordinator.ci_economics.history_administration import HistoryStatus
 from ci_coordinator.ci_economics.history_configuration import HistoryDefaults
+from ci_coordinator.ci_economics.history_population_bound import HistoryPopulationBound
 from ci_coordinator.config_control import RepositoryScope
 from ci_economics.archive_factories import (
     ARCHIVE_TIME,
@@ -85,3 +86,55 @@ def test_unconfigured_scope_has_defaults_and_zero_work_without_a_fake_dataset() 
 def test_each_status_relation_rejects_its_isolated_counterexample(patch: dict[str, object]) -> None:
     with pytest.raises((TypeError, ValueError)):
         cast(Callable[..., HistoryStatus], replace)(STATUS, **patch)
+
+
+def _population_bound(
+    created_from_days: int,
+    *,
+    scope: RepositoryScope = DATASET.scope,
+    generation: int = DATASET.generation,
+    configuration_revision: int = DATASET.configuration_revision,
+    recorded_at: datetime = ARCHIVE_TIME,
+) -> HistoryPopulationBound:
+    return HistoryPopulationBound(
+        scope,
+        generation,
+        ARCHIVE_TIME - timedelta(days=created_from_days),
+        "explicit",
+        None,
+        configuration_revision,
+        recorded_at,
+    )
+
+
+def test_status_projects_unrecorded_when_min_bound_differs_from_cursor() -> None:
+    # Kills: showing stale provenance after an old-writer expansion moved the cursor earlier.
+    current = replace(STATUS, population_bound=_population_bound(365))
+    assert current.current_population_bound == current.population_bound
+    stale = replace(STATUS, population_bound=_population_bound(300))
+    assert stale.current_population_bound is None
+    assert replace(STATUS, population_bound=None).current_population_bound is None
+
+
+@pytest.mark.parametrize(
+    "bound",
+    [
+        _population_bound(365, scope=RepositoryScope(101, 203)),
+        _population_bound(365, generation=2),
+        _population_bound(365, configuration_revision=2),
+        _population_bound(365, recorded_at=ARCHIVE_TIME + timedelta(microseconds=1)),
+        _population_bound(366),
+    ],
+)
+def test_status_rejects_population_bound_outside_current_dataset_authority(
+    bound: HistoryPopulationBound,
+) -> None:
+    with pytest.raises(ValueError, match="population bound"):
+        replace(STATUS, population_bound=bound)
+
+
+def test_status_rejects_a_bound_without_a_dataset() -> None:
+    with pytest.raises(ValueError, match="bound"):
+        replace(
+            STATUS, dataset=None, scan=None, discovery=None, population_bound=_population_bound(365)
+        )

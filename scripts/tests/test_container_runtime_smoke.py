@@ -22,7 +22,7 @@ _RESOURCE_PATTERN = re.compile(
 
 EXPECTED_SUCCESS_STDOUT = (
     "{\n"
-    '  "migrationHead": "20261011_0019 (head)",\n'
+    '  "migrationHead": "20261012_0020 (head)",\n'
     '  "migrationRevisions": [\n'
     '    "20260716_0001_initial_schema.py",\n'
     '    "20260901_0002_config_epoch_registration_operations.py",\n'
@@ -42,7 +42,8 @@ EXPECTED_SUCCESS_STDOUT = (
     '    "20260926_0016_retire_pending_review_authority.py",\n'
     '    "20260926_0017_explicit_review_renewal.py",\n'
     '    "20261011_0018_control_plane_logout_fence.py",\n'
-    '    "20261011_0019_registered_epoch_review.py"\n'
+    '    "20261011_0019_registered_epoch_review.py",\n'
+    '    "20261012_0020_history_population_bound.py"\n'
     "  ],\n"
     '  "operatorUiBundle": "admitted",\n'
     '  "pythonVersion": "Python 3.13.16",\n'
@@ -300,7 +301,8 @@ def test_python_entrypoint_preserves_docker_and_http_argv(tmp_path: Path) -> Non
         "'20260926_0016_retire_pending_review_authority.py', "
         "'20260926_0017_explicit_review_renewal.py', "
         "'20261011_0018_control_plane_logout_fence.py', "
-        "'20261011_0019_registered_epoch_review.py']"
+        "'20261011_0019_registered_epoch_review.py', "
+        "'20261012_0020_history_population_bound.py']"
     )
     build_tools_check = (
         "import importlib.metadata,shutil; "

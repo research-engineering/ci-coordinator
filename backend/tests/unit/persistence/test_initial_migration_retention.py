@@ -15,6 +15,7 @@ from ci_coordinator.persistence.compatibility_profile import load_bundled_profil
 from ci_coordinator.persistence.review_renewal_migration import renewal_declarations
 from ci_coordinator.persistence.schema_capabilities import (
     CI_ECONOMICS_EVIDENCE,
+    CI_HISTORY_POPULATION_BOUND,
     CONTROL_PLANE_LOGOUT_FENCE,
     REGISTERED_EPOCH_REVIEW,
 )
@@ -28,6 +29,9 @@ _ECONOMICS_MIGRATION_PATH = _MIGRATION_DIRECTORY / "20260904_0003_ci_economics_e
 _LOGOUT_FENCE_MIGRATION_PATH = _MIGRATION_DIRECTORY / "20261011_0018_control_plane_logout_fence.py"
 _REGISTERED_EPOCH_REVIEW_MIGRATION_PATH = (
     _MIGRATION_DIRECTORY / "20261011_0019_registered_epoch_review.py"
+)
+_POPULATION_BOUND_MIGRATION_PATH = (
+    _MIGRATION_DIRECTORY / "20261012_0020_history_population_bound.py"
 )
 _RETAINED_DATA_TABLES = (
     "active_config_epochs",
@@ -87,6 +91,7 @@ def test_published_bootstrap_is_the_root_of_the_forward_migration_chain() -> Non
         "20260926_0017_explicit_review_renewal.py",
         "20261011_0018_control_plane_logout_fence.py",
         "20261011_0019_registered_epoch_review.py",
+        "20261012_0020_history_population_bound.py",
     )
     assert migration.revision == "20260716_0001"
     assert migration.down_revision is None
@@ -197,6 +202,22 @@ def test_registered_epoch_review_migration_adds_only_its_capability_to_the_fence
         REGISTERED_EPOCH_REVIEW.declaration()
     }
     assert set(fence._SUCCESSOR.capabilities) < set(migration._SUCCESSOR.capabilities)
+
+
+def test_population_bound_migration_adds_only_its_capability_to_the_review_head() -> None:
+    review = _load_migration(_REGISTERED_EPOCH_REVIEW_MIGRATION_PATH, "registered_epoch_review")
+    migration = _load_migration(_POPULATION_BOUND_MIGRATION_PATH, "history_population_bound")
+
+    assert migration.revision == "20261012_0020"
+    assert migration.down_revision == review.revision
+    assert migration._PREDECESSOR == review._SUCCESSOR
+    assert migration._SUCCESSOR.transition_kind == "expand"
+    assert migration._SUCCESSOR.parent_revision_id == review.revision
+    assert migration._SUCCESSOR.generation == review._SUCCESSOR.generation + 1
+    assert set(migration._SUCCESSOR.capabilities) - set(review._SUCCESSOR.capabilities) == {
+        CI_HISTORY_POPULATION_BOUND.declaration()
+    }
+    assert set(review._SUCCESSOR.capabilities) < set(migration._SUCCESSOR.capabilities)
 
 
 def test_retained_data_catalog_is_exact() -> None:

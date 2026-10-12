@@ -107,6 +107,9 @@ from ci_coordinator.integrations.github.ci_economics_provider import (
 )
 from ci_coordinator.integrations.github.ci_economics_sources import GitHubCiEconomicsSources
 from ci_coordinator.integrations.github.ci_history_provider import GitHubHistoryProvider
+from ci_coordinator.integrations.github.ci_history_repository_creation import (
+    GitHubHistoryRepositoryCreation,
+)
 from ci_coordinator.integrations.github.ci_measurement_report_jobs import (
     GitHubMeasurementReportJobs,
 )
@@ -147,10 +150,11 @@ from ci_coordinator.persistence import (
 from ci_coordinator.persistence.activity_repository import PostgresActivityStore
 from ci_coordinator.persistence.analytics_purpose_store import TransactionalPurposeSettingsStore
 from ci_coordinator.persistence.ci_economics_budget_adapters import TransactionalBudgetPolicyStore
-from ci_coordinator.persistence.ci_history_adapters import TransactionalHistoryStore
+from ci_coordinator.persistence.ci_history_adapters import TransactionalHistoryAdministrationStore
 from ci_coordinator.persistence.ci_history_analytics import TransactionalHistoryAnalyticsStore
 from ci_coordinator.persistence.ci_history_read_adapters import TransactionalHistoryReadStore
 from ci_coordinator.persistence.ci_history_unit_of_work import (
+    PostgresHistoryAdministrationUnitOfWork,
     PostgresHistoryUnitOfWork,
     PostgresPurposeUnitOfWork,
 )
@@ -388,6 +392,9 @@ def _compose_connected_dependencies(
         def ci_history_uow() -> PostgresHistoryUnitOfWork:
             return PostgresHistoryUnitOfWork(engine)
 
+        def ci_history_administration_uow() -> PostgresHistoryAdministrationUnitOfWork:
+            return PostgresHistoryAdministrationUnitOfWork(engine)
+
         def purpose_uow() -> PostgresPurposeUnitOfWork:
             return PostgresPurposeUnitOfWork(engine)
 
@@ -469,7 +476,9 @@ def _compose_connected_dependencies(
             metrics=runtime_metrics,
             diagnostics=diagnostics,
         )
-        ci_history_store = TransactionalHistoryStore(ci_history_uow)
+        ci_history_store = TransactionalHistoryAdministrationStore(
+            ci_history_uow, administration_unit_of_work=ci_history_administration_uow
+        )
         ci_history_collection = CiHistoryCollectionService(
             store=ci_history_store,
             discovery=GitHubCiEconomicsSources(github),
@@ -920,7 +929,9 @@ def _compose_connected_dependencies(
                     role_admission=control_plane.role_admission,
                     mutation_admission=control_plane.mutation_admission,
                     use_case=CiHistoryAdministrationService(
-                        authorizer=control_plane_authorizer, store=ci_history_store
+                        authorizer=control_plane_authorizer,
+                        store=ci_history_store,
+                        creation_reader=GitHubHistoryRepositoryCreation(github),
                     ),
                 ),
                 ci_history_read=CiHistoryReadRouteDependencies(

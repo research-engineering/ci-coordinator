@@ -25,6 +25,9 @@ from ci_coordinator.persistence.ci_economics_schema_contract import (
 from ci_coordinator.persistence.ci_economics_v2_schema_contract import V2_CATALOG
 from ci_coordinator.persistence.ci_economics_v3_schema_contract import V3_CATALOG
 from ci_coordinator.persistence.ci_economics_v4_schema_contract import V4_CATALOG
+from ci_coordinator.persistence.ci_history_population_bound_schema_contract import (
+    history_population_bound_schema_matches_sync,
+)
 from ci_coordinator.persistence.ci_history_schema_attestation import history_default_is_valid_sync
 from ci_coordinator.persistence.ci_history_schema_contract import HISTORY_CATALOG
 from ci_coordinator.persistence.ci_observation_schema_contract import OBSERVATION_CATALOG
@@ -174,6 +177,7 @@ _CAPABILITY_ATTESTORS: Final[dict[str, CapabilityAttestor]] = {
         _ci_economics_matches(connection, HISTORY_CATALOG, "ci-actions-history-archive/v1")
         and history_default_is_valid_sync(connection)
     ),
+    "ci-actions-history-population-bound/v1": history_population_bound_schema_matches_sync,
     "control-plane-identity-state/v1": control_plane_identity_schema_matches_contract_sync,
     "control-plane-logout-fence/v1": control_plane_logout_fence_schema_matches_sync,
     "database-compatibility-protocol/v1": (compatibility_protocol_schema_matches_contract_sync),

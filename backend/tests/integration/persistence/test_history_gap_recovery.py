@@ -23,7 +23,9 @@ from ci_coordinator.ci_economics.history_rechecks import (
     initial_history_recheck,
 )
 from ci_coordinator.observability import RuntimeMetrics
-from ci_coordinator.persistence.ci_history_adapters import TransactionalHistoryStore
+from ci_coordinator.persistence.ci_history_adapters import (
+    TransactionalHistoryAdministrationStore,
+)
 from ci_coordinator.persistence.ci_history_gap_recovery import repair_history_gaps
 from ci_coordinator.persistence.ci_history_gap_store import store_history_gap
 from ci_coordinator.persistence.ci_history_recheck_codec import encode_history_recheck
@@ -46,7 +48,9 @@ from ._history_support import history_command, history_store
 pytestmark = pytest.mark.persistence
 
 
-async def _seed(store: TransactionalHistoryStore, *runs: int) -> tuple[HistoryRecheckGap, ...]:
+async def _seed(
+    store: TransactionalHistoryAdministrationStore, *runs: int
+) -> tuple[HistoryRecheckGap, ...]:
     configured = await store.configure_history(history_command())
     assert isinstance(configured, HistoryConfigured)
     gaps = []

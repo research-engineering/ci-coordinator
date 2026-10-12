@@ -1,5 +1,6 @@
 import { Database, ListChecks, ScanLine, TriangleAlert } from "lucide-react";
 import type { HistoryStatus } from "../../api/ciEconomics/historyStatusSchema";
+import { observationInstant } from "../../api/ciEconomics/observationSchema";
 import { formatDateTime, formatInteger } from "../../domain/format";
 import { retentionLabel } from "./HistorySettings";
 
@@ -31,7 +32,16 @@ export function HistoryProgress({ status }: { readonly status: HistoryStatus }) 
         <span>Initial traversal: {scan.traversalComplete ? "finished" : "pending"}</span>
         <span>Pending rechecks: {formatInteger(status.pendingRechecks)}</span>
         <span>Last outcome: {scan.lastOutcome?.replaceAll("_", " ") ?? "none recorded"}</span>
+        {status.populationBound ? (
+          <span>{populationBoundLabel(status.populationBound)}</span>
+        ) : null}
       </div>
+      {status.populationBound?.source === "repository_created_at" ? (
+        <p className="economics-prompt">
+          GitHub may no longer retain the oldest runs. Missing runs are recorded as gaps, not as
+          deletions, and completing this import does not prove that all history was captured.
+        </p>
+      ) : null}
       <details className="history-advanced">
         <summary>Scan and storage details</summary>
         <dl className="history-timeline">
@@ -119,6 +129,14 @@ export function HistoryProgress({ status }: { readonly status: HistoryStatus }) 
       </p>
     </section>
   );
+}
+
+function populationBoundLabel(bound: NonNullable<HistoryStatus["populationBound"]>): string {
+  const day = observationInstant(bound.createdFrom)?.slice(0, 10) ?? bound.createdFrom;
+  if (bound.source === "repository_created_at")
+    return `Lower bound ${day} (repository creation date, catalog ${bound.repositoryCreatedAt ?? "unknown"})`;
+  if (bound.source === "explicit") return `Lower bound ${day} (explicit date)`;
+  return `Lower bound ${day} (provenance not recorded)`;
 }
 
 function HistoryTime({ value }: { readonly value: string }) {

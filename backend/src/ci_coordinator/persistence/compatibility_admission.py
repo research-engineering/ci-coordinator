@@ -15,6 +15,9 @@ from ci_coordinator.persistence.ci_economics_schema_attestation import (
 from ci_coordinator.persistence.ci_economics_v2_schema_contract import V2_CATALOG
 from ci_coordinator.persistence.ci_economics_v3_schema_contract import V3_CATALOG
 from ci_coordinator.persistence.ci_economics_v4_schema_contract import V4_CATALOG
+from ci_coordinator.persistence.ci_history_population_bound_schema_contract import (
+    history_population_bound_schema_matches_contract,
+)
 from ci_coordinator.persistence.ci_history_schema_attestation import (
     ci_history_schema_matches_contract,
 )
@@ -121,6 +124,12 @@ async def admit_schema_dependent_operation(
             await registered_epoch_review_schema_matches_contract(connection)
         ):
             raise DatabaseCapabilityUnavailable("registered-epoch review schema facts do not match")
+        if "ci-actions-history-population-bound/v1" in capability_ids and not (
+            await history_population_bound_schema_matches_contract(connection)
+        ):
+            raise DatabaseCapabilityUnavailable(
+                "history population-bound schema facts do not match"
+            )
         if "audit-ledger/v1" in capability_ids and not await schema_matches_contract(connection):
             raise DatabaseCapabilityUnavailable("audit ledger schema facts do not match")
         if (

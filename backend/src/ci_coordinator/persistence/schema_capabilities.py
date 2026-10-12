@@ -561,6 +561,23 @@ CI_HISTORY_ARCHIVE = CapabilityDefinition(
     privilege_requirements=("runtime-actions-history-no-permanent-erasure-dml/v1",),
 )
 
+CI_HISTORY_POPULATION_BOUND = CapabilityDefinition(
+    capability_id="ci-actions-history-population-bound/v1",
+    schema_requirements=("ci_coordinator.ci_history_population_bounds/v1",),
+    read_domain_id="generation-scoped-monotonic-population-bound-provenance/v1",
+    write_domain_id="configuration-transaction-append-only-bound-provenance/v1",
+    codec_id="population-bound-source-columns/v1",
+    backfill_state_id="no-provenance-for-pre-capability-bounds/v1",
+    bridge_constraint_ids=(
+        "ci_coordinator.fk_ci_history_population_bounds_dataset/v1",
+        "ci_coordinator.ck_ci_history_population_bounds_identity/v1",
+        "ci_coordinator.ck_ci_history_population_bounds_source/v1",
+        "ci_coordinator.ck_ci_history_population_bounds_catalog_floor/v1",
+    ),
+    routine_requirements=(),
+    privilege_requirements=("runtime-history-population-bound-select-insert/v1",),
+)
+
 ANALYTICS_PURPOSE_SETTINGS = CapabilityDefinition(
     capability_id="ci-analytics-purpose-settings/v1",
     schema_requirements=("ci_coordinator.analytics_purpose_settings/v1",),
@@ -597,6 +614,7 @@ _CAPABILITY_DEFINITIONS = {
     CI_ECONOMICS_EVIDENCE_V4.capability_id: CI_ECONOMICS_EVIDENCE_V4,
     CI_REPOSITORY_OBSERVATION.capability_id: CI_REPOSITORY_OBSERVATION,
     CI_HISTORY_ARCHIVE.capability_id: CI_HISTORY_ARCHIVE,
+    CI_HISTORY_POPULATION_BOUND.capability_id: CI_HISTORY_POPULATION_BOUND,
     RUNTIME_INGRESS_ISSUANCE_STATE_V2.capability_id: RUNTIME_INGRESS_ISSUANCE_STATE_V2,
     SHADOW_RECONCILIATION_STATE_V2.capability_id: SHADOW_RECONCILIATION_STATE_V2,
     PRODUCTION_GENERATION_CUTOVER.capability_id: PRODUCTION_GENERATION_CUTOVER,
@@ -761,6 +779,15 @@ def ci_history_requirements(profile: CompatibilityProfile) -> tuple[CapabilityDe
     return required_capabilities(
         profile,
         (*audit_ledger_requirements(profile), CI_HISTORY_ARCHIVE.declaration()),
+    )
+
+
+def ci_history_administration_requirements(
+    profile: CompatibilityProfile,
+) -> tuple[CapabilityDeclaration, ...]:
+    return required_capabilities(
+        profile,
+        (*ci_history_requirements(profile), CI_HISTORY_POPULATION_BOUND.declaration()),
     )
 
 

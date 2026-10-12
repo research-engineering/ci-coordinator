@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -7,7 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncConnection
 from ci_coordinator.ci_economics.archive_detail import ArchivedAttemptDetail
 from ci_coordinator.ci_economics.archive_statistics import ArchivedAttemptStatistics
 from ci_coordinator.ci_economics.discovery import ProviderObservationPage
-from ci_coordinator.ci_economics.history_administration import HistoryStatus
+from ci_coordinator.ci_economics.history_administration import (
+    HistoryStatus,
+    RepositoryCreationObserved,
+)
 from ci_coordinator.ci_economics.history_commands import (
     ConfigureHistory,
     HistoryConfigurationResult,
@@ -41,7 +44,10 @@ from ci_coordinator.persistence.ci_history_completion import (
     defer_history_claim,
     handoff_discovered_history_run,
 )
-from ci_coordinator.persistence.ci_history_configuration_store import configure_history
+from ci_coordinator.persistence.ci_history_configuration_store import (
+    configure_history,
+    find_history_receipt,
+)
 from ci_coordinator.persistence.ci_history_delivery_transfer import (
     list_history_delivery_scopes,
     transfer_history_deliveries,
@@ -62,26 +68,16 @@ from ci_coordinator.persistence.ci_history_recheck_rows import (
     enqueue_history_recheck,
 )
 from ci_coordinator.persistence.ci_history_state_store import HistoryWriteConflict
-from ci_coordinator.persistence.ci_history_unit_of_work import PostgresHistoryUnitOfWork
+from ci_coordinator.persistence.ci_history_unit_of_work import (
+    PostgresHistoryAdministrationUnitOfWork,
+    PostgresHistoryUnitOfWork,
+)
 from ci_coordinator.persistence.errors import PersistenceError
 
 
 class TransactionalHistoryStore:
     def __init__(self, unit_of_work: Callable[[], PostgresHistoryUnitOfWork]) -> None:
         self._unit_of_work = unit_of_work
-
-    async def configure_history(self, command: ConfigureHistory) -> HistoryConfigurationResult:
-        async with self._transaction() as transaction:
-            result = await configure_history(
-                transaction.history_connection, transaction.history_audit, command
-            )
-            if isinstance(result, HistoryConfigured) and not result.replayed:
-                await transaction.commit()
-            return result
-
-    async def history_status(self, scope: RepositoryScope) -> HistoryStatus:
-        async with self._transaction() as transaction:
-            return await history_status(transaction.history_connection, scope)
 
     async def expire_details(self) -> int:
         async with self._transaction() as transaction:
@@ -233,10 +229,58 @@ class TransactionalHistoryStore:
     async def wait_for_history_attempt(self, claim: HistoryRecheckClaim) -> HistoryTransition:
         return await self._complete(lambda connection: wait_for_history_attempt(connection, claim))
 
-    @asynccontextmanager
-    async def _transaction(self) -> AsyncIterator[PostgresHistoryUnitOfWork]:
-        try:
-            async with self._unit_of_work() as transaction:
-                yield transaction
-        except (PersistenceError, SQLAlchemyError, TypeError, ValueError) as error:
-            raise CiEconomicsStoreUnavailable("history transaction unavailable") from error
+    def _transaction(self) -> AbstractAsyncContextManager[PostgresHistoryUnitOfWork]:
+        return _history_transaction(self._unit_of_work)
+
+
+class TransactionalHistoryAdministrationStore(TransactionalHistoryStore):
+    """Configuration and status additionally require population-bound provenance."""
+
+    def __init__(
+        self,
+        unit_of_work: Callable[[], PostgresHistoryUnitOfWork],
+        *,
+        administration_unit_of_work: Callable[[], PostgresHistoryAdministrationUnitOfWork],
+    ) -> None:
+        super().__init__(unit_of_work)
+        self._administration_unit_of_work = administration_unit_of_work
+
+    async def find_history_receipt(
+        self, command: ConfigureHistory
+    ) -> HistoryConfigurationResult | None:
+        async with _history_transaction(self._administration_unit_of_work) as transaction:
+            return await find_history_receipt(
+                transaction.history_connection, transaction.history_audit, command
+            )
+
+    async def configure_history(
+        self,
+        command: ConfigureHistory,
+        *,
+        verified_creation: RepositoryCreationObserved | None = None,
+    ) -> HistoryConfigurationResult:
+        async with _history_transaction(self._administration_unit_of_work) as transaction:
+            result = await configure_history(
+                transaction.history_connection,
+                transaction.history_audit,
+                command,
+                verified_creation=verified_creation,
+            )
+            if isinstance(result, HistoryConfigured) and not result.replayed:
+                await transaction.commit()
+            return result
+
+    async def history_status(self, scope: RepositoryScope) -> HistoryStatus:
+        async with _history_transaction(self._administration_unit_of_work) as transaction:
+            return await history_status(transaction.history_connection, scope)
+
+
+@asynccontextmanager
+async def _history_transaction[UnitOfWork: PostgresHistoryUnitOfWork](
+    unit_of_work: Callable[[], UnitOfWork],
+) -> AsyncIterator[UnitOfWork]:
+    try:
+        async with unit_of_work() as transaction:
+            yield transaction
+    except (PersistenceError, SQLAlchemyError, TypeError, ValueError) as error:
+        raise CiEconomicsStoreUnavailable("history transaction unavailable") from error

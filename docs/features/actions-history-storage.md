@@ -37,6 +37,7 @@ without loading a repository's complete history or retaining expired detail.
 | Gap                | Bounded scope/scan/interval or exact attempt observation; missing access or 404 is not deletion authority.                                                                                                     |
 | Recheck queue      | Bounded pending run intervals for recent hints and historical repair, with separate source reserve, retry eligibility and exact hard-lease authority.                                                          |
 | Delivery inbox     | At most one compact child per supported retained run observation, with its exact source fingerprint, pending hint and delivered dataset generation. No raw payload, cursor or permanent statistical authority. |
+| Population bound   | Append-only provenance of each lower bound set in one generation (`explicit` or verified `repository_created_at`), keyed by scope/generation/bound; owned by `ci-actions-history-population-bound/v1`.         |
 
 One page holds at most 100 discovered runs. The persisted pending page lets a
 worker consume one attempt at a time before advancing the outer cursor, without
@@ -449,11 +450,52 @@ never expose a retired generation. Old claims and ordinary rescans cannot
 recreate erased rows; starting a new dataset requires explicit authorization.
 Do not reset occupied quota before the corresponding rows are removed.
 
+Population-bound provenance references its dataset with `ON DELETE RESTRICT`.
+Erasure must delete `ci_history_population_bounds` rows before their dataset
+row (child first); forgetting it fails closed by blocking the dataset delete.
+Generation fencing already hides older-generation rows from status.
+
 This first scope does not claim fine-grained privacy erasure or deletion of
 backups. Restore must reconcile current deletion fences before accepting
 writers or exposing archived data. All-copy conservation and backup expiry
 remain deployment obligations; a live SQL delete is not a complete erasure
 receipt.
+
+### Population-Bound Rollout And Rollback
+
+Expand revision `20261012_0020` adds only `ci_history_population_bounds`, its
+constraints and its PUBLIC revocation behind the additive capability
+`ci-actions-history-population-bound/v1`; the archive v1 catalog, codecs and
+receipt bytes are unchanged. History configuration and status require the new
+capability; worker, gap-repair, read and analytics units do not. The runtime
+mapping `RUNTIME_TABLE_GRANTS` grants only `SELECT` and `INSERT` on the relation.
+
+Preserving `ci-actions-history-archive/v1` keeps the data compatible, not the
+role. A predecessor binary attests the runtime role against its own exact
+manifest and rejects any privilege on a relation outside it, as in the
+[observation precedent](repository-observation.md) and
+[database access provisioning](../architecture/modules/database-access-provisioning.md).
+The shared runtime role therefore requires a drain in both directions; no
+zero-downtime coexistence is claimed.
+
+Forward: stop predecessor replicas; run the migration as the migration
+principal; run the successor image's `database-access apply`, which rejects
+live role sessions, revokes every privilege and installs the successor's exact
+grants; start the successor image. Code-only rollback: stop successor replicas;
+run the predecessor image's `database-access apply`, whose full revocation
+removes the relation grants; start the predecessor image, whose capability set
+is still provided. The relation and its rows stay, unreachable by the runtime
+role. Roll forward again repeats the successor apply and start; bounds set during
+the rollback show as `unrecorded`. Version-specific runtime roles would allow
+overlap but are a platform identity decision outside this capability.
+
+Native PostgreSQL witnesses project the predecessor's exact manifest (the
+successor grants minus this relation) into the version-shared apply and
+attestation code: the predecessor closure is admitted after expand, a
+successor-provisioned role fails predecessor attestation, and predecessor
+apply removes the relation grants. They do not run the real predecessor image;
+that remains the shared predecessor-image rollback witness for expand
+migrations, not claimed here.
 
 ## Acceptance
 

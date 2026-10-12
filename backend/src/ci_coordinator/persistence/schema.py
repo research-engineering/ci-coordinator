@@ -58,6 +58,9 @@ from ci_coordinator.persistence._schema_ci_history_archive import (
 from ci_coordinator.persistence._schema_ci_history_delivery import (
     ci_history_delivery_inbox as ci_history_delivery_inbox,
 )
+from ci_coordinator.persistence._schema_ci_history_population_bound import (
+    ci_history_population_bounds as ci_history_population_bounds,
+)
 from ci_coordinator.persistence._schema_analytics_purpose import (
     analytics_purpose_settings as analytics_purpose_settings,
 )
@@ -121,6 +124,7 @@ __all__ = (
     "ci_history_details",
     "ci_history_gaps",
     "ci_history_jobs",
+    "ci_history_population_bounds",
     "ci_history_rechecks",
     "ci_history_scans",
     "ci_job_measurement_reports",

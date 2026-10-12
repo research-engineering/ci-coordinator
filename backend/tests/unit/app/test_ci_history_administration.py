@@ -15,13 +15,18 @@ from ci_coordinator.app import ci_history_administration
 from ci_coordinator.app.ci_economics import CiEconomicsReadForbidden, CiEconomicsReadUnavailable
 from ci_coordinator.app.ci_history_administration import CiHistoryAdministrationService
 from ci_coordinator.ci_economics.archive_retention import DetailRetentionPolicy
-from ci_coordinator.ci_economics.history_administration import HistoryStatus
+from ci_coordinator.ci_economics.history_administration import (
+    HistoryStatus,
+    RepositoryCreationObserved,
+    RepositoryCreationUnavailable,
+)
 from ci_coordinator.ci_economics.history_commands import (
     ConfigureHistory,
     HistoryConfigurationConflict,
     HistoryConfigurationInvalid,
     HistoryConfigurationResult,
     HistoryConfigured,
+    HistoryPopulationSourceRefused,
 )
 from ci_coordinator.ci_economics.history_configuration import HistoryConfiguration, HistoryDefaults
 from ci_coordinator.ci_economics.history_gap_recovery import (
@@ -44,6 +49,16 @@ COMMAND = ConfigureHistory(
     rescan=False,
     operationId="configure-history",
     actor="admin",
+)
+CATALOG_CREATED_AT = ARCHIVE_TIME.replace(hour=12, minute=34, second=56)
+CATALOG_COMMAND = ConfigureHistory.model_validate(
+    {
+        **COMMAND.model_dump(),
+        "populationBoundSource": {
+            "kind": "repository_created_at",
+            "repositoryCreatedAt": CATALOG_CREATED_AT.isoformat(),
+        },
+    }
 )
 RECEIPT = HistoryConfigured(DATASET, False)
 STATUS = HistoryStatus(
@@ -75,6 +90,10 @@ class Boundary:
     receipt: HistoryConfigurationResult = RECEIPT
     snapshot: HistoryStatus = STATUS
     gap_receipt: HistoryGapRepairResult = GAP_RESULT
+    retained: HistoryConfigurationResult | None = None
+    creation: RepositoryCreationObserved | RepositoryCreationUnavailable | BaseException = field(
+        default_factory=lambda: RepositoryCreationObserved(COMMAND.scope, CATALOG_CREATED_AT)
+    )
     calls: list[tuple[str, object]] = field(default_factory=list)
 
     async def allows_scope(self, *, actor: str, scope: RepositoryScope) -> bool:
@@ -88,9 +107,28 @@ class Boundary:
         if self.store_error is not None:
             raise self.store_error
 
-    async def configure_history(self, command: ConfigureHistory) -> HistoryConfigurationResult:
-        self.record("configure", command)
+    async def find_history_receipt(
+        self, command: ConfigureHistory
+    ) -> HistoryConfigurationResult | None:
+        self.record("receipt", command)
+        return self.retained
+
+    async def configure_history(
+        self,
+        command: ConfigureHistory,
+        *,
+        verified_creation: RepositoryCreationObserved | None = None,
+    ) -> HistoryConfigurationResult:
+        self.record("configure", command if verified_creation is None else verified_creation)
         return self.receipt
+
+    async def read_repository_created_at(
+        self, scope: RepositoryScope
+    ) -> RepositoryCreationObserved | RepositoryCreationUnavailable:
+        self.calls.append(("provider", scope))
+        if isinstance(self.creation, BaseException):
+            raise self.creation
+        return self.creation
 
     async def history_status(self, scope: RepositoryScope) -> HistoryStatus:
         self.record("status", scope)
@@ -101,7 +139,7 @@ class Boundary:
         return self.gap_receipt
 
     def service(self) -> CiHistoryAdministrationService:
-        return CiHistoryAdministrationService(authorizer=self, store=self)
+        return CiHistoryAdministrationService(authorizer=self, store=self, creation_reader=self)
 
 
 async def invoke(boundary: Boundary, operation: Operation) -> object:
@@ -248,7 +286,12 @@ async def test_authorization_and_storage_share_one_deadline(
             await asyncio.Event().wait()
             raise AssertionError("operation continued past the shared deadline")
 
-        async def configure_history(self, command: ConfigureHistory) -> HistoryConfigurationResult:
+        async def configure_history(
+            self,
+            command: ConfigureHistory,
+            *,
+            verified_creation: RepositoryCreationObserved | None = None,
+        ) -> HistoryConfigurationResult:
             await asyncio.Event().wait()
             raise AssertionError("operation continued past the shared deadline")
 
@@ -286,3 +329,115 @@ async def test_gap_repair_rejects_foreign_or_malformed_result(variant: str) -> N
         )
     )
     assert await invoke(Boundary(gap_receipt=result), "repair") == CiEconomicsReadUnavailable()
+
+
+async def test_catalog_source_reads_provider_after_authorization_before_store() -> None:
+    # Kills: a provider read before authorization or inside the store transaction.
+    boundary = Boundary()
+    assert await boundary.service().configure(CATALOG_COMMAND) == RECEIPT
+    assert boundary.calls == [
+        ("authorize", (COMMAND.actor, COMMAND.scope)),
+        ("receipt", CATALOG_COMMAND),
+        ("provider", COMMAND.scope),
+        ("configure", RepositoryCreationObserved(COMMAND.scope, CATALOG_CREATED_AT)),
+    ]
+
+
+async def test_forbidden_actor_never_reads_provider() -> None:
+    boundary = Boundary(allowed=False)
+    assert await boundary.service().configure(CATALOG_COMMAND) == CiEconomicsReadForbidden()
+    assert boundary.calls == [("authorize", (COMMAND.actor, COMMAND.scope))]
+
+
+async def test_explicit_request_never_reads_provider() -> None:
+    # Kills: a provider read added to ordinary explicit-date saves.
+    boundary = Boundary(creation=AssertionError("explicit save read the provider"))
+    assert await boundary.service().configure(COMMAND) == RECEIPT
+    assert [call for call, _ in boundary.calls] == ["authorize", "configure"]
+
+
+async def test_retained_receipt_replays_without_provider_read() -> None:
+    # Kills: re-reading GitHub on retained-receipt replay.
+    replay = HistoryConfigured(DATASET, True)
+    boundary = Boundary(retained=replay, creation=AssertionError("replay read the provider"))
+    assert await boundary.service().configure(CATALOG_COMMAND) == replay
+    assert [call for call, _ in boundary.calls] == ["authorize", "receipt"]
+
+
+@pytest.mark.parametrize(
+    "creation,reason",
+    [
+        (RepositoryCreationObserved(COMMAND.scope, None), "creation_date_missing"),
+        (
+            RepositoryCreationObserved(COMMAND.scope, CATALOG_CREATED_AT.replace(second=57)),
+            "creation_date_mismatch",
+        ),
+    ],
+)
+async def test_missing_or_mismatched_creation_date_refuses_without_store_call(
+    creation: RepositoryCreationObserved, reason: str
+) -> None:
+    # Kills: accepting the client assertion, or substituting a fallback floor.
+    boundary = Boundary(creation=creation)
+    assert await boundary.service().configure(CATALOG_COMMAND) == HistoryPopulationSourceRefused(
+        cast(Literal["creation_date_missing", "creation_date_mismatch"], reason)
+    )
+    assert [call for call, _ in boundary.calls] == ["authorize", "receipt", "provider"]
+
+
+@pytest.mark.parametrize(
+    "creation",
+    [
+        RepositoryCreationUnavailable("provider_unavailable"),
+        RepositoryCreationUnavailable("provider_malformed"),
+        RepositoryCreationUnavailable("provider_binding_mismatch"),
+        RepositoryCreationObserved(RepositoryScope(101, 203), CATALOG_CREATED_AT),
+    ],
+)
+async def test_provider_unavailable_or_binding_mismatch_is_unavailable_and_opens_no_transaction(
+    creation: RepositoryCreationObserved | RepositoryCreationUnavailable,
+) -> None:
+    # Kills: treating provider failure as missing metadata (422), or proceeding to the store.
+    boundary = Boundary(creation=creation)
+    assert await boundary.service().configure(CATALOG_COMMAND) == CiEconomicsReadUnavailable()
+    assert "configure" not in [call for call, _ in boundary.calls]
+
+
+async def test_cancellation_during_provider_read_propagates_without_store_call() -> None:
+    boundary = Boundary(creation=asyncio.CancelledError())
+    with pytest.raises(asyncio.CancelledError):
+        await boundary.service().configure(CATALOG_COMMAND)
+    assert [call for call, _ in boundary.calls] == ["authorize", "receipt", "provider"]
+
+
+async def test_deadline_covers_provider_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Kills: reading the provider outside the shared administration deadline.
+    deadline = asyncio.Timeout(None)
+    monkeypatch.setattr(asyncio, "timeout", lambda _seconds: deadline)
+
+    class SlowProvider(Boundary):
+        async def read_repository_created_at(
+            self, scope: RepositoryScope
+        ) -> RepositoryCreationObserved | RepositoryCreationUnavailable:
+            self.calls.append(("provider", scope))
+            deadline.reschedule(asyncio.get_running_loop().time())
+            await asyncio.Event().wait()
+            raise AssertionError("provider read continued past the shared deadline")
+
+    boundary = SlowProvider()
+    assert await boundary.service().configure(CATALOG_COMMAND) == CiEconomicsReadUnavailable()
+    assert "configure" not in [call for call, _ in boundary.calls]
+    assert deadline.expired()
+
+
+@pytest.mark.parametrize(
+    "reason", ["creation_date_missing", "creation_date_mismatch", "creation_date_in_future"]
+)
+async def test_store_population_refusal_is_preserved(reason: str) -> None:
+    refusal = HistoryPopulationSourceRefused(
+        cast(
+            Literal["creation_date_missing", "creation_date_mismatch", "creation_date_in_future"],
+            reason,
+        )
+    )
+    assert await Boundary(receipt=refusal).service().configure(CATALOG_COMMAND) == refusal

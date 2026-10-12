@@ -24,6 +24,9 @@ from ci_coordinator.persistence._schema_ci_history_control import (
     ci_history_datasets,
     ci_history_scans,
 )
+from ci_coordinator.persistence._schema_ci_history_population_bound import (
+    ci_history_population_bounds,
+)
 from ci_coordinator.persistence.ci_history_configuration_store import _validate_receipt
 from ci_coordinator.persistence.ci_history_state_store import (
     load_history_dataset,
@@ -222,7 +225,10 @@ def test_expansion_replay_requires_the_current_lower_bound_to_cover_its_receipt(
         _validate_receipt(command, snapshot, snapshot, history_scan(snapshot, days=365))
 
 
-@pytest.mark.parametrize("relation", ["audit_events", "ci_history_datasets", "ci_history_scans"])
+@pytest.mark.parametrize(
+    "relation",
+    ["audit_events", "ci_history_datasets", "ci_history_scans", "ci_history_population_bounds"],
+)
 def test_configuration_failure_rolls_back_audit_dataset_and_scan_together(
     runtime_postgres_database_url: str,
     relation: str,
@@ -249,7 +255,12 @@ def test_configuration_failure_rolls_back_audit_dataset_and_scan_together(
                 event.remove(engine.sync_engine, "after_cursor_execute", reject_write)
             assert injected
             async with engine.connect() as connection:
-                for table in (audit_events, ci_history_datasets, ci_history_scans):
+                for table in (
+                    audit_events,
+                    ci_history_datasets,
+                    ci_history_scans,
+                    ci_history_population_bounds,
+                ):
                     assert await connection.scalar(select(func.count()).select_from(table)) == 0
             result = await adapter.configure_history(history_command())
             assert isinstance(result, HistoryConfigured) and not result.replayed

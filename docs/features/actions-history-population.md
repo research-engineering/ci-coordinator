@@ -28,14 +28,63 @@ its lower bound comes from repository creation metadata or an explicit bounded
 administrator request, not from the active-evidence registration window.
 
 The [installation repository catalog](https://docs.github.com/en/rest/apps/installations#list-repositories-accessible-to-the-app-installation)
-may expose an admitted repository creation timestamp as a
-UI shortcut for that explicit request. The timestamp is advisory: missing or
-malformed metadata cannot authorize a guessed bound, and a creation date does
-not prove that GitHub still retains every run. The administrator must select
-the shortcut and save the configuration; a deep link without catalog metadata
-continues to accept a manually entered date. The UTC calendar day is rounded
-down to midnight so a run created earlier on the same day is not omitted.
+may expose an admitted repository creation timestamp. Provisional owner
+decision (2026-10-11), Q-007 (a): an explicit administrative "All available"
+choice resolves to that creation instant floored to its UTC calendar day, at
+save time. The floor keeps a run created earlier on the same day. The choice
+is never automatic: enabling collection selects no bound and imports nothing,
+and the initial save still requires either "All available" or an explicit
+date. There is no guessed fallback floor. Missing, malformed or future catalog
+metadata refuses "All available" with an explicit reason, and a deep link
+without catalog metadata continues to accept only a manually entered date.
 Selection is scoped to the current repository and browser authority revision.
+A creation date does not prove that GitHub still retains every run, so the UI
+states that the oldest runs may no longer be retained; missing runs remain
+gaps, not deletions.
+
+The command carries `populationBoundSource = {kind: "repository_created_at",
+repositoryCreatedAt}` only with that choice, and its bound must equal the UTC-day
+floor of the asserted instant. The server does not trust the assertion: after
+repository authorization, outside the database transaction and inside the
+existing administration deadline, it reads the scoped repository once through
+the admitted installation-token `GET /repositories/{id}` operation and requires
+the reported creation instant to equal the asserted one
+([administration](actions-history-administration.md#catalog-population-source)).
+A retained receipt replays without that read. The server holds no catalog
+record of creation time: inventory is a live provider projection and persisting
+it was [rejected](../decisions/provider-inventory-authorization.md).
+
+### Recorded Bound Provenance
+
+Capability `ci-actions-history-population-bound/v1` owns the append-only
+relation `ci_history_population_bounds`. The configuration transaction inserts
+one row whenever it sets a backfill lower bound: the initial bound and every
+strictly earlier expansion. A row records scope, dataset generation, the exact
+`created_from`, its source (`explicit` or `repository_created_at`), the verified
+catalog instant for a catalog source, the configuration revision and database
+time. Rescan, selector change, pause/resume and policy edits keep the cursor
+bound and therefore add no row.
+
+Within one generation the backfill `created_from` never increases: the initial
+bound is set once, restarts keep it and expansion is strictly earlier. Every
+recorded row is therefore at or after the current bound, and the earliest row
+equals the current bound exactly when that bound was recorded. Status projects
+that earliest current-generation row only when it equals the cursor bound;
+otherwise, for example after an expansion by a predecessor binary that writes
+no row, the bound is shown as `unrecorded`. Generation fencing scopes rows away
+after erasure. Pre-capability bounds have no row and are never backfilled with
+guessed provenance.
+
+The relation exists because a deterministically keyed companion audit event
+would make the audit ledger the only persisted home of a status field. That is
+forbidden: [persistence](../architecture/modules/persistence.md) states that
+the audit ledger does not replace query tables, and the
+[configuration lifecycle](api-first-configuration-lifecycle.md) keeps the ledger
+out of query and replay authority. Changing the archive v1 scan or dataset
+codec, the receipt payload or the v1 catalog would instead retire
+`ci-actions-history-archive/v1`. An owner amendment admitting exact-key,
+atomically paired audit events as a bounded projection source would revisit
+this choice.
 
 ## Frozen Identity And Progress
 
@@ -75,8 +124,9 @@ revision after the database lock. Pause or erasure invalidates old writers.
 ### Explicit Earlier-Bound Expansion
 
 An administrator may explicitly move the configured lower bound to an earlier
-whole UTC second. This is an existing-dataset configuration command, not a
-provider-discovered creation date or an implicit effect of ordinary rescan.
+whole UTC second. This is an existing-dataset configuration command, never an
+implicit effect of ordinary rescan or a provider-discovered date applied
+without the explicit "All available" choice above.
 It requires the exact current configuration revision, a new operation ID, the
 same authorization and audit transaction, and a bound strictly earlier than
 the current backfill cursor's `created_from`. Moving the bound forward or

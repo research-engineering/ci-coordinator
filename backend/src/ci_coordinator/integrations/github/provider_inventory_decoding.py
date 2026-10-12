@@ -157,7 +157,7 @@ def _decode_repository(value: object, *, installation_id: int) -> RepositorySumm
     owner_login = _bounded_text(owner.get("login"), maximum_bytes=512)
     flags = tuple(repository.get(name) for name in ("archived", "disabled", "fork"))
     raw_created_at = repository.get("created_at")
-    created_at = _repository_created_at(raw_created_at)
+    created_at = decode_repository_created_at(raw_created_at)
     if (
         repository_id is None
         or node_id is None
@@ -190,7 +190,7 @@ def _decode_repository(value: object, *, installation_id: int) -> RepositorySumm
         return None
 
 
-def _repository_created_at(value: object) -> datetime | None:
+def decode_repository_created_at(value: object) -> datetime | None:
     if value is None or type(value) is not str:
         return None
     if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z", value) is None:

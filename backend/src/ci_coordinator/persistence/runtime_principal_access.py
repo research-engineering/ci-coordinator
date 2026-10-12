@@ -85,6 +85,7 @@ RUNTIME_TABLE_GRANTS: Final[Mapping[str, tuple[LiteralString, ...]]] = MappingPr
         "ci_history_gaps": ("SELECT", "INSERT"),
         "ci_history_rechecks": ("SELECT", "INSERT", "DELETE"),
         "ci_history_delivery_inbox": ("SELECT", "INSERT"),
+        "ci_history_population_bounds": ("SELECT", "INSERT"),
         "issued_plan_envelopes": ("SELECT", "INSERT"),
         "production_admission_authorities": ("SELECT", "INSERT"),
         "production_admission_scope_bindings": ("SELECT", "INSERT"),

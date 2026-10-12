@@ -33,6 +33,7 @@ from ci_coordinator.ci_economics.history_commands import (
     HistoryConfigurationInvalid,
     HistoryConfigurationRequest,
     HistoryConfigured,
+    HistoryPopulationSourceRefused,
 )
 from ci_coordinator.ci_economics.history_gap_recovery import (
     HistoryGapRepairRequest,
@@ -130,6 +131,7 @@ def build_ci_history_router(dependencies: CiHistoryRouteDependencies) -> APIRout
             **_ERRORS,
             400: {"model": EconomicsSourceErrorResponse | HistoryMutationResponse},
             409: {"model": HistoryMutationResponse},
+            422: {"model": InvalidRequestBody | HistoryMutationResponse},
         },
     )
     async def configure(
@@ -152,13 +154,22 @@ def build_ci_history_router(dependencies: CiHistoryRouteDependencies) -> APIRout
                 snapshot=HistoryDatasetPayload.model_validate(result.snapshot.canonical_mapping()),
             )
             return JSONResponse(response.to_wire_mapping(), headers=_NO_STORE)
-        if isinstance(result, HistoryConfigurationConflict | HistoryConfigurationInvalid):
+        if isinstance(
+            result,
+            HistoryConfigurationConflict
+            | HistoryConfigurationInvalid
+            | HistoryPopulationSourceRefused,
+        ):
             response = HistoryMutationResponse(
                 operation_id=body.operation_id, outcome=result.reason, snapshot=None
             )
             return JSONResponse(
                 response.to_wire_mapping(),
-                status_code=409 if isinstance(result, HistoryConfigurationConflict) else 400,
+                status_code=409
+                if isinstance(result, HistoryConfigurationConflict)
+                else 422
+                if isinstance(result, HistoryPopulationSourceRefused)
+                else 400,
                 headers=_NO_STORE,
             )
         return _access_error(result)

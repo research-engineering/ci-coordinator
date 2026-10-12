@@ -5,7 +5,9 @@ import {
   type HistoryCommand,
   type HistoryConfiguration,
   type HistoryMutation,
+  historyCatalogBoundSource,
   historyCommandSchema,
+  historyCreationDay,
   sameHistoryConfiguration,
 } from "../../api/ciEconomics/historySchema";
 import type { HistoryStatus } from "../../api/ciEconomics/historyStatusSchema";
@@ -25,6 +27,9 @@ type WriteState =
   | { readonly kind: "idle" }
   | { readonly kind: "pending" | "uncertain"; readonly command: HistoryCommand }
   | { readonly kind: "rejected"; readonly message: string };
+type InitialRange = "unset" | "all" | "specific";
+const RETENTION_NOTICE =
+  "GitHub may no longer retain the oldest runs. Missing runs are recorded as gaps, not as deletions, and completing this import does not prove that all history was captured.";
 
 export function HistoryEditor({
   scope,
@@ -46,6 +51,8 @@ export function HistoryEditor({
   const [draft, setDraft] = useState(snapshot?.configuration ?? INITIAL);
   const [initialDate, setInitialDate] = useState("");
   const [expandedDate, setExpandedDate] = useState("");
+  const [initialRange, setInitialRange] = useState<InitialRange>("unset");
+  const [allAvailable, setAllAvailable] = useState(false);
   const [rescan, setRescan] = useState(false);
   const [operationId, setOperationId] = useState(() => crypto.randomUUID());
   const [write, setWrite] = useState<WriteState>({ kind: "idle" });
@@ -59,6 +66,27 @@ export function HistoryEditor({
   const configurationChanged =
     base !== null && !sameHistoryConfiguration(base.configuration, draft);
   const changed = base === null || rescan || expandedDate !== "" || configurationChanged;
+  const catalogSource =
+    repositoryCreatedAt === undefined ? undefined : historyCatalogBoundSource(repositoryCreatedAt);
+  const creationInstant = catalogSource
+    ? observationMicroseconds(catalogSource.repositoryCreatedAt)
+    : undefined;
+  const observedInstant = observationMicroseconds(status.observedAt);
+  const creationDate =
+    catalogSource !== undefined &&
+    creationInstant !== undefined &&
+    observedInstant !== undefined &&
+    creationInstant <= observedInstant
+      ? historyCreationDay(catalogSource.repositoryCreatedAt)
+      : undefined;
+  const currentBound = status.scan?.createdFrom;
+  const canUseCreationDate =
+    creationDate !== undefined &&
+    (base === null ||
+      (currentBound !== undefined &&
+        new Date(`${creationDate}T00:00:00Z`).getTime() < Date.parse(currentBound)));
+  const selectedBound = base === null ? initialDate : expandedDate;
+  const sourced = allAvailable && creationDate !== undefined && selectedBound === creationDate;
   const candidate = historyCommandSchema.safeParse({
     installationId: scope.installationId,
     repositoryId: scope.repositoryId,
@@ -66,21 +94,11 @@ export function HistoryEditor({
     configuration: draft,
     initialCreatedFrom: base === null && initialDate ? `${initialDate}T00:00:00Z` : null,
     ...(base !== null && expandedDate ? { expandCreatedFrom: `${expandedDate}T00:00:00Z` } : {}),
+    ...(sourced && catalogSource ? { populationBoundSource: catalogSource } : {}),
     rescan,
     operationId,
   });
   const expandedBound = candidate.success ? candidate.data.expandCreatedFrom : null;
-  const currentBound = status.scan?.createdFrom;
-  const createdTime = repositoryCreatedAt ? Date.parse(repositoryCreatedAt) : Number.NaN;
-  const creationDate =
-    Number.isFinite(createdTime) && createdTime <= Date.parse(status.observedAt)
-      ? new Date(createdTime).toISOString().slice(0, 10)
-      : undefined;
-  const canUseCreationDate =
-    creationDate !== undefined &&
-    (base === null ||
-      (currentBound !== undefined &&
-        new Date(`${creationDate}T00:00:00Z`).getTime() < Date.parse(currentBound)));
   const currentBoundRevision =
     status.snapshot?.configurationRevision === base?.configurationRevision;
   const expandedInstant = expandedBound ? observationMicroseconds(expandedBound) : undefined;
@@ -96,6 +114,14 @@ export function HistoryEditor({
         expandedInstant !== undefined &&
         currentInstant !== undefined &&
         expandedInstant < currentInstant));
+  const creationUnavailable =
+    creationDate === undefined
+      ? repositoryCreatedAt === undefined
+        ? "All available is unavailable: the repository catalog did not provide a creation date. Choose an explicit date."
+        : "All available is unavailable: the repository catalog creation date is invalid. Choose an explicit date."
+      : base !== null && !canUseCreationDate
+        ? "History already starts at or before the repository creation date."
+        : undefined;
   function reload() {
     if (
       pending ||
@@ -107,7 +133,10 @@ export function HistoryEditor({
     setBase(snapshot);
     setDraft(snapshot?.configuration ?? INITIAL);
     setRescan(false);
+    setInitialDate("");
+    setInitialRange("unset");
     setExpandedDate("");
+    setAllAvailable(false);
     setOperationId(crypto.randomUUID());
     setWrite({ kind: "idle" });
   }
@@ -124,6 +153,7 @@ export function HistoryEditor({
         setDraft(result.value.snapshot.configuration);
         setRescan(false);
         setExpandedDate("");
+        setAllAvailable(false);
         setOperationId(crypto.randomUUID());
         setWrite({ kind: "idle" });
         onSaved();
@@ -165,16 +195,54 @@ export function HistoryEditor({
             Collection enabled
           </label>
           {base === null ? (
-            <label>
-              Import runs created since (UTC)
-              <input
-                type="date"
-                required
-                value={initialDate}
-                max={status.observedAt.slice(0, 10)}
-                onChange={(event) => setInitialDate(event.target.value)}
-              />
-            </label>
+            <>
+              <fieldset>
+                <legend>Import range</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="history-import-range"
+                    value="all"
+                    checked={initialRange === "all"}
+                    disabled={creationDate === undefined}
+                    onChange={() => {
+                      if (!creationDate) return;
+                      setInitialRange("all");
+                      setInitialDate(creationDate);
+                      setAllAvailable(true);
+                    }}
+                  />
+                  All available (from repository creation date)
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="history-import-range"
+                    value="specific"
+                    checked={initialRange === "specific"}
+                    onChange={() => {
+                      setInitialRange("specific");
+                      setAllAvailable(false);
+                    }}
+                  />
+                  From a specific date (UTC)
+                </label>
+              </fieldset>
+              <label>
+                Import runs created since (UTC)
+                <input
+                  type="date"
+                  required
+                  value={initialDate}
+                  max={status.observedAt.slice(0, 10)}
+                  onChange={(event) => {
+                    setInitialDate(event.target.value);
+                    setInitialRange("specific");
+                    setAllAvailable(false);
+                  }}
+                />
+              </label>
+            </>
           ) : (
             <>
               <label>
@@ -185,6 +253,7 @@ export function HistoryEditor({
                   max={status.scan?.createdFrom.slice(0, 10)}
                   onChange={(event) => {
                     setExpandedDate(event.target.value);
+                    setAllAvailable(false);
                     if (event.target.value) setRescan(false);
                   }}
                 />
@@ -195,29 +264,30 @@ export function HistoryEditor({
                   checked={rescan}
                   onChange={(event) => {
                     setRescan(event.target.checked);
-                    if (event.target.checked) setExpandedDate("");
+                    if (event.target.checked) {
+                      setExpandedDate("");
+                      setAllAvailable(false);
+                    }
                   }}
                 />
                 Rescan the configured history
               </label>
+              {canUseCreationDate ? (
+                <button
+                  type="button"
+                  className="button button--compact"
+                  onClick={() => {
+                    if (!creationDate) return;
+                    setExpandedDate(creationDate);
+                    setAllAvailable(true);
+                    setRescan(false);
+                  }}
+                >
+                  Extend to all available (from repository creation date, {creationDate})
+                </button>
+              ) : null}
             </>
           )}
-          {canUseCreationDate ? (
-            <button
-              type="button"
-              className="button button--compact"
-              onClick={() => {
-                if (!creationDate) return;
-                if (base === null) setInitialDate(creationDate);
-                else {
-                  setExpandedDate(creationDate);
-                  setRescan(false);
-                }
-              }}
-            >
-              Use repository creation date ({creationDate})
-            </button>
-          ) : null}
           <label>
             Workflows
             <select
@@ -253,6 +323,17 @@ export function HistoryEditor({
         Saved revision {base?.configurationRevision ?? 0}. Pausing preserves recorded statistics.
         Rescanning reconciles existing identities without duplicating them.
       </p>
+      {creationUnavailable ? (
+        <p className="economics-provenance" role="status">
+          {creationUnavailable}
+        </p>
+      ) : null}
+      {sourced ? (
+        <p className="economics-provenance" role="status">
+          Import starts at {creationDate} (repository creation date, catalog {repositoryCreatedAt}).{" "}
+          {RETENTION_NOTICE}
+        </p>
+      ) : null}
       {expandedDate ? (
         <p className="economics-provenance" role="status">
           Extending the range rereads existing history and preserves recorded statistics. Save other
@@ -306,6 +387,12 @@ export function HistoryEditor({
 }
 
 function rejectionMessage(outcome: HistoryMutation["outcome"]): string {
+  if (outcome === "creation_date_missing")
+    return "All available was refused: GitHub did not report a creation date for this repository. Choose an explicit date.";
+  if (outcome === "creation_date_mismatch")
+    return "All available was refused: GitHub now reports a different repository creation date. Reload the repository catalog and choose again.";
+  if (outcome === "creation_date_in_future")
+    return "All available was refused: the repository creation date is later than the current server time. Choose an explicit date.";
   if (outcome === "invalid_population")
     return "The requested history boundary is invalid or no longer current. Reload and choose an earlier date.";
   if (outcome === "pending_work")

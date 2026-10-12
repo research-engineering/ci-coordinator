@@ -14,6 +14,7 @@ from ci_coordinator.persistence.runtime_principal_access import (
 )
 
 from .conftest import RUNTIME_ROLE
+from .test_history_population_bound_migration import project_predecessor_runtime_acl
 
 pytestmark = pytest.mark.persistence
 
@@ -136,3 +137,23 @@ def test_either_membership_direction_is_rejected(
             check_runtime_principal_access(connection, RUNTIME_ROLE)
         assert rejection.value.code == "runtime_role_unsafe"
         connection.rollback()
+
+
+def test_predecessor_apply_revokes_population_bound_grants_for_rollback(
+    postgres_database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Kills: a code-only rollback reprovision that leaves stale successor grants behind.
+    relation = "ci_coordinator.ci_history_population_bounds"
+    with psycopg.connect(to_psycopg_connection_string(postgres_database_url)) as connection:
+        check_runtime_principal_access(connection, RUNTIME_ROLE)
+        assert connection.execute(
+            "SELECT has_table_privilege(%s, %s, 'INSERT')", (RUNTIME_ROLE, relation)
+        ).fetchone() == (True,)
+        connection.rollback()
+        project_predecessor_runtime_acl(monkeypatch)
+        apply_runtime_principal_access(connection, RUNTIME_ROLE)
+        check_runtime_principal_access(connection, RUNTIME_ROLE)
+        for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE"):
+            assert connection.execute(
+                "SELECT has_table_privilege(%s, %s, %s)", (RUNTIME_ROLE, relation, privilege)
+            ).fetchone() == (False,)

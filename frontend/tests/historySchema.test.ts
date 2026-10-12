@@ -184,3 +184,103 @@ test("configuration comparison is set-aware but sensitive to all policy and quot
     false,
   );
 });
+
+test.each([
+  ["2020-01-01T00:00:00Z", "2020-01-01T23:59:59Z", true],
+  ["2020-01-01T00:00:00Z", "2020-01-01T00:00:00+00:00", true],
+  ["2020-01-02T00:00:00Z", "2020-01-01T23:59:59Z", false],
+  ["2019-12-31T00:00:00Z", "2020-01-01T00:00:00Z", false],
+  ["2020-01-01T00:00:00Z", "2020-01-01T01:00:00+02:00", false],
+] as const)(
+  "catalog source for bound %s requires the UTC day of %s: %s",
+  (bound, createdAt, ok) => {
+    const command = {
+      ...historyCommand(),
+      initialCreatedFrom: bound,
+      populationBoundSource: { kind: "repository_created_at", repositoryCreatedAt: createdAt },
+    };
+    expect(historyCommandSchema.safeParse(command).success).toBe(ok);
+  },
+);
+test("catalog source requires a bound and its closed shape", () => {
+  const source = { kind: "repository_created_at", repositoryCreatedAt: "2020-01-01T12:00:00Z" };
+  const plainUpdate = { ...historyCommand(), expectedRevision: 1, initialCreatedFrom: null };
+  expect(
+    historyCommandSchema.safeParse({ ...plainUpdate, populationBoundSource: source }).success,
+  ).toBe(false);
+  expect(
+    historyCommandSchema.safeParse({
+      ...plainUpdate,
+      expandCreatedFrom: "2020-01-01T00:00:00Z",
+      populationBoundSource: source,
+    }).success,
+  ).toBe(true);
+  expect(
+    historyCommandSchema.safeParse({
+      ...historyCommand(),
+      initialCreatedFrom: "2020-01-01T00:00:00Z",
+      populationBoundSource: { ...source, kind: "explicit" },
+    }).success,
+  ).toBe(false);
+  expect(historyCommandSchema.parse(historyCommand())).not.toHaveProperty("populationBoundSource");
+  // The generated and backend contracts admit null as omission; the parsed command omits it.
+  expect(
+    historyCommandSchema.parse({ ...historyCommand(), populationBoundSource: null }),
+  ).toStrictEqual(historyCommandSchema.parse(historyCommand()));
+});
+test.each([
+  { source: "explicit", repositoryCreatedAt: null, recordedAt: "2026-09-12T10:00:00Z" },
+  {
+    source: "repository_created_at",
+    repositoryCreatedAt: "2020-01-01T12:34:56Z",
+    recordedAt: "2026-09-12T10:00:00Z",
+  },
+  { source: "unrecorded", repositoryCreatedAt: null, recordedAt: null },
+] as const)("admits population bound provenance %j", (provenance) => {
+  const value = historyStatus();
+  expect(
+    historyStatusSchema.safeParse({
+      ...value,
+      populationBound: { createdFrom: "2020-01-01T00:00:00Z", ...provenance },
+    }).success,
+  ).toBe(true);
+});
+test.each([
+  { populationBound: null },
+  { createdFrom: "2019-12-01T00:00:00Z" },
+  { source: "unrecorded" },
+  { source: "explicit", repositoryCreatedAt: "2020-01-01T12:34:56Z" },
+  { source: "repository_created_at", repositoryCreatedAt: null },
+  { source: "repository_created_at", repositoryCreatedAt: "2020-01-02T00:00:00Z" },
+  { recordedAt: "2027-01-01T00:00:00Z" },
+  { token: "not public" },
+])("rejects contradictory population bound operand %j", (delta) => {
+  const value = historyStatus();
+  const populationBound =
+    "populationBound" in delta ? delta.populationBound : { ...value.populationBound, ...delta };
+  expect(historyStatusSchema.safeParse({ ...value, populationBound }).success).toBe(false);
+});
+test.each([
+  ["2020-01-01T01:00:00Z", false],
+  ["2020-01-01T11:59:59.999999Z", false],
+  ["2020-01-01T12:00:00Z", true],
+] as const)(
+  "catalog provenance recorded at %s after creation 2020-01-01T12:00:00Z is admitted=%s",
+  (recordedAt, ok) => {
+    const value = historyStatus();
+    const populationBound = {
+      createdFrom: "2020-01-01T00:00:00Z",
+      source: "repository_created_at",
+      repositoryCreatedAt: "2020-01-01T12:00:00Z",
+      recordedAt,
+    } as const;
+    expect(historyStatusSchema.safeParse({ ...value, populationBound }).success).toBe(ok);
+  },
+);
+test("status v1 stays strict in both directions: a missing or unknown key fails closed", () => {
+  // An already-open tab parses with the same strict-object rule, so it rejects the added
+  // populationBound key and shows the status as unavailable instead of partial.
+  const { populationBound: _populationBound, ...previous } = historyStatus();
+  expect(historyStatusSchema.safeParse(previous).success).toBe(false);
+  expect(historyStatusSchema.safeParse({ ...historyStatus(), unknownKey: 1 }).success).toBe(false);
+});
