@@ -6,7 +6,7 @@ import base64
 import binascii
 import hashlib
 from dataclasses import dataclass
-from typing import TypeGuard
+from typing import Literal, TypeGuard
 
 from ci_coordinator.integrations.github._response_decoding import (
     canonical_text_or_none,
@@ -31,6 +31,12 @@ class DiscoveryRepository:
     repository_id: int
     repository: GitHubRepository
     default_branch: str
+
+
+@dataclass(frozen=True, slots=True)
+class GitReferenceTarget:
+    object_type: Literal["commit", "tag"]
+    object_sha: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,17 +117,30 @@ def decode_git_reference(
     expected_ref: str,
     max_json_bytes: int,
 ) -> str | None:
+    target = decode_git_reference_target(
+        body,
+        expected_ref=expected_ref,
+        max_json_bytes=max_json_bytes,
+    )
+    return None if target is None or target.object_type != "commit" else target.object_sha
+
+
+def decode_git_reference_target(
+    body: bytes,
+    *,
+    expected_ref: str,
+    max_json_bytes: int,
+) -> GitReferenceTarget | None:
+    """Decode one exact ref to its direct commit or annotated-tag object."""
     value = _json_object(body, max_json_bytes=max_json_bytes)
     target = None if value is None else object_or_none(value.get("object"))
-    if (
-        value is None
-        or value.get("ref") != f"refs/{expected_ref}"
-        or target is None
-        or target.get("type") != "commit"
-    ):
+    if value is None or value.get("ref") != f"refs/{expected_ref}" or target is None:
         return None
+    object_type = target.get("type")
     sha = target.get("sha")
-    return sha if is_github_object_id(sha) else None
+    if object_type not in {"commit", "tag"} or not is_github_object_id(sha):
+        return None
+    return GitReferenceTarget("commit" if object_type == "commit" else "tag", sha)
 
 
 def decode_git_commit(

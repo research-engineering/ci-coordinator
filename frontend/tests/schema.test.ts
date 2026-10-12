@@ -727,6 +727,139 @@ describe("workflow discovery response admission", () => {
 
     expect(report.callEdges[0]?.kind).toBe("remote");
     expect(report.localGraphClosed).toBe(true);
+    expect(report.componentPassport.references[0]?.unresolvedReason).toBe(
+      "resolution_not_requested",
+    );
+  });
+
+  test("admits a provider-observed remote callee with its resolution time", () => {
+    const report = workflowDiscoverySchema.parse(reportWithObservedRemoteCall());
+
+    expect(report.componentPassport.references[0]).toMatchObject({
+      resolution: "observed",
+      resolvedAt: "2026-10-11T12:00:00Z",
+      resolvedRevision: "f".repeat(40),
+    });
+  });
+
+  test("admits explicitly omitted references only for a report that declares references", () => {
+    const value = reportWithRemoteCall();
+    const report = workflowDiscoverySchema.parse({
+      ...value,
+      componentPassport: { ...value.componentPassport, references: [], referencesOmitted: true },
+    });
+
+    expect(report.componentPassport.referencesOmitted).toBe(true);
+    expect(report.componentPassport.references).toEqual([]);
+  });
+
+  test("admits incomplete declarations only when the passport says so", () => {
+    expect(workflowDiscoverySchema.safeParse(reportWithUnprojectedSteps(false)).success).toBe(true);
+    expect(workflowDiscoverySchema.safeParse(reportWithUnprojectedSteps(true)).success).toBe(false);
+    expect(workflowDiscoverySchema.safeParse(reportWithUnprojectedJobCall(false)).success).toBe(
+      true,
+    );
+    expect(workflowDiscoverySchema.safeParse(reportWithUnprojectedJobCall(true)).success).toBe(
+      false,
+    );
+  });
+
+  test.each([
+    [
+      "passport for another inventory",
+      () => {
+        const value = reportWithRemoteCall();
+        return {
+          ...value,
+          componentPassport: { ...value.componentPassport, inventoryDigest: "d".repeat(64) },
+        };
+      },
+    ],
+    [
+      "passport that omits a declared reusable call",
+      () => {
+        const value = reportWithRemoteCall();
+        return { ...value, componentPassport: { ...value.componentPassport, references: [] } };
+      },
+    ],
+    [
+      "denied component carrying a revision",
+      () => {
+        const value = reportWithObservedRemoteCall();
+        const reference = value.componentPassport.references[0];
+        if (!reference) throw new Error("observed fixture requires one reference");
+        return {
+          ...value,
+          componentPassport: {
+            ...value.componentPassport,
+            references: [{ ...reference, resolution: "denied" as const }],
+          },
+        };
+      },
+    ],
+    [
+      "provider observation without a resolution time",
+      () => {
+        const value = reportWithObservedRemoteCall();
+        const reference = value.componentPassport.references[0];
+        if (!reference) throw new Error("observed fixture requires one reference");
+        return {
+          ...value,
+          componentPassport: {
+            ...value.componentPassport,
+            references: [{ ...reference, resolvedAt: null }],
+          },
+        };
+      },
+    ],
+    [
+      "same-commit callee observed at another blob",
+      () => {
+        const value = reportWithRemoteCall();
+        const reference = value.componentPassport.references[0];
+        if (!reference) throw new Error("remote-call fixture requires one reference");
+        return {
+          ...value,
+          componentPassport: {
+            ...value.componentPassport,
+            references: [
+              {
+                ...reference,
+                path: value.sources[0]?.path ?? null,
+                ref: null,
+                repository: null,
+                resolution: "observed" as const,
+                resolvedBlobSha: "e".repeat(40),
+                resolvedRevision: value.revision,
+                unresolvedReason: null,
+              },
+            ],
+          },
+        };
+      },
+    ],
+    [
+      "omission that still carries references",
+      () => {
+        const value = reportWithRemoteCall();
+        return {
+          ...value,
+          componentPassport: { ...value.componentPassport, referencesOmitted: true },
+        };
+      },
+    ],
+    [
+      "omission for a report without component declarations",
+      () => {
+        const value = workflowDiscoveryFixture();
+        return {
+          ...value,
+          componentPassport: { ...value.componentPassport, referencesOmitted: true },
+        };
+      },
+    ],
+  ])("rejects component %s", (_label, candidate) => {
+    expect(workflowDiscoverySchema.safeParse(candidate()).success).toBe(false);
   });
 
   test.each([
@@ -1060,6 +1193,19 @@ function reportWithRemoteCall() {
         uses,
       },
     ],
+    componentPassport: {
+      ...value.componentPassport,
+      references: [
+        componentReference({
+          callerJobId: job.jobId,
+          callerWorkflowPath: workflow.path,
+          path: ".github/workflows/python.yml",
+          ref: "main",
+          repository: "example/shared",
+          uses,
+        }),
+      ],
+    },
     proposal: {
       ...value.proposal,
       admittedEpochId: null,
@@ -1075,6 +1221,95 @@ function reportWithRemoteCall() {
         jobs: [{ ...job, uses }],
       },
     ],
+  };
+}
+
+type ComponentReferenceWire = ReturnType<
+  typeof workflowDiscoveryFixture
+>["componentPassport"]["references"][number];
+
+function componentReference(
+  overrides: Partial<ComponentReferenceWire> &
+    Pick<ComponentReferenceWire, "callerJobId" | "callerWorkflowPath" | "uses">,
+): ComponentReferenceWire {
+  return {
+    digest: null,
+    immutable: false,
+    kind: "reusable_workflow",
+    path: null,
+    ref: null,
+    referenceId: `component:${"5".repeat(32)}`,
+    repository: null,
+    resolution: "unresolved",
+    resolvedAt: null,
+    resolvedBlobSha: null,
+    resolvedRevision: null,
+    stepIndex: null,
+    unresolvedReason: "resolution_not_requested",
+    ...overrides,
+  };
+}
+
+function reportWithObservedRemoteCall() {
+  const value = reportWithRemoteCall();
+  const reference = value.componentPassport.references[0];
+  if (!reference) throw new Error("remote-call fixture requires one component reference");
+  return {
+    ...value,
+    componentPassport: {
+      ...value.componentPassport,
+      references: [
+        {
+          ...reference,
+          resolution: "observed" as const,
+          resolvedAt: "2026-10-11T12:00:00Z",
+          resolvedBlobSha: "e".repeat(40),
+          resolvedRevision: "f".repeat(40),
+          unresolvedReason: null,
+        },
+      ],
+    },
+  };
+}
+
+function reportWithUnprojectedJobCall(declarationsComplete: boolean) {
+  const value = workflowDiscoveryFixture();
+  const unknown = value.unknowns[0];
+  const subjectId = value.workflows[0]?.jobs[0]?.subjectId;
+  if (!unknown || !subjectId) throw new Error("workflow discovery fixture requires one unknown");
+  const callUnknown = {
+    ...unknown,
+    field: "job.uses",
+    reason: "dynamic_or_unsupported_job_call",
+    subjectId,
+    unknownId: `unknown:${"3".repeat(32)}`,
+  };
+  return {
+    ...value,
+    componentPassport: { ...value.componentPassport, declarationsComplete },
+    proposal: {
+      ...value.proposal,
+      admittedEpochId: null,
+      blockers: ["stable_provider_signal_absent"],
+      policySource: null,
+      selectedEvents: [],
+      selectedJobName: null,
+      state: "blocked" as const,
+      unknownIds: [unknown.unknownId, callUnknown.unknownId],
+    },
+    unknowns: [unknown, callUnknown],
+  };
+}
+
+function reportWithUnprojectedSteps(declarationsComplete: boolean) {
+  const value = workflowDiscoveryFixture();
+  const workflow = value.workflows[0];
+  const job = workflow?.jobs[0];
+  if (!workflow || !job) throw new Error("workflow discovery fixture requires one job");
+  return {
+    ...value,
+    componentPassport: { ...value.componentPassport, declarationsComplete },
+    workflows: [{ ...workflow, jobs: [{ ...job, steps: null }] }],
   };
 }
 
@@ -1129,6 +1364,20 @@ function reportWithOpenLocalGraph() {
         value: ["workflow_call"],
       },
     ],
+    componentPassport: {
+      ...value.componentPassport,
+      declarationsComplete: false,
+      references: [
+        componentReference({
+          callerJobId: "call",
+          callerWorkflowPath: path,
+          immutable: true,
+          path: targetPath,
+          unresolvedReason: "local_target_missing",
+          uses,
+        }),
+      ],
+    },
     localGraphClosed: false,
     sources: [...value.sources, { blobSha, path, size: 128 }],
     workflows: [

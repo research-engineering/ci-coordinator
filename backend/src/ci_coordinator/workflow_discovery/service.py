@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 from ci_coordinator.config_control import RepositoryScope
-from ci_coordinator.kernel import CanonicalJsonError, utf16_sort_key
+from ci_coordinator.kernel import CanonicalJsonError, Clock, NoQueueAdmission, utf16_sort_key
 from ci_coordinator.workflow_discovery._validation import is_full_sha1
 from ci_coordinator.workflow_discovery.adoption import assess_workflow_adoption
+from ci_coordinator.workflow_discovery.component_passport import (
+    ComponentPassport,
+    ComponentReference,
+)
+from ci_coordinator.workflow_discovery.component_resolution import (
+    resolve_component_references,
+    unresolved_component_references,
+)
 from ci_coordinator.workflow_discovery.evidence import Provenance, Unknown, YamlLocation
 from ci_coordinator.workflow_discovery.graph import analyze_call_graph
 from ci_coordinator.workflow_discovery.outcomes import (
@@ -17,6 +25,7 @@ from ci_coordinator.workflow_discovery.outcomes import (
 )
 from ci_coordinator.workflow_discovery.parser import parse_workflow
 from ci_coordinator.workflow_discovery.ports import (
+    ComponentRevisionResolver,
     WorkflowDiscoveryAuthorizer,
     WorkflowSnapshotReader,
 )
@@ -35,9 +44,16 @@ class WorkflowDiscoveryService:
         *,
         authorizer: WorkflowDiscoveryAuthorizer,
         reader: WorkflowSnapshotReader,
+        component_resolver: ComponentRevisionResolver | None = None,
+        clock: Clock | None = None,
     ) -> None:
+        if (component_resolver is None) != (clock is None):
+            raise ValueError("component resolution requires exactly one resolver and clock")
         self._authorizer = authorizer
         self._reader = reader
+        self._component_resolver = component_resolver
+        self._clock = clock
+        self._resolution_admission = NoQueueAdmission(1)
 
     async def __call__(
         self,
@@ -55,14 +71,44 @@ class WorkflowDiscoveryService:
             return snapshot
         if not isinstance(snapshot, RepositoryWorkflowSnapshot):
             raise TypeError("workflow snapshot reader returned an unsupported outcome")
-        return _complete(snapshot, default_branch_head=revision is None)
+        report = _report(snapshot)
+        if isinstance(report, WorkflowDiscoveryUnavailable):
+            return report
+        references = await self._component_references(actor=actor, report=report)
+        return WorkflowDiscoveryCompleted(
+            report,
+            generate_proposal(report, default_branch_head=revision is None),
+            snapshot.target_projection,
+            assess_workflow_adoption(report, target_projection=snapshot.target_projection),
+            ComponentPassport.create(report, references),
+        )
+
+    async def _component_references(
+        self,
+        *,
+        actor: str,
+        report: DiscoveryReport,
+    ) -> tuple[ComponentReference, ...]:
+        # Provider reads start only after the caller snapshot is complete; no
+        # database transaction or snapshot lease is held while they run.
+        if self._component_resolver is None or self._clock is None:
+            return unresolved_component_references(report, "resolution_not_requested")
+        lease = self._resolution_admission.try_acquire()
+        if lease is None:
+            return unresolved_component_references(report, "resolution_overloaded")
+        try:
+            return await resolve_component_references(
+                report,
+                actor=actor,
+                authorizer=self._authorizer,
+                resolver=self._component_resolver,
+                clock=self._clock,
+            )
+        finally:
+            lease.release()
 
 
-def _complete(
-    snapshot: RepositoryWorkflowSnapshot,
-    *,
-    default_branch_head: bool,
-) -> WorkflowDiscoveryOutcome:
+def _report(snapshot: RepositoryWorkflowSnapshot) -> DiscoveryReport | WorkflowDiscoveryUnavailable:
     parsed: list[ParsedWorkflow] = []
     unknowns = [_source_failure_unknown(snapshot, failure) for failure in snapshot.failures]
     for source in snapshot.sources:
@@ -95,7 +141,7 @@ def _complete(
         )
     )
     try:
-        report = DiscoveryReport.create(
+        return DiscoveryReport.create(
             repository=snapshot.repository,
             revision=snapshot.revision,
             sources=snapshot.source_identities,
@@ -110,12 +156,6 @@ def _complete(
         if error.code == "canonical_json_max_bytes_exceeded":
             return WorkflowDiscoveryUnavailable("report_limit_exceeded")
         raise
-    return WorkflowDiscoveryCompleted(
-        report,
-        generate_proposal(report, default_branch_head=default_branch_head),
-        snapshot.target_projection,
-        assess_workflow_adoption(report, target_projection=snapshot.target_projection),
-    )
 
 
 def _source_failure_unknown(

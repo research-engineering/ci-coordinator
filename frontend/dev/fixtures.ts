@@ -305,6 +305,21 @@ export function workflowDiscoveryFixture(
     ],
     callEdges: [],
     complete: true,
+    componentPassport: {
+      declarationsComplete: true,
+      inventoryDigest,
+      nonClaims: [
+        "component inputs are not projected",
+        "docker image tags are not resolved to digests",
+        "mutable ref resolution is observed at resolvedAt and is not retained",
+        "remote component contents, nested calls and actions are not parsed",
+        "resolution is not omission authority",
+        "reverse consumers and observed run usage are not reported",
+      ],
+      references: [],
+      referencesOmitted: false,
+      revision,
+    },
     facts: [
       {
         category: "identity",

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 
+import pytest
 from control_plane_http_support import (
     ACTOR,
     StaticControlPlaneAuthenticator,
@@ -17,6 +19,7 @@ from ci_coordinator.api.http.dependencies import (
     InvalidCredential,
     WorkflowDiscoveryRouteDependencies,
 )
+from ci_coordinator.api.http.routers import workflow_discovery as workflow_discovery_router
 from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.workflow_discovery import (
     RepositoryIdentity,
@@ -34,6 +37,7 @@ from ci_coordinator.workflow_discovery.source import git_blob_sha1
 
 SCOPE = RepositoryScope(1, 2)
 REVISION = "a" * 40
+DISCOVERY_URL = "/api/v1/workbench/repositories/1/2/workflow-discovery"
 
 
 @dataclass
@@ -81,8 +85,111 @@ def test_route_projects_exact_snapshot_unknowns_and_conservative_proposal() -> N
     assert edge["provenance"]["location"]["path"] == "job.uses"
     graph_unknown = next(item for item in body["unknowns"] if item["field"] == "call.target")
     assert graph_unknown["provenance"]["location"]["path"] == "job.uses"
+    passport = body["componentPassport"]
+    assert passport["inventoryDigest"] == body["inventoryDigest"]
+    assert passport["revision"] == REVISION
+    assert passport["declarationsComplete"] is True
+    assert passport["references"] == [
+        {
+            "referenceId": passport["references"][0]["referenceId"],
+            "callerWorkflowPath": ".github/workflows/reuse.yml",
+            "callerJobId": "call",
+            "stepIndex": None,
+            "uses": "example/shared/.github/workflows/python.yml@main",
+            "kind": "reusable_workflow",
+            "repository": "example/shared",
+            "path": ".github/workflows/python.yml",
+            "ref": "main",
+            "digest": None,
+            "immutable": False,
+            "resolution": "unresolved",
+            "unresolvedReason": "resolution_not_requested",
+            "resolvedRevision": None,
+            "resolvedBlobSha": None,
+            "resolvedAt": None,
+        }
+    ]
+    assert len(passport["nonClaims"]) == 6
     assert "pytest" not in response.text
     assert use_case.calls == [(ACTOR, SCOPE, None)]
+
+
+def test_route_projects_provider_observed_component_time_exactly() -> None:
+    completed = _completed()
+    (reference,) = completed.component_passport.references
+    observed = replace(
+        reference,
+        resolution="observed",
+        unresolved_reason=None,
+        resolved_revision="c" * 40,
+        resolved_blob_sha="d" * 40,
+        resolved_at=datetime(2026, 10, 11, 12, tzinfo=UTC),
+    )
+    use_case = _UseCase(
+        replace(
+            completed,
+            component_passport=replace(completed.component_passport, references=(observed,)),
+        )
+    )
+
+    response = _client("operator", use_case).get(
+        "/api/v1/workbench/repositories/1/2/workflow-discovery"
+    )
+
+    assert response.status_code == 200
+    (projected,) = response.json()["componentPassport"]["references"]
+    assert projected["resolution"] == "observed"
+    assert projected["resolvedRevision"] == "c" * 40
+    assert projected["resolvedBlobSha"] == "d" * 40
+    assert projected["resolvedAt"] == "2026-10-11T12:00:00Z"
+
+
+def test_route_omits_passport_references_exactly_above_the_response_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _client("operator", _UseCase(_completed()))
+    complete = client.get(DISCOVERY_URL)
+    assert complete.json()["componentPassport"]["referencesOmitted"] is False
+    budget = len(complete.content)
+
+    monkeypatch.setattr(workflow_discovery_router, "WORKFLOW_DISCOVERY_RESPONSE_MAX_BYTES", budget)
+    at_budget = client.get(DISCOVERY_URL)
+    monkeypatch.setattr(
+        workflow_discovery_router, "WORKFLOW_DISCOVERY_RESPONSE_MAX_BYTES", budget - 1
+    )
+    above_budget = client.get(DISCOVERY_URL)
+
+    assert at_budget.content == complete.content
+    assert above_budget.status_code == 200
+    assert len(above_budget.content) <= budget - 1
+    omitted = above_budget.json()
+    assert omitted["componentPassport"]["referencesOmitted"] is True
+    assert omitted["componentPassport"]["references"] == []
+    expected = complete.json()
+    expected["componentPassport"].update(references=[], referencesOmitted=True)
+    assert omitted == expected
+
+
+def test_large_action_inventory_fits_the_browser_response_budget() -> None:
+    steps = "      - uses: actions/checkout@v4\n" * 1_000
+    jobs = "".join(
+        f"  job{index}:\n    runs-on: ubuntu-latest\n    steps:\n{steps}" for index in range(6)
+    )
+    content = f"name: CI\non: push\njobs:\n{jobs}".encode()
+    outcome = _discover(
+        WorkflowSource(".github/workflows/ci.yml", git_blob_sha1(content), len(content), content)
+    )
+    assert len(outcome.component_passport.references) == 6_000
+
+    response = _client("operator", _UseCase(outcome)).get(DISCOVERY_URL)
+
+    assert response.status_code == 200
+    assert len(response.content) <= workflow_discovery_router.WORKFLOW_DISCOVERY_RESPONSE_MAX_BYTES
+    body = response.json()
+    assert body["componentPassport"]["referencesOmitted"] is True
+    assert body["componentPassport"]["references"] == []
+    assert body["componentPassport"]["declarationsComplete"] is True
+    assert [len(job["steps"]) for job in body["workflows"][0]["jobs"]] == [1_000] * 6
 
 
 def test_route_preserves_historical_inventory_without_reviewable_policy() -> None:
@@ -211,10 +318,17 @@ def _completed(*, revision: str | None = None) -> WorkflowDiscoveryCompleted:
         len(reusable_content),
         reusable_content,
     )
+    return _discover(ci_source, reusable_source, revision=revision)
+
+
+def _discover(
+    *sources: WorkflowSource,
+    revision: str | None = None,
+) -> WorkflowDiscoveryCompleted:
     snapshot = RepositoryWorkflowSnapshot.create(
         repository=RepositoryIdentity(SCOPE, "example", "repo", "master"),
         revision=REVISION,
-        sources=(ci_source, reusable_source),
+        sources=sources,
     )
 
     class _Allow:

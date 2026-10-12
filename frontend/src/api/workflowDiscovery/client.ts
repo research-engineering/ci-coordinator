@@ -10,6 +10,9 @@ import {
 } from "./schema";
 
 const DISCOVERY_TIMEOUT_MS = 30_000;
+// Equals the server's WORKFLOW_DISCOVERY_RESPONSE_MAX_BYTES: above it the server
+// omits passport references explicitly instead of sending an inadmissible body.
+const DISCOVERY_MAX_RESPONSE_BYTES = 2_097_152;
 type RepositoryScope = components["schemas"]["RepositoryScopeResponse"];
 
 export type WorkflowDiscoveryResult =
@@ -50,6 +53,7 @@ export async function fetchWorkflowDiscovery(
         headers: { accept: "application/json" },
         signal: combinedSignal(signal, timeoutMs),
       }),
+      DISCOVERY_MAX_RESPONSE_BYTES,
     );
     if (response.status !== 200) return await discoveryFailure(response);
     const report = workflowDiscoverySchema.parse(await response.json());

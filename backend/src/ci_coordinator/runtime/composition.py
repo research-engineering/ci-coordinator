@@ -125,6 +125,9 @@ from ci_coordinator.integrations.github.reconciliation_observer import (
 )
 from ci_coordinator.integrations.github.repository_context import GitHubRepositoryContextProvider
 from ci_coordinator.integrations.github.repository_membership import GitHubRepositoryAccess
+from ci_coordinator.integrations.github.workflow_component_resolution import (
+    GitHubComponentRevisionResolver,
+)
 from ci_coordinator.integrations.keycloak import KeycloakIntegration
 from ci_coordinator.kernel import SystemClock, SystemMonotonicClock
 from ci_coordinator.observability import (
@@ -636,6 +639,14 @@ def _compose_connected_dependencies(
             authorizer=control_plane_authorizer,
             reader=workflow_reader,
         )
+        # Only the operator read route resolves remote components; proposal,
+        # attestation and activation callers keep caller-commit evidence only.
+        workflow_discovery_with_components = WorkflowDiscoveryService(
+            authorizer=control_plane_authorizer,
+            reader=workflow_reader,
+            component_resolver=GitHubComponentRevisionResolver(github),
+            clock=clock,
+        )
         proposal_review_store = TransactionalProposalReviewStore(proposal_review_uow)
         registered_epoch_review_store = TransactionalRegisteredEpochReviewStore(
             registered_epoch_review_uow
@@ -884,7 +895,7 @@ def _compose_connected_dependencies(
                 workflow_discovery=WorkflowDiscoveryRouteDependencies(
                     authenticator=control_plane.authenticator,
                     role_admission=control_plane.role_admission,
-                    use_case=workflow_discovery,
+                    use_case=workflow_discovery_with_components,
                 ),
                 governance_observation=GovernanceObservationRouteDependencies(
                     authenticator=control_plane.authenticator,

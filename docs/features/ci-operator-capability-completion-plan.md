@@ -185,6 +185,20 @@ distinct. An incomplete graph reports incomplete impact, not no consumers.
 Changing a component invalidates only evidence depending on that exact input.
 No second YAML parser, broad token or new selective authority is introduced.
 
+Delivery state (source only, not qualified): step 1's forward passport exists
+for job-level reusable calls and step actions/Docker images, with exact caller
+commit, same-commit callee blob, action/reusable ref-to-commit resolution,
+immutability and `resolvedAt`, under provisional owner decision (2026-10-11)
+D6: reads stay inside the caller's already granted installation, only for
+scopes the actor is authorized for, with the existing installation credential;
+everything else is `unresolved` or `denied`
+([module contract](../architecture/modules/workflow-discovery.md#component-passport)).
+Remaining: non-secret inputs, annotated-tag dereference, other granted
+installations, and the persisted step 2 (retained resolutions so a moving tag
+cannot rewrite past resolution, authorized reverse consumers returning
+incomplete rather than none, and observed run/attempt usage from history),
+which belongs to the serialized migration queue; then step 3's impact view.
+
 ## O3: Optimization Portfolio
 
 Owners: [economics](../architecture/modules/ci-economics.md),

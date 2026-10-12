@@ -154,6 +154,34 @@ the shared paginated data table; each call expansion is a native
 `details`/`summary` disclosure and remains keyboard-operable. The richer graph
 navigator remains CI-033.
 
+## Dependency Passport
+
+The inventory renders the response's `componentPassport` as one paginated
+table (CI-022 forward slice). Each row names the caller workflow, job and step,
+the component kind and declared `uses`, whether the declaration is immutable,
+and one resolution:
+
+- `Observed`: the exact commit, the callee blob for a reusable workflow, and
+  either `Bound by caller commit` (same-commit call) or the provider read time;
+- `Access denied`: the callee is in the caller installation but the operator is
+  not authorized for its scope, so no revision is read or shown;
+- an unresolved label for every other closed reason, including another
+  account, absence from the installation, limits, provider failures, local
+  actions and Docker images.
+
+Resolution follows provisional owner decision (2026-10-11) D6 as specified in
+the [module contract](../architecture/modules/workflow-discovery.md#component-passport).
+The browser re-admits the passport only when it binds the report's revision and
+inventory digest, contains exactly one reference per job-level and step `uses`,
+derives `declarationsComplete` from source and step projection, and keeps
+denied or unresolved rows free of revision evidence. When declarations are
+incomplete, a status message states that the list is not a dependency-free
+claim. The discovery transport admits at most 2,097,152 decoded bytes, the
+server's response budget; above it the server sends `referencesOmitted: true`
+with no references, which the browser admits only for a report that declares
+component `uses` and renders as an explicit omission, not an empty table. The view does not list reverse consumers or observed run usage, and a
+mutable ref's revision is shown as observed at its read time, not retained.
+
 ## Evidence and Unknowns
 
 Do not collapse evidence into a single percentage. The current slice has two
@@ -319,14 +347,14 @@ transport module, not by workflow discovery.
 |-------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Malicious YAML, aliases, resource bombs, or parser divergence     | Bounded YAML profile, duplicate-key rejection, differential fixtures, no execution                                                                                                                                                                  |
 | Untrusted PR changes workflow before scan                         | Fetch exact provider commit through GitHub App; bind every fact to blob SHA                                                                                                                                                                         |
-| Mutable remote reusable-workflow ref                              | Record a critical unknown and do not fetch the target in this slice; a future resolver must require immutable commit identity                                                                                                                       |
+| Mutable remote reusable-workflow ref                              | Keep the critical graph unknown; the passport shows a read-time revision only for an authorized caller-installation callee, marks the ref mutable, retains nothing and never parses the callee                                                      |
 | Call cycles, inaccessible private workflow, or truncated API page | Bounded graph traversal and fail-closed unknown                                                                                                                                                                                                     |
 | Expression hides permissions, runners, secrets, or services       | Preserve expression and classify unresolved safety fact as unknown                                                                                                                                                                                  |
 | Secret disclosure                                                 | Read names only when authorized; never fetch values; redact logs and exports                                                                                                                                                                        |
 | Stored or reflected script injection in UI                        | Render all repository text as data under strict output encoding and CSP                                                                                                                                                                             |
 | Cross-repository authorization confusion                          | Bind installation id, repository id, owner/name assertion, actor, and scope on every use case                                                                                                                                                       |
 | TOCTOU between observation and registration                       | Regenerate the complete current-head manifest before the database transaction, retain its exact provider revision, and revalidate the ABA-resistant active baseline under the scope lock; later activation must revalidate provider freshness again |
-| SSRF through remote `uses`                                        | Treat the coordinate as untrusted syntax and perform no remote fetch in this slice                                                                                                                                                                  |
+| SSRF through remote `uses`                                        | Treat the coordinate as untrusted syntax; resolve only an admitted same-account owner/name through the existing GitHub API operations after scope authorization, never an arbitrary URL or registry                                                 |
 | Heuristic becomes authority                                       | Emit only proven assertions or explicit unknowns; unknowns cannot select a provider signal or enable dynamic planning                                                                                                                               |
 
 ## Acceptance Criteria
@@ -336,7 +364,7 @@ transport module, not by workflow discovery.
 2. Local reusable calls form a cycle-checked graph at the same commit whose
    resolved targets declare `workflow_call` and whose call trees respect the
    ten-level and fifty-unique-callee ceilings; remote calls remain typed
-   unknowns and are never fetched by this slice.
+   graph unknowns whose contents are never fetched or parsed.
 3. Permissions, named secrets, runners, services, environments, concurrency,
    matrices, conditions, and stable check identities are represented or marked
    unknown per job.
@@ -365,6 +393,8 @@ transport module, not by workflow discovery.
 | Inventory, graph, unknown and proposal UI without activation controls | Source capability; browser evidence remains target-bound. |
 | Entrypoint/component projection from triggers and call edges | Source capability; native frontend and browser witnesses remain to run. |
 | Adoption support profile, exact-path unknowns and computed consumer changes | Source capability; native backend, frontend and browser witnesses remain to run. |
+| Dependency passport with D6 caller-installation resolution | Source capability; native backend, frontend and browser witnesses and live provider resolution remain to run. |
+| Retained resolutions, reverse consumers and observed usage | Open; requires persistence in the migration queue. |
 | Application, extension-service and reporting-service synthetic archetype replays | Required coverage; no former private replay receipt or executed synthetic run is claimed. |
 | Durable scan history | Deferred; current discovery remains request-scoped. |
 | Semantic diff and affirmative review handoff to epoch registration | Non-activating source capability. |
