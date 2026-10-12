@@ -1313,7 +1313,7 @@ export interface components {
              * Status
              * @enum {string}
              */
-            readonly status: "resolved" | "missing" | "remote" | "dynamic" | "invalid" | "cycle" | "depth_exceeded";
+            readonly status: "resolved" | "missing" | "not_callable" | "callability_unknown" | "remote" | "dynamic" | "invalid" | "cycle" | "depth_exceeded" | "callee_limit_exceeded";
             /** Targetpath */
             readonly targetPath: string | null;
             /** Uses */

@@ -199,9 +199,12 @@ Mapping keys remain bounded to 4,096 UTF-8 bytes during event preflight, before
 node composition. Reflected text and unknown syntax retain their existing
 4,096-byte or narrower field bounds. This distinction does not relax the source
 file, 50,000-event, 20,000-node, or depth-64 limits.
-Parser provenance is `github-actions-static/v4` for the whole-context secret
-change; regenerate discovery reports rather than relabeling earlier parser
-evidence.
+Parser provenance is `github-actions-static/v5`: v4 introduced the
+whole-context secret change and v5 adds the callable-target and
+unique-called-workflow graph statuses of section 6. Regenerate discovery
+reports rather than relabeling earlier parser evidence; a v4 report, proposal
+or review binding no longer matches the current parser and fails the existing
+parser-version mismatch path, so it must be rediscovered.
 
 ## 6. Call Graph
 
@@ -217,8 +220,46 @@ in the snapshot. Invalid local syntax remains an explicit unknown, never an
 inferred remote edge.
 Remote calls are recorded but are not fetched in this slice.
 
+A same-snapshot target is callable only when its statically proven trigger set
+contains `workflow_call`, the same predicate as the execution registry's
+`supports_reuse`. A target whose proven triggers lack it is `not_callable`
+(`local_call_target_not_callable`); a target whose triggers are unknown is
+`callability_unknown` (`local_call_target_callability_unknown`), never proven
+callable and never reported as lacking the trigger. Neither edge is resolved.
+
+Discovery applies the execution registry's GH-12 counting rule (root plus at
+most fifty distinct callees) to every parsed workflow as a potential top-level
+caller. Its call tree is the set of distinct workflows reachable through
+resolved acyclic local edges, excluding the caller itself; more than fifty such
+unique called workflows exceed the ceiling. Every edge
+whose caller lies in an exceeding tree, including the root, is
+`callee_limit_exceeded` (`local_call_unique_callee_limit_exceeded`). A shared
+callee counts once per tree. Classification precedence is `cycle`, then
+`depth_exceeded`, then `callee_limit_exceeded`. Bitset reachability memoizes
+each workflow once, so the check visits every acyclic edge once with
+at most 64-bit sets under the 64-workflow bound.
+
+Execution admission (`repo_context/workflow_syntax.py`) rejects any `@` in a
+same-repository reusable-workflow filename for both prefixes, matching this
+module's local grammar. The shared `is_workflow_path` predicate is unchanged,
+because its other callers do not parse call coordinates.
+
+Entrypoint and component roles are a pure browser projection of `triggers`
+and `callEdges` (provisional owner decision (2026-10-11) D2); the report wire
+and inventory digest carry no role field. The
+[discovery UI contract](../../features/workflow-discovery-ui.md#entrypoints-and-components)
+owns that presentation.
+
+These statuses and the `@` narrowing are the provisional owner decision
+(2026-10-11) D1/D3. The GH-11/GH-12 provider premises (same-commit `./` and
+`$/`, `@` rejection, ten connected levels, fifty unique called workflows and
+the `workflow_call` requirement) remain the repository's documented premises
+and need fresh verification against current GitHub documentation; this change
+did not re-read the provider pages.
+
 ```text
-ClosedLocalGraph := no missing local target, local cycle, or depth violation
+ClosedLocalGraph := no missing, non-callable or callability-unknown local
+  target, local cycle, depth violation, or unique-callee violation
 ImmutableRemoteEdge := remote ref is a full lowercase Git object id
 
 GraphSafeForAuthority :=
@@ -374,9 +415,11 @@ flowchart LR
 | `frontend/src/api/workflowDiscovery/schema.ts`               | bounded wire-shape re-admission and cross-field snapshot integrity  |
 | `frontend/src/api/workflowDiscovery/events.ts`               | one generated-contract-checked CI event vocabulary                  |
 | `frontend/src/api/workflowDiscovery/policyProof.ts`          | stable native-signal and generated-policy proof                     |
+| `frontend/src/api/workflowDiscovery/workflowRoles.ts`        | pure entrypoint/component projection from triggers and call edges   |
 | `frontend/src/api/workflowDiscovery/manifestIdentity.ts`     | canonical proposal manifest identity                                |
 | `frontend/src/api/workflowDiscovery/client.ts`               | exact-scope bounded browser transport and failure algebra           |
 | `frontend/src/features/workbench/WorkflowDiscoveryPanel.tsx` | request state and progressive-disclosure composition                |
+| `frontend/src/features/workbench/WorkflowRoleInventory.tsx`  | entrypoint, component and unknown-role tables                       |
 
 No file may own two rows solely to reduce file count. Conversely, a row is not
 split until it has an independent invariant or change reason.
@@ -392,6 +435,10 @@ split until it has an independent invariant or change reason.
   nested YAML document becomes complete evidence;
 - an expression is presented as a resolved permission, runner, secret, or call;
 - a local missing target or cycle is presented as a closed graph;
+- a non-callable or unknown-trigger target, or a call tree with more than fifty
+  unique called workflows, is presented as a closed graph;
+- an entrypoint or component role is derived from a path, filename or
+  underscore, or a shared callee is shown under one invented parent;
 - a mutable remote reusable-workflow ref is presented as immutable;
 - one failed source disappears from the inventory instead of creating an
   unknown and `complete = false`;

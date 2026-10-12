@@ -25,11 +25,14 @@ type CallKind = Literal["local", "remote", "dynamic", "unknown"]
 type CallStatus = Literal[
     "resolved",
     "missing",
+    "not_callable",
+    "callability_unknown",
     "remote",
     "dynamic",
     "invalid",
     "cycle",
     "depth_exceeded",
+    "callee_limit_exceeded",
 ]
 
 
@@ -94,11 +97,14 @@ class CallEdge:
         if self.status not in {
             "resolved",
             "missing",
+            "not_callable",
+            "callability_unknown",
             "remote",
             "dynamic",
             "invalid",
             "cycle",
             "depth_exceeded",
+            "callee_limit_exceeded",
         }:
             raise ValueError("call status is not admitted")
         if self.target_path is not None:
@@ -242,7 +248,16 @@ def _require_call_shape(edge: CallEdge) -> None:
             edge.target_path is None
             or edge.remote_ref is not None
             or edge.remote_ref_immutable is not None
-            or edge.status not in {"resolved", "missing", "cycle", "depth_exceeded"}
+            or edge.status
+            not in {
+                "resolved",
+                "missing",
+                "not_callable",
+                "callability_unknown",
+                "cycle",
+                "depth_exceeded",
+                "callee_limit_exceeded",
+            }
         ):
             raise ValueError("local call edge shape is inconsistent")
     elif edge.kind == "dynamic":

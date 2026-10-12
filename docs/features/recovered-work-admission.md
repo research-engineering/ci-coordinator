@@ -17,7 +17,7 @@ receipts are not another backlog or prerequisites for understanding this plan.
 | Review of an already registered policy epoch | B3 API-first adoption; required before B1 activates a custom policy | The current attestation start rediscovers a proposal and requires its manifest identity; a separately registered custom dynamic-CI policy cannot substitute for that proposal. Bind actor, scope, provider revision, exact epoch, baseline, one-use handoff, audit identity and activation freshness. Complete HTTP/runtime wiring, forward migration and independent replay/race tests together. Do not bypass review or activate through direct database writes. |
 | Structured decision provenance in reconciliation evidence | B5 selective CI and B7 audit closure | Compare the proposed policy/decision/provenance relation with current codecs and evidence owners. Admit complete identity, canonical bytes, retained-data migration, replay and verifier tamper oracles. Do not remove current policy rules or default-branch semantics. |
 | Critical runtime mutation cohort and owner-class coverage | B1 own-CI assurance and B7 audit closure | Rebind unknown-path fallback, omission-proof independence, JWKS expiry and numeric repository identity mutants to current witnesses. Demonstrate meaningful kills and compare current tuple/risk gates before adding another coverage mechanism. |
-| Same-repository reusable workflow grammar | B3 whole-workflow discovery; required for B1's own workflow graph | GH11 admits `$/` on GitHub.com, and the execution registry uses it, but discovery's graph parser only recognizes `./`. Resolve both forms at the caller commit with identical path, missing-target, cycle and depth checks; preserve the GHES boundary, reject expressions and local `@ref`. Other parser relaxations remain unadmitted candidates. |
+| Same-repository reusable workflow graph parity | B3 whole-workflow discovery; required for B1's own workflow graph | Discovery and the execution registry both resolve `./` and `$/` at the caller commit with identical path, missing-target, cycle and depth checks. Source now also aligns the callable-target (`workflow_call`) rule, the fifty-unique-callee ceiling and local `@` rejection, and presents entrypoints and components; native qualification remains. Preserve the GHES boundary and reject expressions. Other parser relaxations remain unadmitted candidates. |
 
 These are outstanding candidates, not implemented capabilities or automatically
 accepted designs. Implement only the smallest missing behavior, with a focused
@@ -30,14 +30,21 @@ The source assessment on 2026-09-23 binds
 `c5a9be38928f27e2709472852307b864aab07cf2`. Revalidate changed owners before
 implementation; an old finding or prototype is not current authority.
 
-The two B1 prerequisites above have current source counterexamples:
-`workflow_discovery/graph.py` classifies `$/` as invalid, whereas GH11 in the
+The 2026-09-23 grammar counterexample is stale: it said that
+`workflow_discovery/graph.py` classifies `$/` as invalid, but PR #3 (`92e1ceb`,
+2026-09-24) already resolves `./` and `$/` with identical checks, as GH11 in the
 [provider semantics owner](../architecture/cross-cutting/github-actions-semantics.md)
 and the [GitHub contract](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
-admit it on GitHub.com; `app/repository_attestation.py` binds review to the
-new discovery proposal, not an arbitrary registered epoch. Their correction
-does not require all B3 product work before a read-only baseline or shadow
-measurement. Pull forward only the path needed for admitted policy activation.
+admit on GitHub.com. Revalidation on 2026-10-11 found only parity and
+presentation gaps instead: discovery resolved non-`workflow_call` targets and
+lacked the fifty-unique-callee ceiling, execution admitted `@` in a local
+filename, and no view separated entrypoints from components. The
+[discovery call-graph contract](../architecture/modules/workflow-discovery.md#6-call-graph)
+owns the source correction. The remaining B1 prerequisite counterexample stands:
+`app/repository_attestation.py` binds review to the new discovery proposal, not
+an arbitrary registered epoch. Its correction does not require all B3 product
+work before a read-only baseline or shadow measurement. Pull forward only the
+path needed for admitted policy activation.
 
 Registered-policy review must read and re-admit the exact retained epoch, not
 trust an ID-shaped value. Bind the current repository scope and provider

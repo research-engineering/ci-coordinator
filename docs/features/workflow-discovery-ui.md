@@ -33,7 +33,7 @@ An authorized operator can:
    catalog and choose an immutable revision;
 2. inspect every discovered workflow, job, call edge, declared permission,
    secret name, runner/service declaration, concurrency rule, and explicit
-   unknown;
+   unknown, plus standalone-event entrypoints and reusable components;
 3. see proven assertions and unknowns with exact-commit provenance;
 4. generate an observe-only config proposal when one provider job identity is
    statically proven, or see why proposal bytes are blocked; and
@@ -125,6 +125,34 @@ Expressions are retained as syntax and resolved only when every input belongs to
 a finite admitted context. Dynamic action behavior, scripts, custom actions,
 runtime API calls, generated matrices, and environment protection remain
 unknown unless an independent typed contract proves them.
+
+## Entrypoints and Components
+
+The inventory projects workflow roles in the browser from the decoded report's
+`workflows[].triggers` and `callEdges` only (provisional owner decision
+(2026-10-11) D2). No backend field, inventory digest or parser version carries
+roles, so no wire change is needed for this view.
+
+```text
+Entrypoint(w)  := triggers(w) known and contains an event other than workflow_call
+Component(w)   := triggers(w) known and contains workflow_call
+UnknownRole(w) := triggers(w) unknown, empty, or w is an unparsed source
+Callers(w)     := every local call edge whose target is w, in any status
+Reachable(w)   := every call edge reached from w through resolved local edges,
+                  expanding each workflow once
+```
+
+Paths, filenames and leading underscores never decide a role. A workflow with
+both standalone triggers and `workflow_call` appears as an entrypoint and as a
+component. A component lists every caller, not one invented parent; an
+uncalled component remains visible because a remote caller cannot be ruled out.
+Entrypoint expansion lists missing, non-callable, callability-unknown, cyclic,
+depth- or ceiling-exceeded, dynamic, invalid and remote edges without
+following them, so uncertainty stays visible. The view shows only row counts:
+it sums no job, run or cost totals across a parent and its callees. Tables use
+the shared paginated data table; each call expansion is a native
+`details`/`summary` disclosure and remains keyboard-operable. The richer graph
+navigator remains CI-033.
 
 ## Evidence and Unknowns
 
@@ -293,8 +321,10 @@ transport module, not by workflow discovery.
 
 1. Every current target workflow at a frozen commit appears exactly once or has
    a typed inaccessible/truncated reason.
-2. Local reusable calls form a cycle-checked graph at the same commit; remote
-   calls remain typed unknowns and are never fetched by this slice.
+2. Local reusable calls form a cycle-checked graph at the same commit whose
+   resolved targets declare `workflow_call` and whose call trees respect the
+   ten-level and fifty-unique-callee ceilings; remote calls remain typed
+   unknowns and are never fetched by this slice.
 3. Permissions, named secrets, runners, services, environments, concurrency,
    matrices, conditions, and stable check identities are represented or marked
    unknown per job.
@@ -321,6 +351,7 @@ transport module, not by workflow discovery.
 | Canonical inventory, provenance, ledger, call-graph and proposal contracts | Source capability; requalify the public target. |
 | Bounded parser and exact-commit GitHub acquisition | Source capability; exact-source witnesses required. |
 | Inventory, graph, unknown and proposal UI without activation controls | Source capability; browser evidence remains target-bound. |
+| Entrypoint/component projection from triggers and call edges | Source capability; native frontend and browser witnesses remain to run. |
 | Application, extension-service and reporting-service synthetic archetype replays | Required coverage; no former private replay receipt or executed synthetic run is claimed. |
 | Durable scan history | Deferred; current discovery remains request-scoped. |
 | Semantic diff and affirmative review handoff to epoch registration | Non-activating source capability. |

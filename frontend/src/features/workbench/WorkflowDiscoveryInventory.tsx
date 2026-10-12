@@ -4,6 +4,7 @@ import type { DataColumn } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { formatCount, formatInteger } from "../../domain/format";
 import { DiscoveryTable } from "./DiscoveryTable";
+import { WorkflowRoleInventory } from "./WorkflowRoleInventory";
 
 type WorkflowItem = WorkflowDiscoveryReport["workflows"][number];
 type JobItem = WorkflowItem["jobs"][number];
@@ -199,6 +200,7 @@ export function WorkflowDiscoveryInventory({ report }: WorkflowDiscoveryInventor
           rows={report.adoptionAssessments}
         />
       </details>
+      <WorkflowRoleInventory report={report} />
       <details className="evidence-section" open>
         <summary>
           <h3>

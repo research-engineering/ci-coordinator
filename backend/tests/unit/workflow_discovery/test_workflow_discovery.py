@@ -18,6 +18,7 @@ from ci_coordinator.workflow_discovery import (
 from ci_coordinator.workflow_discovery._syntax_fields import PROPOSAL_EVENT_ACTIONS
 from ci_coordinator.workflow_discovery._yaml_preflight import preflight_yaml_events
 from ci_coordinator.workflow_discovery.graph import analyze_call_graph
+from ci_coordinator.workflow_discovery.graph_model import GraphAnalysis
 from ci_coordinator.workflow_discovery.outcomes import (
     WorkflowDiscoveryCompleted,
     WorkflowDiscoveryForbidden,
@@ -196,15 +197,15 @@ def test_identical_snapshot_produces_identical_admitted_proposal() -> None:
     assert first.proposal.admission.source_bytes == first.proposal.policy_source
 
 
-def test_report_binds_the_current_parser_version_and_refuses_relabeled_v3() -> None:
+def test_report_binds_the_current_parser_version_and_refuses_relabeled_v4() -> None:
     report = _completed(_source(_valid_document())).report
 
-    assert report.parser_version == "github-actions-static/v4"
+    assert report.parser_version == "github-actions-static/v5"
     assert {fact.provenance.parser_version for fact in report.facts} | {
         unknown.provenance.parser_version for unknown in report.unknowns
-    } == {"github-actions-static/v4"}
+    } == {"github-actions-static/v5"}
     with pytest.raises(ValueError, match="parser version is not admitted"):
-        replace(report, parser_version="github-actions-static/v3")
+        replace(report, parser_version="github-actions-static/v4")
 
 
 def test_adoption_assessment_is_total_and_fail_closed_without_owner_contract() -> None:
@@ -426,15 +427,15 @@ def test_local_call_graph_resolves_only_same_snapshot_targets_and_detects_cycles
     local_prefix: str,
 ) -> None:
     caller = _source(
-        _call_document(f"{local_prefix}.github/workflows/target.yml"),
+        _call_document(f"{local_prefix}.github/workflows/target.yml", trigger="workflow_call"),
         ".github/workflows/caller.yml",
     )
     target = _source(
-        _call_document(f"{local_prefix}.github/workflows/caller.yml"),
+        _call_document(f"{local_prefix}.github/workflows/caller.yml", trigger="workflow_call"),
         ".github/workflows/target.yml",
     )
 
-    resolved = _completed(caller, _source(_valid_document(), target.path))
+    resolved = _completed(caller, _source(_callable_document(), target.path))
     cyclic = _completed(caller, target)
 
     assert resolved.report.local_graph_closed is True
@@ -460,11 +461,11 @@ def test_local_call_graph_classifies_cycles_and_only_overlong_paths(local_prefix
     short_chain = _call_chain("short", 2, local_prefix)
     cycle = (
         _source(
-            _call_document(f"{local_prefix}.github/workflows/cycle-b.yml"),
+            _call_document(f"{local_prefix}.github/workflows/cycle-b.yml", trigger="workflow_call"),
             ".github/workflows/cycle-a.yml",
         ),
         _source(
-            _call_document(f"{local_prefix}.github/workflows/cycle-a.yml"),
+            _call_document(f"{local_prefix}.github/workflows/cycle-a.yml", trigger="workflow_call"),
             ".github/workflows/cycle-b.yml",
         ),
     )
@@ -488,6 +489,93 @@ def test_local_call_graph_classifies_cycles_and_only_overlong_paths(local_prefix
         "local_call_cycle",
         "local_call_depth_exceeded",
     }
+
+
+@pytest.mark.parametrize("local_prefix", ["./", "$/"])
+@pytest.mark.parametrize(
+    ("target_trigger", "status", "reason"),
+    [
+        ("push", "not_callable", "local_call_target_not_callable"),
+        ("[workflow_call, 7]", "callability_unknown", "local_call_target_callability_unknown"),
+    ],
+    ids=["static-without-workflow-call", "unknown-triggers"],
+)
+def test_local_call_graph_resolves_only_targets_that_declare_workflow_call(
+    local_prefix: str,
+    target_trigger: str,
+    status: str,
+    reason: str,
+) -> None:
+    target = ".github/workflows/target.yml"
+    result = _completed(
+        _source(_call_document(f"{local_prefix}{target}"), ".github/workflows/caller.yml"),
+        _source(
+            f"name: Target\non: {target_trigger}\njobs:\n"
+            "  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pytest\n",
+            target,
+        ),
+    )
+
+    assert [(edge.kind, edge.status, edge.target_path) for edge in result.report.call_edges] == [
+        ("local", status, target)
+    ]
+    assert {item.reason for item in result.report.unknowns if item.field == "call.target"} == {
+        reason
+    }
+    assert not any(fact.field == "call.target" for fact in result.report.facts)
+    assert result.report.local_graph_closed is False
+    assert "local_graph_open" in result.proposal.blockers
+
+
+@pytest.mark.parametrize("local_prefix", ["./", "$/"])
+@pytest.mark.parametrize(
+    ("called_workflows", "status"),
+    [(50, "resolved"), (51, "callee_limit_exceeded")],
+    ids=["unique-50", "unique-51"],
+)
+def test_local_call_graph_enforces_the_unique_called_workflow_ceiling(
+    local_prefix: str,
+    called_workflows: int,
+    status: str,
+) -> None:
+    leaves = tuple(f".github/workflows/leaf-{index:02}.yml" for index in range(called_workflows))
+    graph = _call_graph(
+        _source(_fan_out_document(leaves, local_prefix), ".github/workflows/root.yml"),
+        *(_source(_callable_document(), path) for path in leaves),
+    )
+
+    assert {edge.status for edge in graph.edges} == {status}
+    assert len(graph.edges) == called_workflows
+    assert graph.local_graph_closed is (status == "resolved")
+    assert {item.reason for item in graph.unknowns} == (
+        set() if status == "resolved" else {"local_call_unique_callee_limit_exceeded"}
+    )
+
+
+@pytest.mark.parametrize(
+    ("shape", "status"),
+    [("transitive-51", "callee_limit_exceeded"), ("shared-50", "resolved")],
+)
+def test_unique_called_workflow_ceiling_counts_each_tree_workflow_once(
+    shape: str,
+    status: str,
+) -> None:
+    root = ".github/workflows/root.yml"
+    hubs: tuple[str, ...]
+    if shape == "transitive-51":
+        hubs = (".github/workflows/hub.yml",)
+        leaves = tuple(f".github/workflows/leaf-{index:02}.yml" for index in range(50))
+    else:
+        hubs = (".github/workflows/hub-a.yml", ".github/workflows/hub-b.yml")
+        leaves = tuple(f".github/workflows/leaf-{index:02}.yml" for index in range(48))
+    graph = _call_graph(
+        _source(_fan_out_document(hubs, "$/"), root),
+        *(_source(_fan_out_document(leaves, "./", trigger="workflow_call"), hub) for hub in hubs),
+        *(_source(_callable_document(), path) for path in leaves),
+    )
+
+    assert {edge.status for edge in graph.edges} == {status}
+    assert graph.local_graph_closed is (status == "resolved")
 
 
 @pytest.mark.parametrize(
@@ -652,6 +740,17 @@ def _completed(
     return result
 
 
+def _call_graph(*sources: WorkflowSource) -> GraphAnalysis:
+    # Ceiling fixtures need 51+ workflows; their full discovery report would exceed
+    # MAX_REPORT_BYTES, so they exercise the parsed call graph directly.
+    parsed: list[ParsedWorkflow] = []
+    for source in sources:
+        outcome = parse_workflow(source, scope=SCOPE, revision=REVISION, default_branch="master")
+        assert isinstance(outcome, ParsedWorkflow)
+        parsed.append(outcome)
+    return analyze_call_graph(tuple(parsed))
+
+
 def _native_adoption_projection(
     *,
     gate_signal_name: str = "Pull Request Gate",
@@ -704,17 +803,34 @@ def _sharded_fixture_adoption_projection() -> AdoptionTargetProjection:
     )
 
 
-def _call_document(target: str) -> str:
-    return f"name: Caller\non: push\njobs:\n  call:\n    uses: {target}\n"
+def _call_document(target: str, *, trigger: str = "push") -> str:
+    return f"name: Caller\non: {trigger}\njobs:\n  call:\n    uses: {target}\n"
+
+
+def _fan_out_document(
+    targets: tuple[str, ...],
+    local_prefix: str,
+    *,
+    trigger: str = "push",
+) -> str:
+    jobs = "".join(
+        f"  call-{index:02}:\n    uses: {local_prefix}{target}\n"
+        for index, target in enumerate(targets)
+    )
+    return f"name: Caller\non: {trigger}\njobs:\n{jobs}"
+
+
+def _callable_document() -> str:
+    return _single_job_document(("workflow_call",))
 
 
 def _call_chain(prefix: str, levels: int, local_prefix: str = "./") -> tuple[WorkflowSource, ...]:
     paths = tuple(f".github/workflows/{prefix}-{index:02}.yml" for index in range(levels))
     return tuple(
         _source(
-            _valid_document()
+            _callable_document()
             if index == levels - 1
-            else _call_document(f"{local_prefix}{paths[index + 1]}"),
+            else _call_document(f"{local_prefix}{paths[index + 1]}", trigger="workflow_call"),
             path,
         )
         for index, path in enumerate(paths)
