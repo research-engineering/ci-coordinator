@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Final, Literal, Protocol
 
 from ci_coordinator.app.config_admission import ConfigScopeAuthorizer
 from ci_coordinator.config_control import RepositoryScope, ValidatedEpochDraft
@@ -12,7 +12,20 @@ from ci_coordinator.config_epochs import (
     MAX_CONFIG_EPOCH_PAGE_SIZE,
     ConfigEpochStatus,
     ConfigEpochStoreUnavailable,
+    CoverageRelation,
 )
+from ci_coordinator.planning_core import ConservativeEpochCoverageComparator
+from ci_coordinator.proposal_review import (
+    MAX_CHANGED_POINTERS,
+    MAX_SEMANTIC_DIFF_BYTES,
+    PolicySemanticDiff,
+    SemanticDiffLimitExceeded,
+    compare_policy_drafts,
+)
+
+# Preview pointer bounds are the review semantic-diff owner's bounds, projected for HTTP.
+MAX_PREVIEW_CHANGED_POINTERS: Final = MAX_CHANGED_POINTERS
+MAX_PREVIEW_POINTER_BYTES: Final = MAX_SEMANTIC_DIFF_BYTES
 
 
 class ConfigEpochQueryStore(Protocol):
@@ -49,6 +62,44 @@ class ConfigSourceAvailable:
             raise TypeError("config source result requires an exact validated draft")
 
 
+type ConfigPreviewCoverageRelation = Literal["equal", "greater", "less", "incomparable", "unknown"]
+
+
+@dataclass(frozen=True, slots=True)
+class ConfigEpochPreview:
+    """Read-only comparison of two retained same-scope epochs; it decides nothing."""
+
+    scope: RepositoryScope
+    base_epoch_id: str
+    target_epoch_id: str
+    coverage_relation: ConfigPreviewCoverageRelation
+    # None means the exact pointer set exceeds the admitted semantic-diff bound.
+    diff: PolicySemanticDiff | None
+
+    def __post_init__(self) -> None:
+        _require_scope(self.scope)
+        _require_epoch_id(self.base_epoch_id)
+        _require_epoch_id(self.target_epoch_id)
+        if self.coverage_relation not in {"equal", "greater", "less", "incomparable", "unknown"}:
+            raise ValueError("config preview coverage relation is not admitted")
+        if self.diff is not None and (
+            type(self.diff) is not PolicySemanticDiff
+            or self.diff.scope != self.scope
+            or self.diff.base_epoch_id != self.base_epoch_id
+            or self.diff.target_epoch_id != self.target_epoch_id
+        ):
+            raise ValueError("config preview diff does not bind its scope and epochs")
+
+
+@dataclass(frozen=True, slots=True)
+class ConfigPreviewAvailable:
+    value: ConfigEpochPreview
+
+    def __post_init__(self) -> None:
+        if type(self.value) is not ConfigEpochPreview:
+            raise TypeError("config preview result requires an exact preview value")
+
+
 @dataclass(frozen=True, slots=True)
 class ConfigQueryForbidden:
     pass
@@ -67,6 +118,9 @@ class ConfigQueryUnavailable:
 type ConfigStatusResult = ConfigStatusAvailable | ConfigQueryForbidden | ConfigQueryUnavailable
 type ConfigSourceResult = (
     ConfigSourceAvailable | ConfigQueryForbidden | ConfigQueryNotFound | ConfigQueryUnavailable
+)
+type ConfigPreviewResult = (
+    ConfigPreviewAvailable | ConfigQueryForbidden | ConfigQueryNotFound | ConfigQueryUnavailable
 )
 
 
@@ -87,6 +141,15 @@ class ConfigQueryUseCase(Protocol):
         scope: RepositoryScope,
         epoch_id: str,
     ) -> ConfigSourceResult: ...
+
+    async def preview(
+        self,
+        *,
+        actor: str,
+        scope: RepositoryScope,
+        base_epoch_id: str,
+        target_epoch_id: str,
+    ) -> ConfigPreviewResult: ...
 
 
 class ConfigQueryService:
@@ -146,6 +209,54 @@ class ConfigQueryService:
         if value.scope != scope or value.epoch_id != epoch_id:
             return ConfigQueryUnavailable()
         return ConfigSourceAvailable(value)
+
+    async def preview(
+        self,
+        *,
+        actor: str,
+        scope: RepositoryScope,
+        base_epoch_id: str,
+        target_epoch_id: str,
+    ) -> ConfigPreviewResult:
+        """Compare two retained epochs with the rollback coverage and review diff owners."""
+        _require_scope(scope)
+        _require_epoch_id(base_epoch_id)
+        _require_epoch_id(target_epoch_id)
+        if not await self._authorizer.allows_scope(actor=actor, scope=scope):
+            return ConfigQueryForbidden()
+        try:
+            base = await self._store.load_epoch(scope, base_epoch_id)
+            target = await self._store.load_epoch(scope, target_epoch_id)
+        except ConfigEpochStoreUnavailable:
+            return ConfigQueryUnavailable()
+        if base is None or target is None:
+            return ConfigQueryNotFound()
+        if (
+            base.scope != scope
+            or target.scope != scope
+            or base.epoch_id != base_epoch_id
+            or target.epoch_id != target_epoch_id
+        ):
+            return ConfigQueryUnavailable()
+        relation: CoverageRelation = await ConservativeEpochCoverageComparator(
+            base,
+            target,
+        ).compare(scope=scope, active_epoch_id=base_epoch_id, target_epoch_id=target_epoch_id)
+        if relation == "unavailable":
+            return ConfigQueryUnavailable()
+        try:
+            diff: PolicySemanticDiff | None = compare_policy_drafts(base, target)
+        except SemanticDiffLimitExceeded:
+            diff = None
+        return ConfigPreviewAvailable(
+            ConfigEpochPreview(
+                scope=scope,
+                base_epoch_id=base_epoch_id,
+                target_epoch_id=target_epoch_id,
+                coverage_relation=relation,
+                diff=diff,
+            )
+        )
 
 
 def _require_scope(scope: object) -> None:

@@ -52,8 +52,16 @@ def test_repository_profile_is_exact_and_matches_openapi(
     assert profile.maximum_policy_source_bytes == 2_097_152
     assert profile.maximum_operation_id_bytes == 256
     assert profile.maximum_rollback_reason_bytes == 512
-    assert len(profile.operations) == 6
+    assert len(profile.operations) == 7
     assert profile.operations[2].request_schema == "ci-config-epoch-activation/v2"
+    # Provisional D3: status and preview are metadata reads; exact source stays `configure`.
+    assert [(item.http_operation_id, item.required_roles) for item in profile.operations[4:]] == [
+        ("get_config_epoch_status", ("read",)),
+        ("export_config_epoch_source", ("configure",)),
+        ("preview_config_epoch", ("read",)),
+    ]
+    assert profile.operations[4].success_schema == "ci-config-epoch-status/v2"
+    assert profile.operations[6].success_schema == "ci-config-epoch-preview/v1"
     assert_config_lifecycle_openapi(document, profile)
 
 
@@ -388,6 +396,40 @@ def test_profile_rejects_duplicate_json_keys(tmp_path: Path) -> None:
             ),
             9_007_199_254_740_992,
             "safe-integer bound differs",
+        ),
+        (
+            (
+                "components",
+                "schemas",
+                "ConfigEpochPreviewBody",
+                "properties",
+                "changedPointers",
+                "maxItems",
+            ),
+            1_025,
+            "preview pointer bound differs",
+        ),
+        (
+            (
+                "components",
+                "schemas",
+                "PolicySemanticPointer",
+                "x-max-utf8-bytes",
+            ),
+            65_537,
+            "preview pointer bound differs",
+        ),
+        (
+            (
+                "components",
+                "schemas",
+                "ConfigEpochPreviewBody",
+                "properties",
+                "schemaVersion",
+                "const",
+            ),
+            "ci-config-epoch-preview/v2",
+            "success schema differs",
         ),
     ),
 )

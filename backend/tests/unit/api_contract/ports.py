@@ -142,6 +142,7 @@ class Ports:
             draft.document_hash,
             draft.epoch_hash,
             len(draft.source_bytes),
+            True,
         )
         items = (summary,) if after_epoch_id is None or draft.epoch_id > after_epoch_id else ()
         return ConfigStatusAvailable(
@@ -156,6 +157,16 @@ class Ports:
 
     async def source(self, *, actor: str, scope: RepositoryScope, epoch_id: str) -> Never:
         self.forbidden("source")
+
+    async def preview(
+        self,
+        *,
+        actor: str,
+        scope: RepositoryScope,
+        base_epoch_id: str,
+        target_epoch_id: str,
+    ) -> Never:
+        self.forbidden("preview")
 
     async def register(self, command: RegisterConfigEpoch) -> Never:
         self.forbidden("register")

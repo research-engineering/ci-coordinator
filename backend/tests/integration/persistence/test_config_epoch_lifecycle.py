@@ -288,8 +288,16 @@ def test_rollback_refuses_a_retained_target_without_a_same_scope_activation(
                     )
                 )
                 events = await load_test_audit_records(unit_of_work.audit_events)
+                status = await unit_of_work.config_epochs.read_status(
+                    active.scope, after_epoch_id=None, limit=100
+                )
                 await unit_of_work.rollback()
             assert isinstance(refused, ConfigEpochRollbackTargetNeverActivated)
+            # Status projects the same journal predicate the rollback refusal applies.
+            assert {item.epoch_id: item.previously_activated for item in status.epochs.items} == {
+                active.epoch_id: True,
+                target.epoch_id: False,
+            }
             assert snapshot is not None
             assert snapshot.active.epoch_id == active.epoch_id
             assert snapshot.active.revision == 1
@@ -371,10 +379,21 @@ def test_rollback_transition_is_not_activation_evidence_for_its_target(
                     )
                 )
                 await unit_of_work.commit()
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                status = await unit_of_work.config_epochs.read_status(
+                    scope, after_epoch_id=None, limit=100
+                )
+                await unit_of_work.rollback()
             assert isinstance(laundered, ConfigEpochRollbackTargetNeverActivated)
             assert isinstance(to_second, ConfigEpochActivationApplied)
             assert to_second.record.active.epoch_id == second.epoch_id
             assert to_second.record.active.revision == 5
+            # A retained rollback transition is not activation evidence in status either.
+            assert {item.epoch_id: item.previously_activated for item in status.epochs.items} == {
+                first.epoch_id: True,
+                second.epoch_id: True,
+                rolled_back_only.epoch_id: False,
+            }
         finally:
             await engine.dispose()
 

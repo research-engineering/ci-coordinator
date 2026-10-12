@@ -16,6 +16,7 @@ from ci_coordinator.api.http.config_lifecycle_contracts import (
     CONFIG_SOURCE_HEADERS_OPENAPI,
     ActiveConfigEpochBody,
     ConfigControlErrorBody,
+    ConfigEpochPreviewBody,
     ConfigEpochStatusBody,
     ConfigEpochSummaryBody,
     ConfigEpochValidationAcceptedBody,
@@ -40,6 +41,7 @@ from ci_coordinator.app.config_admission import (
     ConfigAdmissionUnavailable,
 )
 from ci_coordinator.app.config_queries import (
+    ConfigPreviewAvailable,
     ConfigQueryForbidden,
     ConfigQueryNotFound,
     ConfigQueryUnavailable,
@@ -48,13 +50,19 @@ from ci_coordinator.app.config_queries import (
 )
 from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.config_epochs import MAX_CONFIG_EPOCH_PAGE_SIZE
-from ci_coordinator.control_plane_identity import RoleAdmissionGranted
+from ci_coordinator.control_plane_identity import ControlPlaneRole, RoleAdmissionGranted
 from ci_coordinator.kernel.canonical_json import MAX_SAFE_JSON_INTEGER
 
 CONFIG_STATUS_PATH = "/api/v1/config/repositories/{installation_id}/{repository_id}/status"
 CONFIG_SOURCE_PATH = (
     "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/source"
 )
+CONFIG_PREVIEW_PATH = (
+    "/api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/preview"
+)
+# Provisional owner decision D3 (2026-10-11): metadata reads need `read`; source bytes `configure`.
+_CONFIG_METADATA_READ_ROLES: frozenset[ControlPlaneRole] = frozenset({"read"})
+_CONFIG_SOURCE_READ_ROLES: frozenset[ControlPlaneRole] = frozenset({"configure"})
 
 
 def build_config_lifecycle_query_router(
@@ -181,7 +189,7 @@ def build_config_lifecycle_query_router(
         authentication = await admit_config_request(
             request,
             dependencies,
-            frozenset({"configure"}),
+            _CONFIG_METADATA_READ_ROLES,
             mutation=False,
         )
         rejected = config_admission_error(authentication)
@@ -203,7 +211,7 @@ def build_config_lifecycle_query_router(
             raise RuntimeError("config status outcome algebra is incomplete")
         value = result.value
         response = ConfigEpochStatusBody(
-            schema_version="ci-config-epoch-status/v1",
+            schema_version="ci-config-epoch-status/v2",
             installation_id=value.scope.installation_id,
             repository_id=value.scope.repository_id,
             active=(
@@ -222,6 +230,7 @@ def build_config_lifecycle_query_router(
                     document_hash=item.document_hash,
                     epoch_hash=item.epoch_hash,
                     source_byte_count=item.source_byte_count,
+                    previously_activated=item.previously_activated,
                 )
                 for item in value.epochs.items
             ),
@@ -272,7 +281,7 @@ def build_config_lifecycle_query_router(
         authentication = await admit_config_request(
             request,
             dependencies,
-            frozenset({"configure"}),
+            _CONFIG_SOURCE_READ_ROLES,
             mutation=False,
         )
         rejected = config_admission_error(authentication)
@@ -304,6 +313,86 @@ def build_config_lifecycle_query_router(
                 "ETag": f'"{draft.source_hash}"',
                 "X-CI-Config-Epoch-Id": draft.epoch_id,
             },
+        )
+
+    @router.get(
+        CONFIG_PREVIEW_PATH,
+        operation_id="preview_config_epoch",
+        response_model=ConfigEpochPreviewBody,
+        responses={
+            status.HTTP_200_OK: {
+                "model": ConfigEpochPreviewBody,
+                "headers": CONFIG_NO_STORE_OPENAPI,
+            },
+            status.HTTP_401_UNAUTHORIZED: {
+                "model": ConfigControlErrorBody,
+                "headers": WWW_AUTHENTICATE_OPENAPI,
+            },
+            status.HTTP_403_FORBIDDEN: {"model": ConfigControlErrorBody},
+            status.HTTP_404_NOT_FOUND: {"model": ConfigControlErrorBody},
+            status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": ErrorBody},
+            status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ConfigControlErrorBody},
+        },
+    )
+    async def preview_config_epoch(
+        request: Request,
+        installation_id: Annotated[int, Path(ge=1, le=MAX_SAFE_JSON_INTEGER)],
+        repository_id: Annotated[int, Path(ge=1, le=MAX_SAFE_JSON_INTEGER)],
+        epoch_id: Annotated[
+            str,
+            Path(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
+        ],
+        base_epoch_id: Annotated[
+            str,
+            Query(alias="baseEpochId", min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"),
+        ],
+        _security: Annotated[
+            HTTPAuthorizationCredentials | None,
+            Security(CONTROL_PLANE_BEARER),
+        ],
+        _session_security: Annotated[str | None, Security(CONTROL_PLANE_SESSION)] = None,
+    ) -> JSONResponse:
+        authentication = await admit_config_request(
+            request,
+            dependencies,
+            _CONFIG_METADATA_READ_ROLES,
+            mutation=False,
+        )
+        rejected = config_admission_error(authentication)
+        if rejected is not None:
+            return rejected
+        if not isinstance(authentication, RoleAdmissionGranted):
+            raise RuntimeError("config preview admission was not granted")
+        result = await dependencies.queries.preview(
+            actor=authentication.principal.actor_id,
+            scope=RepositoryScope(installation_id, repository_id),
+            base_epoch_id=base_epoch_id,
+            target_epoch_id=epoch_id,
+        )
+        if isinstance(result, ConfigQueryForbidden):
+            return config_error(status.HTTP_403_FORBIDDEN, "forbidden")
+        if isinstance(result, ConfigQueryNotFound):
+            return config_error(status.HTTP_404_NOT_FOUND, "target_unavailable")
+        if isinstance(result, ConfigQueryUnavailable):
+            return config_error(status.HTTP_503_SERVICE_UNAVAILABLE, "unavailable")
+        if not isinstance(result, ConfigPreviewAvailable):
+            raise RuntimeError("config preview outcome algebra is incomplete")
+        preview = result.value
+        response = ConfigEpochPreviewBody(
+            schema_version="ci-config-epoch-preview/v1",
+            installation_id=preview.scope.installation_id,
+            repository_id=preview.scope.repository_id,
+            base_epoch_id=preview.base_epoch_id,
+            target_epoch_id=preview.target_epoch_id,
+            coverage_relation=preview.coverage_relation,
+            diff_state="limit_exceeded" if preview.diff is None else "complete",
+            changed_pointers=() if preview.diff is None else preview.diff.changed_pointers,
+            diff_hash=None if preview.diff is None else preview.diff.diff_hash,
+        )
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=response.to_wire_mapping(),
+            headers=CONFIG_NO_STORE_HEADER,
         )
 
     return router

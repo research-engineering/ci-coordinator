@@ -42,10 +42,11 @@ external compatibility contract; only the versioned schemas do.
 
 The configuration lifecycle exposes a finite API-first projection before its
 UI consumer: effect-free validation, operation-idempotent registration,
-activation, rollback, bounded status traversal, and exact retained-source
-export. Validation and registration share one policy-admission capability.
-Status never returns source bytes; export scope-filters and re-admits the
-retained draft before emitting it. The exact operation map and bounds are owned
+activation, rollback, bounded status traversal, read-only epoch-to-epoch
+preview, and exact retained-source export. Validation and registration share
+one policy-admission capability. Status and preview never return source bytes
+or policy values; export scope-filters and re-admits the retained draft before
+emitting it. The exact operation map and bounds are owned
 by `config-lifecycle-http-profile.v1.json` and checked against OpenAPI before
 the TypeScript projection is generated.
 

@@ -26,7 +26,8 @@ The behavior contract is owned by
 
 - an already provisioned connected instance in `non_enforcing` or `enforcing` mode;
 - a short-lived Keycloak workload access token with the exact API audience and
-  `configure` and `activate` roles;
+  `read`, `configure` and `activate` roles (status and preview need `read`,
+  source work `configure`, activation and rollback `activate`);
 - `jq` and `curl`;
 - an admitted secret-free policy source, such as `config.example.yaml` after
   replacing repository identities with real values.
@@ -295,7 +296,30 @@ jq . "${policy_dir}/status-next.response.json"
 Pages are keyset-ordered by immutable epoch id. They are bounded live reads,
 not a snapshot across concurrent registrations. Restart traversal when a
 stable collection view matters and concurrent registrations may have occurred.
-The active pointer is the sole owner of activation revision.
+The active pointer is the sole owner of activation revision. Each epoch's
+`previouslyActivated` reports whether it is currently eligible as a rollback
+target; the rollback command re-checks it.
+
+## Preview A Retained Epoch
+
+Compare a retained target with a retained base, normally the active epoch, before
+review, activation or rollback:
+
+```sh
+active_epoch_id="$(jq -er '.active.epochId' "${policy_dir:?}/status.response.json")" &&
+curl --disable --fail-with-body --silent --show-error \
+  --get \
+  --header "@${CONTROL_PLANE_HEADER_FILE}" \
+  --data-urlencode "baseEpochId=${active_epoch_id}" \
+  --output "${policy_dir:?}/preview.response.json" \
+  "${COORDINATOR_URL}/api/v1/config/repositories/${INSTALLATION_ID}/${REPOSITORY_ID}/epochs/${PREVIOUS_EPOCH_ID:?}/preview" &&
+jq '{coverageRelation, diffState, changedPointers, diffHash}' "${policy_dir}/preview.response.json"
+```
+
+`changedPointers` are policy schema locations without values; export both
+sources to compare values. `coverageRelation` is the target's relation to the
+base under the rollback coverage algebra. The preview writes nothing and does
+not authorize a command.
 
 ## Export Exact Retained Source
 

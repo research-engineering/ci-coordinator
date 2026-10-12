@@ -3,11 +3,18 @@ import { type KeyboardEvent, type MouseEvent, useEffect, useMemo, useState } fro
 import type { ControlPlaneSession } from "../../api/controlPlaneIdentity/schema";
 import type { ExpectedActiveEpoch } from "../../api/repositoryAttestation/client";
 import type { WorkbenchScope } from "../../api/workbench/client";
-import { consoleHref } from "../workbench/navigation";
+import {
+  consoleHref,
+  type RegisteredEpochReviewHint,
+  registeredEpochReviewHint,
+} from "../workbench/navigation";
 import { ConfigurationNotice } from "./ConfigurationNotice";
+import { ReviewedEpochActivation } from "./RegisteredEpochReview";
 import { RetainedEpochs } from "./RetainedEpochs";
 import { SourceEditor } from "./SourceEditor";
 import { useConfigurationCommand } from "./useConfigurationCommand";
+
+const CONFIGURATION_ROLES = ["read", "configure", "activate"] as const;
 
 export function ConfigurationPage({
   scope,
@@ -41,12 +48,18 @@ export function ConfigurationPage({
     );
     return () => clearTimeout(timer);
   }, [session, now]);
+  // Provisional D3: each control below mirrors the role its route admits.
   if (
-    !session?.roles.includes("configure") ||
+    !session ||
+    !CONFIGURATION_ROLES.some((role) => session.roles.includes(role)) ||
     !Number.isFinite(Date.parse(session.expiresAt)) ||
     Date.parse(session.expiresAt) <= Math.max(now, Date.now())
   )
-    return <p role="status">A current administrator session with configure access is required.</p>;
+    return (
+      <p role="status">
+        A current administrator session with read, configure or activate access is required.
+      </p>
+    );
   const key = JSON.stringify([
     scope.installationId,
     scope.repositoryId,
@@ -102,6 +115,9 @@ function AuthorizedConfiguration({
     return () => document.removeEventListener("visibilitychange", update);
   }, []);
   const command = useConfigurationCommand(session, onConfirmed);
+  const [reviewed, setReviewed] = useState<RegisteredEpochReviewHint | undefined>(() =>
+    registeredEpochReviewHint(new URLSearchParams(globalThis.location.search), repository),
+  );
   function tabKey(event: KeyboardEvent<HTMLButtonElement>) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -119,11 +135,17 @@ function AuthorizedConfiguration({
   const state = command.state;
   const localMinimum = useMemo(
     () =>
-      state.kind === "complete" && state.command.kind === "rollback" && "revision" in state.value
+      state.kind === "complete" &&
+      state.command.kind !== "registration" &&
+      "revision" in state.value
         ? { epochId: state.value.epochId, revision: state.value.revision }
         : undefined,
     [state],
   );
+  const reviewedActivated =
+    state.kind === "complete" &&
+    state.command.kind === "activation" &&
+    state.command.body.registeredEpochReviewOperationId === reviewed?.operationId;
   const minimumActive =
     confirmedMinimum && (!localMinimum || confirmedMinimum.revision > localMinimum.revision)
       ? confirmedMinimum
@@ -138,6 +160,17 @@ function AuthorizedConfiguration({
     );
   return (
     <div className="configuration-workspace">
+      {reviewed ? (
+        <ReviewedEpochActivation
+          scope={repository}
+          hint={reviewed}
+          session={session}
+          visible={active && visible}
+          locked={command.locked}
+          confirmed={reviewedActivated}
+          onActivate={(value) => void command.submit(value)}
+        />
+      ) : null}
       <div role="tablist" aria-label="Configuration views" className="configuration-tabs">
         {(["source", "epochs"] as const).map((id) => (
           <button
@@ -157,14 +190,22 @@ function AuthorizedConfiguration({
       </div>
       {state.kind === "pending" ? (
         <p role="status">
-          {state.command.kind === "registration" ? "Registering source" : "Requesting rollback"}
+          {state.command.kind === "registration"
+            ? "Registering source"
+            : state.command.kind === "rollback"
+              ? "Requesting rollback"
+              : "Requesting activation"}
         </p>
       ) : null}
       {state.kind === "uncertain" ? (
         <section role="alert" className="configuration-notice">
           <p>
-            {state.command.kind === "registration" ? "Registration" : "Rollback"} outcome unknown.
-            The exact command is retained.
+            {state.command.kind === "registration"
+              ? "Registration"
+              : state.command.kind === "rollback"
+                ? "Rollback"
+                : "Activation"}{" "}
+            outcome unknown. The exact command is retained.
           </p>
           <details>
             <summary>Pending command</summary>
@@ -193,6 +234,16 @@ function AuthorizedConfiguration({
                   <dd>{state.command.body.reason}</dd>
                 </>
               ) : null}
+              {state.command.kind === "activation" ? (
+                <>
+                  <dt>Expected revision</dt>
+                  <dd>{state.command.body.expectedRevision ?? "None"}</dd>
+                  <dt>Review operation</dt>
+                  <dd>
+                    <code>{state.command.body.registeredEpochReviewOperationId}</code>
+                  </dd>
+                </>
+              ) : null}
             </dl>
           </details>
           <button
@@ -210,8 +261,8 @@ function AuthorizedConfiguration({
       {state.kind === "complete" ? (
         <p role="status">
           {state.command.kind === "registration"
-            ? "Source registration confirmed. Activation requires a reviewed workflow proposal."
-            : `Rollback confirmed at revision ${"revision" in state.value ? state.value.revision : ""}.`}
+            ? "Source registration confirmed. Activation requires a GitHub review of the retained epoch or a reviewed workflow proposal."
+            : `${state.command.kind === "rollback" ? "Rollback" : "Activation"} confirmed at revision ${"revision" in state.value ? state.value.revision : ""}.`}
         </p>
       ) : null}
       <div
@@ -220,13 +271,17 @@ function AuthorizedConfiguration({
         aria-labelledby="configuration-tab-source"
         hidden={tab !== "source"}
       >
-        <SourceEditor
-          scope={repository}
-          session={session}
-          active={active && visible && tab === "source"}
-          locked={command.locked}
-          onRegister={(value) => void command.submit(value)}
-        />
+        {session.roles.includes("configure") ? (
+          <SourceEditor
+            scope={repository}
+            session={session}
+            active={active && visible && tab === "source"}
+            locked={command.locked}
+            onRegister={(value) => void command.submit(value)}
+          />
+        ) : (
+          <p>Configure role required to validate or register source.</p>
+        )}
       </div>
       <div
         role="tabpanel"
@@ -234,19 +289,26 @@ function AuthorizedConfiguration({
         aria-labelledby="configuration-tab-epochs"
         hidden={tab !== "epochs"}
       >
-        <RetainedEpochs
-          scope={repository}
-          minimumActive={minimumActive}
-          readRevision={command.readRevision}
-          sharedReadRevision={sharedReadRevision}
-          minimumConflict={conflictingMinimum}
-          active={active && visible && tab === "epochs" && !command.locked}
-          canRollback={session.roles.includes("activate")}
-          onRollback={(value) => void command.submit(value)}
-        />
+        {session.roles.includes("read") ? (
+          <RetainedEpochs
+            scope={repository}
+            minimumActive={minimumActive}
+            readRevision={command.readRevision}
+            sharedReadRevision={sharedReadRevision}
+            minimumConflict={conflictingMinimum}
+            active={active && visible && tab === "epochs" && !command.locked}
+            session={session}
+            onRollback={(value) => void command.submit(value)}
+            onReviewed={setReviewed}
+          />
+        ) : (
+          <p>Read role required to list retained epochs.</p>
+        )}
       </div>
       <footer className="configuration-handoff">
-        <span>Activation requires an admitted workflow proposal and repository attestation.</span>
+        <span>
+          Activation requires a GitHub-reviewed registered epoch or an admitted workflow proposal.
+        </span>
         <a
           href={consoleHref({ scope, tab: "plans", view: "workflows" }, location.search)}
           onClick={onWorkflows}

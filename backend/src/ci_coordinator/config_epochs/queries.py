@@ -22,6 +22,8 @@ class ConfigEpochSummary:
     document_hash: str
     epoch_hash: str
     source_byte_count: int
+    # Same-scope activation-journal evidence that admits this epoch as a rollback target.
+    previously_activated: bool
 
     def __post_init__(self) -> None:
         for name, value in (
@@ -39,6 +41,8 @@ class ConfigEpochSummary:
             or not 1 <= self.source_byte_count <= MAX_POLICY_SOURCE_BYTES
         ):
             raise ValueError("source byte count is outside the admitted bound")
+        if type(self.previously_activated) is not bool:
+            raise TypeError("previous activation evidence must be an exact boolean")
 
 
 @dataclass(frozen=True, slots=True)

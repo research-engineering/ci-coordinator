@@ -21,6 +21,16 @@ export interface ConfigActivationCommand {
   readonly targetEpochId: string;
 }
 
+// CI-018 v3 selector for one GitHub-reviewed registered epoch; it carries no proposal manifest.
+export interface RegisteredEpochActivationCommand {
+  readonly scope: RepositoryScope;
+  readonly expectedRevision: number | null;
+  readonly operationId: string;
+  readonly registeredEpochReviewOperationId: string;
+  readonly expectedSourceHash: string;
+  readonly targetEpochId: string;
+}
+
 export type ConfigActivationResult =
   | { readonly kind: "complete"; readonly activation: ConfigActivation }
   | { readonly kind: ConfigControlErrorCode }
@@ -41,21 +51,68 @@ export async function activateConfig(
   if (!activationCommandIsAdmitted(command) || !/^[A-Za-z0-9_-]{43}$/.test(csrfToken)) {
     return { kind: "invalid-response" };
   }
-  const targetEpochId = command.targetEpochId;
-  const resultRevision = (command.expectedRevision ?? 0) + 1;
+  return postActivation(
+    {
+      expectedRevision: command.expectedRevision,
+      installationId: command.scope.installationId,
+      operationId: command.operationId,
+      proposalManifestId: command.proposalManifestId,
+      reviewOperationId: command.reviewOperationId,
+      repositoryId: command.scope.repositoryId,
+      schemaVersion: "ci-config-epoch-activation/v2",
+      targetEpochId: command.targetEpochId,
+    } satisfies components["schemas"]["ExplicitConfigEpochActivationBody"],
+    csrfToken,
+    signal,
+    timeoutMs,
+  );
+}
+
+export async function activateRegisteredEpoch(
+  command: RegisteredEpochActivationCommand,
+  csrfToken: string,
+  signal?: AbortSignal,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<ConfigActivationResult> {
+  if (
+    !commonActivationIsAdmitted(command) ||
+    !operationIdIsAdmitted(command.registeredEpochReviewOperationId) ||
+    !/^[0-9a-f]{64}$/.test(command.expectedSourceHash) ||
+    !/^[A-Za-z0-9_-]{43}$/.test(csrfToken)
+  ) {
+    return { kind: "invalid-response" };
+  }
+  return postActivation(
+    {
+      expectedRevision: command.expectedRevision,
+      expectedSourceHash: command.expectedSourceHash,
+      installationId: command.scope.installationId,
+      operationId: command.operationId,
+      registeredEpochReviewOperationId: command.registeredEpochReviewOperationId,
+      repositoryId: command.scope.repositoryId,
+      schemaVersion: "ci-config-epoch-activation/v3",
+      targetEpochId: command.targetEpochId,
+    } satisfies components["schemas"]["RegisteredEpochConfigActivationBody"],
+    csrfToken,
+    signal,
+    timeoutMs,
+  );
+}
+
+async function postActivation(
+  body:
+    | components["schemas"]["ExplicitConfigEpochActivationBody"]
+    | components["schemas"]["RegisteredEpochConfigActivationBody"],
+  csrfToken: string,
+  signal: AbortSignal | undefined,
+  timeoutMs: number,
+): Promise<ConfigActivationResult> {
+  const targetEpochId = body.targetEpochId;
+  const resultRevision = (body.expectedRevision ?? 0) + 1;
   try {
     const response = await boundedFetch(
       new Request(new URL("/api/v1/config/activations", globalThis.location.origin), {
-        body: JSON.stringify({
-          expectedRevision: command.expectedRevision,
-          installationId: command.scope.installationId,
-          operationId: command.operationId,
-          proposalManifestId: command.proposalManifestId,
-          reviewOperationId: command.reviewOperationId,
-          repositoryId: command.scope.repositoryId,
-          schemaVersion: "ci-config-epoch-activation/v2",
-          targetEpochId,
-        }),
+        body: JSON.stringify(body),
         credentials: "same-origin",
         headers: {
           accept: "application/json",
@@ -104,6 +161,19 @@ async function activationFailure(response: Response): Promise<ConfigActivationRe
 
 function activationCommandIsAdmitted(command: ConfigActivationCommand): boolean {
   return (
+    commonActivationIsAdmitted(command) &&
+    operationIdIsAdmitted(command.reviewOperationId) &&
+    /^proposal:[0-9a-f]{32}$/.test(command.proposalManifestId)
+  );
+}
+
+function commonActivationIsAdmitted(
+  command: Pick<
+    ConfigActivationCommand,
+    "scope" | "expectedRevision" | "operationId" | "targetEpochId"
+  >,
+): boolean {
+  return (
     Number.isSafeInteger(command.scope.installationId) &&
     command.scope.installationId > 0 &&
     Number.isSafeInteger(command.scope.repositoryId) &&
@@ -111,8 +181,6 @@ function activationCommandIsAdmitted(command: ConfigActivationCommand): boolean 
     (command.expectedRevision === null ||
       (Number.isSafeInteger(command.expectedRevision) && command.expectedRevision > 0)) &&
     operationIdIsAdmitted(command.operationId) &&
-    operationIdIsAdmitted(command.reviewOperationId) &&
-    /^proposal:[0-9a-f]{32}$/.test(command.proposalManifestId) &&
     /^[0-9a-f]{64}$/.test(command.targetEpochId)
   );
 }
