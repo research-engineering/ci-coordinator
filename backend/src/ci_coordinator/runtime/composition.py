@@ -179,6 +179,12 @@ from ci_coordinator.persistence.proposal_review_unit_of_work import (
     PostgresProposalReviewUnitOfWork,
 )
 from ci_coordinator.persistence.readiness import READINESS_AUDIT_BATCH_SIZE
+from ci_coordinator.persistence.registered_epoch_review_adapter import (
+    TransactionalRegisteredEpochReviewStore,
+)
+from ci_coordinator.persistence.registered_epoch_review_unit_of_work import (
+    PostgresRegisteredEpochReviewUnitOfWork,
+)
 from ci_coordinator.persistence.workbench_repository import PostgresWorkbenchRepository
 from ci_coordinator.plan_issuance import SignedPlanIssuer, SignedPlanSigner
 from ci_coordinator.production_admission import (
@@ -393,6 +399,9 @@ def _compose_connected_dependencies(
 
         def proposal_review_uow() -> PostgresProposalReviewUnitOfWork:
             return PostgresProposalReviewUnitOfWork(engine)
+
+        def registered_epoch_review_uow() -> PostgresRegisteredEpochReviewUnitOfWork:
+            return PostgresRegisteredEpochReviewUnitOfWork(engine)
 
         def shadow_uow() -> PostgresShadowReconciliationUnitOfWork:
             return PostgresShadowReconciliationUnitOfWork(engine)
@@ -617,6 +626,9 @@ def _compose_connected_dependencies(
             reader=workflow_reader,
         )
         proposal_review_store = TransactionalProposalReviewStore(proposal_review_uow)
+        registered_epoch_review_store = TransactionalRegisteredEpochReviewStore(
+            registered_epoch_review_uow
+        )
         governance_baseline_store = TransactionalGovernanceBaselineStore(governance_baseline_uow)
         governance_reader = GitHubGovernanceObservationReader(github)
         control_plane = compose_control_plane_runtime_dependencies(
@@ -672,6 +684,7 @@ def _compose_connected_dependencies(
                     provider=reviewer_provider,
                     discovery=workflow_discovery,
                     store=proposal_review_store,
+                    registered_epoch_store=registered_epoch_review_store,
                     clock=clock,
                     authority_profile_digest=identity_settings.profile_digest,
                 ),
@@ -718,11 +731,13 @@ def _compose_connected_dependencies(
                     clock=clock,
                     activation_authorizer=RepositoryActivationAuthorityService(
                         store=proposal_review_store,
+                        registered_epoch_store=registered_epoch_review_store,
                         permission_reader=reviewer_permission_reader,
                         discovery=workflow_discovery,
                         authority_profile_digest=identity_settings.profile_digest,
                     ),
                     attested_activation_store=proposal_review_store,
+                    registered_epoch_activation_store=registered_epoch_review_store,
                     runtime_metrics=runtime_metrics,
                 ),
             )

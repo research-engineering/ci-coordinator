@@ -572,7 +572,21 @@ class _PostgresConfigEpochRepository:
         payload = event.payload
         if type(payload) is not dict:
             return False
-        if replay.mutation_kind == "activation":
+        if replay.mutation_kind == "activation" and replay.activation_version == 3:
+            authority_evidence_hash = payload.get("authorityEvidenceHash")
+            authority_observed_at = payload.get("authorityObservedAt")
+            if (
+                event.event_type != "config-epoch-activation/v1"
+                or payload.get("schemaVersion") != "config-epoch-activation-audit/v3"
+                or payload.get("registeredEpochReviewOperationId") != replay.review_operation_id
+                or payload.get("expectedSourceHash") != replay.expected_source_hash
+                or type(authority_evidence_hash) is not str
+                or type(authority_observed_at) is not str
+            ):
+                return False
+            retained_authority_evidence_hash = authority_evidence_hash
+            retained_authority_observed_at = authority_observed_at
+        elif replay.mutation_kind == "activation":
             expected_schema = (
                 "config-epoch-activation-audit/v1"
                 if replay.activation_version == 1
@@ -629,6 +643,7 @@ class _PostgresConfigEpochRepository:
                     reason=replay.reason,
                     activation_version=replay.activation_version,
                     review_operation_id=replay.review_operation_id,
+                    expected_source_hash=replay.expected_source_hash,
                 )
             )
         except (TypeError, ValueError):

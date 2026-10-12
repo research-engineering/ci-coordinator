@@ -7,6 +7,7 @@ from typing import cast
 
 import pytest
 from control_plane_http_support import NOW, human_principal
+from registered_epoch_review_support import RegisteredEpochStore
 from repository_activation_support import REVIEWER, SCOPE, completed_discovery, review_record
 
 from ci_coordinator.app.repository_attestation import (
@@ -33,6 +34,7 @@ from ci_coordinator.proposal_review import (
     ProposalReviewResolution,
     ProposalReviewStore,
     ProposalReviewWriteResult,
+    RegisteredEpochReviewStore,
     RepositoryAttestationCapacityExceeded,
     RepositoryAttestationRegistered,
     RepositoryAttestationRegistration,
@@ -269,6 +271,28 @@ def test_callback_consumes_one_exact_transaction_and_replay_stops_before_provide
     assert store.pending is None
 
 
+def test_proposal_callback_neither_inspects_nor_consumes_a_registered_epoch_challenge() -> None:
+    completed = completed_discovery()
+    store = _Store()
+    registered = RegisteredEpochStore()
+    provider = _Provider()
+    service = _service(store, provider, _Discovery(completed), registered)
+    started = asyncio.run(service.start(principal=_PRINCIPAL, command=_command(completed)))
+    assert started.transaction_cookie is not None and provider.state is not None
+
+    outcome = asyncio.run(
+        service.complete(
+            principal=_PRINCIPAL,
+            transaction_cookie=started.transaction_cookie,
+            state=provider.state,
+            code="provider-code",
+        )
+    )
+
+    assert outcome.state == "completed" and outcome.registered_epoch_review is None
+    assert registered.calls == []
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
@@ -365,12 +389,16 @@ def _service(
     store: _Store,
     provider: _Provider,
     discovery: _Discovery,
+    registered_store: RegisteredEpochStore | None = None,
 ) -> RepositoryAttestationService:
     return RepositoryAttestationService(
         crypto=ControlPlaneIdentityCrypto(bytes(range(32)), entropy=_Entropy()),
         provider=provider,
         discovery=discovery,
         store=cast(ProposalReviewStore, store),
+        registered_epoch_store=cast(
+            RegisteredEpochReviewStore, registered_store or RegisteredEpochStore()
+        ),
         clock=FixedClock(NOW),
         authority_profile_digest=_PROFILE,
     )

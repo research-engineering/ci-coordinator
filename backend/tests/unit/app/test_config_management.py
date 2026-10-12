@@ -8,6 +8,12 @@ from typing import Literal, cast
 
 import pytest
 from config_epoch_support import CONFIG_SOURCE, admitted_config_epoch
+from registered_epoch_review_support import (
+    RegisteredEpochStore,
+    admitted_draft,
+    discovered_inventory,
+    registered_review_record,
+)
 from repository_activation_support import ACTOR, NOW, REVIEWER, SCOPE, review_record
 
 from ci_coordinator.app import (
@@ -40,6 +46,7 @@ from ci_coordinator.config_control import (
 from ci_coordinator.config_epochs import (
     ActiveConfigEpoch,
     ActiveConfigEpochSnapshot,
+    ConfigEpochActivationCommand,
     ConfigEpochActivationDuplicate,
     ConfigEpochActivationRecord,
     ConfigEpochActivationResult,
@@ -59,10 +66,15 @@ from ci_coordinator.config_epochs import (
     EpochCoverageComparator,
     PreparedConfigEpochActivation,
     PreparedConfigEpochRegistration,
+    prepare_config_epoch_activation,
 )
 from ci_coordinator.kernel import Clock, FixedClock
 from ci_coordinator.proposal_review import (
     AttestedConfigActivationResult,
+    RegisteredEpochActivationAuthority,
+    RegisteredEpochActivationAuthorization,
+    RegisteredEpochActivationGranted,
+    RegisteredEpochActivationStore,
     RepositoryActivationAuthority,
     RepositoryActivationAuthorityConflict,
     RepositoryActivationAuthorization,
@@ -78,6 +90,13 @@ _AUTHORITY = RepositoryActivationAuthority(
 )
 _ACTIVATION_TARGET = _AUTHORITY.review.target_epoch_id
 _ACTIVATION_MANIFEST = _AUTHORITY.review.command.expected_manifest_id
+_REGISTERED_AUTHORITY = RegisteredEpochActivationAuthority(
+    registered_review_record(discovered_inventory(), admitted_draft()),
+    REVIEWER,
+    NOW + timedelta(seconds=1),
+)
+_REGISTERED_TARGET = _REGISTERED_AUTHORITY.review.command.target_epoch_id
+_REGISTERED_SOURCE = _REGISTERED_AUTHORITY.review.command.expected_source_hash
 
 
 class _ClockDatetime(datetime):
@@ -268,9 +287,34 @@ class _Comparator(EpochCoverageComparator):
 
 
 class _ActivationAuthorizer:
-    def __init__(self, result: RepositoryActivationAuthorization) -> None:
+    def __init__(
+        self,
+        result: RepositoryActivationAuthorization,
+        registered_result: RegisteredEpochActivationAuthorization | None = None,
+    ) -> None:
         self.result = result
+        self.registered_result = registered_result or RegisteredEpochActivationGranted(
+            _REGISTERED_AUTHORITY
+        )
         self.calls = 0
+        self.registered_calls = 0
+
+    async def authorize_registered_epoch(
+        self,
+        *,
+        actor: str,
+        scope: RepositoryScope,
+        target_epoch_id: str,
+        expected_source_hash: str,
+        review_operation_id: str,
+    ) -> RegisteredEpochActivationAuthorization:
+        assert review_operation_id == "registered-review-1"
+        assert actor == ACTOR
+        assert scope == SCOPE
+        assert target_epoch_id == _REGISTERED_TARGET
+        assert expected_source_hash == _REGISTERED_SOURCE
+        self.registered_calls += 1
+        return self.registered_result
 
     async def authorize(
         self,
@@ -582,6 +626,124 @@ def test_exact_activation_replay_precedes_repository_reauthorization(version: in
     assert store.prepared is None
 
 
+def test_registered_epoch_activation_uses_only_its_subject_and_binds_v3_audit() -> None:
+    # Kills: routing a v3 selector through the proposal authorizer or the proposal store.
+    store = _Store()
+    registered = RegisteredEpochStore()
+    authorizer = _ActivationAuthorizer(RepositoryActivationRejected())
+
+    result = asyncio.run(
+        _service(
+            store,
+            allowed=True,
+            activation_authorizer=authorizer,
+            registered_store=registered,
+        ).activate(_registered_activation_command())
+    )
+
+    assert result.state == "applied"
+    assert (authorizer.calls, authorizer.registered_calls) == (0, 1)
+    assert store.calls == ["resolve_operation"]
+    activations = [call for call in registered.calls if isinstance(call, tuple)]
+    assert [call[0] for call in activations] == ["activate"]
+    command = activations[0][1]
+    assert command.activation_version == 3
+    assert command.proposal_manifest_id is None
+    assert command.expected_source_hash == _REGISTERED_SOURCE
+    assert command.authority_evidence_hash == _REGISTERED_AUTHORITY.evidence_hash
+    assert activations[0][2] is _REGISTERED_AUTHORITY
+
+
+def test_registered_epoch_activation_audit_has_its_own_exact_v3_payload() -> None:
+    event = prepare_config_epoch_activation(
+        ConfigEpochActivationCommand(
+            scope=SCOPE,
+            target_epoch_id="a" * 64,
+            expected_revision=4,
+            operation_id="activate-3",
+            actor=ACTOR,
+            occurred_at="2026-10-11T12:00:00.000Z",
+            activation_version=3,
+            review_operation_id="registered-review-1",
+            expected_source_hash="b" * 64,
+            authority_evidence_hash="c" * 64,
+            authority_observed_at="2026-10-11T11:59:59.000Z",
+        )
+    )._take_audit_event()
+
+    assert event.event_type == "config-epoch-activation/v1"
+    assert json.loads(event.payload_canonical_bytes) == {
+        "authorityEvidenceHash": "c" * 64,
+        "authorityObservedAt": "2026-10-11T11:59:59.000Z",
+        "expectedRevision": 4,
+        "expectedSourceHash": "b" * 64,
+        "operationId": "activate-3",
+        "registeredEpochReviewOperationId": "registered-review-1",
+        "schemaVersion": "config-epoch-activation-audit/v3",
+        "targetEpochId": "a" * 64,
+    }
+
+
+def test_proposal_activation_never_consults_the_registered_subject() -> None:
+    store = _Store()
+    registered = RegisteredEpochStore()
+    authorizer = _ActivationAuthorizer(RepositoryActivationGranted(_AUTHORITY))
+
+    asyncio.run(
+        _service(
+            store,
+            allowed=True,
+            activation_authorizer=authorizer,
+            registered_store=registered,
+        ).activate(_activation_command())
+    )
+
+    assert (authorizer.calls, authorizer.registered_calls) == (1, 0)
+    assert registered.calls == []
+
+
+@pytest.mark.parametrize(
+    ("authorization", "expected_state"),
+    [
+        (RepositoryActivationRejected(), "attestation_invalid"),
+        (RepositoryActivationUnavailable(), "unavailable"),
+    ],
+    ids=("rejected", "unavailable"),
+)
+def test_registered_epoch_authority_failure_never_reaches_its_store(
+    authorization: RegisteredEpochActivationAuthorization,
+    expected_state: str,
+) -> None:
+    registered = RegisteredEpochStore()
+    result = asyncio.run(
+        _service(
+            _Store(),
+            allowed=True,
+            activation_authorizer=_ActivationAuthorizer(
+                RepositoryActivationRejected(), registered_result=authorization
+            ),
+            registered_store=registered,
+        ).activate(_registered_activation_command())
+    )
+
+    assert result.state == expected_state
+    assert registered.calls == []
+
+
+def test_exact_registered_activation_replay_precedes_reauthorization() -> None:
+    store = _Store(operation_resolution=_activation_duplicate())
+    authorizer = _ActivationAuthorizer(RepositoryActivationRejected())
+
+    result = asyncio.run(
+        _service(
+            store, allowed=True, activation_authorizer=authorizer, clock=_UnreadClock()
+        ).activate(_registered_activation_command())
+    )
+
+    assert result.state == "duplicate"
+    assert (authorizer.calls, authorizer.registered_calls) == (0, 0)
+
+
 def test_lock_time_authority_conflict_is_not_reported_as_activation() -> None:
     store = _Store(attested_result=RepositoryActivationAuthorityConflict())
 
@@ -770,6 +932,7 @@ def _service(
     activation_authorization: RepositoryActivationAuthorization | None = None,
     activation_authorizer: _ActivationAuthorizer | None = None,
     clock: Clock | None = None,
+    registered_store: RegisteredEpochStore | None = None,
 ) -> ConfigManagementService:
     resolved_authorizer = activation_authorizer or _ActivationAuthorizer(
         activation_authorization or RepositoryActivationGranted(_AUTHORITY)
@@ -785,6 +948,9 @@ def _service(
         clock=clock if clock is not None else FixedClock(datetime(2026, 7, 15, 10, tzinfo=UTC)),
         activation_authorizer=resolved_authorizer,
         attested_activation_store=store,  # type: ignore[arg-type]
+        registered_epoch_activation_store=cast(
+            RegisteredEpochActivationStore, registered_store or RegisteredEpochStore()
+        ),
         rollback_comparator=comparator,
     )
 
@@ -818,6 +984,20 @@ def _activation_command() -> ActivateConfigEpoch:
         operation_id="activate-1",
         activation_version=2,
         review_operation_id="review-1",
+    )
+
+
+def _registered_activation_command() -> ActivateConfigEpoch:
+    return ActivateConfigEpoch(
+        actor=ACTOR,
+        scope=SCOPE,
+        target_epoch_id=_REGISTERED_TARGET,
+        proposal_manifest_id=None,
+        expected_revision=None,
+        operation_id="activate-1",
+        activation_version=3,
+        review_operation_id="registered-review-1",
+        expected_source_hash=_REGISTERED_SOURCE,
     )
 
 

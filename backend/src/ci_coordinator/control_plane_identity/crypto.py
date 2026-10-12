@@ -25,6 +25,8 @@ from ci_coordinator.control_plane_identity.model import (
     KeycloakBrowserEvidence,
     KeycloakHumanPrincipal,
     LoginStartAnchor,
+    RegisteredEpochReviewerOAuthTransaction,
+    RegisteredEpochStepUpBinding,
     ReviewerOAuthTransaction,
     ReviewerStepUpBinding,
     derive_human_actor_id,
@@ -33,6 +35,11 @@ from ci_coordinator.kernel import canonical_json, load_strict_json
 
 _BROWSER_TRANSACTION_AAD = b"ci-coordinator/keycloak-browser-transaction/v1"
 _REVIEWER_TRANSACTION_AAD = b"ci-coordinator/github-reviewer-transaction/v1"
+# Distinct associated data makes each review subject's cookie unopenable as the other subject.
+_REGISTERED_EPOCH_REVIEWER_TRANSACTION_AAD = (
+    b"ci-coordinator/github-reviewer-transaction/registered-epoch/v1"
+)
+_REGISTERED_EPOCH_SUBJECT_KIND = "registered-epoch"
 _BROWSER_TRANSACTION_KEY_INFO = b"ci-coordinator/keycloak-browser-transaction-key/v1"
 _REVIEWER_TRANSACTION_KEY_INFO = b"ci-coordinator/github-reviewer-transaction-key/v1"
 _CSRF_KEY_INFO = b"ci-coordinator/control-plane-csrf-key/v1"
@@ -235,12 +242,105 @@ class ControlPlaneIdentityCrypto:
         except (TypeError, ValueError):
             return None
 
+    def new_registered_epoch_reviewer_transaction(
+        self,
+        binding: RegisteredEpochStepUpBinding,
+    ) -> ReviewerAuthorizationRequest:
+        if type(binding) is not RegisteredEpochStepUpBinding:
+            raise TypeError("registered-epoch reviewer transaction binding must be exact")
+        state = _encode(self._random_bytes())
+        verifier = _encode(self._random_bytes())
+        transaction = RegisteredEpochReviewerOAuthTransaction(
+            state_digest=hashlib.sha256(state.encode("ascii")).digest(),
+            code_verifier=verifier,
+            binding=binding,
+        )
+        payload = canonical_json(
+            {
+                "binding": _registered_epoch_binding_mapping(transaction.binding),
+                "stateDigest": transaction.state_digest.hex(),
+                "verifier": transaction.code_verifier,
+            }
+        )
+        return ReviewerAuthorizationRequest(
+            state=state,
+            transaction_digest=transaction.state_digest,
+            code_challenge=_pkce_challenge(verifier),
+            transaction_cookie=self._seal(
+                self._reviewer_transaction,
+                payload,
+                _REGISTERED_EPOCH_REVIEWER_TRANSACTION_AAD,
+            ),
+        )
+
+    def open_registered_epoch_reviewer_transaction(
+        self,
+        cookie: str | None,
+    ) -> RegisteredEpochReviewerOAuthTransaction | None:
+        value = self._open(
+            self._reviewer_transaction,
+            cookie,
+            _REGISTERED_EPOCH_REVIEWER_TRANSACTION_AAD,
+        )
+        if value is None or set(value) != {"binding", "stateDigest", "verifier"}:
+            return None
+        binding_value = value.get("binding")
+        if type(binding_value) is not dict:
+            return None
+        binding = cast(dict[str, object], binding_value)
+        if (
+            set(binding) != _REGISTERED_EPOCH_BINDING_KEYS
+            or binding.get("subjectKind") != _REGISTERED_EPOCH_SUBJECT_KIND
+        ):
+            return None
+        try:
+            return RegisteredEpochReviewerOAuthTransaction(
+                state_digest=bytes.fromhex(_exact_text(value, "stateDigest")),
+                code_verifier=_exact_text(value, "verifier"),
+                binding=RegisteredEpochStepUpBinding(
+                    session_handle_digest=bytes.fromhex(
+                        _exact_text(binding, "sessionHandleDigest")
+                    ),
+                    initiating_actor=_exact_text(binding, "initiatingActor"),
+                    scope=RepositoryScope(
+                        _exact_int(binding, "installationId"),
+                        _exact_int(binding, "repositoryId"),
+                    ),
+                    operation_id=_exact_text(binding, "operationId"),
+                    target_epoch_id=_exact_text(binding, "targetEpochId"),
+                    source_hash=_exact_text(binding, "sourceHash"),
+                    revision=_exact_text(binding, "revision"),
+                    inventory_digest=_exact_text(binding, "inventoryDigest"),
+                    expected_active_epoch_id=_optional_exact_text(
+                        binding,
+                        "expectedActiveEpochId",
+                    ),
+                    expected_active_revision=_optional_exact_int(
+                        binding,
+                        "expectedActiveRevision",
+                    ),
+                    authority_profile_digest=_exact_text(binding, "authorityProfileDigest"),
+                    issued_at=_instant(binding, "issuedAt"),
+                    expires_at=_instant(binding, "expiresAt"),
+                ),
+            )
+        except (TypeError, ValueError):
+            return None
+
     @staticmethod
     def state_matches(
-        transaction: BrowserOAuthTransaction | ReviewerOAuthTransaction,
+        transaction: (
+            BrowserOAuthTransaction
+            | ReviewerOAuthTransaction
+            | RegisteredEpochReviewerOAuthTransaction
+        ),
         state: str | None,
     ) -> bool:
-        if type(transaction) not in {BrowserOAuthTransaction, ReviewerOAuthTransaction}:
+        if type(transaction) not in {
+            BrowserOAuthTransaction,
+            ReviewerOAuthTransaction,
+            RegisteredEpochReviewerOAuthTransaction,
+        }:
             return False
         if not _is_handle(state):
             return False
@@ -378,6 +478,47 @@ def _reviewer_binding_mapping(binding: ReviewerStepUpBinding) -> dict[str, objec
         "repositoryId": binding.scope.repository_id,
         "revision": binding.revision,
         "sessionHandleDigest": binding.session_handle_digest.hex(),
+    }
+
+
+_REGISTERED_EPOCH_BINDING_KEYS: Final = frozenset(
+    {
+        "authorityProfileDigest",
+        "expiresAt",
+        "expectedActiveEpochId",
+        "expectedActiveRevision",
+        "initiatingActor",
+        "installationId",
+        "inventoryDigest",
+        "issuedAt",
+        "operationId",
+        "repositoryId",
+        "revision",
+        "sessionHandleDigest",
+        "sourceHash",
+        "subjectKind",
+        "targetEpochId",
+    }
+)
+
+
+def _registered_epoch_binding_mapping(binding: RegisteredEpochStepUpBinding) -> dict[str, object]:
+    return {
+        "authorityProfileDigest": binding.authority_profile_digest,
+        "expiresAt": binding.expires_at.isoformat(),
+        "expectedActiveEpochId": binding.expected_active_epoch_id,
+        "expectedActiveRevision": binding.expected_active_revision,
+        "initiatingActor": binding.initiating_actor,
+        "installationId": binding.scope.installation_id,
+        "inventoryDigest": binding.inventory_digest,
+        "issuedAt": binding.issued_at.isoformat(),
+        "operationId": binding.operation_id,
+        "repositoryId": binding.scope.repository_id,
+        "revision": binding.revision,
+        "sessionHandleDigest": binding.session_handle_digest.hex(),
+        "sourceHash": binding.source_hash,
+        "subjectKind": _REGISTERED_EPOCH_SUBJECT_KIND,
+        "targetEpochId": binding.target_epoch_id,
     }
 
 

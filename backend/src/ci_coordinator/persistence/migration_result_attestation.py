@@ -71,6 +71,9 @@ from ci_coordinator.persistence.proposal_review_schema_attestation import (
     proposal_review_registration_schema_matches_contract_sync,
     proposal_review_renewal_schema_matches_contract_sync,
 )
+from ci_coordinator.persistence.registered_epoch_review_schema_contract import (
+    registered_epoch_review_schema_matches_sync,
+)
 from ci_coordinator.persistence.repository_attestation_schema_attestation import (
     repository_attestation_schema_mismatches_sync,
 )
@@ -190,6 +193,7 @@ _CAPABILITY_ATTESTORS: Final[dict[str, CapabilityAttestor]] = {
     "runtime-ingress-issuance-state/v2": runtime_ingress_issuance_v2_schema_matches_contract_sync,
     "runtime-shadow-reconciliation-state/v2": shadow_reconciliation_v2_schema_matches_contract_sync,
     "production-generation-cutover/v1": _production_cutover_matches,
+    "registered-epoch-review/v1": registered_epoch_review_schema_matches_sync,
     "webhook-body-identity/v1": webhook_body_identity_schema_matches_contract_sync,
 }
 

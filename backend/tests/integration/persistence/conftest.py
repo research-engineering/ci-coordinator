@@ -106,6 +106,8 @@ def _reset_ledger(database_url: str) -> None:
             "ci_coordinator.control_plane_logout_replays, "
             "ci_coordinator.control_plane_sessions, "
             "ci_coordinator.repository_attestation_transactions, "
+            "ci_coordinator.registered_epoch_attestation_transactions, "
+            "ci_coordinator.registered_epoch_reviews, "
             "ci_coordinator.reconciliation_results, "
             "ci_coordinator.reconciliation_observations, ci_coordinator.reconciliation_subjects, "
             "ci_coordinator.shadow_evidence, ci_coordinator.config_epoch_activations, "

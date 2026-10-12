@@ -304,6 +304,21 @@
   ],
   "implementationInventory": [
     {
+      "path": "backend/alembic/versions/20261011_0019_registered_epoch_review.py",
+      "responsibility": "generation-nineteen registered-epoch review expansion over the exact logout-fence head",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/registered_epoch_review_schema_contract.py",
+      "responsibility": "exact registered-epoch pending attestation and immutable review catalog contract shared by migration and runtime admission",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_registered_epoch_review_migration.py",
+      "responsibility": "native atomic forward expansion, replay, downgrade refusal, damaged catalog and runtime ACL falsifiers",
+      "proofClass": "postgres"
+    },
+    {
       "path": "backend/alembic/versions/20261011_0018_control_plane_logout_fence.py",
       "responsibility": "generation-eighteen durable logout revocation fence expansion over the exact renewal head",
       "proofClass": "postgres"

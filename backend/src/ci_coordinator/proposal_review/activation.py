@@ -10,6 +10,7 @@ from ci_coordinator.config_epochs import ConfigEpochActivationResult
 from ci_coordinator.control_plane_identity import GitHubReviewerEvidence
 from ci_coordinator.kernel import canonical_json
 from ci_coordinator.proposal_review.model import ProposalReviewRecord
+from ci_coordinator.proposal_review.registered_epoch import RegisteredEpochReviewRecord
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +77,80 @@ class RepositoryActivationAuthority:
 
 
 @dataclass(frozen=True, slots=True)
+class RegisteredEpochActivationAuthority:
+    """Bind one fresh App observation to one immutable registered-epoch review receipt."""
+
+    review: RegisteredEpochReviewRecord
+    rechecked: GitHubReviewerEvidence
+    rechecked_at: datetime
+
+    def __post_init__(self) -> None:
+        if type(self.review) is not RegisteredEpochReviewRecord:
+            raise TypeError("registered-epoch activation authority requires an exact review")
+        if type(self.rechecked) is not GitHubReviewerEvidence:
+            raise TypeError("registered-epoch activation authority requires exact App evidence")
+        observed_at = _aware_utc(self.rechecked_at)
+        retained = self.review.attestation.reviewer
+        if self.rechecked != retained.evidence:
+            raise ValueError("registered-epoch activation reviewer evidence changed")
+        if not retained.observed_at <= observed_at < retained.expires_at:
+            raise ValueError("registered-epoch activation recheck is outside the review receipt")
+        object.__setattr__(self, "rechecked_at", observed_at)
+
+    @property
+    def evidence_hash(self) -> str:
+        review = self.review
+        attestation = review.attestation
+        binding = attestation.transaction.binding
+        reviewer = attestation.reviewer
+        command = review.command
+        active = command.expected_active
+        projection = {
+            "schemaVersion": "registered-epoch-activation-authority/v1",
+            "installationId": command.scope.installation_id,
+            "repositoryId": command.scope.repository_id,
+            "targetEpochId": command.target_epoch_id,
+            "sourceHash": command.expected_source_hash,
+            "reviewOperationId": command.operation_id,
+            "registrationOperationId": review.registrant.operation_id,
+            "registrantActor": review.registrant.actor,
+            "providerRevision": review.provider_revision,
+            "inventoryDigest": review.inventory_digest,
+            "baseEpochId": None if active is None else active.epoch_id,
+            "baseRevision": None if active is None else active.revision,
+            "semanticDiffVersion": review.semantic_diff.version,
+            "semanticDiffHash": review.semantic_diff.diff_hash,
+            "changedPointerCount": len(review.semantic_diff.changed_pointers),
+            "attestationTransactionDigest": attestation.transaction.transaction_digest.hex(),
+            "sessionHandleDigest": binding.session_handle_digest.hex(),
+            "initiatingActor": binding.initiating_actor,
+            "reviewerActor": reviewer.actor_id,
+            "reviewerUserId": reviewer.user_id,
+            "reviewerLogin": reviewer.login,
+            "reviewerPermission": reviewer.permission,
+            "attestationIssuedAt": _timestamp(binding.issued_at),
+            "permissionObservedAt": _timestamp(reviewer.observed_at),
+            "receiptExpiresAt": _timestamp(reviewer.expires_at),
+            "authorityProfileDigest": binding.authority_profile_digest,
+            "auditEventId": review.audit_event_id,
+            "auditInputHash": review.audit_input_hash,
+            "appRecheckedAt": _timestamp(self.rechecked_at),
+        }
+        return sha256(
+            b"registered-epoch-activation-authority/v1\0" + canonical_json(projection)
+        ).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredEpochActivationGranted:
+    authority: RegisteredEpochActivationAuthority
+
+    def __post_init__(self) -> None:
+        if type(self.authority) is not RegisteredEpochActivationAuthority:
+            raise TypeError("registered-epoch activation grant requires exact authority")
+
+
+@dataclass(frozen=True, slots=True)
 class RepositoryActivationGranted:
     authority: RepositoryActivationAuthority
 
@@ -101,6 +176,11 @@ class RepositoryActivationAuthorityConflict:
 
 type RepositoryActivationAuthorization = (
     RepositoryActivationGranted | RepositoryActivationRejected | RepositoryActivationUnavailable
+)
+type RegisteredEpochActivationAuthorization = (
+    RegisteredEpochActivationGranted
+    | RepositoryActivationRejected
+    | RepositoryActivationUnavailable
 )
 type AttestedConfigActivationResult = (
     ConfigEpochActivationResult | RepositoryActivationAuthorityConflict

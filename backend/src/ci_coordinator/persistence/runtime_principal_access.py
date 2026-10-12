@@ -54,6 +54,8 @@ RUNTIME_TABLE_GRANTS: Final[Mapping[str, tuple[LiteralString, ...]]] = MappingPr
         "config_epoch_activations": ("SELECT", "INSERT"),
         "workflow_proposal_reviews": ("SELECT", "INSERT"),
         "repository_attestation_transactions": ("SELECT", "INSERT", "DELETE"),
+        "registered_epoch_reviews": ("SELECT", "INSERT"),
+        "registered_epoch_attestation_transactions": ("SELECT", "INSERT", "DELETE"),
         "governance_baselines": ("SELECT", "INSERT"),
         "governance_baseline_operations": ("SELECT", "INSERT"),
         "control_plane_sessions": ("SELECT", "INSERT", "DELETE"),

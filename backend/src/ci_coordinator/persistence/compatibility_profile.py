@@ -10,7 +10,7 @@ from importlib.resources import files
 from typing import Literal, cast
 
 PROFILE_RESOURCE_NAME = "database-compatibility-profile.v1.json"
-PROFILE_SHA256 = "dbccb5c75c0fd0bb97dac61dac9350e4a757148ee0fec695754721814880017b"
+PROFILE_SHA256 = "2fca779c8c04fafb83ea923ed5841e13633a379ff2595899dc7135473cd85ea6"
 COMPATIBILITY_FENCE_KEY_DOMAIN = "ci-coordinator/database-compatibility-writer-fence/v1"
 _COMPATIBILITY_FENCE_KEY_DERIVATION = (
     "first eight SHA-256 bytes split into two signed big-endian int32 values"

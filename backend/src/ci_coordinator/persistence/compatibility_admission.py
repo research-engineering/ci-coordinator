@@ -62,6 +62,9 @@ from ci_coordinator.persistence.proposal_review_schema_attestation import (
     proposal_review_registration_schema_matches_contract,
     proposal_review_renewal_schema_matches_contract,
 )
+from ci_coordinator.persistence.registered_epoch_review_schema_contract import (
+    registered_epoch_review_schema_matches_contract,
+)
 from ci_coordinator.persistence.repository_attestation_schema_attestation import (
     repository_attestation_schema_matches_contract,
 )
@@ -114,6 +117,10 @@ async def admit_schema_dependent_operation(
             raise DatabaseCapabilityUnavailable(
                 "control-plane logout fence schema facts do not match"
             )
+        if "registered-epoch-review/v1" in capability_ids and not (
+            await registered_epoch_review_schema_matches_contract(connection)
+        ):
+            raise DatabaseCapabilityUnavailable("registered-epoch review schema facts do not match")
         if "audit-ledger/v1" in capability_ids and not await schema_matches_contract(connection):
             raise DatabaseCapabilityUnavailable("audit ledger schema facts do not match")
         if (

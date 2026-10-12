@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -102,3 +102,82 @@ def test_valid_generic_hashes_do_not_admit_an_unknown_or_hybrid_activation(
 
     monkeypatch.setattr(repository, "_load_audit_event", load)
     assert asyncio.run(repository._same_operation(record, replay)) is (mutant is None)
+
+
+@pytest.mark.parametrize(
+    ("replay_version", "selector", "source_hash", "matches"),
+    [
+        (3, "registered-review", "d" * 64, True),
+        (3, "another-review", "d" * 64, False),
+        (3, "registered-review", "e" * 64, False),
+        (2, "registered-review", None, False),
+    ],
+    ids=("exact", "other-review", "other-source", "proposal-selector"),
+)
+def test_registered_epoch_receipt_replays_only_its_exact_v3_selector(
+    replay_version: int,
+    selector: str,
+    source_hash: str | None,
+    matches: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Kills: v3 replay ignoring the source hash, or a v2 selector replaying a v3 receipt.
+    scope = RepositoryScope(1, 2)
+    appended = append_event(
+        (),
+        AuditEventInput(
+            idempotency_key="config-epoch-activation:1:2:activation-1",
+            installation_id=1,
+            repository_id=2,
+            subject_type="policy-decision",
+            subject_id="config-epoch:1:2",
+            event_type="config-epoch-activation/v1",
+            created_at="2026-10-11T10:00:01.000Z",
+            actor="operator:123",
+            payload={
+                "schemaVersion": "config-epoch-activation-audit/v3",
+                "operationId": "activation-1",
+                "expectedRevision": None,
+                "targetEpochId": "a" * 64,
+                "expectedSourceHash": "d" * 64,
+                "registeredEpochReviewOperationId": "registered-review",
+                "authorityEvidenceHash": "c" * 64,
+                "authorityObservedAt": "2026-10-11T10:00:00.000Z",
+            },
+        ),
+    )
+    assert isinstance(appended, AuditAppendAppended)
+    event = appended.record
+    record = ConfigEpochActivationRecord(
+        scope=scope,
+        operation_id="activation-1",
+        expected_revision=None,
+        previous=None,
+        active=ActiveConfigEpoch(scope, "a" * 64, 1),
+        audit_event_id=event.audit_event_id,
+        audit_input_hash=event.input_hash,
+    )
+    replay = ConfigEpochReplayCommand(
+        scope=scope,
+        target_epoch_id="a" * 64,
+        expected_revision=None,
+        operation_id="activation-1",
+        actor="operator:123",
+        proposal_manifest_id=None if replay_version == 3 else "proposal:" + "b" * 32,
+        activation_version=cast(Any, replay_version),
+        review_operation_id=selector,
+        expected_source_hash=source_hash,
+    )
+    repository = _PostgresConfigEpochRepository(
+        cast(AsyncConnection, object()),
+        cast(_PostgresAuditEventRepository, object()),
+        lambda: None,
+        lambda: None,
+    )
+
+    async def load(audit_event_id: str) -> AuditEventRecord:
+        assert audit_event_id == event.audit_event_id
+        return event
+
+    monkeypatch.setattr(repository, "_load_audit_event", load)
+    assert asyncio.run(repository._same_operation(record, replay)) is matches

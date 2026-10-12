@@ -361,6 +361,59 @@ class ReviewerStepUpBinding:
 
 
 @dataclass(frozen=True, slots=True)
+class RegisteredEpochStepUpBinding:
+    """Reviewer step-up subject for one already registered, retained config epoch."""
+
+    session_handle_digest: bytes = field(repr=False)
+    initiating_actor: str
+    scope: RepositoryScope
+    operation_id: str
+    target_epoch_id: str
+    source_hash: str
+    revision: str
+    inventory_digest: str
+    expected_active_epoch_id: str | None
+    expected_active_revision: int | None
+    authority_profile_digest: str
+    issued_at: datetime
+    expires_at: datetime
+
+    def __post_init__(self) -> None:
+        _bytes(self.session_handle_digest, "reviewer session digest", exact=32)
+        if (
+            type(self.initiating_actor) is not str
+            or _ACTOR_ID.fullmatch(self.initiating_actor) is None
+            or not self.initiating_actor.startswith("keycloak-human:v1:")
+        ):
+            raise ValueError("registered-epoch step-up requires a human Keycloak actor")
+        if type(self.scope) is not RepositoryScope:
+            raise TypeError("registered-epoch step-up scope must be exact")
+        _text(self.operation_id, "reviewer operation id", maximum_bytes=_MAX_OPERATION_ID_BYTES)
+        if "\0" in self.operation_id:
+            raise ValueError("reviewer operation id cannot contain NUL")
+        _digest(self.target_epoch_id, "registered target epoch")
+        _digest(self.source_hash, "registered target source hash")
+        if type(self.revision) is not str or _GIT_REVISION.fullmatch(self.revision) is None:
+            raise ValueError("reviewer revision must be an exact Git object id")
+        _digest(self.inventory_digest, "workflow inventory digest")
+        if (self.expected_active_epoch_id is None) != (self.expected_active_revision is None):
+            raise ValueError("expected active identity must be wholly present or absent")
+        if self.expected_active_epoch_id is not None:
+            _digest(self.expected_active_epoch_id, "expected active epoch")
+            _positive_safe_integer(self.expected_active_revision, "expected active revision")
+        _digest(self.authority_profile_digest, "authority profile digest")
+        issued_at, expires_at = _time_interval(
+            self.issued_at,
+            self.expires_at,
+            "registered-epoch step-up binding",
+        )
+        if expires_at - issued_at > timedelta(seconds=300):
+            raise ValueError("reviewer step-up exceeds the five minute maximum")
+        object.__setattr__(self, "issued_at", issued_at)
+        object.__setattr__(self, "expires_at", expires_at)
+
+
+@dataclass(frozen=True, slots=True)
 class ReviewerOAuthTransaction:
     state_digest: bytes = field(repr=False)
     code_verifier: str = field(repr=False)
@@ -371,6 +424,19 @@ class ReviewerOAuthTransaction:
         _opaque_handle(self.code_verifier, "reviewer PKCE verifier")
         if type(self.binding) is not ReviewerStepUpBinding:
             raise TypeError("reviewer OAuth binding must be exact")
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredEpochReviewerOAuthTransaction:
+    state_digest: bytes = field(repr=False)
+    code_verifier: str = field(repr=False)
+    binding: RegisteredEpochStepUpBinding
+
+    def __post_init__(self) -> None:
+        _bytes(self.state_digest, "reviewer OAuth state digest", exact=32)
+        _opaque_handle(self.code_verifier, "reviewer PKCE verifier")
+        if type(self.binding) is not RegisteredEpochStepUpBinding:
+            raise TypeError("registered-epoch reviewer OAuth binding must be exact")
 
 
 @dataclass(frozen=True, slots=True)

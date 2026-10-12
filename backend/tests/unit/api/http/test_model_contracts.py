@@ -123,7 +123,7 @@ _PROJECTED_RESPONSE_MODELS = {
     ("ci_coordinator.api.http.workflow_discovery_contracts", "WorkflowResponse"),
     ("ci_coordinator.api.http.workflow_discovery_contracts", "YamlLocationResponse"),
 }
-_EXPECTED_HTTP_MODEL_COUNT = 169
+_EXPECTED_HTTP_MODEL_COUNT = 171
 
 
 def test_every_http_model_uses_exactly_one_owned_policy() -> None:
@@ -145,6 +145,14 @@ def test_every_http_model_uses_exactly_one_owned_policy() -> None:
         (
             "ci_coordinator.api.http.routers.repository_attestations",
             "LegacyRepositoryAttestationStartRequest",
+        ),
+        (
+            "ci_coordinator.api.http.config_lifecycle_contracts",
+            "RegisteredEpochConfigActivationBody",
+        ),
+        (
+            "ci_coordinator.api.http.routers.repository_attestations",
+            "RegisteredEpochAttestationStartRequest",
         ),
     } <= {_model_id(model) for model in models}
     for model in models:

@@ -181,6 +181,58 @@ class ExplicitConfigEpochActivationBody(_ConfigEpochActivationFields):
         return _validate_operation_id(value)
 
 
+# Activation selector for one reviewed registered epoch; it carries no proposal manifest.
+class RegisteredEpochConfigActivationBody(RequestModel):
+    schema_version: Literal["ci-config-epoch-activation/v3"] = Field(
+        validation_alias="schemaVersion"
+    )
+    installation_id: int = Field(
+        validation_alias="installationId",
+        ge=1,
+        le=MAX_SAFE_JSON_INTEGER,
+    )
+    repository_id: int = Field(
+        validation_alias="repositoryId",
+        ge=1,
+        le=MAX_SAFE_JSON_INTEGER,
+    )
+    target_epoch_id: str = Field(
+        validation_alias="targetEpochId",
+        min_length=64,
+        max_length=64,
+        pattern=_SHA256_PATTERN,
+    )
+    expected_source_hash: str = Field(
+        validation_alias="expectedSourceHash",
+        min_length=64,
+        max_length=64,
+        pattern=_SHA256_PATTERN,
+    )
+    registered_epoch_review_operation_id: str = Field(
+        validation_alias="registeredEpochReviewOperationId",
+        min_length=1,
+        max_length=MAX_CONFIG_OPERATION_ID_UTF8_BYTES,
+        json_schema_extra={"x-max-utf8-bytes": MAX_CONFIG_OPERATION_ID_UTF8_BYTES},
+    )
+    expected_revision: int | None = Field(
+        default=None,
+        validation_alias="expectedRevision",
+        ge=1,
+        le=MAX_SAFE_JSON_INTEGER,
+    )
+    operation_id: str = Field(
+        validation_alias="operationId",
+        min_length=1,
+        max_length=MAX_CONFIG_OPERATION_ID_UTF8_BYTES,
+        json_schema_extra={"x-max-utf8-bytes": MAX_CONFIG_OPERATION_ID_UTF8_BYTES},
+    )
+
+    @field_validator("operation_id", "registered_epoch_review_operation_id")
+    @classmethod
+    def operation_ids_fit_the_persistence_contract(cls, value: str) -> str:
+        return _validate_operation_id(value)
+
+
 class ConfigEpochRollbackBody(RequestModel):
     schema_version: Literal["ci-config-epoch-rollback/v1"] = Field(validation_alias="schemaVersion")
     installation_id: int = Field(

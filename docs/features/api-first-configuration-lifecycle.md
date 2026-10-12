@@ -42,6 +42,15 @@ The Batch D transport profile is finite and exact:
 | Read status     | `GET /api/v1/config/repositories/{installation_id}/{repository_id}/status`                   | `configure` | Bounded read                              |
 | Export source   | `GET /api/v1/config/repositories/{installation_id}/{repository_id}/epochs/{epoch_id}/source` | `configure` | Exact read                                |
 
+Activation admits three request generations: v1 is exact retained replay only,
+v2 selects a proposal review by `reviewOperationId`, and v3 selects a reviewed
+registered epoch by `registeredEpochReviewOperationId` and
+`expectedSourceHash` (ROADMAP CI-018). A body that mixes subject selectors is
+rejected at the wire. The registered epoch's review itself starts at
+`POST /api/v1/repository-attestations/github/start` with
+`ci-registered-epoch-attestation-start/v1`; its algebra is owned by
+[proposal review registration](../architecture/modules/proposal-review-registration.md#12-registered-epoch-review-subject).
+
 This map closes only configuration lifecycle API coverage. The aggregate
 `REQ-CI-CONTROL-008` remains deferred until every product operation and its UI
 projection are covered.
@@ -114,6 +123,9 @@ One forward expand migration adds `config_epoch_registrations` and a distinct
 `config-epoch-registration-operations/v1` capability. The existing
 `config-epoch-lifecycle/v1` descriptor remains immutable, so an older binary
 can still attest and use its original closure after the additive migration.
+Registered-epoch review likewise uses its own expand revision `20261011_0019`
+and capability `registered-epoch-review/v1` instead of widening an existing
+descriptor.
 
 ## 5. Read Semantics
 

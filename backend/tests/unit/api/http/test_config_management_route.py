@@ -491,6 +491,55 @@ def test_current_activation_wire_requires_an_exact_review_selector() -> None:
     assert len(use_case.activate_commands) == 1
 
 
+def test_registered_epoch_activation_wire_selects_only_the_registered_subject() -> None:
+    use_case = _UseCase(
+        ConfigRegistrationOutcome("unavailable"),
+        ConfigActivationOutcome("applied", epoch_id="a" * 64, revision=1),
+    )
+    client = _client("operator", use_case)
+    body = {
+        "schemaVersion": "ci-config-epoch-activation/v3",
+        "installationId": 1,
+        "repositoryId": 2,
+        "targetEpochId": "a" * 64,
+        "expectedSourceHash": "c" * 64,
+        "registeredEpochReviewOperationId": "registered-review-1",
+        "expectedRevision": None,
+        "operationId": "activation-registered",
+    }
+
+    response = client.post("/api/v1/config/activations", json=body)
+
+    assert response.status_code == 200
+    assert len(use_case.activate_commands) == 1
+    command = use_case.activate_commands[0]
+    assert command.activation_version == 3
+    assert command.proposal_manifest_id is None
+    assert command.review_operation_id == "registered-review-1"
+    assert command.expected_source_hash == "c" * 64
+    assert command.target_epoch_id == "a" * 64
+    for refused in (
+        {**body, "proposalManifestId": "proposal:" + "b" * 32},
+        {**body, "reviewOperationId": "review-1"},
+        {**body, "schemaVersion": "ci-config-epoch-activation/v2"},
+        {**body, "expectedSourceHash": "C" * 64},
+        {**body, "registeredEpochReviewOperationId": "x" * 257},
+        {key: value for key, value in body.items() if key != "expectedSourceHash"},
+        {
+            "schemaVersion": "ci-config-epoch-activation/v2",
+            "installationId": 1,
+            "repositoryId": 2,
+            "targetEpochId": "a" * 64,
+            "proposalManifestId": "proposal:" + "b" * 32,
+            "registeredEpochReviewOperationId": "registered-review-1",
+            "expectedRevision": None,
+            "operationId": "activation-hybrid",
+        },
+    ):
+        assert client.post("/api/v1/config/activations", json=refused).status_code == 422
+    assert len(use_case.activate_commands) == 1
+
+
 def test_activation_rejects_non_exact_or_unpersistable_request_facts() -> None:
     use_case = _UseCase(
         ConfigRegistrationOutcome("unavailable"),

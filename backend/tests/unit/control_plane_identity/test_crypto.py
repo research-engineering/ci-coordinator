@@ -8,6 +8,7 @@ from ci_coordinator.control_plane_identity import (
     DisplayMetadata,
     KeycloakBrowserEvidence,
     LoginStartAnchor,
+    RegisteredEpochStepUpBinding,
     ReviewerStepUpBinding,
     derive_human_actor_id,
 )
@@ -130,6 +131,65 @@ def test_reviewer_transaction_round_trip_preserves_every_binding() -> None:
     assert crypto.open_reviewer_transaction(request.transaction_cookie + "=") is None
 
 
+def test_registered_epoch_transaction_round_trip_preserves_every_binding() -> None:
+    crypto = _crypto()
+    binding = _registered_epoch_binding(crypto)
+
+    request = crypto.new_registered_epoch_reviewer_transaction(binding)
+    opened = crypto.open_registered_epoch_reviewer_transaction(request.transaction_cookie)
+
+    assert opened is not None
+    assert opened.binding == binding
+    assert crypto.state_matches(opened, request.state)
+    assert len(request.code_challenge) == 43
+    assert (
+        crypto.open_registered_epoch_reviewer_transaction(_tamper(request.transaction_cookie))
+        is None
+    )
+
+
+def test_proposal_and_registered_epoch_cookies_are_not_interchangeable() -> None:
+    # Kills: sealing the registered-epoch subject under the proposal associated data.
+    crypto = _crypto()
+    proposal = crypto.new_reviewer_transaction(_reviewer_binding(crypto))
+    registered = crypto.new_registered_epoch_reviewer_transaction(_registered_epoch_binding(crypto))
+
+    assert crypto.open_registered_epoch_reviewer_transaction(proposal.transaction_cookie) is None
+    assert crypto.open_reviewer_transaction(registered.transaction_cookie) is None
+    assert crypto.open_browser_transaction(registered.transaction_cookie) is None
+
+
+def test_registered_epoch_cookie_requires_its_exact_subject_kind_and_key_set() -> None:
+    # Kills: dropping the explicit subjectKind discriminator or the exact key-set check.
+    crypto = _crypto()
+    request = crypto.new_registered_epoch_reviewer_transaction(_registered_epoch_binding(crypto))
+    opened = crypto.open_registered_epoch_reviewer_transaction(request.transaction_cookie)
+    assert opened is not None
+    exact = identity_crypto._registered_epoch_binding_mapping(opened.binding)
+
+    def sealed(binding: dict[str, object]) -> str:
+        # noinspection PyProtectedMember
+        return crypto._seal(
+            crypto._reviewer_transaction,
+            canonical_json(
+                {
+                    "binding": binding,
+                    "stateDigest": opened.state_digest.hex(),
+                    "verifier": opened.code_verifier,
+                }
+            ),
+            identity_crypto._REGISTERED_EPOCH_REVIEWER_TRANSACTION_AAD,
+        )
+
+    assert crypto.open_registered_epoch_reviewer_transaction(sealed(exact)) is not None
+    for rejected in (
+        {**exact, "subjectKind": "proposal"},
+        {key: value for key, value in exact.items() if key != "subjectKind"},
+        {**exact, "proposalManifestId": "proposal:" + "d" * 32},
+    ):
+        assert crypto.open_registered_epoch_reviewer_transaction(sealed(rejected)) is None
+
+
 def test_session_handle_restores_no_provider_credential_and_binds_csrf() -> None:
     crypto = _crypto()
     handle, record = crypto.issue_session(
@@ -176,6 +236,26 @@ def _reviewer_binding(crypto: ControlPlaneIdentityCrypto) -> ReviewerStepUpBindi
         proposal_manifest_id="proposal:" + "d" * 32,
         revision="b" * 40,
         proposal_digest="c" * 64,
+        expected_active_epoch_id="e" * 64,
+        expected_active_revision=3,
+        authority_profile_digest=_PROFILE,
+        issued_at=_NOW,
+        expires_at=_NOW + timedelta(minutes=5),
+    )
+
+
+def _registered_epoch_binding(crypto: ControlPlaneIdentityCrypto) -> RegisteredEpochStepUpBinding:
+    session_digest = crypto.handle_digest("S" * 43)
+    assert session_digest is not None
+    return RegisteredEpochStepUpBinding(
+        session_handle_digest=session_digest,
+        initiating_actor=derive_human_actor_id(_ISSUER, "subject"),
+        scope=RepositoryScope(7, 11),
+        operation_id="registered-review-1",
+        target_epoch_id="f" * 64,
+        source_hash="1" * 64,
+        revision="b" * 40,
+        inventory_digest="2" * 64,
         expected_active_epoch_id="e" * 64,
         expected_active_revision=3,
         authority_profile_digest=_PROFILE,

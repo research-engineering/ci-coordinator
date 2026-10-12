@@ -79,6 +79,7 @@
     "validation-has-no-durable-or-provider-effect",
     "registration-replay-compares-all-client-owned-facts",
     "current-activation-v2-requires-an-explicit-review-operation-id",
+    "registered-epoch-activation-v3-requires-review-operation-id-and-source-hash",
     "legacy-activation-v1-without-selector-is-exact-retained-replay-only",
     "unknown-legacy-activation-operations-reject-without-new-writes",
     "status-cardinality-is-page-bounded",

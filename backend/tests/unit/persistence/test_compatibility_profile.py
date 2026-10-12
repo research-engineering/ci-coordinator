@@ -45,8 +45,11 @@ def test_bundled_profile_is_digest_pinned_and_projects_admitted_coordinates() ->
     )
     assert profile.capability_read_limit == profile.maximum_capabilities_per_revision + 1
     assert parse_profile(profile_bytes) == profile
-    assert len(profile_document["implementationInventory"]) == 62
+    assert len(profile_document["implementationInventory"]) == 65
     assert {
+        "backend/alembic/versions/20261011_0019_registered_epoch_review.py",
+        "backend/src/ci_coordinator/persistence/registered_epoch_review_schema_contract.py",
+        "backend/tests/integration/persistence/test_registered_epoch_review_migration.py",
         "backend/alembic/versions/20261011_0018_control_plane_logout_fence.py",
         "backend/src/ci_coordinator/persistence/control_plane_logout_fence_schema_contract.py",
         "backend/tests/integration/persistence/test_control_plane_logout_fence_migration.py",

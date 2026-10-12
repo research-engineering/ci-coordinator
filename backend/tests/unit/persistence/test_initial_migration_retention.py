@@ -16,6 +16,7 @@ from ci_coordinator.persistence.review_renewal_migration import renewal_declarat
 from ci_coordinator.persistence.schema_capabilities import (
     CI_ECONOMICS_EVIDENCE,
     CONTROL_PLANE_LOGOUT_FENCE,
+    REGISTERED_EPOCH_REVIEW,
 )
 
 _MIGRATION_DIRECTORY = Path(__file__).parents[3] / "alembic" / "versions"
@@ -25,6 +26,9 @@ _REGISTRATION_MIGRATION_PATH = (
 )
 _ECONOMICS_MIGRATION_PATH = _MIGRATION_DIRECTORY / "20260904_0003_ci_economics_evidence.py"
 _LOGOUT_FENCE_MIGRATION_PATH = _MIGRATION_DIRECTORY / "20261011_0018_control_plane_logout_fence.py"
+_REGISTERED_EPOCH_REVIEW_MIGRATION_PATH = (
+    _MIGRATION_DIRECTORY / "20261011_0019_registered_epoch_review.py"
+)
 _RETAINED_DATA_TABLES = (
     "active_config_epochs",
     "audit_events",
@@ -82,6 +86,7 @@ def test_published_bootstrap_is_the_root_of_the_forward_migration_chain() -> Non
         "20260926_0016_retire_pending_review_authority.py",
         "20260926_0017_explicit_review_renewal.py",
         "20261011_0018_control_plane_logout_fence.py",
+        "20261011_0019_registered_epoch_review.py",
     )
     assert migration.revision == "20260716_0001"
     assert migration.down_revision is None
@@ -176,6 +181,22 @@ def test_logout_fence_migration_adds_only_its_capability_to_the_renewal_head() -
         CONTROL_PLANE_LOGOUT_FENCE.declaration()
     }
     assert set(predecessor.capabilities) < set(migration._SUCCESSOR.capabilities)
+
+
+def test_registered_epoch_review_migration_adds_only_its_capability_to_the_fence_head() -> None:
+    fence = _load_migration(_LOGOUT_FENCE_MIGRATION_PATH, "control_plane_logout_fence")
+    migration = _load_migration(_REGISTERED_EPOCH_REVIEW_MIGRATION_PATH, "registered_epoch_review")
+
+    assert migration.revision == "20261011_0019"
+    assert migration.down_revision == fence.revision
+    assert migration._PREDECESSOR == fence._SUCCESSOR
+    assert migration._SUCCESSOR.transition_kind == "expand"
+    assert migration._SUCCESSOR.parent_revision_id == fence.revision
+    assert migration._SUCCESSOR.generation == fence._SUCCESSOR.generation + 1
+    assert set(migration._SUCCESSOR.capabilities) - set(fence._SUCCESSOR.capabilities) == {
+        REGISTERED_EPOCH_REVIEW.declaration()
+    }
+    assert set(fence._SUCCESSOR.capabilities) < set(migration._SUCCESSOR.capabilities)
 
 
 def test_retained_data_catalog_is_exact() -> None:

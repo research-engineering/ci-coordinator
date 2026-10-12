@@ -43,6 +43,7 @@ _EXPECTED_INVARIANTS = (
     "validation-has-no-durable-or-provider-effect",
     "registration-replay-compares-all-client-owned-facts",
     "current-activation-v2-requires-an-explicit-review-operation-id",
+    "registered-epoch-activation-v3-requires-review-operation-id-and-source-hash",
     "legacy-activation-v1-without-selector-is-exact-retained-replay-only",
     "unknown-legacy-activation-operations-reject-without-new-writes",
     "status-cardinality-is-page-bounded",
@@ -300,18 +301,14 @@ def _assert_request_schema(
 
 
 def _assert_activation_request(document: JsonObject, schema: JsonObject) -> None:
-    # These two transport shapes do not themselves prove retained-operation replay admission.
+    # These transport shapes do not themselves prove retained-operation replay admission.
     alternatives = schema.get("anyOf")
     if (
         set(schema) - {"anyOf", "title"}
         or not isinstance(alternatives, list)
-        or len(alternatives) != 2
+        or len(alternatives) != len(_ACTIVATION_VERSIONS)
     ):
-        raise ValueError("config activation request must contain exactly the V1/V2 union")
-    expected_versions = {
-        "#/components/schemas/ConfigEpochActivationBody": "ci-config-epoch-activation/v1",
-        "#/components/schemas/ExplicitConfigEpochActivationBody": "ci-config-epoch-activation/v2",
-    }
+        raise ValueError("config activation request must contain exactly the V1/V2/V3 union")
     observed: set[str] = set()
     for raw in alternatives:
         reference = as_object(raw, "activation request branch")
@@ -319,25 +316,14 @@ def _assert_activation_request(document: JsonObject, schema: JsonObject) -> None
         if (
             set(reference) != {"$ref"}
             or not isinstance(name, str)
-            or name not in expected_versions
+            or name not in _ACTIVATION_VERSIONS
             or name in observed
         ):
-            raise ValueError("config activation request alternatives differ from V1/V2")
+            raise ValueError("config activation request alternatives differ from V1/V2/V3")
         observed.add(name)
+        version_id, fields, selector_field = _ACTIVATION_VERSIONS[name]
         branch = _resolve_schema(document, reference)
         properties = as_object(branch.get("properties"), "activation request properties")
-        fields = {
-            "schemaVersion",
-            "installationId",
-            "repositoryId",
-            "targetEpochId",
-            "proposalManifestId",
-            "expectedRevision",
-            "operationId",
-        }
-        current = expected_versions[name] == "ci-config-epoch-activation/v2"
-        if current:
-            fields.add("reviewOperationId")
         required = _string_tuple(branch.get("required"), "activation request required fields")
         if (
             set(branch) - {"type", "properties", "required", "additionalProperties", "title"}
@@ -346,14 +332,14 @@ def _assert_activation_request(document: JsonObject, schema: JsonObject) -> None
             or set(properties) != fields
             or set(required) != fields - {"expectedRevision"}
             or len(required) != len(set(required))
-            or _schema_version(branch) != expected_versions[name]
+            or _schema_version(branch) != version_id
         ):
             raise ValueError("config activation request fields or version differ")
         version = as_object(properties["schemaVersion"], "activation request version")
         if set(version) - {"type", "const", "title"} or version.get("type") != "string":
             raise ValueError("config activation request version must be a literal string")
-        if current:
-            selector = as_object(properties["reviewOperationId"], "activation request selector")
+        if selector_field is not None:
+            selector = as_object(properties[selector_field], "activation request selector")
             if (
                 set(selector) - {"type", "minLength", "maxLength", "x-max-utf8-bytes", "title"}
                 or selector.get("type") != "string"
@@ -362,6 +348,36 @@ def _assert_activation_request(document: JsonObject, schema: JsonObject) -> None
                 or selector.get("x-max-utf8-bytes") != MAX_CONFIG_OPERATION_ID_UTF8_BYTES
             ):
                 raise ValueError("config activation request selector bound differs")
+
+
+_ACTIVATION_COMMON_FIELDS: Final = frozenset(
+    {
+        "schemaVersion",
+        "installationId",
+        "repositoryId",
+        "targetEpochId",
+        "expectedRevision",
+        "operationId",
+    }
+)
+# Schema reference -> (version, exact property set, explicit review selector field or None).
+_ACTIVATION_VERSIONS: Final[dict[str, tuple[str, frozenset[str], str | None]]] = {
+    "#/components/schemas/ConfigEpochActivationBody": (
+        "ci-config-epoch-activation/v1",
+        _ACTIVATION_COMMON_FIELDS | {"proposalManifestId"},
+        None,
+    ),
+    "#/components/schemas/ExplicitConfigEpochActivationBody": (
+        "ci-config-epoch-activation/v2",
+        _ACTIVATION_COMMON_FIELDS | {"proposalManifestId", "reviewOperationId"},
+        "reviewOperationId",
+    ),
+    "#/components/schemas/RegisteredEpochConfigActivationBody": (
+        "ci-config-epoch-activation/v3",
+        _ACTIVATION_COMMON_FIELDS | {"expectedSourceHash", "registeredEpochReviewOperationId"},
+        "registeredEpochReviewOperationId",
+    ),
+}
 
 
 def _assert_success_schema(
@@ -398,6 +414,7 @@ def _assert_openapi_bounds(
     for schema_name in (
         "ConfigEpochActivationBody",
         "ExplicitConfigEpochActivationBody",
+        "RegisteredEpochConfigActivationBody",
         "ConfigEpochRegistrationBody",
         "ConfigEpochRollbackBody",
     ):
