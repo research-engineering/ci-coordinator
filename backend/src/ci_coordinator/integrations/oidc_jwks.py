@@ -7,6 +7,7 @@ import asyncio
 import httpx2 as httpx
 
 from ci_coordinator.identity_admission.jwks_contracts import (
+    JwksCacheState,
     JwksFetchResponse,
     JwksProviderConfig,
     JwksTransportFailure,
@@ -130,6 +131,9 @@ class GitHubActionsJwksProvider:
     async def probe(self) -> bool:
         """Return whether a current admitted key set can authenticate requests."""
         return await self._cache.probe() is None
+
+    def cache_state(self) -> JwksCacheState:
+        return self._cache.cache_state()
 
     async def aclose(self) -> None:
         """Close the cache, then start transport close only for an uncancelled closer.

@@ -107,6 +107,41 @@ def test_wrong_actor_is_forbidden_before_provider_io() -> None:
     assert repositories.calls == []
 
 
+def test_installation_lookup_denies_ungranted_installation_before_provider_io() -> None:
+    # Kills: lookup that reads the provider before checking the inventory grant.
+    installations = _Installations({1: _installation(), 2: _installation(installation_id=2)})
+    service = _service(installations, _Repositories(_page()))
+
+    denied = asyncio.run(service.installation(actor=ADMIN_ACTOR, installation_id=2))
+    wrong_actor = asyncio.run(service.installation(actor="other", installation_id=1))
+
+    assert isinstance(denied, ProviderInventoryForbidden)
+    assert isinstance(wrong_actor, ProviderInventoryForbidden)
+    assert installations.calls == []
+
+
+def test_installation_lookup_preserves_failure_and_binds_exact_identity() -> None:
+    # Kills: rate limits collapsed into denial and substituted installation identities.
+    limited = _service(
+        _Installations({1: ProviderInventoryUnavailable("rate_limited", 30)}),
+        _Repositories(_page()),
+    )
+    substituted = _service(
+        _Installations({1: _installation(installation_id=2)}), _Repositories(_page())
+    )
+    granted = _service(_Installations({1: _installation()}), _Repositories(_page()))
+
+    assert asyncio.run(
+        limited.installation(actor=ADMIN_ACTOR, installation_id=1)
+    ) == ProviderInventoryUnavailable("rate_limited", 30)
+    assert asyncio.run(
+        substituted.installation(actor=ADMIN_ACTOR, installation_id=1)
+    ) == ProviderInventoryUnavailable("provider_binding_mismatch")
+    assert asyncio.run(granted.installation(actor=ADMIN_ACTOR, installation_id=1)) == (
+        _installation()
+    )
+
+
 def test_installation_catalog_preserves_independent_partial_failures() -> None:
     installations = _Installations(
         {

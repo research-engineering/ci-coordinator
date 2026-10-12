@@ -53,6 +53,12 @@ failure observations, current retained headers and explicit queue admission.
 `REQ-CI-RUNTIME-055` owns this relation; no completeness or planning authority
 follows from a retry receipt.
 
+The read-time
+[capability passport](../../features/ci-operator-capability-completion-plan.md#o1-capability-diagnostics)
+composes existing inventory, observation and key-cache owners for one
+repository. `REQ-CI-RUNTIME-056` owns it; it stores no readiness flag and
+grants no mode.
+
 The machine-admissible source is `requirements.v1.json`. This overview explains
 context only; it does not create additional normative requirements.
 

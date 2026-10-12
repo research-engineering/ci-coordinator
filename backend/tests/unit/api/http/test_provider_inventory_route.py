@@ -23,6 +23,7 @@ from ci_coordinator.provider_inventory import (
     InstallationCatalog,
     InstallationCatalogResult,
     InstallationFailure,
+    InstallationPermission,
     InstallationSummary,
     ProviderInventoryForbidden,
     ProviderInventoryIneligible,
@@ -91,6 +92,8 @@ def test_installation_route_preserves_partial_catalog_evidence() -> None:
                 "accountType": "Organization",
                 "repositorySelection": "selected",
                 "state": "active",
+                "permissions": [{"name": "metadata", "level": "read"}],
+                "events": ["workflow_run"],
             }
         ],
         "failures": [{"installationId": 2, "reason": "rate_limited", "retryAfterSeconds": 30}],
@@ -237,7 +240,16 @@ def _client(
 
 
 def _installation() -> InstallationSummary:
-    return InstallationSummary(1, 101, "example", "Organization", "selected", "active")
+    return InstallationSummary(
+        1,
+        101,
+        "example",
+        "Organization",
+        "selected",
+        "active",
+        (InstallationPermission("metadata", "read"),),
+        ("workflow_run",),
+    )
 
 
 def _page() -> RepositoryPage:

@@ -15,17 +15,31 @@ from ci_coordinator.integrations.github._response_decoding import (
 )
 from ci_coordinator.kernel import StrictJsonError, load_strict_json
 from ci_coordinator.provider_inventory import (
+    InstallationPermission,
     InstallationSummary,
     ProviderInstallationPage,
     ProviderRepositoryPage,
     RepositorySummary,
 )
 from ci_coordinator.provider_inventory.model import (
+    MAX_INSTALLATION_EVENTS,
+    MAX_INSTALLATION_PERMISSIONS,
+    PROVIDER_GRANT_NAME_PATTERN,
     AccountType,
+    InstallationPermissionLevel,
     InstallationState,
     RepositorySelection,
     RepositoryVisibility,
 )
+
+_ADMITTED_PERMISSION_LEVELS = frozenset({"read", "write", "admin"})
+
+
+class _MalformedGrant:
+    """Structural grant error; distinct from an unreported or oversized grant set."""
+
+
+_MALFORMED_GRANT = _MalformedGrant()
 
 
 def decode_installation_page(
@@ -76,6 +90,8 @@ def decode_installation_value(value: object) -> InstallationSummary | None:
     account_login = _bounded_text(account.get("login"), maximum_bytes=512)
     account_type = _enum_text(account.get("type"), {"Organization", "User"})
     suspended = _suspension_state(value.get("suspended_at"))
+    permissions = _installation_permissions(value.get("permissions"))
+    events = _installation_events(value.get("events"))
     if (
         installation_id is None
         or repository_selection is None
@@ -83,6 +99,8 @@ def decode_installation_value(value: object) -> InstallationSummary | None:
         or account_login is None
         or account_type is None
         or suspended is None
+        or isinstance(permissions, _MalformedGrant)
+        or isinstance(events, _MalformedGrant)
     ):
         return None
     state = (
@@ -98,9 +116,48 @@ def decode_installation_value(value: object) -> InstallationSummary | None:
             account_type=cast(AccountType, account_type),
             repository_selection=cast(RepositorySelection, repository_selection),
             state=cast(InstallationState, state),
+            permissions=permissions,
+            events=events,
         )
     except (TypeError, ValueError):
         return None
+
+
+def _installation_permissions(
+    value: object,
+) -> tuple[InstallationPermission, ...] | _MalformedGrant | None:
+    """Keep exact names; an unrecognized level is ``unknown`` and an oversized map unreported."""
+    if value is None:
+        return None
+    permissions = object_or_none(value)
+    if permissions is None:
+        return _MALFORMED_GRANT
+    if len(permissions) > MAX_INSTALLATION_PERMISSIONS:
+        return None
+    decoded: list[InstallationPermission] = []
+    for name, level in permissions.items():
+        if PROVIDER_GRANT_NAME_PATTERN.fullmatch(name) is None:
+            return _MALFORMED_GRANT
+        admitted = (
+            level if type(level) is str and level in _ADMITTED_PERMISSION_LEVELS else "unknown"
+        )
+        decoded.append(InstallationPermission(name, cast(InstallationPermissionLevel, admitted)))
+    return tuple(sorted(decoded, key=lambda item: item.name))
+
+
+def _installation_events(value: object) -> tuple[str, ...] | _MalformedGrant | None:
+    if value is None:
+        return None
+    if type(value) is not list:
+        return _MALFORMED_GRANT
+    if len(value) > MAX_INSTALLATION_EVENTS:
+        return None
+    events: list[str] = []
+    for event in value:
+        if type(event) is not str or PROVIDER_GRANT_NAME_PATTERN.fullmatch(event) is None:
+            return _MALFORMED_GRANT
+        events.append(event)
+    return _MALFORMED_GRANT if len(set(events)) != len(events) else tuple(sorted(events))
 
 
 def decode_repository_page(

@@ -43,6 +43,10 @@ from ci_coordinator.api.http.routers.analytics_configuration import (
     PURPOSE_REQUEST_LIMITS,
     build_purpose_settings_router,
 )
+from ci_coordinator.api.http.routers.capability_passport import (
+    CAPABILITY_PASSPORT_PATH,
+    build_capability_passport_router,
+)
 from ci_coordinator.api.http.routers.ci_economics import (
     CI_ECONOMICS_ATTEMPTS_PATH,
     CI_ECONOMICS_JOBS_PATH,
@@ -236,6 +240,9 @@ def create_app(
     if routes.provider_inventory is not None:
         router = build_provider_inventory_router(routes.provider_inventory)
         _include_router(app, router, admitted_routes)
+    if routes.capability_passport is not None:
+        router = build_capability_passport_router(routes.capability_passport)
+        _include_router(app, router, admitted_routes)
     if routes.workflow_discovery is not None:
         router = build_workflow_discovery_router(routes.workflow_discovery)
         _include_router(app, router, admitted_routes)
@@ -369,6 +376,7 @@ def _normalize_dependencies(
         and dependencies.observability is None
         and dependencies.workbench is None
         and dependencies.provider_inventory is None
+        and dependencies.capability_passport is None
         and dependencies.workflow_discovery is None
         and dependencies.governance_observation is None
         and dependencies.ci_economics is None
@@ -517,6 +525,9 @@ def _request_admission_policies(
         economics_read_paths.extend(
             (REPORT_READ_PATH, REPORT_COMPARISON_PATH, REPORT_BUDGET_PATH, REPORT_CATALOG_PATH)
         )
+    if routes.capability_passport is not None:
+        # The passport performs observation reads, so it shares their bulkhead.
+        economics_read_paths.append(CAPABILITY_PASSPORT_PATH)
     if economics_read_paths:
         policies.extend(
             RequestAdmissionPolicy(

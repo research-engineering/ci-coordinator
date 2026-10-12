@@ -41,12 +41,26 @@ export const providerInventoryErrorSchema: z.ZodType<ProviderInventoryError> = z
     }
   });
 
-const installation = z
+const MAX_INSTALLATION_PERMISSIONS = 64;
+const MAX_INSTALLATION_EVENTS = 128;
+const providerGrantName = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/);
+
+export const installationSchema = z
   .strictObject({
     accountId: positiveInteger,
     accountLogin: providerIdentifier,
     accountType: z.enum(["Organization", "User"]),
+    events: z.array(providerGrantName).max(MAX_INSTALLATION_EVENTS).nullable(),
     installationId: positiveInteger,
+    permissions: z
+      .array(
+        z.strictObject({
+          level: z.enum(["read", "write", "admin", "unknown"]),
+          name: providerGrantName,
+        }),
+      )
+      .max(MAX_INSTALLATION_PERMISSIONS)
+      .nullable(),
     repositorySelection: z.enum(["all", "selected"]),
     state: z.enum(["active", "suspended", "unsupported"]),
   })
@@ -56,6 +70,12 @@ const installation = z
       (value.accountType === "User" && value.state === "active")
     ) {
       context.addIssue({ code: "custom", message: "installation state contradicts account type" });
+    }
+    if (
+      (value.permissions !== null && !isAscending(value.permissions.map((item) => item.name))) ||
+      (value.events !== null && !isAscending(value.events))
+    ) {
+      context.addIssue({ code: "custom", message: "installation grants are not canonical" });
     }
   });
 
@@ -77,7 +97,7 @@ export const installationCatalogSchema: z.ZodType<InstallationCatalog> = z
           }),
       )
       .max(100),
-    installations: z.array(installation).max(100),
+    installations: z.array(installationSchema).max(100),
     page: z.number().int().min(1).max(10_000),
     perPage: z.number().int().min(1).max(100),
     hasNextPage: z.boolean(),
@@ -137,7 +157,7 @@ export const repositoryPageSchema: z.ZodType<RepositoryPage> = z
   .strictObject({
     consistency: z.literal("best_effort"),
     hasNextPage: z.boolean(),
-    installation,
+    installation: installationSchema,
     observedAt: dateTime,
     ok: z.literal(true),
     page: z.number().int().min(1).max(10_000),
@@ -201,7 +221,7 @@ function isUnicodeScalarText(value: string): boolean {
   return true;
 }
 
-function isAscending(values: readonly number[]): boolean {
+function isAscending<Value extends number | string>(values: readonly Value[]): boolean {
   return values.every((value, index) => {
     const previous = values[index - 1];
     return previous === undefined || previous < value;

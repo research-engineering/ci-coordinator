@@ -378,6 +378,23 @@ export interface paths {
         readonly patch?: never;
         readonly trace?: never;
     };
+    readonly "/api/v1/workbench/repositories/{installation_id}/{repository_id}/capabilities": {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path?: never;
+            readonly cookie?: never;
+        };
+        /** Get Repository Capability Passport */
+        readonly get: operations["get_repository_capability_passport"];
+        readonly put?: never;
+        readonly post?: never;
+        readonly delete?: never;
+        readonly options?: never;
+        readonly head?: never;
+        readonly patch?: never;
+        readonly trace?: never;
+    };
     readonly "/api/v1/workbench/repositories/{installation_id}/{repository_id}/governance-baselines": {
         readonly parameters: {
             readonly query?: never;
@@ -1203,6 +1220,11 @@ export interface components {
             /** Subjecttype */
             readonly subjectType: string;
         };
+        /**
+         * BackgroundHealthState
+         * @enum {string}
+         */
+        readonly BackgroundHealthState: "healthy" | "degraded" | "starting" | "stopped" | "not_configured" | "unobservable" | "terminal_failure";
         /** BudgetConfigurationPayload */
         readonly BudgetConfigurationPayload: {
             readonly counter: components["schemas"]["ReportCounter"];
@@ -1344,6 +1366,52 @@ export interface components {
             readonly targetPath: string | null;
             /** Uses */
             readonly uses: string;
+        };
+        /** @enum {string} */
+        readonly CapabilityNextAction: "request_access" | "repair_webhook" | "refresh_evidence" | "complete_configuration" | "none";
+        /** @enum {string} */
+        readonly CapabilityPassportError: "unauthenticated" | "forbidden" | "unavailable";
+        /** CapabilityPassportErrorResponse */
+        readonly CapabilityPassportErrorResponse: {
+            readonly error: components["schemas"]["CapabilityPassportError"];
+            /**
+             * Ok
+             * @constant
+             */
+            readonly ok: false;
+        };
+        /** CapabilityPassportResponse */
+        readonly CapabilityPassportResponse: {
+            readonly actionsOidcKeys: components["schemas"]["TrustKeyResponse"];
+            readonly installationGrant: components["schemas"]["InstallationGrantResponse"];
+            readonly nextAction: components["schemas"]["CapabilityNextAction"];
+            /**
+             * Observedat
+             * Format: date-time
+             */
+            readonly observedAt: string;
+            /**
+             * Ok
+             * @constant
+             */
+            readonly ok: true;
+            readonly productionAdmissionKeys: components["schemas"]["UnprojectedFactResponse"];
+            readonly providerLimits: components["schemas"]["ProviderLimitResponse"];
+            readonly reconciliation: components["schemas"]["ReconciliationResponse"];
+            /**
+             * Schemaversion
+             * @constant
+             */
+            readonly schemaVersion: "capability-passport/v1";
+            readonly scope: components["schemas"]["CapabilityScopeResponse"];
+            readonly webhookObservation: components["schemas"]["UnprojectedFactResponse"];
+        };
+        /** CapabilityScopeResponse */
+        readonly CapabilityScopeResponse: {
+            /** Installationid */
+            readonly installationId: number;
+            /** Repositoryid */
+            readonly repositoryId: number;
         };
         /** CiEconomicsAttemptIdentityResponse */
         readonly CiEconomicsAttemptIdentityResponse: {
@@ -3031,6 +3099,33 @@ export interface components {
             /** Retryafterseconds */
             readonly retryAfterSeconds: number | null;
         };
+        readonly InstallationGrantReason: components["schemas"]["InventoryFailureReason"] | "inventory_grant_absent";
+        /** InstallationGrantResponse */
+        readonly InstallationGrantResponse: {
+            readonly installation: components["schemas"]["InstallationResponse"] | null;
+            /**
+             * Observedat
+             * Format: date-time
+             */
+            readonly observedAt: string;
+            readonly reason: components["schemas"]["InstallationGrantReason"] | null;
+            /**
+             * Source
+             * @constant
+             */
+            readonly source: "github_app_installation";
+            readonly status: components["schemas"]["InstallationGrantStatus"];
+        };
+        /** @enum {string} */
+        readonly InstallationGrantStatus: "known" | "denied" | "unavailable";
+        /** @enum {string} */
+        readonly InstallationPermissionLevel: "read" | "write" | "admin" | "unknown";
+        /** InstallationPermissionResponse */
+        readonly InstallationPermissionResponse: {
+            readonly level: components["schemas"]["InstallationPermissionLevel"];
+            /** Name */
+            readonly name: string;
+        };
         /** InstallationResponse */
         readonly InstallationResponse: {
             /** Accountid */
@@ -3042,8 +3137,12 @@ export interface components {
              * @enum {string}
              */
             readonly accountType: "Organization" | "User";
+            /** Events */
+            readonly events: readonly string[] | null;
             /** Installationid */
             readonly installationId: number;
+            /** Permissions */
+            readonly permissions: readonly components["schemas"]["InstallationPermissionResponse"][] | null;
             /**
              * Repositoryselection
              * @enum {string}
@@ -3756,6 +3855,27 @@ export interface components {
             readonly retryAfterSeconds: number | null;
         };
         /** @enum {string} */
+        readonly ProviderLimitReason: "rate_limited" | "no_retained_limit_observation";
+        /** ProviderLimitResponse */
+        readonly ProviderLimitResponse: {
+            /**
+             * Observedat
+             * Format: date-time
+             */
+            readonly observedAt: string;
+            readonly reason: components["schemas"]["ProviderLimitReason"];
+            /** Retryafterseconds */
+            readonly retryAfterSeconds: number | null;
+            /**
+             * Source
+             * @constant
+             */
+            readonly source: "github_app_installation";
+            readonly status: components["schemas"]["ProviderLimitStatus"];
+        };
+        /** @enum {string} */
+        readonly ProviderLimitStatus: "known" | "unknown";
+        /** @enum {string} */
         readonly ProviderSourceRegistrationResult: "registered" | "replayed" | "source_conflict" | "outside_source_window" | "capacity_reached";
         /** @enum {string} */
         readonly Purpose: "lint" | "typecheck" | "test" | "build" | "deploy";
@@ -3827,6 +3947,45 @@ export interface components {
             readonly snapshot: components["schemas"]["PurposeSettingsSnapshot"] | null;
         };
         readonly QueryId: number;
+        /** ReconciliationLaneResponse */
+        readonly ReconciliationLaneResponse: {
+            readonly lane: components["schemas"]["ObservationLane"];
+            /** Lastcompletedthrough */
+            readonly lastCompletedThrough: string | null;
+            readonly lastOutcome: components["schemas"]["ObservationOutcome"] | null;
+            /** Lastpageat */
+            readonly lastPageAt: string | null;
+            /**
+             * Nextattemptat
+             * Format: date-time
+             */
+            readonly nextAttemptAt: string;
+        };
+        /** @enum {string} */
+        readonly ReconciliationReason: "observation_not_configured" | "observation_paused" | "access_denied" | "store_unavailable";
+        /** ReconciliationResponse */
+        readonly ReconciliationResponse: {
+            readonly backgroundState: components["schemas"]["BackgroundHealthState"];
+            /** Detailtruncateduntil */
+            readonly detailTruncatedUntil: string | null;
+            /** Enabled */
+            readonly enabled: boolean | null;
+            /** Gapsrecorded */
+            readonly gapsRecorded: boolean | null;
+            /** Lanes */
+            readonly lanes: readonly components["schemas"]["ReconciliationLaneResponse"][];
+            /** Observedat */
+            readonly observedAt: string | null;
+            readonly reason: components["schemas"]["ReconciliationReason"] | null;
+            /**
+             * Source
+             * @constant
+             */
+            readonly source: "ci_observation_status";
+            readonly status: components["schemas"]["ReconciliationStatus"];
+        };
+        /** @enum {string} */
+        readonly ReconciliationStatus: "known" | "unknown" | "denied" | "unavailable";
         /** RegisteredEpochAttestationStartRequest */
         readonly RegisteredEpochAttestationStartRequest: {
             readonly expectedActive: components["schemas"]["ExpectedActiveRequest"] | null;
@@ -4185,6 +4344,29 @@ export interface components {
             /** Runs */
             readonly runs: boolean;
         };
+        /** @enum {string} */
+        readonly TrustKeyReason: "cache_expired" | "cache_absent" | "cache_closed" | "not_configured";
+        /** TrustKeyResponse */
+        readonly TrustKeyResponse: {
+            /** Ageseconds */
+            readonly ageSeconds: number | null;
+            /** Keycount */
+            readonly keyCount: number;
+            /**
+             * Observedat
+             * Format: date-time
+             */
+            readonly observedAt: string;
+            readonly reason: components["schemas"]["TrustKeyReason"] | null;
+            /**
+             * Source
+             * @constant
+             */
+            readonly source: "github_actions_jwks_cache";
+            readonly status: components["schemas"]["TrustKeyStatus"];
+        };
+        /** @enum {string} */
+        readonly TrustKeyStatus: "known" | "expired" | "unknown";
         /** UnknownResponse */
         readonly UnknownResponse: {
             /**
@@ -4209,6 +4391,20 @@ export interface components {
             /** Unknownid */
             readonly unknownId: string;
         };
+        /** @enum {string} */
+        readonly UnprojectedFactReason: "receipt_clock_not_indexed" | "not_projected";
+        /** UnprojectedFactResponse */
+        readonly UnprojectedFactResponse: {
+            readonly reason: components["schemas"]["UnprojectedFactReason"];
+            readonly source: components["schemas"]["UnprojectedFactSource"];
+            /**
+             * Status
+             * @constant
+             */
+            readonly status: "unknown";
+        };
+        /** @enum {string} */
+        readonly UnprojectedFactSource: "history_delivery_inbox" | "production_admission_authorities";
         /** ValidationError */
         readonly ValidationError: {
             /** Context */
@@ -6203,6 +6399,76 @@ export interface operations {
                 };
                 content: {
                     readonly "application/json": components["schemas"]["WorkbenchErrorResponse"];
+                };
+            };
+        };
+    };
+    readonly get_repository_capability_passport: {
+        readonly parameters: {
+            readonly query?: never;
+            readonly header?: never;
+            readonly path: {
+                readonly installation_id: number;
+                readonly repository_id: number;
+            };
+            readonly cookie?: never;
+        };
+        readonly requestBody?: never;
+        readonly responses: {
+            /** @description Successful Response */
+            readonly 200: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CapabilityPassportResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            readonly 401: {
+                headers: {
+                    /** @description Bearer authentication challenge. */
+                    readonly "WWW-Authenticate"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CapabilityPassportErrorResponse"];
+                };
+            };
+            /** @description Forbidden */
+            readonly 403: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CapabilityPassportErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            readonly 422: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["InvalidRequestBody"];
+                };
+            };
+            /** @description Internal Server Error */
+            readonly 500: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Service Unavailable */
+            readonly 503: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["CapabilityPassportErrorResponse"];
                 };
             };
         };

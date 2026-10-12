@@ -2,7 +2,9 @@ from ci_coordinator.provider_inventory.model import (
     InstallationCatalog,
     InstallationCatalogResult,
     InstallationFailure,
+    InstallationLookupResult,
     InstallationPageReadResult,
+    InstallationPermission,
     InstallationReadResult,
     InstallationSummary,
     InventoryGrant,
@@ -21,6 +23,7 @@ from ci_coordinator.provider_inventory.model import (
 )
 from ci_coordinator.provider_inventory.permissions import ControlPlaneProviderInventoryAuthorizer
 from ci_coordinator.provider_inventory.ports import (
+    ProviderInstallationLookup,
     ProviderInstallationReader,
     ProviderInventoryAuthorizer,
     ProviderInventoryUseCase,
@@ -33,11 +36,14 @@ __all__ = [
     "InstallationCatalog",
     "InstallationCatalogResult",
     "InstallationFailure",
+    "InstallationLookupResult",
     "InstallationPageReadResult",
+    "InstallationPermission",
     "InstallationReadResult",
     "InstallationSummary",
     "InventoryGrant",
     "InventoryMode",
+    "ProviderInstallationLookup",
     "ProviderInstallationPage",
     "ProviderInstallationReader",
     "ProviderInventoryAuthorizer",

@@ -9,6 +9,8 @@ from ci_coordinator.identity_admission.actions_oidc import (
     workflow_path_identity_from_ref,
 )
 from ci_coordinator.identity_admission.jwks_contracts import (
+    JwksCacheCondition,
+    JwksCacheState,
     JwksFetchResponse,
     JwksProvider,
     JwksProviderConfig,
@@ -36,6 +38,8 @@ __all__ = [
     "ActionsOidcJwkSet",
     "CachingJwksProvider",
     "ExpectedActionsOidcClaims",
+    "JwksCacheCondition",
+    "JwksCacheState",
     "JwksFetchResponse",
     "JwksProvider",
     "JwksProviderConfig",

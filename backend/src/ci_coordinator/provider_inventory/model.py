@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -22,7 +23,11 @@ type InventoryFailureReason = Literal[
 ]
 type InventoryIneligibleReason = Literal["suspended", "unsupported_account_type"]
 type InventoryMode = Literal["restricted", "app"]
+type InstallationPermissionLevel = Literal["read", "write", "admin", "unknown"]
 
+MAX_INSTALLATION_PERMISSIONS = 64
+MAX_INSTALLATION_EVENTS = 128
+PROVIDER_GRANT_NAME_PATTERN = re.compile(r"[a-z][a-z0-9_]{0,63}")
 _MAX_INSTALLATION_CATALOG_ITEMS = 64
 _MAX_REPOSITORY_PAGE = 10_000
 
@@ -49,13 +54,28 @@ class InventoryGrant:
 
 
 @dataclass(frozen=True, slots=True)
+class InstallationPermission:
+    name: str
+    level: InstallationPermissionLevel
+
+    def __post_init__(self) -> None:
+        _require_grant_name(self.name)
+        if self.level not in {"read", "write", "admin", "unknown"}:
+            raise ValueError("installation permission level is not admitted")
+
+
+@dataclass(frozen=True, slots=True)
 class InstallationSummary:
+    """Provider installation facts; ``None`` grants are unreported or exceed their bound."""
+
     installation_id: int
     account_id: int
     account_login: str
     account_type: AccountType
     repository_selection: RepositorySelection
     state: InstallationState
+    permissions: tuple[InstallationPermission, ...] | None = None
+    events: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         _require_positive_safe_integer(self.installation_id, "installation id")
@@ -71,6 +91,20 @@ class InstallationSummary:
             raise ValueError("user installation cannot be active")
         if self.account_type == "Organization" and self.state == "unsupported":
             raise ValueError("organization installation cannot be unsupported")
+        if self.permissions is not None:
+            if (
+                type(self.permissions) is not tuple
+                or len(self.permissions) > MAX_INSTALLATION_PERMISSIONS
+                or any(type(item) is not InstallationPermission for item in self.permissions)
+            ):
+                raise ValueError("installation permissions exceed their bound")
+            _require_canonical_names(tuple(item.name for item in self.permissions))
+        if self.events is not None:
+            if type(self.events) is not tuple or len(self.events) > MAX_INSTALLATION_EVENTS:
+                raise ValueError("installation events exceed their bound")
+            for event in self.events:
+                _require_grant_name(event)
+            _require_canonical_names(self.events)
 
 
 @dataclass(frozen=True, slots=True)
@@ -295,6 +329,9 @@ class ProviderInventoryIneligible:
 
 
 type InstallationReadResult = InstallationSummary | ProviderInventoryUnavailable
+type InstallationLookupResult = (
+    InstallationSummary | ProviderInventoryForbidden | ProviderInventoryUnavailable
+)
 type InstallationPageReadResult = ProviderInstallationPage | ProviderInventoryUnavailable
 type RepositoryReadResult = ProviderRepositoryPage | ProviderInventoryUnavailable
 type InstallationCatalogResult = (
@@ -323,6 +360,16 @@ def _require_text(value: object, name: str, *, maximum_bytes: int) -> None:
         raise ValueError(f"{name} must be Unicode scalar text") from error
     if size > maximum_bytes:
         raise ValueError(f"{name} exceeds its byte bound")
+
+
+def _require_grant_name(value: object) -> None:
+    if type(value) is not str or PROVIDER_GRANT_NAME_PATTERN.fullmatch(value) is None:
+        raise ValueError("installation grant name is not canonical")
+
+
+def _require_canonical_names(names: tuple[str, ...]) -> None:
+    if names != tuple(sorted(set(names))):
+        raise ValueError("installation grant names must be unique and canonically ordered")
 
 
 def _require_page(page: object, per_page: object) -> None:

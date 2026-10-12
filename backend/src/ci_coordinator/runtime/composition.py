@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from ci_coordinator.api.http.app import create_app
 from ci_coordinator.api.http.dependencies import (
     ActivityRouteDependencies,
+    CapabilityPassportRouteDependencies,
     CiEconomicsBudgetRouteDependencies,
     CiEconomicsRouteDependencies,
     CiEconomicsSourceRouteDependencies,
@@ -54,6 +55,7 @@ from ci_coordinator.app import (
     ShadowReconciliationProjector,
 )
 from ci_coordinator.app.analytics_configuration import PurposeSettingsService
+from ci_coordinator.app.capability_passport import CapabilityPassportService
 from ci_coordinator.app.ci_economics import (
     CiEconomicsCollectionService,
     CiEconomicsReadService,
@@ -788,6 +790,18 @@ def _compose_connected_dependencies(
                 runtime_metrics=runtime_metrics,
             )
 
+        provider_inventory_service = ProviderInventoryService(
+            authorizer=provider_inventory_authorizer,
+            installations=provider_inventory,
+            repositories=provider_inventory,
+            clock=clock,
+        )
+        ci_observation_service = CiObservationService(
+            authorizer=control_plane_authorizer,
+            configuration_store=ci_observation_store,
+            query=ci_observation_store,
+            workflow_catalog=GitHubCiObservationWorkflows(github),
+        )
         resources = RuntimeResources(
             engine,
             github,
@@ -853,10 +867,17 @@ def _compose_connected_dependencies(
                 provider_inventory=ProviderInventoryRouteDependencies(
                     authenticator=control_plane.authenticator,
                     role_admission=control_plane.role_admission,
-                    use_case=ProviderInventoryService(
-                        authorizer=provider_inventory_authorizer,
-                        installations=provider_inventory,
-                        repositories=provider_inventory,
+                    use_case=provider_inventory_service,
+                ),
+                capability_passport=CapabilityPassportRouteDependencies(
+                    authenticator=control_plane.authenticator,
+                    role_admission=control_plane.role_admission,
+                    use_case=CapabilityPassportService(
+                        authorizer=control_plane_authorizer,
+                        installations=provider_inventory_service,
+                        observation=ci_observation_service,
+                        background=resources,
+                        oidc_keys=jwks,
                         clock=clock,
                     ),
                 ),
@@ -905,12 +926,7 @@ def _compose_connected_dependencies(
                     authenticator=control_plane.authenticator,
                     role_admission=control_plane.role_admission,
                     mutation_admission=control_plane.mutation_admission,
-                    use_case=CiObservationService(
-                        authorizer=control_plane_authorizer,
-                        configuration_store=ci_observation_store,
-                        query=ci_observation_store,
-                        workflow_catalog=GitHubCiObservationWorkflows(github),
-                    ),
+                    use_case=ci_observation_service,
                 ),
                 activity=ActivityRouteDependencies(
                     authenticator=control_plane.authenticator,

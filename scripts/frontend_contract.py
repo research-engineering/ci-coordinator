@@ -15,6 +15,7 @@ from typing import Never, cast
 from ci_coordinator.api.http.app import create_app
 from ci_coordinator.api.http.dependencies import (
     ActivityRouteDependencies,
+    CapabilityPassportRouteDependencies,
     CiEconomicsBudgetRouteDependencies,
     CiEconomicsRouteDependencies,
     CiEconomicsSourceRouteDependencies,
@@ -40,6 +41,7 @@ from ci_coordinator.api.http.routers.activity import ACTIVITY_PATHS
 from ci_coordinator.api.http.routers.analytics_configuration import (
     PURPOSE_SETTINGS_PATH,
 )
+from ci_coordinator.api.http.routers.capability_passport import CAPABILITY_PASSPORT_PATH
 from ci_coordinator.api.http.routers.ci_economics import (
     CI_ECONOMICS_ATTEMPTS_PATH,
     CI_ECONOMICS_JOBS_PATH,
@@ -151,6 +153,7 @@ def rendered_contract() -> bytes:
             purpose_settings=cast(PurposeSettingsRouteDependencies, object()),
             workbench=cast(WorkbenchRouteDependencies, object()),
             provider_inventory=cast(ProviderInventoryRouteDependencies, object()),
+            capability_passport=cast(CapabilityPassportRouteDependencies, object()),
             workflow_discovery=cast(WorkflowDiscoveryRouteDependencies, object()),
             governance_observation=cast(GovernanceObservationRouteDependencies, object()),
             control_plane_identity=cast(ControlPlaneIdentityRouteDependencies, identity),
@@ -183,6 +186,7 @@ def rendered_contract() -> bytes:
         GOVERNANCE_COMPARISON_PATH,
         PROVIDER_INSTALLATIONS_PATH,
         PROVIDER_REPOSITORIES_PATH,
+        CAPABILITY_PASSPORT_PATH,
         KEYCLOAK_LOGIN_START_PATH,
         KEYCLOAK_LOGIN_CALLBACK_PATH,
         CONTROL_PLANE_SESSION_PATH,

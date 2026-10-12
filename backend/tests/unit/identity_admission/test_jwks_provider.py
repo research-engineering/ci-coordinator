@@ -14,6 +14,7 @@ from jwt.algorithms import RSAAlgorithm
 from ci_coordinator.identity_admission import (
     ActionsOidcJwkSet,
     CachingJwksProvider,
+    JwksCacheState,
     JwksFetchResponse,
     JwksProviderConfig,
     JwksTransportFailure,
@@ -255,6 +256,26 @@ def test_expired_snapshot_is_never_a_fallback_after_refresh_failure() -> None:
 
         _assert_unavailable(result, "fetch_timeout")
         assert transport.calls == 2
+
+    asyncio.run(scenario())
+
+
+def test_cache_state_is_passive_and_never_reports_expired_keys_as_current() -> None:
+    # Kills: a diagnostic read that refreshes the cache or projects an expired snapshot.
+    async def scenario() -> None:
+        clock = ManualMonotonicClock()
+        transport = ScriptedTransport(deque([_response(_jwk("current"))]))
+        provider = CachingJwksProvider(transport, clock, _config())
+
+        assert provider.cache_state() == JwksCacheState("absent")
+        assert not isinstance(await provider.get_key_set("current"), JwksUnavailable)
+        clock.value = 299.5
+        assert provider.cache_state() == JwksCacheState("current", 1, 299)
+        clock.value = 300.0
+        assert provider.cache_state() == JwksCacheState("expired", 1, 300)
+        assert transport.calls == 1
+        await provider.aclose()
+        assert provider.cache_state() == JwksCacheState("closed")
 
     asyncio.run(scenario())
 

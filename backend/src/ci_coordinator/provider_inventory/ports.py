@@ -6,6 +6,7 @@ from typing import Protocol
 
 from ci_coordinator.provider_inventory.model import (
     InstallationCatalogResult,
+    InstallationLookupResult,
     InstallationPageReadResult,
     InstallationReadResult,
     InventoryGrant,
@@ -31,6 +32,15 @@ class ProviderInventoryUseCase(Protocol):
         page: int,
         per_page: int,
     ) -> RepositoryPageResult: ...
+
+
+class ProviderInstallationLookup(Protocol):
+    async def installation(
+        self,
+        *,
+        actor: str,
+        installation_id: int,
+    ) -> InstallationLookupResult: ...
 
 
 class ProviderInventoryAuthorizer(Protocol):

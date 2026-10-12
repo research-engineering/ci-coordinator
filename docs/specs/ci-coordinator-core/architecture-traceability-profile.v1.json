@@ -461,11 +461,12 @@
     },
     {
       "traceId": "runtime.10-read-surfaces",
-      "requirementIds": ["REQ-CI-RUNTIME-014", "REQ-CI-RUNTIME-018"],
+      "requirementIds": ["REQ-CI-RUNTIME-014", "REQ-CI-RUNTIME-018", "REQ-CI-RUNTIME-056"],
       "lawIds": ["MS-10", "MS-7", "MS-8"],
       "contractPaths": [
         "docs/architecture/modules/provider-inventory.md",
-        "docs/architecture/modules/workbench-read-models.md"
+        "docs/architecture/modules/workbench-read-models.md",
+        "docs/features/ci-operator-capability-completion-plan.md"
       ]
     },
     {
