@@ -1534,7 +1534,7 @@ export interface components {
              * Error
              * @enum {string}
              */
-            readonly error: "unauthenticated" | "forbidden" | "invalid_config" | "conflict" | "revision_conflict" | "target_unavailable" | "attestation_invalid" | "legacy_new_operation_unsupported" | "coverage_reducing" | "coverage_unproven" | "overloaded" | "unavailable";
+            readonly error: "unauthenticated" | "forbidden" | "invalid_config" | "conflict" | "revision_conflict" | "target_unavailable" | "attestation_invalid" | "legacy_new_operation_unsupported" | "coverage_reducing" | "coverage_unproven" | "target_never_activated" | "overloaded" | "unavailable";
             /**
              * Ok
              * @constant

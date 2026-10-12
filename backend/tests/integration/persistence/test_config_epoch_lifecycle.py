@@ -7,7 +7,7 @@ from io import StringIO
 from typing import Literal
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 
 from ci_coordinator.audit_replay import AuditEventInput, prepare_audit_event
 from ci_coordinator.audit_replay.replay import AllAuditReplayFilter
@@ -25,6 +25,7 @@ from ci_coordinator.config_epochs import (
     ConfigEpochRegistrationCreated,
     ConfigEpochRegistrationDuplicate,
     ConfigEpochReplayCommand,
+    ConfigEpochRollbackTargetNeverActivated,
     prepare_config_epoch_activation,
 )
 from ci_coordinator.persistence import (
@@ -32,6 +33,7 @@ from ci_coordinator.persistence import (
     PostgresConfigEpochUnitOfWork,
     PostgresUnitOfWork,
 )
+from ci_coordinator.persistence.config_epoch_repository import _PostgresConfigEpochRepository
 from ci_coordinator.persistence.config_epoch_schema_attestation import (
     config_epoch_lifecycle_schema_matches_contract,
 )
@@ -40,6 +42,7 @@ from ci_coordinator.replay_cli import ReplayCommand, execute_replay
 
 from ._audit_replay_support import load_test_audit_records
 from ._config_epoch_support import config_epoch_draft
+from ._temporal_lock_support import wait_for_blocked_operation
 
 pytestmark = pytest.mark.persistence
 
@@ -100,9 +103,15 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
             async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
                 await unit_of_work.config_epochs.register(active)
                 await unit_of_work.config_epochs.register(target)
+                initial_target = await unit_of_work.config_epochs.activate(
+                    prepare_config_epoch_activation(
+                        _command(active.scope, target.epoch_id, None, "initial-target")
+                    )
+                )
+                assert isinstance(initial_target, ConfigEpochActivationApplied)
                 initial = await unit_of_work.config_epochs.activate(
                     prepare_config_epoch_activation(
-                        _command(active.scope, active.epoch_id, None, "initial")
+                        _command(active.scope, active.epoch_id, 1, "initial")
                     )
                 )
                 assert isinstance(initial, ConfigEpochActivationApplied)
@@ -126,7 +135,7 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
                         ConfigEpochActivationCommand(
                             scope=active.scope,
                             target_epoch_id=target.epoch_id,
-                            expected_revision=1,
+                            expected_revision=2,
                             operation_id="stale-comparison",
                             actor="operator:123",
                             occurred_at="2026-07-14T12:00:30.000Z",
@@ -143,7 +152,7 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
                         ConfigEpochActivationCommand(
                             scope=active.scope,
                             target_epoch_id=target.epoch_id,
-                            expected_revision=1,
+                            expected_revision=2,
                             operation_id="rollback-to-target",
                             actor="operator:123",
                             occurred_at="2026-07-14T12:01:00.000Z",
@@ -163,7 +172,7 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
                         ConfigEpochActivationCommand(
                             scope=active.scope,
                             target_epoch_id=target.epoch_id,
-                            expected_revision=1,
+                            expected_revision=2,
                             operation_id="rollback-to-target",
                             actor="operator:123",
                             occurred_at="2026-07-14T13:01:00.000Z",
@@ -180,12 +189,12 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
             assert isinstance(replay, ConfigEpochActivationDuplicate)
             assert snapshot is not None
             assert snapshot.active.epoch_id == target.epoch_id
-            assert snapshot.active.revision == 2
+            assert snapshot.active.revision == 3
             event = next(item for item in events if item.event_type == "config-epoch-rollback/v1")
             assert event.payload == {
                 "schemaVersion": "config-epoch-rollback-audit/v1",
                 "operationId": "rollback-to-target",
-                "expectedRevision": 1,
+                "expectedRevision": 2,
                 "activeEpochId": active.epoch_id,
                 "targetEpochId": target.epoch_id,
                 "coverageRelation": "equal",
@@ -195,7 +204,7 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
             async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
                 intervening = await unit_of_work.config_epochs.activate(
                     prepare_config_epoch_activation(
-                        _command(active.scope, active.epoch_id, 2, "intervening-activation")
+                        _command(active.scope, active.epoch_id, 3, "intervening-activation")
                     )
                 )
                 assert isinstance(intervening, ConfigEpochActivationApplied)
@@ -206,7 +215,7 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
                     ConfigEpochReplayCommand(
                         scope=active.scope,
                         target_epoch_id=target.epoch_id,
-                        expected_revision=1,
+                        expected_revision=2,
                         operation_id="rollback-to-target",
                         actor="operator:123",
                         mutation_kind="rollback",
@@ -217,7 +226,7 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
                     ConfigEpochReplayCommand(
                         scope=active.scope,
                         target_epoch_id=target.epoch_id,
-                        expected_revision=1,
+                        expected_revision=2,
                         operation_id="rollback-to-target",
                         actor="operator:123",
                         mutation_kind="rollback",
@@ -230,9 +239,250 @@ def test_rollback_cas_persists_bounded_reason_and_compared_epoch_evidence(
             assert isinstance(divergent, ConfigEpochActivationOperationConflict)
             assert changed_snapshot is not None
             assert changed_snapshot.active.epoch_id == active.epoch_id
-            assert changed_snapshot.active.revision == 3
+            assert changed_snapshot.active.revision == 4
         finally:
             await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_rollback_refuses_a_retained_target_without_a_same_scope_activation(
+    runtime_postgres_database_url: str,
+) -> None:
+    async def scenario() -> None:
+        active = _draft("json")
+        target = _draft("yaml-1.2")
+        foreign_target = config_epoch_draft("yaml-1.2", repository_id=3)
+        assert foreign_target.scope != target.scope
+        assert foreign_target.epoch_id != target.epoch_id
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        try:
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                for draft in (active, target, foreign_target):
+                    await unit_of_work.config_epochs.register(draft)
+                for command in (
+                    _command(foreign_target.scope, foreign_target.epoch_id, None, "foreign"),
+                    _command(active.scope, active.epoch_id, None, "initial"),
+                ):
+                    assert isinstance(
+                        await unit_of_work.config_epochs.activate(
+                            prepare_config_epoch_activation(command)
+                        ),
+                        ConfigEpochActivationApplied,
+                    )
+                await unit_of_work.commit()
+
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                refused = await unit_of_work.config_epochs.activate(
+                    prepare_config_epoch_activation(
+                        _rollback(active.scope, target.epoch_id, 1, active.epoch_id, "rollback")
+                    )
+                )
+                await unit_of_work.commit()
+
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                snapshot = await unit_of_work.config_epochs.load_active(active.scope)
+                retained = await unit_of_work.config_epochs.resolve_operation(
+                    ConfigEpochReplayCommand.from_activation(
+                        _rollback(active.scope, target.epoch_id, 1, active.epoch_id, "rollback")
+                    )
+                )
+                events = await load_test_audit_records(unit_of_work.audit_events)
+                await unit_of_work.rollback()
+            assert isinstance(refused, ConfigEpochRollbackTargetNeverActivated)
+            assert snapshot is not None
+            assert snapshot.active.epoch_id == active.epoch_id
+            assert snapshot.active.revision == 1
+            assert retained is None
+            assert all(item.event_type != "config-epoch-rollback/v1" for item in events)
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_rollback_transition_is_not_activation_evidence_for_its_target(
+    runtime_postgres_database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def assume_activated(
+        self: _PostgresConfigEpochRepository,
+        scope: RepositoryScope,
+        epoch_id: str,
+    ) -> bool:
+        del self, scope, epoch_id
+        return True
+
+    async def scenario() -> None:
+        first = _draft("json")
+        second = _draft("yaml-1.2")
+        rolled_back_only = config_epoch_draft("json", name="rolled-back-only")
+        scope = first.scope
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        try:
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                for draft in (first, second, rolled_back_only):
+                    await unit_of_work.config_epochs.register(draft)
+                for command in (
+                    _command(scope, first.epoch_id, None, "activate-first"),
+                    _command(scope, second.epoch_id, 1, "activate-second"),
+                ):
+                    assert isinstance(
+                        await unit_of_work.config_epochs.activate(
+                            prepare_config_epoch_activation(command)
+                        ),
+                        ConfigEpochActivationApplied,
+                    )
+                await unit_of_work.commit()
+
+            # Retain a rollback transition to a never-activated target, as admitted
+            # before the prior-activation rule existed.
+            with monkeypatch.context() as patch:
+                patch.setattr(_PostgresConfigEpochRepository, "_was_activated", assume_activated)
+                async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                    retained_rollback = await unit_of_work.config_epochs.activate(
+                        prepare_config_epoch_activation(
+                            _rollback(
+                                scope, rolled_back_only.epoch_id, 2, second.epoch_id, "legacy"
+                            )
+                        )
+                    )
+                    assert isinstance(retained_rollback, ConfigEpochActivationApplied)
+                    await unit_of_work.commit()
+
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                to_first = await unit_of_work.config_epochs.activate(
+                    prepare_config_epoch_activation(
+                        _rollback(scope, first.epoch_id, 3, rolled_back_only.epoch_id, "to-first")
+                    )
+                )
+                assert isinstance(to_first, ConfigEpochActivationApplied)
+                await unit_of_work.commit()
+
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                laundered = await unit_of_work.config_epochs.activate(
+                    prepare_config_epoch_activation(
+                        _rollback(scope, rolled_back_only.epoch_id, 4, first.epoch_id, "again")
+                    )
+                )
+                to_second = await unit_of_work.config_epochs.activate(
+                    prepare_config_epoch_activation(
+                        _rollback(scope, second.epoch_id, 4, first.epoch_id, "to-second")
+                    )
+                )
+                await unit_of_work.commit()
+            assert isinstance(laundered, ConfigEpochRollbackTargetNeverActivated)
+            assert isinstance(to_second, ConfigEpochActivationApplied)
+            assert to_second.record.active.epoch_id == second.epoch_id
+            assert to_second.record.active.revision == 5
+        finally:
+            await engine.dispose()
+
+    asyncio.run(scenario())
+
+
+def test_prior_activation_check_is_serialized_with_a_concurrent_activation(
+    runtime_postgres_database_url: str, postgres_database_url: str
+) -> None:
+    async def scenario() -> None:
+        active = _draft("json")
+        target = _draft("yaml-1.2")
+        later = config_epoch_draft("json", name="later")
+        scope = active.scope
+        engine = create_postgres_engine(runtime_postgres_database_url)
+        admin = create_postgres_engine(postgres_database_url)
+
+        async def apply_in_own_transaction(
+            command: ConfigEpochActivationCommand,
+            backend_pid: asyncio.Future[int] | None = None,
+        ) -> object:
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                if backend_pid is not None:
+                    backend_pid.set_result(await _backend_pid(unit_of_work))
+                result = await unit_of_work.config_epochs.activate(
+                    prepare_config_epoch_activation(command)
+                )
+                if isinstance(result, ConfigEpochActivationApplied):
+                    await unit_of_work.commit()
+                else:
+                    await unit_of_work.rollback()
+                return result
+
+        try:
+            async with PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                for draft in (active, target, later):
+                    await unit_of_work.config_epochs.register(draft)
+                assert isinstance(
+                    await unit_of_work.config_epochs.activate(
+                        prepare_config_epoch_activation(
+                            _command(scope, active.epoch_id, None, "initial")
+                        )
+                    ),
+                    ConfigEpochActivationApplied,
+                )
+                await unit_of_work.commit()
+
+            # The refused rollback holds the scope lock; the activation waits for it.
+            async with asyncio.timeout(20), PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                refused = await unit_of_work.config_epochs.activate(
+                    prepare_config_epoch_activation(
+                        _rollback(scope, target.epoch_id, 1, active.epoch_id, "rollback-first")
+                    )
+                )
+                assert isinstance(refused, ConfigEpochRollbackTargetNeverActivated)
+                activation_pid: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+                waiting_activation = asyncio.create_task(
+                    apply_in_own_transaction(
+                        _command(scope, target.epoch_id, 1, "activate-target"), activation_pid
+                    )
+                )
+                await wait_for_blocked_operation(
+                    admin,
+                    await _backend_pid(unit_of_work),
+                    waiting_activation,
+                    waiter_pid=await activation_pid,
+                )
+                await unit_of_work.rollback()
+            activation = await waiting_activation
+            assert isinstance(activation, ConfigEpochActivationApplied)
+            assert activation.record.active.revision == 2
+
+            # An uncommitted activation holds the lock; the waiting rollback observes
+            # its committed successor revision instead of a stale history read.
+            async with asyncio.timeout(20), PostgresConfigEpochUnitOfWork(engine) as unit_of_work:
+                uncommitted = await unit_of_work.config_epochs.activate(
+                    prepare_config_epoch_activation(_command(scope, later.epoch_id, 2, "later"))
+                )
+                assert isinstance(uncommitted, ConfigEpochActivationApplied)
+                rollback_pid: asyncio.Future[int] = asyncio.get_running_loop().create_future()
+                waiting_rollback = asyncio.create_task(
+                    apply_in_own_transaction(
+                        _rollback(scope, later.epoch_id, 2, target.epoch_id, "rollback-second"),
+                        rollback_pid,
+                    )
+                )
+                await wait_for_blocked_operation(
+                    admin,
+                    await _backend_pid(unit_of_work),
+                    waiting_rollback,
+                    waiter_pid=await rollback_pid,
+                )
+                await unit_of_work.commit()
+            stale_rollback = await waiting_rollback
+            assert isinstance(stale_rollback, ConfigEpochActivationRevisionConflict)
+            assert stale_rollback.active is not None
+            assert stale_rollback.active.epoch_id == later.epoch_id
+            assert stale_rollback.active.revision == 3
+
+            restored = await apply_in_own_transaction(
+                _rollback(scope, target.epoch_id, 3, later.epoch_id, "restore-target")
+            )
+            assert isinstance(restored, ConfigEpochActivationApplied)
+            assert restored.record.active.epoch_id == target.epoch_id
+            assert restored.record.active.revision == 4
+        finally:
+            await engine.dispose()
+            await admin.dispose()
 
     asyncio.run(scenario())
 
@@ -573,6 +823,14 @@ def test_immutable_epoch_and_activation_rows_reject_direct_mutation(
     asyncio.run(scenario())
 
 
+async def _backend_pid(unit_of_work: PostgresConfigEpochUnitOfWork) -> int:
+    connection = unit_of_work._connection
+    assert connection is not None
+    pid = await connection.scalar(select(func.pg_backend_pid()))
+    assert type(pid) is int
+    return pid
+
+
 def _draft(source_format: PolicySourceFormat) -> ValidatedEpochDraft:
     return config_epoch_draft(source_format)
 
@@ -593,4 +851,25 @@ def _command(
         proposal_manifest_id=_PROPOSAL_MANIFEST_ID,
         authority_evidence_hash=_AUTHORITY_EVIDENCE_HASH,
         authority_observed_at=_AUTHORITY_OBSERVED_AT,
+    )
+
+
+def _rollback(
+    scope: RepositoryScope,
+    target_epoch_id: str,
+    expected_revision: int,
+    active_epoch_id: str,
+    operation_id: str,
+) -> ConfigEpochActivationCommand:
+    return ConfigEpochActivationCommand(
+        scope=scope,
+        target_epoch_id=target_epoch_id,
+        expected_revision=expected_revision,
+        operation_id=operation_id,
+        actor="operator:123",
+        occurred_at="2026-07-14T12:01:00.000Z",
+        mutation_kind="rollback",
+        expected_active_epoch_id=active_epoch_id,
+        coverage_relation="equal",
+        reason="restore a previously activated policy",
     )

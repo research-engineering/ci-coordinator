@@ -2,7 +2,7 @@
 
 Status: module specification
 
-Last updated: 2026-09-04
+Last updated: 2026-10-11
 
 ## 1. Owned Invariant
 
@@ -69,20 +69,37 @@ it does not fabricate a standalone registration receipt.
 
 ```text
 Activated(active) | ExactDuplicate(activation) | RevisionConflict(active)
-| TargetUnavailable | OperationConflict
+| TargetUnavailable | OperationConflict | RollbackTargetNeverActivated
 ```
 
 `rollback(preparedCommand)` uses the same revision and transaction algebra, but
-adds one mandatory policy relation:
+adds two mandatory policy relations:
 
 ```text
 RollbackAllowed(active, target) iff
   TargetRetained(target)
+  and PreviouslyActivated(S, target)
   and CoverageRelation(target, active) in {equal, greater}
+
+PreviouslyActivated(S, target) iff
+  exists Activation[S, _] with target epoch = target
+  whose pair-owned audit event is config-epoch-activation/v1
 ```
 
 `less`, `incomparable`, unknown, or unavailable comparison is fail-closed and
-cannot mutate the active pointer.
+cannot mutate the active pointer. Under binding owner decision D8 (2026-10-11),
+a registered epoch that was never activated in the same scope is refused with
+`RollbackTargetNeverActivated`, even when it is retained and its coverage is
+equal or greater; rollback cannot substitute for review-bound activation. Only
+the immutable activation journal joined to its pair-owned activation event is
+evidence. A retained rollback transition is not, so a rollback admitted before
+this rule cannot qualify its own target. Another scope's history cannot qualify
+the target: the journal is filtered by scope and its target epoch is
+foreign-keyed to the same scope. The repository evaluates the predicate after
+the scope lock, the active-pointer row lock and the revision/active-epoch CAS
+checks, so `RevisionConflict` keeps precedence and a concurrently committed
+activation is observed by a READ COMMITTED statement taken after the lock. The
+journal is append-only, so a positive answer cannot later become false.
 
 An initial activation requires `expectedRevision = null` and creates revision
 one. A later activation requires the exact current revision and creates its
@@ -202,6 +219,12 @@ as `ExactDuplicate` or no effect; it never creates a second transition.
 - a runtime principal missing exact epoch-table privileges is unavailable;
 - a retained but coverage-reducing, incomparable, or unproven epoch cannot be
   activated through rollback;
+- a retained epoch never activated in the same scope, including one reached
+  only by an earlier rollback or activated only in another scope, cannot be
+  activated through rollback, while a previously activated epoch can;
+- a rollback waiting behind an uncommitted activation observes the committed
+  successor revision, and an activation waiting behind a refused rollback
+  commits normally;
 - an exact retry with a later server clock value returns the retained duplicate.
 - a second concurrent policy admission is not queued or submitted;
 - request cancellation releases local admission capacity and cannot publish a

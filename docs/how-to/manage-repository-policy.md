@@ -261,7 +261,10 @@ jq . "${policy_dir}/rollback.response.json"
 ```
 
 Rollback fails closed when target coverage is lower, incomparable, unknown, or
-unavailable.
+unavailable. It also refuses an epoch that was never activated in this
+repository with `409 target_never_activated`: a registered epoch must first go
+through the reviewed activation flow above, and an earlier rollback to it does
+not count as activation.
 
 ## Inspect Current State
 

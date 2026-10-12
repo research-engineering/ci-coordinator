@@ -320,6 +320,8 @@ def _activation_response(result: ConfigActivationOutcome) -> JSONResponse:
         return config_error(status.HTTP_409_CONFLICT, "coverage_reducing")
     if result.state == "coverage_unproven":
         return config_error(status.HTTP_409_CONFLICT, "coverage_unproven")
+    if result.state == "target_never_activated":
+        return config_error(status.HTTP_409_CONFLICT, "target_never_activated")
     if result.state == "unavailable":
         return config_error(status.HTTP_503_SERVICE_UNAVAILABLE, "unavailable")
     raise RuntimeError("unsupported config activation outcome")

@@ -12,6 +12,8 @@ export function ConfigurationNotice({ failure }: { readonly failure: LifecycleFa
     legacy_new_operation_unsupported: "This command uses a retired contract. Start a new command.",
     coverage_reducing: "Rollback rejected: required validation coverage would be reduced.",
     coverage_unproven: "Rollback rejected: non-reducing coverage is not proved.",
+    target_never_activated:
+      "Rollback rejected: the selected epoch was never activated in this repository.",
     overloaded: "Configuration service is busy.",
     unavailable: "Configuration service is unavailable.",
     "invalid-response": "Response identity or metadata could not be verified.",

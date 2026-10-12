@@ -106,6 +106,7 @@ _CONFIG_ACTIVATION_RESULTS: Final = frozenset(
         "operation_conflict",
         "other",
         "revision_conflict",
+        "target_never_activated",
         "target_unavailable",
         "unavailable",
     }

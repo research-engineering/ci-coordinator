@@ -180,7 +180,14 @@ test("rollback preview makes no mutation; same command is preserved after respon
   });
 });
 
-test.each(["revision_conflict", "coverage_reducing", "coverage_unproven"] as const)(
+const definitiveRollbackRejections = [
+  "revision_conflict",
+  "coverage_reducing",
+  "coverage_unproven",
+  "target_never_activated",
+] as const;
+
+test.each(definitiveRollbackRejections)(
   "rollback %s requires fresh review rather than automatic retry",
   async (error) => {
     const commands: unknown[] = [];

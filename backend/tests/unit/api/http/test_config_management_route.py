@@ -554,6 +554,22 @@ def test_rollback_projects_coverage_rejections_without_dispatch_success() -> Non
     )
 
 
+def test_rollback_projects_a_never_activated_target_as_a_distinct_conflict() -> None:
+    use_case = _UseCase(
+        ConfigRegistrationOutcome("unavailable"),
+        ConfigActivationOutcome("unavailable"),
+        ConfigActivationOutcome("target_never_activated"),
+    )
+
+    response = _client("operator", use_case).post("/api/v1/config/rollbacks", json=_rollback_body())
+
+    assert (response.status_code, response.json()) == (
+        409,
+        {"ok": False, "error": "target_never_activated", "diagnostics": []},
+    )
+    assert response.headers["cache-control"] == "no-store"
+
+
 def test_rollback_rejects_non_cas_or_unpersistable_request_facts() -> None:
     use_case = _UseCase(
         ConfigRegistrationOutcome("unavailable"),

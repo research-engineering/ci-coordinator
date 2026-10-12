@@ -108,12 +108,13 @@ behind a committed control must not restore selected execution authority.
 ## 5. Policy Rollback Boundary
 
 Config rollback is not an override command. It is owned by `config_epochs` and
-is admitted only when the retained target epoch has equal or greater validation
-coverage:
+is admitted only when the retained target epoch was previously activated in the
+same scope and has equal or greater validation coverage:
 
 ```text
 RollbackAllowed(active, target) iff
   TargetEpochRetainedAndReadmitted(target)
+  and PreviouslyActivated(scope, target)
   and CoverageRelation(target, active) in {equal, greater}
   and ActorAuthorized
   and ExpectedRevisionMatches
@@ -159,7 +160,8 @@ PersistenceFailure  -> unavailable; no partial state/audit pair
 - divergent replay mutates state;
 - cancellation or conflict commits only one member of the state/audit pair;
 - selected insertion races and bypasses a newly committed control; or
-- rollback activates a coverage-reducing or incomparable epoch.
+- rollback activates a coverage-reducing or incomparable epoch; or
+- rollback activates an epoch never activated in the same scope.
 
 ## 9. Non-Claims
 

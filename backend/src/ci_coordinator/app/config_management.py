@@ -36,6 +36,7 @@ from ci_coordinator.config_epochs import (
     ConfigEpochRegistrationOperationResult,
     ConfigEpochRegistrationReplay,
     ConfigEpochReplayCommand,
+    ConfigEpochRollbackTargetNeverActivated,
     ConfigEpochStoreUnavailable,
     EpochCoverageComparator,
     PreparedConfigEpochActivation,
@@ -133,6 +134,7 @@ type ConfigActivationState = Literal[
     "legacy_new_operation_unsupported",
     "coverage_reducing",
     "coverage_unproven",
+    "target_never_activated",
     "unavailable",
 ]
 _CONFIG_ACTIVATION_STATES: Final[frozenset[str]] = frozenset(
@@ -147,6 +149,7 @@ _CONFIG_ACTIVATION_STATES: Final[frozenset[str]] = frozenset(
         "legacy_new_operation_unsupported",
         "coverage_reducing",
         "coverage_unproven",
+        "target_never_activated",
         "unavailable",
     }
 )
@@ -338,7 +341,7 @@ class ConfigManagementService:
         return self._activation_outcome(result)
 
     async def rollback(self, command: RollbackConfigEpoch) -> ConfigActivationOutcome:
-        """Reactivate only an admitted epoch whose coverage is proved non-reducing."""
+        """Reactivate only a previously activated epoch with non-reducing coverage."""
         if not await self._authorizer.allows_scope(actor=command.actor, scope=command.scope):
             return self._observe_activation(ConfigActivationOutcome("forbidden"))
         try:
@@ -432,6 +435,8 @@ class ConfigManagementService:
             return self._observe_activation(ConfigActivationOutcome("target_unavailable"))
         if isinstance(result, ConfigEpochActivationOperationConflict):
             return self._observe_activation(ConfigActivationOutcome("operation_conflict"))
+        if isinstance(result, ConfigEpochRollbackTargetNeverActivated):
+            return self._observe_activation(ConfigActivationOutcome("target_never_activated"))
         raise RuntimeError("config activation result algebra is incomplete")
 
     def _observe_activation(self, outcome: ConfigActivationOutcome) -> ConfigActivationOutcome:
