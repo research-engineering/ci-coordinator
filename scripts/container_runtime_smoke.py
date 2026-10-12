@@ -67,6 +67,7 @@ _MIGRATION_ARTIFACT_CHECK = (
 def _build_args(image: str) -> tuple[str, ...]:
     return (
         "build",
+        "--progress=plain",
         "--platform",
         "linux/amd64",
         "--pull",
