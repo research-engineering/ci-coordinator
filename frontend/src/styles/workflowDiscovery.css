@@ -170,6 +170,11 @@
 .discovery-table {
   min-width: 0;
 }
+.discovery-note {
+  margin: 10px 0 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
 .discovery-pagination {
   min-height: 48px;
   display: flex;

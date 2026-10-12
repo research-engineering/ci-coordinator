@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal, Self
 
 from pydantic import Field, model_validator
@@ -248,6 +249,68 @@ class AdoptionTargetProjectionResponse(ResponseModel):
         return self
 
 
+class ComponentReferenceResponse(ProjectedResponseModel):
+    reference_id: str = Field(pattern=r"^component:[0-9a-f]{32}$")
+    caller_workflow_path: str
+    caller_job_id: str
+    step_index: int | None
+    uses: str
+    kind: Literal["reusable_workflow", "action", "docker_image"]
+    repository: str | None
+    path: str | None
+    ref: str | None
+    digest: str | None
+    immutable: bool
+    resolution: Literal["observed", "unresolved", "denied"]
+    unresolved_reason: (
+        Literal[
+            "annotated_tag_not_dereferenced",
+            "callee_workflow_missing",
+            "dynamic_reference",
+            "installation_inventory_limit_exceeded",
+            "installation_inventory_unavailable",
+            "invalid_reference",
+            "local_target_missing",
+            "malformed_provider_response",
+            "not_in_caller_installation",
+            "outside_caller_installation",
+            "provider_binding_mismatch",
+            "provider_limit_exceeded",
+            "provider_unavailable",
+            "rate_limited",
+            "ref_not_found",
+            "registry_not_read",
+            "repository_not_found",
+            "resolution_deadline_exceeded",
+            "resolution_limit_exceeded",
+            "resolution_not_requested",
+            "resolution_overloaded",
+            "workspace_checkout_dependent",
+        ]
+        | None
+    )
+    resolved_revision: str | None = Field(pattern=r"^[0-9a-f]{40}$")
+    resolved_blob_sha: str | None = Field(pattern=r"^[0-9a-f]{40}$")
+    resolved_at: datetime | None
+
+
+class ComponentPassportResponse(ResponseModel):
+    """`referencesOmitted` is true only when all references are withheld for the response budget."""
+
+    revision: str = Field(pattern=r"^[0-9a-f]{40}$")
+    inventory_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    declarations_complete: bool
+    references: tuple[ComponentReferenceResponse, ...] = Field(max_length=24_576)
+    references_omitted: bool
+    non_claims: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def require_omission_to_carry_no_references(self) -> Self:
+        if self.references_omitted and self.references:
+            raise ValueError("omitted component references cannot carry references")
+        return self
+
+
 class WorkflowDiscoveryResponse(ResponseModel):
     ok: Literal[True]
     repository: DiscoveryRepositoryResponse
@@ -267,6 +330,7 @@ class WorkflowDiscoveryResponse(ResponseModel):
     adoption_assessments: tuple[AdoptionAssessmentResponse, ...] = Field(
         max_length=64,
     )
+    component_passport: ComponentPassportResponse
 
 
 type WorkflowDiscoveryErrorCode = Literal[

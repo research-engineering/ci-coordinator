@@ -741,6 +741,28 @@ describe("workflow discovery client", () => {
     await expect(fetchWorkflowDiscovery(scope)).resolves.toEqual({ kind: "invalid-response" });
   });
 
+  test.each([
+    [0, "ready"],
+    [1, "invalid-response"],
+  ] as const)(
+    "bounds the discovery body at the server budget plus %i bytes",
+    async (excess, kind) => {
+      const body = JSON.stringify(workflowDiscoveryFixture());
+      const padding = 2_097_152 - new TextEncoder().encode(body).byteLength + excess;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(
+          async () =>
+            new Response(`${body}${" ".repeat(padding)}`, {
+              headers: { "content-type": "application/json" },
+            }),
+        ),
+      );
+
+      await expect(fetchWorkflowDiscovery(scope)).resolves.toMatchObject({ kind });
+    },
+  );
+
   test("rejects invalid revisions before transport", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

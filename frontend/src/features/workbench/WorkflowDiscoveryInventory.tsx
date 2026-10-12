@@ -3,6 +3,7 @@ import type { WorkflowDiscoveryReport } from "../../api/workflowDiscovery/schema
 import type { DataColumn } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { formatCount, formatInteger } from "../../domain/format";
+import { ComponentPassportInventory } from "./ComponentPassportInventory";
 import { DiscoveryTable } from "./DiscoveryTable";
 import { WorkflowRoleInventory } from "./WorkflowRoleInventory";
 
@@ -234,6 +235,7 @@ export function WorkflowDiscoveryInventory({ report }: WorkflowDiscoveryInventor
         />
       </details>
       <WorkflowRoleInventory report={report} />
+      <ComponentPassportInventory passport={report.componentPassport} />
       <details className="evidence-section" open>
         <summary>
           <h3>

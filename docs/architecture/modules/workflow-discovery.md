@@ -294,6 +294,87 @@ the complete 64-workflow layered DAG exercises the public analysis path. These
 witnesses qualify classification and bounded traversal, not deployment capacity.
 Revisit if call semantics, graph bounds or required provider nesting change.
 
+### Component Passport
+
+The completed discovery outcome carries a component passport: one reference per
+job-level `uses` (kind `reusable_workflow`) and per step `uses` (kind `action`
+or `docker_image`) of the exact caller commit, keyed by caller workflow path,
+job id, step index and declared syntax. It is a projection of the admitted
+report, not a second parser: coordinates are split from the already admitted
+`job.uses`/step `uses` text and the call-edge classification.
+
+```text
+Reference := caller coordinate, kind, repository, path, ref, digest, immutable,
+  resolution in {observed, unresolved, denied}, unresolvedReason,
+  resolvedRevision, resolvedBlobSha, resolvedAt
+
+Immutable := same-commit reusable call
+  or full 40-hex Git ref
+  or Docker digest sha256:<64 hex>
+```
+
+A same-commit reusable call is `observed` at the caller commit with the target
+source blob and no `resolvedAt`; a missing target is `local_target_missing`.
+A local action (`./path`) depends on the workspace checkout and a Docker image
+is not read from any registry, so both stay `unresolved`. Dynamic or
+unparseable syntax is `dynamic_reference` or `invalid_reference`. The parser
+admits wider `uses` text than a component coordinate, so a split coordinate is
+also `invalid_reference`, and never a read target, when its ref or path has
+surrounding whitespace, its Docker tag is outside Docker tag syntax, or a
+remote callee path fails the workflow-path contract (backslash, over 512
+bytes). Classification never fails a discovery that the report admitted.
+
+Remote Git components (reusable workflows and actions) are resolved only under
+provisional owner decision (2026-10-11) D6: within the caller's installation,
+which the actor was already authorized for, with the existing installation
+credential at read time and no broad token. This change narrows "installations
+granted to the actor" to the caller installation; other installations remain
+`unresolved`.
+
+```text
+Resolve(A, S, C) :=
+  Owner(C) != Owner(S)                       => outside_caller_installation
+  not InInventory(I(S), C) within 10 pages    => not_in_caller_installation
+                                                 or installation_inventory_limit_exceeded
+  not ScopeAllowed(A, Scope(C))               => denied (no callee read)
+  otherwise                                    => read Scope(C):
+    bind /repositories/{id} to owner/name, resolve ref (tag before branch,
+    full SHA directly), read the commit and, for a reusable workflow, the
+    root -> .github -> workflows trees to the callee blob
+```
+
+Bounds: at most eight distinct repository/ref targets per request in canonical
+order (later ones `resolution_limit_exceeded`), four concurrent reads, a
+ten-second resolution deadline (`resolution_deadline_exceeded`) and one
+resolution at a time per process (`resolution_overloaded`). Callee reads run in
+one task group: a failed read or the deadline cancels and joins every sibling
+read before the resolution admission is released, so no read outlives it. Reads
+start only after the caller snapshot completed, outside any database
+transaction and without holding the snapshot lease. An annotated tag is reported as
+`annotated_tag_not_dereferenced`; tag objects are not read. The tag-over-branch
+precedence is the documented GitHub reusable-workflow premise and needs fresh
+provider verification, like the GH-11/GH-12 premises above.
+
+The passport is outside the inventory digest, proposal and adoption
+assessments. A moving tag can change `resolvedRevision` on a later request but
+never the caller-commit evidence; resolution is request-scoped and not
+retained, so this slice makes no claim about past resolutions.
+`declarationsComplete` is false when any source failed or any job's steps were
+not projected; an incomplete or empty list is not a dependency-free claim.
+Only the operator read route composes a resolver; proposal review, attestation
+and activation callers keep `resolution_not_requested` and perform no extra
+provider reads.
+
+The passport is not bounded by the report byte bound: each reference repeats
+its caller path, job id and coordinate, so 6,000 `actions/checkout@v4` steps
+fit the report but their references alone exceed 2 MiB. The route and the
+browser share one 2,097,152-byte decoded discovery response budget. When the
+complete response exceeds it, the route sends the passport with
+`referencesOmitted: true` and no references instead of a body the browser must
+reject; revision, inventory digest and `declarationsComplete` remain. Omission
+is explicit and never reads as an empty dependency set. A response that
+exceeds the budget without passport references is outside this slice.
+
 ## 7. Proposal Law
 
 The generator reuses `config_control` and never invents a second repository
@@ -406,11 +487,14 @@ flowchart LR
 | `workflow_discovery/outcomes.py`                             | use-case and snapshot-read outcome algebra                          |
 | `workflow_discovery/parser.py`                               | bounded GitHub Actions syntax projection                            |
 | `workflow_discovery/graph.py`                                | deterministic local call-graph closure                              |
+| `workflow_discovery/component_passport.py`                   | caller-commit component references and resolution values            |
+| `workflow_discovery/component_resolution.py`                 | D6-bounded remote component resolution orchestration                |
 | `workflow_discovery/proposal.py`                             | conservative existing-policy proposal                               |
 | `workflow_discovery/ports.py`                                | scope authorization and snapshot capabilities                       |
 | `workflow_discovery/service.py`                              | authorization-first orchestration                                   |
 | `integrations/github/workflow_discovery.py`                  | exact-commit provider acquisition                                   |
 | `integrations/github/workflow_discovery_decoding.py`         | strict endpoint decoders                                            |
+| `integrations/github/workflow_component_resolution.py`       | caller-installation callee location and ref-to-commit reads         |
 | `api/http/routers/workflow_discovery.py`                     | authenticated transport projection                                  |
 | `frontend/src/api/workflowDiscovery/schema.ts`               | bounded wire-shape re-admission and cross-field snapshot integrity  |
 | `frontend/src/api/workflowDiscovery/events.ts`               | one generated-contract-checked CI event vocabulary                  |
@@ -420,6 +504,7 @@ flowchart LR
 | `frontend/src/api/workflowDiscovery/client.ts`               | exact-scope bounded browser transport and failure algebra           |
 | `frontend/src/features/workbench/WorkflowDiscoveryPanel.tsx` | request state and progressive-disclosure composition                |
 | `frontend/src/features/workbench/WorkflowRoleInventory.tsx`  | entrypoint, component and unknown-role tables                       |
+| `frontend/src/features/workbench/ComponentPassportInventory.tsx` | dependency passport table                                       |
 
 No file may own two rows solely to reduce file count. Conversely, a row is not
 split until it has an independent invariant or change reason.
@@ -453,14 +538,23 @@ split until it has an independent invariant or change reason.
 - zero or multiple stable provider-signal candidates silently choose one job;
 - a generated source bypasses existing policy admission;
 - a reviewable proposal enables dynamic planning, dispatch, or omission;
+- a remote component is read outside the caller installation or before the
+  actor is authorized for the callee scope, or a denied callee shows a revision;
+- a mutable ref resolution changes the inventory digest, proposal or adoption
+  evidence, or is presented as retained;
+- a passport omits a job or step `uses` without `referencesOmitted`, or
+  reports complete declarations when a source or step projection failed;
+- a coordinate admitted by the parser fails discovery, or a callee read
+  outlives the resolution admission;
 - provider text is rendered as markup or executable browser content; or
 - the endpoint registers, activates, approves, or writes provider state.
 
 ## 12. Deferred Authority
 
-Durable scan history, refresh webhooks, remote reusable-workflow acquisition,
-production owner-role proof, activation, and provider enforcement remain
-separate future slices. Semantic diff, current-head revalidation, and
+Durable scan history, refresh webhooks, remote reusable-workflow content
+acquisition and parsing, retained component resolutions, reverse consumer
+queries, observed run/attempt usage, component inputs, production owner-role
+proof, activation, and provider enforcement remain separate future slices. Semantic diff, current-head revalidation, and
 non-activating affirmative review registration are implemented by
 `proposal_review`; this read-only module neither imports nor exposes that
 mutation authority.
@@ -469,5 +563,6 @@ mutation authority.
 
 This module does not prove runtime workflow behavior, FullCI completeness,
 secret existence, environment protection, external action behavior, remote
-reusable-workflow safety, owner approval, configuration activation, provider
+reusable-workflow safety, retained or historical component resolution, reverse
+consumers, owner approval, configuration activation, provider
 administration, production deployment, or omission safety.

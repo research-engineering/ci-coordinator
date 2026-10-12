@@ -168,6 +168,7 @@ ci_coordinator/integrations/github/reviewer_permission.py
 ci_coordinator/integrations/github/workflow_discovery.py
 ci_coordinator/integrations/github/workflow_discovery_client.py
 ci_coordinator/integrations/github/workflow_discovery_decoding.py
+ci_coordinator/integrations/github/workflow_component_resolution.py
 ci_coordinator/integrations/github/repository_context_decoding.py
 ```
 
@@ -383,6 +384,15 @@ R-scoped and may carry provider-implicit metadata access across installation
 repositories. No combination of R and organization permission is assumed to
 preserve the same population. No mint denial authorizes a union, unscoped
 repository token, alternate credential or retry with broader permissions.
+
+Workflow component resolution adds no operation identity. It reuses
+`provider_inventory.list_repositories` with `(I,None,metadata)` only to find a
+same-account callee repository id in the caller installation `I`, then the
+existing `workflow_discovery.get_repository`, `get_reference`, `get_commit` and
+`get_tree` rows with `(I,R',P)` for that callee `R'` after the workflow
+discovery use case authorized the actor for `(I,R')`. Another account, another
+installation or an unauthorized `R'` is never read; see
+[workflow discovery](workflow-discovery.md#component-passport).
 
 ### 8.1 Failure And Cancellation Algebra
 

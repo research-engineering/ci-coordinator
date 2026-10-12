@@ -20,6 +20,7 @@ const MAX_ADOPTION_REQUIRED_CHANGES = 4_096;
 const GITHUB_COM_SUPPORT_PROFILE_ID = "github.com/github-actions-static/v5";
 // Fixed by the target execution registry; never an owner-selected identity.
 const INVOCATION_CLASSIFIER_JOB_ID = "ci-invocation";
+const MAX_COMPONENT_REFERENCES = 24_576;
 
 const exactSha1 = z.string().regex(/^[0-9a-f]{40}$/);
 const exactSha256 = z.string().regex(/^[0-9a-f]{64}$/);
@@ -398,6 +399,100 @@ const targetProjection = z
     }
   });
 
+const componentNonClaims = z.tuple([
+  z.literal("component inputs are not projected"),
+  z.literal("docker image tags are not resolved to digests"),
+  z.literal("mutable ref resolution is observed at resolvedAt and is not retained"),
+  z.literal("remote component contents, nested calls and actions are not parsed"),
+  z.literal("resolution is not omission authority"),
+  z.literal("reverse consumers and observed run usage are not reported"),
+]);
+
+const componentReference = z
+  .strictObject({
+    callerJobId: boundedText(128),
+    callerWorkflowPath: workflowPath,
+    digest: nullableText,
+    immutable: z.boolean(),
+    kind: z.enum(["reusable_workflow", "action", "docker_image"]),
+    path: nullableText,
+    ref: nullableText,
+    referenceId: z.string().regex(/^component:[0-9a-f]{32}$/),
+    repository: nullableText,
+    resolution: z.enum(["observed", "unresolved", "denied"]),
+    resolvedAt: z.iso.datetime({ offset: true }).nullable(),
+    resolvedBlobSha: exactSha1.nullable(),
+    resolvedRevision: exactSha1.nullable(),
+    stepIndex: nonNegativeInteger.nullable(),
+    unresolvedReason: z
+      .enum([
+        "annotated_tag_not_dereferenced",
+        "callee_workflow_missing",
+        "dynamic_reference",
+        "installation_inventory_limit_exceeded",
+        "installation_inventory_unavailable",
+        "invalid_reference",
+        "local_target_missing",
+        "malformed_provider_response",
+        "not_in_caller_installation",
+        "outside_caller_installation",
+        "provider_binding_mismatch",
+        "provider_limit_exceeded",
+        "provider_unavailable",
+        "rate_limited",
+        "ref_not_found",
+        "registry_not_read",
+        "repository_not_found",
+        "resolution_deadline_exceeded",
+        "resolution_limit_exceeded",
+        "resolution_not_requested",
+        "resolution_overloaded",
+        "workspace_checkout_dependent",
+      ])
+      .nullable(),
+    uses: text,
+  })
+  .superRefine((value, context) => {
+    if ((value.kind === "reusable_workflow") !== (value.stepIndex === null)) {
+      context.addIssue({ code: "custom", message: "component level contradicts its kind" });
+    }
+    const providerResolvable = value.kind !== "docker_image" && value.repository !== null;
+    const observed = value.resolution === "observed";
+    const evidenceCoherent = observed
+      ? value.resolvedRevision !== null &&
+        value.unresolvedReason === null &&
+        (value.kind === "reusable_workflow") === (value.resolvedBlobSha !== null) &&
+        (providerResolvable
+          ? value.resolvedAt !== null
+          : value.resolvedAt === null && value.kind === "reusable_workflow")
+      : value.resolvedRevision === null &&
+        value.resolvedBlobSha === null &&
+        value.resolvedAt === null &&
+        (value.resolution === "denied"
+          ? value.unresolvedReason === null && providerResolvable
+          : value.unresolvedReason !== null);
+    if (!evidenceCoherent) {
+      context.addIssue({ code: "custom", message: "component resolution is contradictory" });
+    }
+  });
+
+const componentPassport = z
+  .strictObject({
+    declarationsComplete: z.boolean(),
+    inventoryDigest: exactSha256,
+    nonClaims: componentNonClaims,
+    references: canonicalObjects(
+      componentReference,
+      (entry) => entry.referenceId,
+      MAX_COMPONENT_REFERENCES,
+    ),
+    referencesOmitted: z.boolean(),
+    revision: exactSha1,
+  })
+  .refine((value) => !value.referencesOmitted || value.references.length === 0, {
+    message: "omitted component references cannot carry references",
+  });
+
 export const workflowDiscoveryErrorSchema: z.ZodType<WorkflowDiscoveryError> = z.strictObject({
   error: z.enum([
     "forbidden",
@@ -425,6 +520,7 @@ export const workflowDiscoverySchema: z.ZodType<WorkflowDiscoveryReport> = z
     ),
     callEdges: canonicalObjects(callEdge, (entry) => entry.edgeId, MAX_CALL_EDGES),
     complete: z.boolean(),
+    componentPassport,
     facts: canonicalObjects(fact, (entry) => entry.factId, MAX_EVIDENCE_ITEMS),
     inventoryDigest: exactSha256,
     localGraphClosed: z.boolean(),
@@ -561,7 +657,82 @@ export const workflowDiscoverySchema: z.ZodType<WorkflowDiscoveryReport> = z
     ) {
       context.addIssue({ code: "custom", message: "complete report omits a workflow" });
     }
+    if (!componentPassportBindsReport(value, sourceByPath)) {
+      context.addIssue({ code: "custom", message: "component passport does not bind the report" });
+    }
   });
+
+function componentPassportBindsReport(
+  value: WorkflowDiscoveryReport,
+  sourceByPath: ReadonlyMap<string, string>,
+): boolean {
+  const passport = value.componentPassport;
+  const unprojectedCalls = new Set(
+    value.unknowns.filter((entry) => entry.field === "job.uses").map((entry) => entry.subjectId),
+  );
+  const declarationsComplete =
+    value.complete &&
+    value.workflows.every((workflowEntry) =>
+      workflowEntry.jobs.every(
+        (jobEntry) =>
+          jobEntry.steps !== null &&
+          (jobEntry.uses !== null || !unprojectedCalls.has(jobEntry.subjectId)),
+      ),
+    );
+  const expected = [
+    ...value.workflows.flatMap((workflowEntry) =>
+      workflowEntry.jobs.flatMap((jobEntry) =>
+        jobEntry.uses === null
+          ? []
+          : [componentCoordinate(workflowEntry.path, jobEntry.jobId, null, jobEntry.uses)],
+      ),
+    ),
+    ...value.workflows.flatMap((workflowEntry) =>
+      workflowEntry.jobs.flatMap((jobEntry) =>
+        (jobEntry.steps ?? []).flatMap((stepEntry) =>
+          stepEntry.uses === null
+            ? []
+            : [
+                componentCoordinate(
+                  workflowEntry.path,
+                  jobEntry.jobId,
+                  stepEntry.index,
+                  stepEntry.uses,
+                ),
+              ],
+        ),
+      ),
+    ),
+  ].sort();
+  const actual = passport.references
+    .map((entry) =>
+      componentCoordinate(entry.callerWorkflowPath, entry.callerJobId, entry.stepIndex, entry.uses),
+    )
+    .sort();
+  return (
+    passport.revision === value.revision &&
+    passport.inventoryDigest === value.inventoryDigest &&
+    passport.declarationsComplete === declarationsComplete &&
+    (passport.referencesOmitted ? expected.length > 0 : sameValues(actual, expected)) &&
+    passport.references.every(
+      (entry) =>
+        entry.resolution !== "observed" ||
+        entry.repository !== null ||
+        (entry.path !== null &&
+          entry.resolvedRevision === value.revision &&
+          entry.resolvedBlobSha === sourceByPath.get(entry.path)),
+    )
+  );
+}
+
+function componentCoordinate(
+  workflowPathValue: string,
+  jobId: string,
+  stepIndex: number | null,
+  uses: string,
+): string {
+  return JSON.stringify([workflowPathValue, jobId, stepIndex, uses]);
+}
 
 function boundedText(maximumBytes: number, allowEmpty = false) {
   return z

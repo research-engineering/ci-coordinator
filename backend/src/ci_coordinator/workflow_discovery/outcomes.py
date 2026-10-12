@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from ci_coordinator.workflow_discovery._validation import require_text
 from ci_coordinator.workflow_discovery.adoption import AdoptionAssessment, assess_workflow_adoption
 from ci_coordinator.workflow_discovery.adoption_target import AdoptionTargetProjection
+from ci_coordinator.workflow_discovery.component_passport import ComponentPassport
 from ci_coordinator.workflow_discovery.proposal_model import ProposalManifest
 from ci_coordinator.workflow_discovery.report import DiscoveryReport
 from ci_coordinator.workflow_discovery.source import RepositoryWorkflowSnapshot
@@ -39,6 +40,7 @@ class WorkflowDiscoveryCompleted:
     proposal: ProposalManifest
     target_projection: AdoptionTargetProjection
     adoption_assessments: tuple[AdoptionAssessment, ...]
+    component_passport: ComponentPassport
 
     def __post_init__(self) -> None:
         if type(self.report) is not DiscoveryReport or type(self.proposal) is not ProposalManifest:
@@ -60,6 +62,10 @@ class WorkflowDiscoveryCompleted:
         )
         if self.adoption_assessments != expected_assessments:
             raise ValueError("adoption assessments must totally bind the discovery report")
+        if type(self.component_passport) is not ComponentPassport or not (
+            self.component_passport.binds(self.report)
+        ):
+            raise ValueError("component passport must totally bind the discovery report")
 
 
 type WorkflowDiscoveryOutcome = (

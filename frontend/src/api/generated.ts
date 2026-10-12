@@ -1609,6 +1609,65 @@ export interface components {
         readonly CollectionStatus: "pending" | "leased" | "deferred" | "captured" | "terminal_unavailable" | "expired";
         /** @enum {string} */
         readonly CollectionTerminalReason: "deadline_exceeded" | "attempts_exhausted" | "evidence_conflict";
+        /**
+         * ComponentPassportResponse
+         * @description `referencesOmitted` is true only when all references are withheld for the response budget.
+         */
+        readonly ComponentPassportResponse: {
+            /** Declarationscomplete */
+            readonly declarationsComplete: boolean;
+            /** Inventorydigest */
+            readonly inventoryDigest: string;
+            /** Nonclaims */
+            readonly nonClaims: readonly string[];
+            /** References */
+            readonly references: readonly components["schemas"]["ComponentReferenceResponse"][];
+            /** Referencesomitted */
+            readonly referencesOmitted: boolean;
+            /** Revision */
+            readonly revision: string;
+        };
+        /** ComponentReferenceResponse */
+        readonly ComponentReferenceResponse: {
+            /** Callerjobid */
+            readonly callerJobId: string;
+            /** Callerworkflowpath */
+            readonly callerWorkflowPath: string;
+            /** Digest */
+            readonly digest: string | null;
+            /** Immutable */
+            readonly immutable: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            readonly kind: "reusable_workflow" | "action" | "docker_image";
+            /** Path */
+            readonly path: string | null;
+            /** Ref */
+            readonly ref: string | null;
+            /** Referenceid */
+            readonly referenceId: string;
+            /** Repository */
+            readonly repository: string | null;
+            /**
+             * Resolution
+             * @enum {string}
+             */
+            readonly resolution: "observed" | "unresolved" | "denied";
+            /** Resolvedat */
+            readonly resolvedAt: string | null;
+            /** Resolvedblobsha */
+            readonly resolvedBlobSha: string | null;
+            /** Resolvedrevision */
+            readonly resolvedRevision: string | null;
+            /** Stepindex */
+            readonly stepIndex: number | null;
+            /** Unresolvedreason */
+            readonly unresolvedReason: ("annotated_tag_not_dereferenced" | "callee_workflow_missing" | "dynamic_reference" | "installation_inventory_limit_exceeded" | "installation_inventory_unavailable" | "invalid_reference" | "local_target_missing" | "malformed_provider_response" | "not_in_caller_installation" | "outside_caller_installation" | "provider_binding_mismatch" | "provider_limit_exceeded" | "provider_unavailable" | "rate_limited" | "ref_not_found" | "registry_not_read" | "repository_not_found" | "resolution_deadline_exceeded" | "resolution_limit_exceeded" | "resolution_not_requested" | "resolution_overloaded" | "workspace_checkout_dependent") | null;
+            /** Uses */
+            readonly uses: string;
+        };
         /** ConcurrencyResponse */
         readonly ConcurrencyResponse: {
             /** Cancelinprogress */
@@ -4525,6 +4584,7 @@ export interface components {
             readonly callEdges: readonly components["schemas"]["CallEdgeResponse"][];
             /** Complete */
             readonly complete: boolean;
+            readonly componentPassport: components["schemas"]["ComponentPassportResponse"];
             /** Facts */
             readonly facts: readonly components["schemas"]["FactResponse"][];
             /** Inventorydigest */

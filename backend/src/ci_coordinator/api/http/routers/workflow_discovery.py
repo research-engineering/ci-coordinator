@@ -41,6 +41,9 @@ WORKFLOW_DISCOVERY_PATH = (
     "/api/v1/workbench/repositories/{installation_id}/{repository_id}/workflow-discovery"
 )
 _NO_STORE = {"Cache-Control": "no-store"}
+# Decoded-body budget shared with the operator UI discovery transport
+# (`frontend/src/api/workflowDiscovery/client.ts`).
+WORKFLOW_DISCOVERY_RESPONSE_MAX_BYTES = 2_097_152
 
 
 def build_workflow_discovery_router(
@@ -107,57 +110,86 @@ def build_workflow_discovery_router(
             raise RuntimeError("unsupported workflow discovery outcome")
         report = outcome.report
         proposal = outcome.proposal
-        response = WorkflowDiscoveryResponse.model_validate(
-            {
-                "ok": True,
-                "repository": report.repository,
-                "revision": report.revision,
-                "parser_version": report.parser_version,
-                "complete": report.complete,
-                "local_graph_closed": report.local_graph_closed,
-                "inventory_digest": report.inventory_digest,
-                "sources": report.sources,
-                "workflows": report.workflows,
-                "call_edges": report.call_edges,
-                "facts": report.facts,
-                "unknowns": report.unknowns,
-                "non_claims": report.non_claims,
-                "target_projection": {
-                    "status": outcome.target_projection.status,
-                    "registry_hash": outcome.target_projection.registry_hash,
-                },
-                "adoption_assessments": outcome.adoption_assessments,
-                "proposal": {
-                    "manifest_id": proposal.manifest_id,
-                    "state": proposal.state,
-                    "generator_version": proposal.generator_version,
-                    "inventory_digest": proposal.inventory_digest,
-                    "selected_workflow_path": proposal.selected_workflow_path,
-                    "selected_job_id": proposal.selected_job_id,
-                    "selected_job_name": proposal.selected_job_name,
-                    "selected_events": proposal.selected_events,
-                    "policy_source": (
-                        None
-                        if proposal.policy_source is None
-                        else proposal.policy_source.decode("utf-8", errors="strict")
-                    ),
-                    "admitted_epoch_id": (
-                        None if proposal.admission is None else proposal.admission.epoch_id
-                    ),
-                    "diagnostics": proposal.diagnostics,
-                    "blockers": proposal.blockers,
-                    "unknown_ids": proposal.unknown_ids,
-                    "non_claims": proposal.non_claims,
-                },
-            }
-        )
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=response.to_wire_mapping(),
-            headers=_NO_STORE,
-        )
+        payload: dict[str, object] = {
+            "ok": True,
+            "repository": report.repository,
+            "revision": report.revision,
+            "parser_version": report.parser_version,
+            "complete": report.complete,
+            "local_graph_closed": report.local_graph_closed,
+            "inventory_digest": report.inventory_digest,
+            "sources": report.sources,
+            "workflows": report.workflows,
+            "call_edges": report.call_edges,
+            "facts": report.facts,
+            "unknowns": report.unknowns,
+            "non_claims": report.non_claims,
+            "target_projection": {
+                "status": outcome.target_projection.status,
+                "registry_hash": outcome.target_projection.registry_hash,
+            },
+            "adoption_assessments": outcome.adoption_assessments,
+            "component_passport": _component_passport(outcome, references_omitted=False),
+            "proposal": {
+                "manifest_id": proposal.manifest_id,
+                "state": proposal.state,
+                "generator_version": proposal.generator_version,
+                "inventory_digest": proposal.inventory_digest,
+                "selected_workflow_path": proposal.selected_workflow_path,
+                "selected_job_id": proposal.selected_job_id,
+                "selected_job_name": proposal.selected_job_name,
+                "selected_events": proposal.selected_events,
+                "policy_source": (
+                    None
+                    if proposal.policy_source is None
+                    else proposal.policy_source.decode("utf-8", errors="strict")
+                ),
+                "admitted_epoch_id": (
+                    None if proposal.admission is None else proposal.admission.epoch_id
+                ),
+                "diagnostics": proposal.diagnostics,
+                "blockers": proposal.blockers,
+                "unknown_ids": proposal.unknown_ids,
+                "non_claims": proposal.non_claims,
+            },
+        }
+        completed = _completed(payload)
+        if (
+            len(completed.body) > WORKFLOW_DISCOVERY_RESPONSE_MAX_BYTES
+            and outcome.component_passport.references
+        ):
+            # The browser rejects a whole inventory above its budget, so only the
+            # passport references are replaced, explicitly, by their omission.
+            payload["component_passport"] = _component_passport(outcome, references_omitted=True)
+            completed = _completed(payload)
+        return completed
 
     return router
+
+
+def _component_passport(
+    outcome: WorkflowDiscoveryCompleted,
+    *,
+    references_omitted: bool,
+) -> dict[str, object]:
+    passport = outcome.component_passport
+    return {
+        "revision": passport.revision,
+        "inventory_digest": passport.inventory_digest,
+        "declarations_complete": passport.declarations_complete,
+        "references": () if references_omitted else passport.references,
+        "references_omitted": references_omitted,
+        "non_claims": passport.non_claims,
+    }
+
+
+def _completed(payload: dict[str, object]) -> JSONResponse:
+    response = WorkflowDiscoveryResponse.model_validate(payload)
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=response.to_wire_mapping(),
+        headers=_NO_STORE,
+    )
 
 
 def _unavailable(outcome: WorkflowDiscoveryUnavailable) -> JSONResponse:

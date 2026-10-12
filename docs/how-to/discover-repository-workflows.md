@@ -57,6 +57,17 @@ topology and signal availability, not FullCI step semantics.
 
 Secret names are metadata. Secret values are never fetched or returned.
 
+The **Dependency passport** table and `componentPassport` list every reusable
+workflow call, action and Docker image with its caller. `Observed` shows the
+exact commit (and callee blob for a reusable workflow) read for a callee owned
+by the same account, present in this installation and authorized for you.
+`Access denied` means the callee is in the installation but outside your
+scopes. Other rows stay unresolved with a reason. A mutable ref's commit is
+only what GitHub returned at the shown time; it is not stored. If
+`declarationsComplete` is false, the list may be missing dependencies. If
+`referencesOmitted` is true, the references did not fit the 2 MiB discovery
+response and are not shown; that is not an empty dependency list.
+
 ## Use The API
 
 Scan the current default-branch head:
