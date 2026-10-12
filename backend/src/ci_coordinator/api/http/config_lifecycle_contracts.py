@@ -312,6 +312,7 @@ class ConfigControlErrorBody(ResponseModel):
         "legacy_new_operation_unsupported",
         "coverage_reducing",
         "coverage_unproven",
+        "target_never_activated",
         "overloaded",
         "unavailable",
     ]

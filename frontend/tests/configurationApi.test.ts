@@ -290,6 +290,7 @@ test.each([
   [409, "revision_conflict"],
   [409, "coverage_reducing"],
   [409, "coverage_unproven"],
+  [409, "target_never_activated"],
   [503, "unavailable"],
 ] as const)("typed failure %s/%s remains observable", async (status, error) => {
   const observed = vi.fn();

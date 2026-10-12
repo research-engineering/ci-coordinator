@@ -324,12 +324,18 @@ class ConfigEpochActivationOperationConflict:
     existing: ConfigEpochActivationRecord
 
 
+@dataclass(frozen=True, slots=True)
+class ConfigEpochRollbackTargetNeverActivated:
+    pass
+
+
 type ConfigEpochActivationResult = (
     ConfigEpochActivationApplied
     | ConfigEpochActivationDuplicate
     | ConfigEpochActivationRevisionConflict
     | ConfigEpochActivationTargetUnavailable
     | ConfigEpochActivationOperationConflict
+    | ConfigEpochRollbackTargetNeverActivated
 )
 type ConfigEpochOperationResolution = (
     ConfigEpochActivationDuplicate | ConfigEpochActivationOperationConflict | None

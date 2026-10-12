@@ -479,6 +479,8 @@ function activationFailureLabel(kind: ConfigActivationFailure): string {
       return "Activation would reduce required validation coverage";
     case "coverage_unproven":
       return "Required validation coverage is not proved";
+    case "target_never_activated":
+      return "The selected epoch was never activated in this repository";
     case "overloaded":
       return "Activation service is busy; retry shortly";
     case "unavailable":

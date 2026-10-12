@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Mapping
-from typing import Literal, cast
+from typing import Final, Literal, cast
 
 from sqlalchemy import func, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
@@ -47,6 +47,7 @@ from ci_coordinator.config_epochs import (
     ConfigEpochRegistrationReplay,
     ConfigEpochRegistrationResult,
     ConfigEpochReplayCommand,
+    ConfigEpochRollbackTargetNeverActivated,
     ConfigEpochStatus,
     ConfigEpochSummary,
     PreparedConfigEpochActivation,
@@ -73,6 +74,8 @@ from ci_coordinator.persistence.schema import (
     config_epochs,
 )
 from ci_coordinator.persistence.schema_capabilities import config_epoch_lifecycle_requirements
+
+_ACTIVATION_EVENT_TYPE: Final = "config-epoch-activation/v1"
 
 
 async def admit_config_epoch_lifecycle(
@@ -335,6 +338,10 @@ class _PostgresConfigEpochRepository:
                 and previous.epoch_id != command.expected_active_epoch_id
             ):
                 return ConfigEpochActivationRevisionConflict(active=previous)
+            if command.mutation_kind == "rollback" and not await self._was_activated(
+                command.scope, target.epoch_id
+            ):
+                return ConfigEpochRollbackTargetNeverActivated()
 
             appended = await self._audit_events._append_pair_owned(
                 prepared._take_audit_event(),
@@ -508,6 +515,25 @@ class _PostgresConfigEpochRepository:
             revision=_required_int(fields, "revision"),
         )
 
+    async def _was_activated(self, scope: RepositoryScope, epoch_id: str) -> bool:
+        # Only an activation transition counts. A retained rollback transition is
+        # not activation evidence, so an earlier rollback cannot qualify its target.
+        found = await self._connection.scalar(
+            select(config_epoch_activations.c.operation_id)
+            .join(
+                audit_events,
+                audit_events.c.audit_event_id == config_epoch_activations.c.audit_event_id,
+            )
+            .where(
+                config_epoch_activations.c.installation_id == scope.installation_id,
+                config_epoch_activations.c.repository_id == scope.repository_id,
+                config_epoch_activations.c.target_epoch_id == epoch_id,
+                audit_events.c.event_type == _ACTIVATION_EVENT_TYPE.encode("utf-8"),
+            )
+            .limit(1)
+        )
+        return found is not None
+
     async def _load_activation(
         self,
         scope: RepositoryScope,
@@ -553,7 +579,7 @@ class _PostgresConfigEpochRepository:
                 else "config-epoch-activation-audit/v2"
             )
             if (
-                event.event_type != "config-epoch-activation/v1"
+                event.event_type != _ACTIVATION_EVENT_TYPE
                 or payload.get("schemaVersion") != expected_schema
                 or (
                     replay.activation_version == 2

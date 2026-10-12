@@ -77,6 +77,7 @@ export function useConfigurationCommand(
           "target_unavailable",
           "coverage_reducing",
           "coverage_unproven",
+          "target_never_activated",
         ].includes(result.kind)
       )
         publish({ kind: "rejected", failure: result });

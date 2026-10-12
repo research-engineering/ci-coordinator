@@ -53,6 +53,7 @@ from ci_coordinator.config_epochs import (
     ConfigEpochRegistrationRecord,
     ConfigEpochRegistrationReplay,
     ConfigEpochReplayCommand,
+    ConfigEpochRollbackTargetNeverActivated,
     ConfigEpochStoreUnavailable,
     CoverageRelation,
     EpochCoverageComparator,
@@ -729,6 +730,23 @@ def test_rollback_cas_rejects_an_active_epoch_change_after_comparison() -> None:
     assert isinstance(store.prepared, PreparedConfigEpochActivation)
     assert store.prepared.command.expected_revision == 7
     assert store.prepared.command.expected_active_epoch_id == active.active.epoch_id
+
+
+def test_rollback_reports_a_never_activated_target_distinctly_after_coverage_admission() -> None:
+    active, target = _rollback_epochs()
+    store = _Store(
+        active=active,
+        target=target,
+        activation_result=ConfigEpochRollbackTargetNeverActivated(),
+    )
+
+    result = asyncio.run(_service(store, allowed=True).rollback(_rollback_command()))
+
+    assert result == ConfigActivationOutcome("target_never_activated")
+    assert store.calls == ["resolve_operation", "load_active", "load_epoch", "activate"]
+    assert isinstance(store.prepared, PreparedConfigEpochActivation)
+    assert store.prepared.command.mutation_kind == "rollback"
+    assert store.prepared.command.target_epoch_id == target.epoch_id
 
 
 def _run_config_operation(

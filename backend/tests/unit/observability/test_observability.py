@@ -47,6 +47,7 @@ _ACTIVATION_STATES = (
     "legacy_new_operation_unsupported",
     "operation_conflict",
     "revision_conflict",
+    "target_never_activated",
     "target_unavailable",
     "unavailable",
 )

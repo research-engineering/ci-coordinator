@@ -93,7 +93,8 @@ or alternate activation route is added.
 
 Rollback review displays full current and target epoch identity, revision and
 reason. It is a local command preview, not a backend safety verdict. The server
-still checks current revision and non-reducing coverage. A conflict requires a
+still checks current revision, prior same-scope activation and non-reducing
+coverage. A conflict requires a
 fresh read and fresh review, not silent rebasing. A lost response retains the
 original operation ID, expected revision, target and reason for explicit replay.
 
