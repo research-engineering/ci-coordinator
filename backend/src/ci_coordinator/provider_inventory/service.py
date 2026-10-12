@@ -6,10 +6,12 @@ import asyncio
 from dataclasses import replace
 
 from ci_coordinator.kernel import Clock
+from ci_coordinator.kernel.canonical_json import MAX_SAFE_JSON_INTEGER
 from ci_coordinator.provider_inventory.model import (
     InstallationCatalog,
     InstallationCatalogResult,
     InstallationFailure,
+    InstallationLookupResult,
     InstallationSummary,
     ProviderInstallationPage,
     ProviderInventoryForbidden,
@@ -100,6 +102,20 @@ class ProviderInventoryService:
             per_page=per_page,
             has_next_page=start + per_page < len(grant.installation_ids),
         )
+
+    async def installation(self, *, actor: str, installation_id: int) -> InstallationLookupResult:
+        """Read one granted installation's current facts; denial performs no provider I/O."""
+        if type(installation_id) is not int or not 1 <= installation_id <= MAX_SAFE_JSON_INTEGER:
+            raise ValueError("installation id must be a positive safe integer")
+        grant = self._authorizer.authorized_installations(actor)
+        if grant is None or not grant.permits(installation_id):
+            return ProviderInventoryForbidden()
+        installation = await self._installations.get_installation(installation_id)
+        if isinstance(installation, ProviderInventoryUnavailable):
+            return installation
+        if installation.installation_id != installation_id:
+            return ProviderInventoryUnavailable("provider_binding_mismatch")
+        return installation
 
     async def list_repositories(
         self,

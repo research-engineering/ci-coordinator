@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
-from ci_coordinator.identity_admission.oidc_verifier import ActionsOidcJwkSet
+from ci_coordinator.identity_admission.oidc_verifier import (
+    MAXIMUM_ACTIONS_OIDC_JWKS_KEYS,
+    ActionsOidcJwkSet,
+)
 
 type JwksTransportFailureKind = Literal[
     "cancelled",
@@ -79,6 +82,32 @@ class JwksUnavailable:
             raise ValueError("JWKS unavailable kind is not admitted")
         if type(self.message) is not str or not self.message:
             raise ValueError("JWKS unavailable message is required")
+
+
+type JwksCacheCondition = Literal["current", "expired", "absent", "closed"]
+
+
+@dataclass(frozen=True, slots=True)
+class JwksCacheState:
+    """Passive cache projection; only ``current`` keys can authenticate requests."""
+
+    condition: JwksCacheCondition
+    key_count: int = 0
+    age_seconds: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.condition not in {"current", "expired", "absent", "closed"}:
+            raise ValueError("JWKS cache condition is not admitted")
+        cached = self.condition in {"current", "expired"}
+        if type(self.key_count) is not int or not (
+            1 <= self.key_count <= MAXIMUM_ACTIONS_OIDC_JWKS_KEYS if cached else self.key_count == 0
+        ):
+            raise ValueError("JWKS cache key count contradicts its condition")
+        if cached != (self.age_seconds is not None) or (
+            self.age_seconds is not None
+            and (type(self.age_seconds) is not int or self.age_seconds < 0)
+        ):
+            raise ValueError("JWKS cache age contradicts its condition")
 
 
 @dataclass(frozen=True, slots=True)

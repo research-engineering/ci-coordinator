@@ -1079,6 +1079,19 @@
       "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
       "deferral": null,
       "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
+    },
+    {
+      "requirementId": "REQ-CI-RUNTIME-056",
+      "ownerId": "ci-coordinator.runtime",
+      "invariant": "The read-only repository capability passport authenticates before use-case execution, admits only the audit role and authorizes the exact installation-and-repository scope before reading any owner. It shares the no-queue observation query admission lane, so a saturated lane rejects it before authentication or owner reads, and cancellation releases its lease. It composes owners at read time without persistence or a stored readiness flag. The scoped App installation grant is read through the inventory grant: denial performs no provider I/O and differs from a known installation with an empty grant set. Installation permissions decode per exact canonical name as read, write, admin or unknown, with subscribed events; absent or over-bound sets are unknown, structural grant errors fail closed and the catalog projects the same grants. Provider limits are only the rate limit observed by that read. Reconciliation uses existing observation status, first-page gap presence and passive background-reconciliation health. Actions OIDC keys are the in-process JWKS cache state read without refresh; expired or absent keys are never known. Webhook receipt time stays unknown because no index orders the history delivery inbox by time, and silence never derives a repair; production-admission keys stay unknown. Every fact names its source and observation time; known, unknown, denied, unavailable and expired remain distinct, and an unavailable provider preserves stored observation facts. The next action is a closed function of those facts. The UI reads the passport only on explicit request, rejects contradictory or cross-scope evidence, including a next action other than the one its facts derive, and discards responses for a replaced repository or authority. The passport changes no planning, readiness, credential or evidence owner.",
+      "claimLevel": "blocking",
+      "riskClass": "high",
+      "proofBindingRefs": ["proofkit/requirement-bindings.json"],
+      "nonClaimRefs": ["NC-CI-RUNTIME-056"],
+      "nonClaims": ["The passport does not prove live installation grants, webhook delivery cadence, permission sufficiency, selected-repository membership, provider capacity, production-admission key custody, native qualification, deployment readiness or omission safety."],
+      "lifecycle": {"state": "active", "replacementRequirementIds": [], "evidenceRefs": []},
+      "deferral": null,
+      "updatePolicy": {"reviewOwnerId": "ci-coordinator.runtime", "requiresImpactDeclaration": true, "requiresProofBindingReview": true}
     }
   ],
   "nonClaims": [

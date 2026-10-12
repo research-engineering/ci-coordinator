@@ -191,6 +191,10 @@ HTTP_CONCRETE_SERVICE_POLICY = (
         "PurposeSettingsService",
     ),
     HttpConcreteServicePolicy(
+        "ci_coordinator.app.capability_passport",
+        "CapabilityPassportService",
+    ),
+    HttpConcreteServicePolicy(
         "ci_coordinator.app.capacity_planning",
         "CapacityPlanningService",
         ("ci_coordinator.app",),
@@ -1159,6 +1163,7 @@ IMPORT_RULES = (
             "ci_coordinator.planning_core",
             "ci_coordinator.production_admission",
             "ci_coordinator.proposal_review",
+            "ci_coordinator.provider_inventory",
             "ci_coordinator.reconciliation",
             "ci_coordinator.repo_context",
             "ci_coordinator.runner_capacity",

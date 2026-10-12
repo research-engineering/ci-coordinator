@@ -9,6 +9,7 @@ import { StatePanel } from "../../components/StatePanel";
 import type { EconomicsTab } from "../../domain/consoleSelection";
 import { EconomicsConsole } from "../ciEconomics/EconomicsConsole";
 import { ConfigurationPage } from "../configuration/ConfigurationPage";
+import { CapabilityPassportPanel } from "./CapabilityPassportPanel";
 import { EvidenceTabs } from "./EvidenceTabs";
 import { GovernanceObservationPanel } from "./GovernanceObservationPanel";
 import { type ConsoleView, EVIDENCE_TABS, type EvidenceTab } from "./navigation";
@@ -89,6 +90,9 @@ export function RepositoryWorkspace({
           <StatePanel kind={result.kind} onRetry={query.refresh} />
         ) : null
       ) : null}
+      <RetainedTask active={view === "overview"}>
+        <CapabilityPassportPanel authorityRevision={authorityRevision} scope={scope} />
+      </RetainedTask>
       <RetainedTask active={view === "configuration"}>
         <ConfigurationPage
           authorityRevision={authorityRevision}

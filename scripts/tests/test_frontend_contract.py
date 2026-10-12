@@ -245,6 +245,10 @@ def test_rendered_contract_has_exact_control_plane_workbench_surface() -> None:
             "get_repository_workbench_snapshot",
             {"200", "401", "403", "422", "503"},
         ),
+        ("get", f"{repository_path}/capabilities"): (
+            "get_repository_capability_passport",
+            {"200", "401", "403", "422", "503"},
+        ),
         ("get", discovery_path): (
             "discover_repository_workflows",
             {"200", "401", "403", "404", "422", "429", "503"},
@@ -335,6 +339,7 @@ def test_rendered_contract_has_exact_control_plane_workbench_surface() -> None:
         ("get", economics_v2 + "/observation/gaps"),
         ("get", economics_v2 + "/observation/workflows"),
         ("get", "/api/v1/workbench/installations"),
+        ("get", f"{repository_path}/capabilities"),
         ("post", baseline_path),
     ):
         assert contract["paths"][path][method]["security"] == dual_plane_security

@@ -51,6 +51,7 @@ production readiness.
 | `GET`  | `/api/v1/workbench/installations/{installation_id}/repositories`                         | List one authorized installation's bounded repository page                   |
 | `GET`  | `/api/v1/workbench/repositories/{installation_id}/{repository_id}`                       | Read one authorized bounded proof snapshot                                   |
 | `GET`  | `/api/v1/workbench/repositories/{installation_id}/{repository_id}/workflow-discovery`    | Read exact-commit workflow evidence and an observe-only proposal or blockers |
+| `GET`  | `/api/v1/workbench/repositories/{installation_id}/{repository_id}/capabilities`          | Read the audit-role capability passport composed from existing owners        |
 | `POST` | `/api/v1/repository-attestations/github/start`                                           | Bind one proposal to a Keycloak session and start GitHub reviewer step-up    |
 | `GET`  | `/api/v1/repository-attestations/github/callback`                                        | Consume the one-use step-up and retain one exact review receipt              |
 

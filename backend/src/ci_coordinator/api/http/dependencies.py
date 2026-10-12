@@ -10,6 +10,7 @@ from fastapi import Request
 from ci_coordinator.api.http.metrics_authentication import StaticMetricsBearerAuthenticator
 from ci_coordinator.api.http.webhook_ingress import WebhookIngressUseCase
 from ci_coordinator.app.analytics_configuration import PurposeSettingsUseCase
+from ci_coordinator.app.capability_passport import CapabilityPassportUseCase
 from ci_coordinator.app.ci_economics import CiEconomicsReadUseCase
 from ci_coordinator.app.ci_economics_budgets import CiEconomicsBudgetUseCase
 from ci_coordinator.app.ci_economics_sources import CiEconomicsSourceUseCase
@@ -158,6 +159,13 @@ class WorkbenchRouteDependencies:
     authenticator: ControlPlaneAuthenticator
     role_admission: ControlPlaneRoleAdmission
     use_case: WorkbenchUseCase
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilityPassportRouteDependencies:
+    authenticator: ControlPlaneAuthenticator
+    role_admission: ControlPlaneRoleAdmission
+    use_case: CapabilityPassportUseCase
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,6 +345,7 @@ class HttpRouteDependencies:
     observability: ObservabilityRouteDependencies | None = None
     workbench: WorkbenchRouteDependencies | None = None
     provider_inventory: ProviderInventoryRouteDependencies | None = None
+    capability_passport: CapabilityPassportRouteDependencies | None = None
     workflow_discovery: WorkflowDiscoveryRouteDependencies | None = None
     governance_observation: GovernanceObservationRouteDependencies | None = None
     ci_economics: CiEconomicsRouteDependencies | None = None

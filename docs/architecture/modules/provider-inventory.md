@@ -79,6 +79,8 @@ InstallationSummary :=
   accountType
   repositorySelection
   state
+  permissions : sorted (name, read | write | admin | unknown)[<= 64] | unknown
+  events      : sorted unique name[<= 128] | unknown
 
 RepositorySummary :=
   identity
@@ -94,6 +96,14 @@ RepositorySummary :=
   fork
   workbenchAuthorized
 ```
+
+Grant names match `[a-z][a-z0-9_]{0,63}` and are decoded passively from the
+same installation response; no provider call is added. An absent, `null` or
+over-bound grant set is `unknown`, never an empty grant set. An unrecognized
+permission level is `unknown`, so a provider addition cannot break the
+catalog or widen a grant. A non-object permission map, non-list event set,
+noncanonical name or duplicate event is a malformed installation. Grants are
+observations, not a sufficiency verdict for any capability.
 
 Names are mutable assertions. Numeric ids remain canonical. The complete
 composite repository identity is retained through authorization and response
@@ -118,7 +128,14 @@ list_installations(actor, page = 1, perPage = 30)
   -> InstallationCatalog | Forbidden | Unavailable
 list_repositories(actor, installation, page, perPage)
   -> RepositoryPage | Forbidden | IneligibleInstallation | Unavailable
+installation(actor, installation)
+  -> InstallationSummary | Forbidden | Unavailable
 ```
+
+`installation` serves the read-time
+[capability passport](../../features/ci-operator-capability-completion-plan.md#o1-capability-diagnostics).
+It checks the same inventory grant before one exact App-authenticated
+installation read and binds the returned identity to the requested one.
 
 Restricted mode is immutable process wiring. Its empty set produces an empty
 complete page without provider I/O. Independent reads preserve partial failures.
@@ -170,6 +187,9 @@ scan closes every page without drift.
 | malformed JSON, identity mismatch, duplicate id, or invalid pagination | malformed provider response                       |
 | repository owner differs from installation account                     | provider binding mismatch                         |
 | one installation lookup fails in a catalog                             | partial catalog with typed failure row            |
+| grant set absent or over its bound                                     | `unknown` grants; installation still admitted     |
+| unrecognized permission level                                          | that permission is `unknown`                      |
+| malformed grant structure or noncanonical grant name                   | malformed provider response                       |
 
 The API never returns provider response bodies, tokens, private keys, arbitrary
 headers, or credential-bearing URLs. Every response is `Cache-Control:
@@ -230,6 +250,8 @@ noncanonical query fails before credential construction or provider I/O.
 - a rate limit is mapped to forbidden or retried without a bound;
 - one failed authorized installation hides successful independent rows;
 - an empty restricted authorization set performs provider I/O;
+- an unreported or over-bound grant set is presented as an empty grant set,
+  or an unrecognized permission level fails the catalog or widens a grant;
 - a reviewer, break-glass, or Actions credential is accepted for inventory;
   or
 - provider visibility is presented as config registration or enforcement.

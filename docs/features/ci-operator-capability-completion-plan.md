@@ -113,6 +113,55 @@ erase prior observations; expired evidence cannot grant a mode; identical
 repository names across installations do not cross-contaminate access. A
 passport failure leaves planning and existing readiness owners unchanged.
 
+### O1 Source Delivery
+
+Source delivered on 2026-10-11 under `REQ-CI-RUNTIME-056`; live installation
+facts remain [CI-062](../../ROADMAP.md). These are provisional owner
+decisions (2026-10-11):
+
+- D5(a): webhook observation is passive and repository-scoped; installation
+  silence stays `unknown` and the webhook hot path gains no write. The history
+  delivery inbox has no index ordered by receipt time, so a latest-receipt
+  read would scan every retained row of a repository. The fact therefore stays
+  `unknown` (`receipt_clock_not_indexed`). Its source is the history delivery
+  inbox, which covers history-enabled repositories only. No migration is added.
+- `GET /api/v1/workbench/repositories/{installation_id}/{repository_id}/capabilities`
+  requires the `audit` role and the existing workbench scope authorizer, because
+  observation freshness is audit-owned. A read-only operator receives an
+  explicit forbidden state, not an empty passport.
+- Trust keys are the in-process GitHub Actions JWKS cache state, read without
+  refresh. Production-admission keys stay `unknown` (`not_projected`).
+- App permissions decode per name as `read`, `write`, `admin` or `unknown`.
+  An absent or over-bound set is `unknown`. Structural errors still fail the
+  installation read.
+- `nextAction` is a closed function of the facts: `request_access`,
+  `refresh_evidence`, `complete_configuration` or `none`. `repair_webhook` is
+  declared but is never derived while silence is unknown.
+
+The passport composes owners at read time and persists nothing:
+
+| Fact | Owner read per request | Distinct outcomes |
+| --- | --- | --- |
+| App installation grant | one inventory-granted installation read | known, denied before provider I/O, unavailable with reason |
+| Provider limits | the same read | `rate_limited` with retry delay, otherwise unknown |
+| Reconciliation | observation status, first gap page (limit 1), passive background health | known, unconfigured, paused, denied, unavailable |
+| Actions OIDC keys | JWKS cache state without refresh | current, expired, absent, closed, not configured |
+| Webhook receipt, production-admission keys | none | always unknown with reason |
+
+Each fact carries its source and observation time. An unavailable provider
+keeps stored observation facts. The route shares the no-queue
+`ci_economics_query` admission lane with the observation reads it performs;
+a saturated lane rejects it as `unavailable` before any owner read. The operator UI reads the passport only on
+explicit request in the repository overview. It rejects contradictory or
+cross-scope evidence and discards responses for a replaced repository or
+authority. Numeric latency and cardinality budgets still need representative
+deployment measurement.
+
+Remaining: live grants, delivery cadence and limits (CI-062); a time-ordered
+receipt read, which needs an owner decision on an index migration;
+production-admission key projection; permission sufficiency and
+selected-repository membership; exact-head native qualification.
+
 ## O2: Reusable Dependency Passport
 
 Owners: [workflow discovery](../architecture/modules/workflow-discovery.md),

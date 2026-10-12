@@ -24,6 +24,8 @@ const GOVERNANCE_BASELINE_PATH =
   /^\/api\/v1\/workbench\/repositories\/([1-9][0-9]*)\/([1-9][0-9]*)\/governance-baselines$/;
 const GOVERNANCE_COMPARISON_PATH =
   /^\/api\/v1\/workbench\/repositories\/([1-9][0-9]*)\/([1-9][0-9]*)\/governance-comparison$/;
+const CAPABILITY_PASSPORT_PATH =
+  /^\/api\/v1\/workbench\/repositories\/([1-9][0-9]*)\/([1-9][0-9]*)\/capabilities$/;
 const INSTALLATIONS_PATH = "/api/v1/workbench/installations";
 const REPOSITORIES_PATH = /^\/api\/v1\/workbench\/installations\/([1-9][0-9]*)\/repositories$/;
 
@@ -82,6 +84,10 @@ export function proxyRequestIsAdmitted(
   const comparison = GOVERNANCE_COMPARISON_PATH.exec(url.pathname);
   if (comparison) {
     return url.search === "" && pathIdentifiersAreSafe(comparison);
+  }
+  const capabilities = CAPABILITY_PASSPORT_PATH.exec(url.pathname);
+  if (capabilities) {
+    return url.search === "" && pathIdentifiersAreSafe(capabilities);
   }
 
   const discovery = WORKFLOW_DISCOVERY_PATH.exec(url.pathname);

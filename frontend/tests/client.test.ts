@@ -917,6 +917,10 @@ describe("development proxy authority", () => {
     ["GET", "/api/v1/workbench/repositories/1/1/governance-comparison", true],
     ["POST", "/api/v1/workbench/repositories/1/1/governance-comparison", false],
     ["GET", "/api/v1/workbench/repositories/1/1/governance-comparison?x=1", false],
+    ["GET", "/api/v1/workbench/repositories/1/1/capabilities", true],
+    ["POST", "/api/v1/workbench/repositories/1/1/capabilities", false],
+    ["GET", "/api/v1/workbench/repositories/1/1/capabilities?x=1", false],
+    ["GET", "/api/v1/workbench/repositories/0/1/capabilities", false],
     [
       "GET",
       `/api/v1/workbench/repositories/1/1/workflow-discovery?revision=${"a".repeat(40)}`,

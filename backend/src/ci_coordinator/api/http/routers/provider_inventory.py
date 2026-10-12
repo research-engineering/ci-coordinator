@@ -34,6 +34,7 @@ from ci_coordinator.provider_inventory import (
     RepositoryPage,
 )
 from ci_coordinator.provider_inventory.model import (
+    InstallationPermissionLevel,
     InstallationState,
     InventoryFailureReason,
 )
@@ -43,6 +44,11 @@ PROVIDER_REPOSITORIES_PATH = PROVIDER_INSTALLATIONS_PATH + "/{installation_id}/r
 _NO_STORE = {"Cache-Control": "no-store"}
 
 
+class InstallationPermissionResponse(ProjectedResponseModel):
+    name: str
+    level: InstallationPermissionLevel
+
+
 class InstallationResponse(ProjectedResponseModel):
     installation_id: int
     account_id: int
@@ -50,6 +56,8 @@ class InstallationResponse(ProjectedResponseModel):
     account_type: Literal["Organization", "User"]
     repository_selection: Literal["all", "selected"]
     state: InstallationState
+    permissions: tuple[InstallationPermissionResponse, ...] | None
+    events: tuple[str, ...] | None
 
 
 class InstallationFailureResponse(ProjectedResponseModel):

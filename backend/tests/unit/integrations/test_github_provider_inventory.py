@@ -9,9 +9,13 @@ import pytest
 
 from ci_coordinator.integrations.github import GitHubAppTransportFactory, GitHubProviderInventory
 from ci_coordinator.integrations.github.app_transport_profile import GITHUB_API_VERSION
-from ci_coordinator.integrations.github.provider_inventory_decoding import decode_repository_page
+from ci_coordinator.integrations.github.provider_inventory_decoding import (
+    decode_installation,
+    decode_repository_page,
+)
 from ci_coordinator.provider_inventory import (
     InstallationPageReadResult,
+    InstallationPermission,
     InstallationReadResult,
     InstallationSummary,
     ProviderInstallationPage,
@@ -47,6 +51,55 @@ def test_installation_identity_uses_app_jwt_without_minting_installation_token()
     token = authorization.removeprefix("Bearer ")
     assert token != INSTALLATION_TOKEN
     assert jwt.decode(token, options={"verify_signature": False})["iss"] == APP_ID
+
+
+def test_installation_grants_keep_exact_names_and_unknown_levels() -> None:
+    # Kills: a new provider permission level failing inventory, or being widened to admin.
+    installation = decode_installation(
+        _installation_body(
+            permissions={"metadata": "read", "actions": "write", "checks": "triage"},
+            events=["workflow_run", "check_suite"],
+        )
+    )
+
+    assert installation is not None
+    assert installation.permissions == (
+        InstallationPermission("actions", "write"),
+        InstallationPermission("checks", "unknown"),
+        InstallationPermission("metadata", "read"),
+    )
+    assert installation.events == ("check_suite", "workflow_run")
+
+
+def test_unreported_or_oversized_grants_are_unknown_not_empty() -> None:
+    # Kills: absent grants projected as an empty grant set, or oversize breaking the catalog.
+    absent = decode_installation(_installation_body())
+    empty = decode_installation(_installation_body(permissions={}, events=[]))
+    oversized = decode_installation(
+        _installation_body(
+            permissions={f"permission_{index}": "read" for index in range(65)},
+            events=[f"event_{index}" for index in range(129)],
+        )
+    )
+
+    assert absent is not None and (absent.permissions, absent.events) == (None, None)
+    assert empty is not None and (empty.permissions, empty.events) == ((), ())
+    assert oversized is not None and (oversized.permissions, oversized.events) == (None, None)
+
+
+@pytest.mark.parametrize(
+    "grants",
+    [
+        {"permissions": ["metadata"]},
+        {"permissions": {"Metadata": "read"}},
+        {"events": "workflow_run"},
+        {"events": ["workflow_run", 7]},
+        {"events": ["workflow_run", "workflow_run"]},
+    ],
+)
+def test_structurally_malformed_grants_reject_the_installation(grants: dict[str, object]) -> None:
+    # Kills: structural grant errors silently dropped instead of failing closed.
+    assert decode_installation(_installation_body(**grants)) is None
 
 
 def test_repository_page_uses_exact_installation_token_and_validates_next_link() -> None:
@@ -252,7 +305,7 @@ async def _read_repositories(
         await factory.aclose()
 
 
-def _installation_body() -> bytes:
+def _installation_body(**grants: object) -> bytes:
     return json.dumps(
         {
             "id": 77,
@@ -263,6 +316,7 @@ def _installation_body() -> bytes:
             },
             "repository_selection": "selected",
             "suspended_at": None,
+            **grants,
         }
     ).encode()
 

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import cast
 
 from ci_coordinator.identity_admission.jwks_contracts import (
+    JwksCacheState,
     JwksFetchResponse,
     JwksProviderConfig,
     JwksTransport,
@@ -88,6 +89,20 @@ class CachingJwksProvider:
         if isinstance(refresh_result, JwksUnavailable):
             return refresh_result
         return _unavailable("fetch_unavailable", "JWKS snapshot is no longer current")
+
+    def cache_state(self) -> JwksCacheState:
+        """Project the cached key set without refreshing, awaiting or extending its lifetime."""
+        if self._closed:
+            return JwksCacheState("closed")
+        snapshot = self._snapshot
+        if snapshot is None:
+            return JwksCacheState("absent")
+        now = self._clock.now()
+        return JwksCacheState(
+            "current" if self._has_current_snapshot(now) else "expired",
+            len(snapshot.key_set.keys),
+            max(0, int(now - snapshot.obtained_at)),
+        )
 
     async def aclose(self) -> None:
         """Stop the shared refresh owner and reject every later lookup."""
