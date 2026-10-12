@@ -192,6 +192,8 @@ does not by itself make the document obsolete.
 - [Bounded runtime recovery plan](features/bounded-runtime-recovery-implementation-plan.md)
 - [Webhook recovery boundaries](features/webhook-recovery-boundaries.md)
 - [Webhook recovery delivery plan](features/webhook-recovery-boundaries-implementation-plan.md)
+- [Webhook ingress scheduling](features/webhook-ingress-scheduling.md)
+- [Webhook ingress scheduling plan](features/webhook-ingress-scheduling-plan.md)
 - [API-first configuration lifecycle](features/api-first-configuration-lifecycle.md)
 - [API-first configuration lifecycle implementation plan](features/api-first-configuration-lifecycle-implementation-plan.md)
 - [Dynamic CI enforcement](features/dynamic-ci-enforcement.md)
