@@ -162,11 +162,12 @@ class StructuredEventLogger:
             encoded = _encode_bounded_record(record)
             self._logger.log(_LEVELS[severity], encoded.decode("ascii"))
         except Exception:
-            self._record_failure()
+            self.record_instrumentation_failure()
             if admitted_correlation_id is not None:
                 self._emit_fallback(admitted_correlation_id)
 
-    def _record_failure(self) -> None:
+    def record_instrumentation_failure(self) -> None:
+        """Count one contained caller-side projection or emission failure."""
         with self._failure_lock:
             self._failure_count += 1
 

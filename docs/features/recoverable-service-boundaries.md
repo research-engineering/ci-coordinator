@@ -121,8 +121,11 @@ owner-distinguishable states. No new timeout wrapper or error hierarchy is
 justified. Reconsider this projection if operations gain typed outcomes or the
 runtime replaces its native deadline mechanism.
 
-Diagnostic operands are stage and exception class only. Messages, arguments,
-tracebacks, tokens, request bodies and database strings remain excluded.
+Diagnostic operands are stage, exception class, first-party source
+coordinates and a failure fingerprint, as owned by the
+[observability diagnostic projection](../architecture/modules/observability.md#8-failure-behavior).
+Messages, arguments, traceback locals, tokens, request bodies and database
+strings remain excluded.
 The existing bounded structured logger owns serialization and sink failure.
 
 ## 4. Observe Absence Explicitly
