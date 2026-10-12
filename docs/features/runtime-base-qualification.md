@@ -128,6 +128,26 @@ required results artifact is uploaded only after success. A reviewed policy
 change may copy observed installed hashes and start a new window at that
 qualification; admission still rejects stale bytes and expired windows.
 
+Local qualification admission runs the repair-admission owner as
+`backend/.venv/bin/python -I -B scripts/release_repair_admission.py`. The
+script derives its import and source-hash root from its own checkout path, so
+the working directory, `PYTHONPATH` and `PYTHONOPTIMIZE` cannot replace the
+admitted modules or strip checks. Every rejection raises an explicit cause and
+does not rely on `assert`. Its inputs are bounded strict JSON, and
+malformed, missing or truncated files are rejected. Release-workflow
+invocations that use `PYTHONPATH=backend/src` are unchanged. The first-party
+modules they import directly contain no `assert` statements, but an isolated
+import contract for them is not yet claimed.
+
+The final-image zlib inventory is limited to the named shared library
+(provisional owner decision, 2026-10-11). It scans `/lib`, `/lib64`, `/usr/lib`,
+`/usr/lib64`, `/usr/local` and the application virtual environment. It admits
+the file names `libz.so`, `libz.so.*` and `libz-*`, and it identifies each copy
+by its resolved path, so alias roots and symlinks are not counted twice.
+Any other copy reporting the repaired version, or a missing repaired copy,
+fails qualification. Static, embedded or otherwise renamed copies, and other
+libraries, stay outside this claim unless a separate named claim covers them.
+
 The current policy copies the installed hashes observed by the CPython 3.13.16
 qualification and starts its window at that observation,
 `2026-10-11T19:39:14Z`, with exclusive expiry 14 days later. It lists only the

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
-from datetime import datetime, timedelta
+import sys
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictBool, ValidationError
+
+if __package__ in {None, ""}:
+    # Isolated script execution imports only from this checkout, never cwd or PYTHONPATH.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.release_predicate_admission import _load_strict_json, _timestamp
 from scripts.release_publisher_identity import REPAIR_PREDICATE as REPAIR_PREDICATE
@@ -15,6 +22,7 @@ Hash = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Digest = Annotated[str, Field(pattern=r"^sha256:[0-9a-f]{64}$")]
 Commit = Annotated[str, Field(pattern=r"^[0-9a-f]{40}$")]
 MAX_REPAIR_BYTES = 65_536
+MAX_QUALIFICATION_REPORT_BYTES = 16_777_216
 STDLIB = "/usr/local/lib/python3.13/"
 ZLIB = "/usr/lib/x86_64-linux-gnu/libz.so.1.3.2"
 BUILDER_ROOT = "/tmp/zlib-"  # noqa: S108 -- expected protocol data, never opened on the host
@@ -275,3 +283,117 @@ def occurrence_is_repaired(
         (item.path, item.evidence, evidence.runtimeLayer) for item in candidates[0].locations
     }
     return set(locations) == expected
+
+
+class _ObservedProjection(BaseModel):
+    """Workflow-produced projection; only the consumed fields are admitted."""
+
+    model_config = ConfigDict(strict=True, extra="ignore", frozen=True)
+
+
+class QualificationImage(_ObservedProjection):
+    Id: Digest
+
+
+class QualificationLocation(_ObservedProjection):
+    path: str
+    layerID: str
+    annotations: dict[str, str]
+
+
+class QualificationMatch(_ObservedProjection):
+    id: str
+    severity: Literal["Negligible", "Low", "Medium", "High", "Critical"]
+
+
+class DisallowedQualificationMatch(QualificationMatch):
+    package: str
+    version: str
+    type: str
+    purl: str
+    locations: list[QualificationLocation]
+
+
+class QualificationReport(_ObservedProjection):
+    imageId: Digest
+    matches: list[dict[str, JsonValue]]
+
+
+def admit_local_qualification(
+    *,
+    qualification_root: Path,
+    policy_path: Path,
+    source_root: Path,
+    observed: datetime,
+) -> None:
+    policy_sha256, policy = read_policy(policy_path, source_root)
+    _, evidence_value = _load_strict_json(
+        qualification_root / "repair-evidence.json",
+        label="RepairEvidence",
+        maximum=MAX_REPAIR_BYTES,
+    )
+    evidence = RepairEvidence.model_validate(evidence_value)
+    validate_observations(
+        policy=policy, policy_sha256=policy_sha256, evidence=evidence, observed=observed
+    )
+    _, image_value = _load_strict_json(
+        qualification_root / "image.json", label="QualificationImage", maximum=MAX_REPAIR_BYTES
+    )
+    _, report_value = _load_strict_json(
+        qualification_root / "vulnerabilities.json",
+        label="QualificationReport",
+        maximum=MAX_QUALIFICATION_REPORT_BYTES,
+    )
+    image = QualificationImage.model_validate(image_value)
+    report = QualificationReport.model_validate(report_value)
+    _require(evidence.sourceKind == "local", "non-local")
+    _require(evidence.imageId == report.imageId, "qualification-image")
+    _require(evidence.subject == image.Id, "qualification-subject")
+    for value in report.matches:
+        match = QualificationMatch.model_validate(value)
+        if match.severity not in {"High", "Critical"}:
+            continue
+        disallowed = DisallowedQualificationMatch.model_validate(value)
+        _require(
+            occurrence_is_repaired(
+                policy,
+                evidence,
+                cve=disallowed.id,
+                severity=disallowed.severity,
+                package=disallowed.package,
+                version=disallowed.version,
+                package_type=disallowed.type,
+                purl=disallowed.purl,
+                locations=tuple(
+                    (location.path, location.annotations.get("evidence", ""), location.layerID)
+                    for location in disallowed.locations
+                ),
+            ),
+            "qualification-unrepaired:" + disallowed.id,
+        )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Admit local runtime qualification repair evidence and scan matches."
+    )
+    parser.add_argument("--qualification-root", type=Path, required=True)
+    parser.add_argument("--policy", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        admit_local_qualification(
+            qualification_root=args.qualification_root,
+            policy_path=args.policy,
+            source_root=Path(__file__).resolve().parents[1],
+            observed=datetime.now(UTC),
+        )
+    except ValidationError as error:
+        parser.exit(1, f"runtime qualification repair admission failed: {error.title} schema\n")
+    except (OSError, ValueError) as error:
+        parser.exit(1, f"runtime qualification repair admission failed: {error}\n")
+    print("runtime qualification repair admission passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

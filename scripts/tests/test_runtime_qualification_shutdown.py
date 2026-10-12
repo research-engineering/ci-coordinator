@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from ruamel.yaml import YAML
 from scripts.bounded_process import spawn
 
@@ -180,6 +182,14 @@ def _qualification_step() -> dict[str, Any]:
     )
     steps: list[dict[str, Any]] = workflow["jobs"]["qualify"]["steps"]
     return next(step for step in steps if step.get("name") == QUALIFICATION_STEP)
+
+
+def test_runtime_qualification_expects_the_single_alembic_head() -> None:
+    heads = ScriptDirectory.from_config(Config(str(ROOT / "backend/alembic.ini"))).get_heads()
+    assert len(heads) == 1
+    run = _qualification_step()["run"]
+    assert run.count("grep -Fx '") == 1
+    assert f"grep -Fx '{heads[0]} (head)' \"${{root}}/migration.txt\"" in run
 
 
 def test_runtime_qualification_records_each_bounded_command_at_its_original_bound() -> None:

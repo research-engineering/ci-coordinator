@@ -2,22 +2,26 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import re
+import sys
 import tarfile
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 from scripts import release_repair_evidence as collector
-from scripts.bounded_process import CommandResult
+from scripts.bounded_process import CommandResult, spawn
 from scripts.release_repair_admission import (
     INSTALLED_PATHS,
     SOURCE_PATHS,
     RepairEvidence,
     RepairPolicy,
     _expected_witnesses,
+    admit_local_qualification,
     evidence_bytes,
     file_hash,
     occurrence_is_repaired,
@@ -436,3 +440,247 @@ def test_observation_diagnostic_never_changes_repair_admission(
         assert diagnostic.read_bytes() == evidence_bytes(evidence)
     else:
         assert not diagnostic.exists()
+
+
+QUALIFICATION_WORKFLOW = ROOT / ".github/workflows/runtime-image-qualification.yml"
+QUALIFICATION_ADMISSION_SCRIPT = ROOT / "scripts/release_repair_admission.py"
+ISOLATED_INTERPRETER_FLAGS = ("-I", "-B")
+QUALIFICATION_ADMISSION_COMMAND = (
+    "backend/.venv/bin/python -I -B scripts/release_repair_admission.py \\\n"
+    '            --qualification-root "${root}" \\\n'
+    "            --policy docker/runtime/security/repaired-matches.v1.json\n"
+)
+REPAIRED_HIGH_MATCH: dict[str, object] = {
+    "id": "CVE-2026-82049",
+    "severity": "High",
+    "package": "python",
+    "version": "3.13.16",
+    "type": "binary",
+    "purl": "pkg:generic/python@3.13.16",
+    "locations": [
+        {
+            "path": "/usr/local/bin/python3.13",
+            "layerID": LAYER,
+            "annotations": {"evidence": "primary"},
+        },
+        {
+            "path": "/usr/local/lib/libpython3.13.so.1.0",
+            "layerID": LAYER,
+            "annotations": {"evidence": "supporting"},
+        },
+    ],
+}
+# The jq projection keeps null fields; only High/Critical rows need repair identity.
+ADMITTED_LOW_MATCH: dict[str, object] = {
+    "id": "CVE-2026-1",
+    "severity": "Low",
+    "package": "other",
+    "version": "1",
+    "type": "deb",
+    "purl": None,
+    "locations": [],
+}
+UNREPAIRED_CRITICAL_MATCH: dict[str, object] = {
+    **REPAIRED_HIGH_MATCH,
+    "id": "CVE-2026-99999",
+    "severity": "Critical",
+}
+
+
+def _rfc3339(value: datetime) -> str:
+    return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _write_local_qualification(
+    tmp_path: Path, matches: list[dict[str, object]]
+) -> tuple[Path, Path, datetime]:
+    observed = datetime.now(UTC).replace(microsecond=0)
+    document = policy_value()
+    document["validFrom"] = _rfc3339(observed - timedelta(days=1))
+    document["validUntil"] = _rfc3339(observed + timedelta(days=1))
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(document))
+    evidence = evidence_value(RepairPolicy.model_validate(document))
+    evidence.update(
+        sourceKind="local",
+        subject=IMAGE,
+        repoDigests=[],
+        productionEligible=False,
+        observedAt=_rfc3339(observed - timedelta(hours=1)),
+        policySha256=file_hash(policy_path),
+    )
+    root = tmp_path / "qualification"
+    root.mkdir()
+    (root / "repair-evidence.json").write_text(json.dumps(evidence))
+    (root / "image.json").write_text(json.dumps({"Id": IMAGE, "Size": 1}))
+    (root / "vulnerabilities.json").write_text(json.dumps({"imageId": IMAGE, "matches": matches}))
+    return root, policy_path, observed
+
+
+def _hostile_import_root(tmp_path: Path) -> Path:
+    hostile = tmp_path / "hostile"
+    for package in ("scripts", "pydantic"):
+        (hostile / package).mkdir(parents=True)
+        (hostile / package / "__init__.py").write_text(
+            'raise SystemExit("hostile import root was used")\n'
+        )
+    return hostile
+
+
+def _run_isolated_admission(
+    root: Path,
+    policy_path: Path,
+    *,
+    cwd: Path,
+    extra_flags: tuple[str, ...] = (),
+    env: dict[str, str] | None = None,
+) -> tuple[int | None, str, str]:
+    result = spawn(
+        sys.executable,
+        (
+            *ISOLATED_INTERPRETER_FLAGS,
+            *extra_flags,
+            str(QUALIFICATION_ADMISSION_SCRIPT),
+            "--qualification-root",
+            str(root),
+            "--policy",
+            str(policy_path),
+        ),
+        cwd=cwd,
+        env={"PATH": os.environ["PATH"], **(env or {})},
+        timeout_seconds=60,
+        max_buffer=65_536,
+    )
+    assert result.error is None, result
+    return result.status, result.stdout, result.stderr
+
+
+def test_runtime_qualification_runs_the_isolated_admission_entrypoint_once() -> None:
+    workflow = QUALIFICATION_WORKFLOW.read_text()
+    assert workflow.count(QUALIFICATION_ADMISSION_COMMAND) == 1
+    assert QUALIFICATION_ADMISSION_COMMAND.startswith(
+        "backend/.venv/bin/python "
+        + " ".join(ISOLATED_INTERPRETER_FLAGS)
+        + " scripts/release_repair_admission.py "
+    )
+    assert "release_repair_admission import" not in workflow
+
+
+def test_isolated_qualification_admission_imports_only_its_checkout(tmp_path: Path) -> None:
+    root, policy_path, _observed = _write_local_qualification(
+        tmp_path, [REPAIRED_HIGH_MATCH, ADMITTED_LOW_MATCH]
+    )
+    hostile = _hostile_import_root(tmp_path)
+    assert _run_isolated_admission(
+        root,
+        policy_path,
+        cwd=hostile,
+        env={"PYTHONPATH": str(hostile), "PYTHONOPTIMIZE": "1"},
+    ) == (0, "runtime qualification repair admission passed\n", "")
+
+
+@pytest.mark.parametrize(
+    ("extra_flags", "variation"),
+    [
+        ((), "isolated"),
+        (("-O",), "optimized-flag"),
+        ((), "optimized-environment"),
+        ((), "hostile-pythonpath"),
+    ],
+)
+def test_isolated_qualification_admission_rejects_identically_under_variations(
+    tmp_path: Path, extra_flags: tuple[str, ...], variation: str
+) -> None:
+    root, policy_path, _observed = _write_local_qualification(
+        tmp_path, [REPAIRED_HIGH_MATCH, UNREPAIRED_CRITICAL_MATCH]
+    )
+    hostile = _hostile_import_root(tmp_path)
+    env = {
+        "isolated": {},
+        "optimized-flag": {},
+        "optimized-environment": {"PYTHONOPTIMIZE": "1"},
+        "hostile-pythonpath": {"PYTHONPATH": str(hostile)},
+    }[variation]
+    cwd = hostile if variation == "hostile-pythonpath" else tmp_path
+    assert _run_isolated_admission(
+        root, policy_path, cwd=cwd, extra_flags=extra_flags, env=env
+    ) == (
+        1,
+        "",
+        "runtime qualification repair admission failed: "
+        "repair-qualification-unrepaired:CVE-2026-99999\n",
+    )
+
+
+@pytest.mark.parametrize(
+    ("change", "cause"),
+    [
+        ("registry-source", "repair-non-local"),
+        ("foreign-report-image", "repair-qualification-image"),
+        ("foreign-image-subject", "repair-qualification-subject"),
+        ("unknown-severity", "QualificationMatch"),
+        ("null-disallowed-purl", "DisallowedQualificationMatch"),
+        ("unrepaired-critical", "repair-qualification-unrepaired:CVE-2026-99999"),
+        ("truncated-report", "QualificationReport is not strict JSON"),
+        ("missing-report", "QualificationReport is unavailable"),
+        ("empty-image", "QualificationImage size is outside its bound"),
+        ("malformed-evidence", "RepairEvidence is not strict JSON"),
+        ("expired-policy", "repair-expired"),
+    ],
+)
+def test_local_qualification_admission_rejects_each_invalid_input_with_its_cause(
+    tmp_path: Path, change: str, cause: str
+) -> None:
+    root, policy_path, observed = _write_local_qualification(tmp_path, [REPAIRED_HIGH_MATCH])
+    evidence_path = root / "repair-evidence.json"
+    report_path = root / "vulnerabilities.json"
+    if change == "registry-source":
+        evidence = json.loads(evidence_path.read_text())
+        evidence["sourceKind"] = "registry"
+        evidence_path.write_text(json.dumps(evidence))
+    elif change == "foreign-report-image":
+        report_path.write_text(json.dumps({"imageId": "sha256:" + "1" * 64, "matches": []}))
+    elif change == "foreign-image-subject":
+        (root / "image.json").write_text(json.dumps({"Id": "sha256:" + "1" * 64}))
+    elif change == "unknown-severity":
+        report_path.write_text(
+            json.dumps(
+                {"imageId": IMAGE, "matches": [{**ADMITTED_LOW_MATCH, "severity": "Unknown"}]}
+            )
+        )
+    elif change == "null-disallowed-purl":
+        report_path.write_text(
+            json.dumps({"imageId": IMAGE, "matches": [{**REPAIRED_HIGH_MATCH, "purl": None}]})
+        )
+    elif change == "unrepaired-critical":
+        report_path.write_text(
+            json.dumps({"imageId": IMAGE, "matches": [UNREPAIRED_CRITICAL_MATCH]})
+        )
+    elif change == "truncated-report":
+        report_path.write_bytes(report_path.read_bytes()[:-1])
+    elif change == "missing-report":
+        report_path.unlink()
+    elif change == "empty-image":
+        (root / "image.json").write_bytes(b"")
+    elif change == "malformed-evidence":
+        evidence_path.write_text('{"schemaVersion": 1, "schemaVersion": 2}')
+    else:
+        observed += timedelta(days=2)
+    with pytest.raises(ValueError, match=re.escape(cause)):
+        admit_local_qualification(
+            qualification_root=root,
+            policy_path=policy_path,
+            source_root=ROOT,
+            observed=observed,
+        )
+
+
+def test_local_qualification_admission_accepts_repaired_and_lower_severity_matches(
+    tmp_path: Path,
+) -> None:
+    root, policy_path, observed = _write_local_qualification(
+        tmp_path, [REPAIRED_HIGH_MATCH, ADMITTED_LOW_MATCH]
+    )
+    admit_local_qualification(
+        qualification_root=root, policy_path=policy_path, source_root=ROOT, observed=observed
+    )

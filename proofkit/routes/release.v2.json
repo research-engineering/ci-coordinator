@@ -65,6 +65,7 @@
     ["001","release001-vulnerability-falsifiers","release001-vulnerability-falsifiers","falsification","scripts/tests/test_release_vulnerability_admission.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan"],["local-python"]],
     ["001","runtime-comparison-falsifiers","runtime-comparison-falsifiers","falsification","scripts/tests/test_runtime_comparison.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["001","runtime-qualification-routing-falsifiers","runtime-qualification-routing-falsifiers","falsification","scripts/tests/test_runtime_qualification_routing.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy","workflow.lint"],["local-python","local-python-container-external"]],
+    ["001","runtime-zlib-inventory-falsifiers","runtime-zlib-inventory-falsifiers","falsification","scripts/tests/test_runtime_zlib_inventory.py",["proofkit.verify","python.lint","python.test","python.typecheck","selective.plan","text.policy"],["local-python"]],
     ["001","coverage-release-015","coverage-release-015","falsification","scripts/tests/test_scheduled_advisories.py",["proofkit.verify","python.lint","python.test","python.typecheck","requirements.admission","selective.plan","text.policy"],["local-python"]]
   ],
   "nonClaims": ["This source declares structural binding routes; it does not execute or assess witnesses."]
