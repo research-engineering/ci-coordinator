@@ -119,6 +119,28 @@ retention event. Current unregistered lookup fails closed before mutation.
 The authored transactional implementation is not independently executable as
 a successful product operation until this registry admission is made.
 
+## Source Availability Decision
+
+Provisional owner decision (2026-10-11), recorded under CI-012 in the
+[roadmap](../../ROADMAP.md#b2-durable-observation-and-recovery): the lazy
+source-availability presentation and its budgeted reconciliation are rejected
+without implementation. Records keep `upstreamAvailability` `not_checked`, and
+provider-not-found gaps remain observations rather than deletion claims.
+
+The simplest alternative was a lazy probe on explicit attempt-detail open that
+shows only `available`, `not_found_or_denied` or `unavailable` with its
+observation time. It is rejected because it cannot answer the question that
+would justify its provider cost. Falsifier for any deletion label: the run and
+attempt resources the App reads expose no positive deletion signal, and GitHub
+documents [404 responses for existing resources](https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api#404-not-found-for-an-existing-resource)
+when authorization is missing. A not-found probe therefore cannot distinguish
+deletion from lost access. The retention design's "upstream unavailable"
+analytics distinction is not delivered by this decision.
+
+Revision trigger: a recorded operator need for the label. Any label claiming
+deletion additionally needs an admitted provider source of positive deletion
+evidence. The decision remains provisional until owner confirmation.
+
 ## Qualification Refinements
 
 Instance revalidation consumes the explicit Pydantic field iterator. A valid

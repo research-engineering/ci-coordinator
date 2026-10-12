@@ -1,6 +1,7 @@
 # History Review Convergence Implementation Plan
 
 Status: proposed execution plan; no unchecked item is an implementation receipt.
+Source reconciliation (2026-10-11): see [Source Reconciliation](#source-reconciliation).
 
 Design: [History Review Convergence](history-review-convergence.md).
 Baseline: `9547a85b1f9b2a8c79c59bf8c8633167731c9021`.
@@ -57,10 +58,14 @@ must fill any unresolved mechanism before its first semantic edit.
 ## Order And Checkpoints
 
 - [ ] Freeze current ledger, report provenance and a reviewed design.
-- [ ] Complete WP4 and WP6's independently owned test changes.
-- [ ] Implement and qualify WP2a before enabling any detail producer.
+- [ ] Complete WP4 and WP6's independently owned test changes. WP6 witnesses
+      present in source; WP4 lacks an unknown-provenance presentation oracle.
+- [ ] Implement and qualify WP2a before enabling any detail producer. Source
+      present; qualification open.
 - [ ] Resolve and review WP2b's provider-to-store scheduling contract, then implement it.
+      Source present; review and qualification receipts absent.
 - [ ] Resolve and review WP3's command/principal/restore boundary, then implement primary-store operations.
+      No source.
 - [ ] Implement WP5 under the release owner's exact artifact contract.
 - [ ] Reconcile all historical rows against the final diff and independent review.
 - [ ] Run required final-candidate GitHub checks and record exact run/attempt/subject.
@@ -78,6 +83,31 @@ independent durable deletion-fence source and restore admission have exact
 owners and coordinates. The missing source cannot be replaced by a row in the
 database being restored. This is an unresolved safety operand, not a rejected
 feature, and does not block the other independently owned packages.
+
+## Source Reconciliation
+
+Bound to source `62d7765d32f6bbb19848b1bba319b71bf9c379f9`. Backend source
+paths are relative to `backend/src/ci_coordinator`, `unit/` and `integration/`
+paths to `backend/tests`; frontend paths are repository-relative. Every cited
+file entered with the initial import `6313297`; no package progress receipt
+with candidate identity, review findings and test results exists, so no
+checkbox above moves. Source presence is not native or operational
+qualification. As an evidence class only, the unmerged stacked chain runs the
+complete native population on every head; head `62d7765` (PR #63) passed
+"Complete native population and aggregate coverage" on 2026-10-11. That run is
+not a merged exact-source receipt and closes no package.
+
+| Package | Source at `62d7765` | Witness files (not executed locally) | Remaining |
+|---------|---------------------|--------------------------------------|-----------|
+| WP2a | Operation `ci_history_detail_cleanup` (`runtime/maintenance_round.py:37`), wired at `runtime/composition.py:514-518` with `HistoryDetailCleanup` and its 10-second bound (`runtime/history_detail_cleanup.py:5-14`) over `persistence/ci_history_detail_cleanup.py:30`. | `unit/runtime/test_history_detail_cleanup.py:10,24,34`; `integration/persistence/test_history_detail_cleanup.py:111,174,257,304,353`. | Merged exact-source native qualification. The required order before any detail producer cannot be shown retrospectively: WP2b is present in the same import. |
+| WP2b | `ci-economics-archive-detail/v1` with 256-step and 262,144-byte bounds (`ci_economics/archive_detail.py:13-14,39-40`); `HistoryAttemptObservation` (`ci_economics/history_ports.py:29`); sidecar admission (`app/ci_history_collection.py:310-326`); first-import store (`persistence/ci_history_detail_store.py:53`, called from `persistence/ci_history_completion.py:118`); exact-attempt route (`api/http/routers/ci_history_read.py:49-52`). | `integration/persistence/test_history_detail_import.py:102,134,254,296,403`. | Review receipt, native race proof and provider-to-store-to-read qualification. |
+| WP3 | None. No code writes `erasing` or `erased`; no erasure capability, migration or CLI exists. | None. | Unchanged blocker below; CI-011 owns it. |
+| WP4 | Unequal nondefault scope IDs through GET path, POST body and response (`frontend/tests/historyApi.test.ts:13,54`); per-label `datetime`, `title` and rendered value with independent revisions (`frontend/tests/historyProgress.test.tsx:55-69,71`); absent lease/discovery fields (`frontend/tests/historyProgress.test.tsx:92`). | Same files. | No test asserts that a null `workflowBlobSha` renders as unknown (`frontend/src/features/ciEconomics/ArchiveBrowser.tsx:454`); the null fixture `frontend/tests/archiveFixture.ts:42` is not asserted. Native frontend qualification. |
+| WP6 | Budget relation (`unit/runtime/test_history_budget_contract.py:8`); terminal SQL CAS (`integration/persistence/test_history_completion_authority.py:188`, `integration/persistence/test_history_detail_import.py:296`); source child-insert/cascade barrier (`integration/persistence/test_history_source_cascade_race.py:199`); false source columns (`unit/persistence/test_ci_history_delivery_codec.py:158`, `integration/persistence/test_history_delivery_transfer.py:324`); empty lanes and cancellation (`unit/runtime/test_history_collection_worker.py:124,352`). | Same files. | Merged exact-source native qualification; causal-kill attribution per A-P01. |
+
+WP1, WP5 and WP7 are not reconciled here. CI-009 in the
+[roadmap](../../ROADMAP.md#b2-durable-observation-and-recovery) remains the
+sole state owner.
 
 ## Stop And Replan Conditions
 
