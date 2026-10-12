@@ -471,6 +471,8 @@
     {"requirementId":"REQ-CI-RUNTIME-008","witnessPath":"docs/features/perimeter-runtime-safety-implementation-plan.md","requiredCommandIds":["proofkit.verify","requirements.admission","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-008","witnessPath":"docs/features/runtime-http-contract-hardening-implementation-plan.md","requiredCommandIds":["proofkit.verify","requirements.admission","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-008","witnessPath":"docs/features/runtime-http-contract-hardening.md","requiredCommandIds":["proofkit.verify","requirements.admission","selective.plan","text.policy"]},
+    {"requirementId":"REQ-CI-RUNTIME-008","witnessPath":"docs/features/webhook-ingress-scheduling-plan.md","requiredCommandIds":["documentation.graph","proofkit.verify","requirements.admission","selective.plan","text.policy"]},
+    {"requirementId":"REQ-CI-RUNTIME-008","witnessPath":"docs/features/webhook-ingress-scheduling.md","requiredCommandIds":["documentation.graph","proofkit.verify","requirements.admission","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-008","witnessPath":"docs/how-to/deploy-container.md","requiredCommandIds":["container.smoke","proofkit.verify","requirements.admission","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-009","witnessPath":"docs/decisions/lts-dependency-consolidation.md","requiredCommandIds":["documentation.graph","proofkit.verify","python.package-check","python.test","requirements.admission","selective.plan","text.policy"]},
     {"requirementId":"REQ-CI-RUNTIME-010","witnessPath":".dockerignore","requiredCommandIds":["build.inputs","proofkit.verify","selective.plan","text.policy"]},
