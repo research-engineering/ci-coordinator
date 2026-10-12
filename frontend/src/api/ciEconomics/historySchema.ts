@@ -1,6 +1,11 @@
 import { z } from "zod";
 import type { components, operations } from "../generated";
-import { observationCounter, observationInstant, observationTimestamp } from "./observationSchema";
+import {
+  observationCounter,
+  observationInstant,
+  observationPayloadInstant,
+  observationTimestamp,
+} from "./observationSchema";
 import { positiveInteger, repositoryScopeSchema } from "./sourceSchema";
 
 export type HistoryConfiguration = components["schemas"]["HistoryConfiguration"];
@@ -9,6 +14,22 @@ export type HistoryCommand =
   operations["configure_ci_history"]["requestBody"]["content"]["application/json"];
 export type HistoryMutation = components["schemas"]["HistoryMutationResponse"];
 export type DetailRetention = components["schemas"]["DetailRetentionPayload"];
+export type HistoryCatalogBoundSource = components["schemas"]["HistoryCatalogBoundSource"];
+
+/** UTC calendar day (YYYY-MM-DD) of an admitted catalog creation instant. */
+export function historyCreationDay(repositoryCreatedAt: string): string | undefined {
+  return observationInstant(repositoryCreatedAt)?.slice(0, 10);
+}
+
+/** The "All available" source for one admitted catalog creation instant. */
+export function historyCatalogBoundSource(
+  repositoryCreatedAt: string,
+): HistoryCatalogBoundSource | undefined {
+  const instant = observationPayloadInstant(repositoryCreatedAt);
+  return instant === undefined
+    ? undefined
+    : { kind: "repository_created_at", repositoryCreatedAt: instant };
+}
 
 export const detailRetentionSchema: z.ZodType<DetailRetention> = z.discriminatedUnion("mode", [
   z.strictObject({ mode: z.literal("disabled") }),
@@ -77,19 +98,41 @@ export const historyCommandSchema: z.ZodType<HistoryCommand> = z
       .refine((value) => observationInstant(value)?.slice(20, 26) === "000000")
       .nullable()
       .optional(),
+    populationBoundSource: z
+      .strictObject({
+        kind: z.literal("repository_created_at"),
+        repositoryCreatedAt: observationTimestamp,
+      })
+      .nullable()
+      .optional(),
     rescan: z.boolean(),
     operationId,
   })
   .transform((value): HistoryCommand => {
-    const { expandCreatedFrom, ...command } = value;
-    return expandCreatedFrom === undefined ? command : { ...command, expandCreatedFrom };
+    const { expandCreatedFrom, populationBoundSource, ...command } = value;
+    return {
+      ...command,
+      ...(expandCreatedFrom === undefined ? {} : { expandCreatedFrom }),
+      ...(populationBoundSource == null ? {} : { populationBoundSource }),
+    };
   })
   .refine(
     (value) =>
       (value.expectedRevision === 0) === (value.initialCreatedFrom !== null) &&
       (value.expectedRevision !== 0 || !value.rescan) &&
-      (value.expandCreatedFrom == null || (value.expectedRevision > 0 && !value.rescan)),
+      (value.expandCreatedFrom == null || (value.expectedRevision > 0 && !value.rescan)) &&
+      catalogSourceMatchesBound(value),
   );
+
+function catalogSourceMatchesBound(command: HistoryCommand): boolean {
+  const source = command.populationBoundSource;
+  if (source == null) return true;
+  const bound = command.initialCreatedFrom ?? command.expandCreatedFrom;
+  const day = historyCreationDay(source.repositoryCreatedAt);
+  return (
+    bound != null && day !== undefined && observationInstant(bound) === `${day}T00:00:00.000000Z`
+  );
+}
 
 export const historyMutationSchema: z.ZodType<HistoryMutation> = z
   .strictObject({
@@ -104,6 +147,9 @@ export const historyMutationSchema: z.ZodType<HistoryMutation> = z
       "dataset_fenced",
       "pending_work",
       "invalid_population",
+      "creation_date_missing",
+      "creation_date_mismatch",
+      "creation_date_in_future",
     ]),
     snapshot: historyDatasetSchema.nullable(),
   })

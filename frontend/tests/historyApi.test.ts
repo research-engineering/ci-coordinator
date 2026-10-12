@@ -51,6 +51,49 @@ test("an earlier-bound command remains exact across the API transport", async ()
   expect(body).not.toHaveProperty("actor");
 });
 
+test("a null catalog source is sent exactly like an omitted one", async () => {
+  const fetch = vi.fn(async (_request: Request) => Response.json(historyMutation()));
+  vi.stubGlobal("fetch", fetch);
+  expect((await configureHistory(historyCommand(), csrf)).kind).toBe("ready");
+  expect(
+    (await configureHistory({ ...historyCommand(), populationBoundSource: null }, csrf)).kind,
+  ).toBe("ready");
+  const [omitted, nulled] = await Promise.all(fetch.mock.calls.map(([request]) => request.text()));
+  expect(nulled).toBe(omitted);
+  expect(JSON.parse(nulled ?? "")).not.toHaveProperty("populationBoundSource");
+});
+
+test.each([
+  ["creation_date_missing", true, 422, "ready"],
+  ["creation_date_mismatch", true, 422, "ready"],
+  ["creation_date_in_future", true, 422, "ready"],
+  ["creation_date_mismatch", true, 400, "invalid-response"],
+  ["creation_date_mismatch", false, 422, "invalid-response"],
+] as const)(
+  "catalog refusal %s with source=%s admits only HTTP %i from an all-available command",
+  async (outcome, sourced, status, kind) => {
+    const command = {
+      ...historyCommand(),
+      initialCreatedFrom: "2020-01-01T00:00:00Z",
+      ...(sourced
+        ? {
+            populationBoundSource: {
+              kind: "repository_created_at" as const,
+              repositoryCreatedAt: "2020-01-01T12:34:56+00:00",
+            },
+          }
+        : {}),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ ...historyMutation(command), outcome, snapshot: null }, { status }),
+      ),
+    );
+    expect((await configureHistory(command, csrf)).kind).toBe(kind);
+  },
+);
+
 test("binds unequal nondefault IDs through the actual GET path, POST body and response", async () => {
   const command = { ...historyCommand(), ...UNEQUAL_SCOPE };
   const status = historyStatus({ ...historyDataset(), ...UNEQUAL_SCOPE });

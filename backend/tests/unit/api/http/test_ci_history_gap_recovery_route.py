@@ -15,7 +15,10 @@ from ci_coordinator.app.ci_history_administration import (
     CiHistoryAdministrationService,
     CiHistoryAdministrationUseCase,
 )
-from ci_coordinator.ci_economics.history_administration import HistoryAdministrationStore
+from ci_coordinator.ci_economics.history_administration import (
+    HistoryAdministrationStore,
+    HistoryRepositoryCreationReader,
+)
 from ci_coordinator.ci_economics.history_gap_recovery import (
     HistoryGapRepairInterval,
     HistoryGapRepairReceipt,
@@ -45,7 +48,10 @@ def test_first_gap_refusal_precedes_target_store_with_rest_valid_command(denial:
             ),
         ),
     )
-    service = CiHistoryAdministrationService(authorizer=authorizer, store=store)
+    creation_reader = AsyncMock(spec=HistoryRepositoryCreationReader)
+    service = CiHistoryAdministrationService(
+        authorizer=authorizer, store=store, creation_reader=creation_reader
+    )
     use_case = AsyncMock(spec=CiHistoryAdministrationUseCase, wraps=service)
     with TestClient(
         _app(
@@ -57,6 +63,7 @@ def test_first_gap_refusal_precedes_target_store_with_rest_valid_command(denial:
         denied = client.post(HISTORY_GAP_REPAIR_PATH, json=BODY)
     assert (denied.status_code, denied.json()) == (403, {"ok": False, "error": "forbidden"})
     assert not store.mock_calls
+    assert not creation_reader.mock_calls
     authorizer.allows_scope.return_value = True
     with TestClient(_app(use_case)) as client:
         accepted = client.post(HISTORY_GAP_REPAIR_PATH, json=BODY)

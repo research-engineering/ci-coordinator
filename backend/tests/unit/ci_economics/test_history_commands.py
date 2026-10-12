@@ -203,3 +203,76 @@ def test_dataset_audit_payload_revalidates_the_domain_relations() -> None:
     assert HistoryDatasetPayload.model_validate(dataset.canonical_mapping()).to_dataset() == dataset
     with pytest.raises(ValidationError):
         HistoryDatasetPayload.model_validate({**dataset.canonical_mapping(), "state": "erased"})
+
+
+_CATALOG_SOURCE = {"kind": "repository_created_at", "repositoryCreatedAt": "2020-01-01T12:34:56Z"}
+
+
+def test_omitted_and_null_bound_source_keep_existing_digest_bytes() -> None:
+    # Kills: serializing populationBoundSource: null, or a default "explicit" key.
+    original = _command_mapping()
+    absent = ConfigureHistory.model_validate(original)
+    explicit_null = ConfigureHistory.model_validate({**original, "populationBoundSource": None})
+    sourced = ConfigureHistory.model_validate(
+        {**original, "populationBoundSource": _CATALOG_SOURCE}
+    )
+
+    assert absent.model_dump_json() == json.dumps(original, separators=(",", ":"))
+    assert explicit_null.model_dump_json() == absent.model_dump_json()
+    assert explicit_null.command_digest == absent.command_digest == hash_object(original)
+    assert sourced.command_digest != absent.command_digest
+    assert sourced.population_bound_source is not None
+    assert ConfigureHistory.model_validate_json(sourced.model_dump_json()) == sourced
+
+
+@pytest.mark.parametrize(
+    "expanded,bound,created_at,admitted",
+    [
+        (False, "2020-01-01T00:00:00Z", "2020-01-01T23:59:59Z", True),
+        (False, "2020-01-01T00:00:00Z", "2020-01-01T00:00:00+00:00", True),
+        (True, "2019-06-01T00:00:00Z", "2019-06-01T08:00:00Z", True),
+        (False, "2020-01-01T00:00:01Z", "2020-01-01T12:34:56Z", False),
+        (False, "2020-01-02T00:00:00Z", "2020-01-01T12:34:56Z", False),
+        (True, "2019-05-31T00:00:00Z", "2019-06-01T08:00:00Z", False),
+        (False, "2019-12-31T00:00:00Z", "2020-01-01T01:00:00+00:00", False),
+    ],
+)
+def test_catalog_bound_source_requires_exact_utc_day_floor_of_its_bound(
+    expanded: bool, bound: str, created_at: str, admitted: bool
+) -> None:
+    # Kills: dropping or loosening the floor validator (second, day or local-time floor).
+    payload = {
+        **_command_mapping(),
+        "populationBoundSource": {
+            "kind": "repository_created_at",
+            "repositoryCreatedAt": created_at,
+        },
+    }
+    if expanded:
+        payload.update(expectedRevision=1, initialCreatedFrom=None, expandCreatedFrom=bound)
+    else:
+        payload.update(initialCreatedFrom=bound)
+    if admitted:
+        assert ConfigureHistory.model_validate(payload).population_bound_source is not None
+    else:
+        with pytest.raises(ValidationError, match="creation UTC day"):
+            ConfigureHistory.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"expectedRevision": 1, "initialCreatedFrom": None},
+        {"expectedRevision": 1, "initialCreatedFrom": None, "rescan": True},
+        {"populationBoundSource": {**_CATALOG_SOURCE, "kind": "explicit"}},
+        {"populationBoundSource": {**_CATALOG_SOURCE, "extra": True}},
+        {"populationBoundSource": {"kind": "repository_created_at"}},
+    ],
+)
+def test_catalog_bound_source_rejected_without_a_bound_or_with_rescan(
+    patch: dict[str, object],
+) -> None:
+    # Kills: admitting the catalog source on plain updates, rescans or an open shape.
+    payload = {**_command_mapping(), "populationBoundSource": _CATALOG_SOURCE, **patch}
+    with pytest.raises(ValidationError):
+        ConfigureHistory.model_validate(payload)

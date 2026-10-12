@@ -5,6 +5,7 @@ from typing import Final, Literal, Self
 from pydantic import Field, field_validator, model_validator
 
 from ci_coordinator.ci_economics.history_configuration import HistoryConfiguration, HistoryDataset
+from ci_coordinator.ci_economics.history_population_bound import utc_day_floor
 from ci_coordinator.ci_economics.observation_payload import (
     ObservationPositiveId,
     ObservationTimestamp,
@@ -17,6 +18,17 @@ from ci_coordinator.kernel.canonical_json import MAX_SAFE_JSON_INTEGER
 HISTORY_CONFIGURED_EVENT_TYPE: Final = "ci-economics-history-configured/v1"
 
 
+class HistoryCatalogBoundSource(EconomicsPayloadModel):
+    """The administrator chose "All available": the bound is the catalog creation UTC day."""
+
+    kind: Literal["repository_created_at"]
+    repository_created_at: ObservationTimestamp = Field(alias="repositoryCreatedAt")
+
+    @property
+    def created_at(self) -> datetime:
+        return datetime.fromisoformat(self.repository_created_at)
+
+
 class HistoryConfigurationRequest(EconomicsPayloadModel):
     installation_id: ObservationPositiveId = Field(alias="installationId")
     repository_id: ObservationPositiveId = Field(alias="repositoryId")
@@ -25,6 +37,9 @@ class HistoryConfigurationRequest(EconomicsPayloadModel):
     initial_created_from: ObservationTimestamp | None = Field(alias="initialCreatedFrom")
     expand_created_from: ObservationTimestamp | None = Field(
         default=None, alias="expandCreatedFrom", exclude_if=lambda value: value is None
+    )
+    population_bound_source: HistoryCatalogBoundSource | None = Field(
+        default=None, alias="populationBoundSource", exclude_if=lambda value: value is None
     )
     rescan: bool
     operation_id: str = Field(
@@ -47,6 +62,13 @@ class HistoryConfigurationRequest(EconomicsPayloadModel):
             raise ValueError("rescan requires an existing history dataset")
         if self.expand_created_from is not None and (initial or self.rescan):
             raise ValueError("history expansion requires an existing dataset without rescan")
+        source = self.population_bound_source
+        if source is not None:
+            bound = self.initial_created_from or self.expand_created_from
+            if bound is None or datetime.fromisoformat(bound) != utc_day_floor(source.created_at):
+                raise ValueError(
+                    "a catalog population source requires its bound to be the creation UTC day"
+                )
         return self
 
     @property
@@ -120,6 +142,29 @@ class HistoryConfigurationInvalid:
             raise ValueError("unknown invalid history configuration")
 
 
+type HistoryPopulationSourceRefusal = Literal[
+    "creation_date_missing", "creation_date_mismatch", "creation_date_in_future"
+]
+
+
+@dataclass(frozen=True, slots=True)
+class HistoryPopulationSourceRefused:
+    """An "All available" bound cannot be recorded; no fallback bound is substituted."""
+
+    reason: HistoryPopulationSourceRefusal
+
+    def __post_init__(self) -> None:
+        if self.reason not in {
+            "creation_date_missing",
+            "creation_date_mismatch",
+            "creation_date_in_future",
+        }:
+            raise ValueError("unknown history population source refusal")
+
+
 type HistoryConfigurationResult = (
-    HistoryConfigured | HistoryConfigurationConflict | HistoryConfigurationInvalid
+    HistoryConfigured
+    | HistoryConfigurationConflict
+    | HistoryConfigurationInvalid
+    | HistoryPopulationSourceRefused
 )

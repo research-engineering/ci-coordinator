@@ -4,6 +4,7 @@ from ci_coordinator.persistence.audit_repository import _PostgresAuditEventRepos
 from ci_coordinator.persistence.compatibility_contracts import required_capabilities
 from ci_coordinator.persistence.schema_capabilities import (
     ANALYTICS_PURPOSE_SETTINGS,
+    ci_history_administration_requirements,
     ci_history_requirements,
 )
 from ci_coordinator.persistence.unit_of_work import PostgresUnitOfWork
@@ -23,6 +24,14 @@ class PostgresHistoryUnitOfWork(PostgresUnitOfWork):
     def history_audit(self) -> _PostgresAuditEventRepository:
         self._require_active()
         return self._require_initialized(self._audit_events, "history audit")
+
+
+class PostgresHistoryAdministrationUnitOfWork(PostgresHistoryUnitOfWork):
+    """History configuration and status, which also own population-bound provenance."""
+
+    def __init__(self, engine: AsyncEngine) -> None:
+        super().__init__(engine)
+        self._required_capabilities = ci_history_administration_requirements(self._profile)
 
 
 class PostgresPurposeUnitOfWork(PostgresHistoryUnitOfWork):

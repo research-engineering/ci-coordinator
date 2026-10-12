@@ -137,7 +137,7 @@ case "$1" in
         ;;
       *'alembic upgrade head') if failing migration-upgrade; then exit 1; fi ;;
       *'alembic current')
-        printf '20261011_0019 (head)\n'
+        printf '20261012_0020 (head)\n'
         if failing migration-current; then exit 124; fi
         ;;
       *) exit 64 ;;
@@ -276,7 +276,7 @@ def test_runtime_qualification_success_writes_no_failure_diagnostics(
     assert not (root / "runtime-failure.json").exists()
     assert not (root / "runtime-failure.log").exists()
     assert (root / "runtime.json").read_text() == '{"schemaVersion":"fake"}\n'
-    assert (root / "migration.txt").read_text() == "20261011_0019 (head)\n"
+    assert (root / "migration.txt").read_text() == "20261012_0020 (head)\n"
     assert json.loads((root / "shutdown.json").read_text())["ExitCode"] == 0
     assert not any(call.startswith("logs --tail") for call in calls)
     assert calls[-2:] == [
@@ -327,7 +327,7 @@ def test_runtime_qualification_failure_records_the_failed_bounded_command(
         "rm --force runtime-candidate runtime-database"
     )
     if recorded >= 3:
-        assert (root / "migration.txt").read_text() == "20261011_0019 (head)\n"
+        assert (root / "migration.txt").read_text() == "20261012_0020 (head)\n"
 
 
 @pytest.mark.parametrize("date_failure", DATE_FAILURES)

@@ -2524,6 +2524,18 @@ export interface components {
             readonly runAttempt: components["schemas"]["ObservationPositiveId"];
             readonly workflowRunId: components["schemas"]["ObservationPositiveId"];
         };
+        /**
+         * HistoryCatalogBoundSource
+         * @description The administrator chose "All available": the bound is the catalog creation UTC day.
+         */
+        readonly HistoryCatalogBoundSource: {
+            /**
+             * Kind
+             * @constant
+             */
+            readonly kind: "repository_created_at";
+            readonly repositoryCreatedAt: components["schemas"]["ObservationTimestamp"];
+        };
         /** HistoryConfiguration */
         readonly HistoryConfiguration: {
             readonly detailRetention: components["schemas"]["DetailRetentionPayload"] | null;
@@ -2543,6 +2555,7 @@ export interface components {
             readonly installationId: components["schemas"]["ObservationPositiveId"];
             /** Operationid */
             readonly operationId: string;
+            readonly populationBoundSource?: components["schemas"]["HistoryCatalogBoundSource"] | null;
             readonly repositoryId: components["schemas"]["ObservationPositiveId"];
             /** Rescan */
             readonly rescan: boolean;
@@ -2684,7 +2697,7 @@ export interface components {
              * Outcome
              * @enum {string}
              */
-            readonly outcome: "committed" | "replayed" | "revision_conflict" | "operation_conflict" | "capacity_reached" | "dataset_fenced" | "pending_work" | "invalid_population";
+            readonly outcome: "committed" | "replayed" | "revision_conflict" | "operation_conflict" | "capacity_reached" | "dataset_fenced" | "pending_work" | "invalid_population" | "creation_date_missing" | "creation_date_mismatch" | "creation_date_in_future";
             /**
              * Schemaversion
              * @default ci-economics-history-mutation/v1
@@ -2692,6 +2705,26 @@ export interface components {
              */
             readonly schemaVersion: "ci-economics-history-mutation/v1";
             readonly snapshot: components["schemas"]["HistoryDatasetPayload"] | null;
+        };
+        /**
+         * HistoryPopulationBoundResponse
+         * @description Provenance of the current backfill lower bound; unrecorded when none is retained.
+         */
+        readonly HistoryPopulationBoundResponse: {
+            /**
+             * Createdfrom
+             * Format: date-time
+             */
+            readonly createdFrom: string;
+            /** Recordedat */
+            readonly recordedAt: string | null;
+            /** Repositorycreatedat */
+            readonly repositoryCreatedAt: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            readonly source: "explicit" | "repository_created_at" | "unrecorded";
         };
         /** HistoryQuota */
         readonly HistoryQuota: {
@@ -2907,6 +2940,7 @@ export interface components {
             readonly observedAt: string;
             /** Pendingrechecks */
             readonly pendingRechecks: number;
+            readonly populationBound: components["schemas"]["HistoryPopulationBoundResponse"] | null;
             readonly repositoryId: components["schemas"]["ObservationPositiveId"];
             readonly scan: components["schemas"]["HistoryScanResponse"] | null;
             /**
@@ -6775,7 +6809,7 @@ export interface operations {
                     readonly [name: string]: unknown;
                 };
                 content: {
-                    readonly "application/json": components["schemas"]["InvalidRequestBody"];
+                    readonly "application/json": components["schemas"]["InvalidRequestBody"] | components["schemas"]["HistoryMutationResponse"];
                 };
             };
             /** @description Internal Server Error */

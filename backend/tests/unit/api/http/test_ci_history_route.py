@@ -25,6 +25,8 @@ from ci_coordinator.ci_economics.history_commands import (
     HistoryConfigurationConflict,
     HistoryConfigurationInvalid,
     HistoryConfigured,
+    HistoryPopulationSourceRefusal,
+    HistoryPopulationSourceRefused,
 )
 from ci_coordinator.ci_economics.history_configuration import HistoryConfiguration, HistoryDefaults
 from ci_coordinator.ci_economics.observation import MAX_OBSERVATION_WORKFLOW_IDS
@@ -121,6 +123,37 @@ def test_impossible_population_is_a_typed_rejection_not_a_transport_failure() ->
     assert response.status_code == 400
     assert response.json()["outcome"] == "invalid_population"
     assert response.json()["snapshot"] is None
+
+
+@pytest.mark.parametrize(
+    "reason", ["creation_date_missing", "creation_date_mismatch", "creation_date_in_future"]
+)
+def test_catalog_population_refusal_is_a_typed_422_without_snapshot(
+    reason: HistoryPopulationSourceRefusal,
+) -> None:
+    # Kills: projecting a refused all-available bound as 400/409, 503 or a saved snapshot.
+    body = {
+        **_BODY,
+        "initialCreatedFrom": "2020-01-01T00:00:00Z",
+        "populationBoundSource": {
+            "kind": "repository_created_at",
+            "repositoryCreatedAt": "2020-01-01T12:34:56Z",
+        },
+    }
+    use_case = AsyncMock(spec=CiHistoryAdministrationUseCase)
+    use_case.configure.return_value = HistoryPopulationSourceRefused(reason)
+    with TestClient(_app(use_case)) as client:
+        response = client.post(HISTORY_CONFIGURATION_PATH, json=body)
+    assert response.status_code == 422 and response.headers["cache-control"] == "no-store"
+    assert response.json() == {
+        "schemaVersion": "ci-economics-history-mutation/v1",
+        "operationId": "operation-1",
+        "outcome": reason,
+        "snapshot": None,
+    }
+    use_case.configure.assert_awaited_once_with(
+        ConfigureHistory.model_validate({**body, "actor": human_principal().actor_id})
+    )
 
 
 @pytest.mark.parametrize("method,path", _ROUTES)

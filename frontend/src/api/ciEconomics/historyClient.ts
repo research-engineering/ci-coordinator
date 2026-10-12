@@ -45,14 +45,26 @@ export async function configureHistory(
     signal,
     csrfToken,
     body: command,
-    successStatuses: [200, 400, 409],
+    successStatuses: [200, 400, 409, 422],
     admits: (result, status) =>
       result.operationId === command.operationId &&
       (result.snapshot === null
-        ? status === (result.outcome === "invalid_population" ? 400 : 409)
+        ? status === rejectionStatus(result.outcome) &&
+          (status !== 422 || command.populationBoundSource != null)
         : status === 200 &&
           sameScope(result.snapshot, command) &&
           result.snapshot.configurationRevision === command.expectedRevision + 1 &&
           sameHistoryConfiguration(result.snapshot.configuration, command.configuration)),
   });
+}
+
+function rejectionStatus(outcome: HistoryMutation["outcome"]): number {
+  if (outcome === "invalid_population") return 400;
+  if (
+    outcome === "creation_date_missing" ||
+    outcome === "creation_date_mismatch" ||
+    outcome === "creation_date_in_future"
+  )
+    return 422;
+  return 409;
 }

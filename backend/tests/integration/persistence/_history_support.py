@@ -5,8 +5,11 @@ from ci_coordinator.ci_economics.discovery import ProviderObservationPage, Provi
 from ci_coordinator.ci_economics.history_commands import ConfigureHistory
 from ci_coordinator.ci_economics.history_scan import HistoryClaim
 from ci_coordinator.ci_economics.sources import ProviderRunCollectionSource
-from ci_coordinator.persistence.ci_history_adapters import TransactionalHistoryStore
-from ci_coordinator.persistence.ci_history_unit_of_work import PostgresHistoryUnitOfWork
+from ci_coordinator.persistence.ci_history_adapters import TransactionalHistoryAdministrationStore
+from ci_coordinator.persistence.ci_history_unit_of_work import (
+    PostgresHistoryAdministrationUnitOfWork,
+    PostgresHistoryUnitOfWork,
+)
 
 
 def history_command() -> ConfigureHistory:
@@ -23,8 +26,11 @@ def history_command() -> ConfigureHistory:
     )
 
 
-def history_store(engine: AsyncEngine) -> TransactionalHistoryStore:
-    return TransactionalHistoryStore(lambda: PostgresHistoryUnitOfWork(engine))
+def history_store(engine: AsyncEngine) -> TransactionalHistoryAdministrationStore:
+    return TransactionalHistoryAdministrationStore(
+        lambda: PostgresHistoryUnitOfWork(engine),
+        administration_unit_of_work=lambda: PostgresHistoryAdministrationUnitOfWork(engine),
+    )
 
 
 def history_page(claim: HistoryClaim) -> ProviderObservationPage:

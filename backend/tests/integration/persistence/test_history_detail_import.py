@@ -40,7 +40,9 @@ from ci_coordinator.persistence._schema_ci_history_control import (
     ci_history_datasets,
     ci_history_scans,
 )
-from ci_coordinator.persistence.ci_history_adapters import TransactionalHistoryStore
+from ci_coordinator.persistence.ci_history_adapters import (
+    TransactionalHistoryAdministrationStore,
+)
 from ci_coordinator.persistence.ci_history_codec import encode_archive_statistics
 from ci_coordinator.persistence.ci_history_control_codec import (
     encode_history_dataset,
@@ -87,7 +89,7 @@ def _command(
 
 
 async def _claim_attempt(
-    store: TransactionalHistoryStore, command: ConfigureHistory
+    store: TransactionalHistoryAdministrationStore, command: ConfigureHistory
 ) -> tuple[HistoryDataset, HistoryClaim]:
     configured = await store.configure_history(command)
     assert isinstance(configured, HistoryConfigured)

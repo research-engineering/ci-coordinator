@@ -87,6 +87,7 @@ def _reset_ledger(database_url: str) -> None:
             "ci_coordinator.ci_history_attempts, ci_coordinator.ci_history_gaps, "
             "ci_coordinator.ci_history_rechecks, ci_coordinator.ci_history_scans, "
             "ci_coordinator.analytics_purpose_settings, "
+            "ci_coordinator.ci_history_population_bounds, "
             "ci_coordinator.ci_history_datasets, "
             "ci_coordinator.ci_history_defaults, "
             "ci_coordinator.ci_history_delivery_inbox, "

@@ -304,6 +304,21 @@
   ],
   "implementationInventory": [
     {
+      "path": "backend/alembic/versions/20261012_0020_history_population_bound.py",
+      "responsibility": "generation-twenty append-only history population-bound provenance expansion over the exact registered-epoch review head",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/src/ci_coordinator/persistence/ci_history_population_bound_schema_contract.py",
+      "responsibility": "exact history population-bound provenance catalog contract shared by migration and runtime admission",
+      "proofClass": "postgres"
+    },
+    {
+      "path": "backend/tests/integration/persistence/test_history_population_bound_migration.py",
+      "responsibility": "native atomic forward expansion, replay, downgrade refusal, damaged catalog, catalog-floor and predecessor runtime-role admission falsifiers",
+      "proofClass": "postgres"
+    },
+    {
       "path": "backend/alembic/versions/20261011_0019_registered_epoch_review.py",
       "responsibility": "generation-nineteen registered-epoch review expansion over the exact logout-fence head",
       "proofClass": "postgres"

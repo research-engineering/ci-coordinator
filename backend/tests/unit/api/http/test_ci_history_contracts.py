@@ -1,4 +1,5 @@
 from dataclasses import replace
+from datetime import datetime
 from typing import Literal
 
 import pytest
@@ -12,12 +13,14 @@ from pydantic import ValidationError
 
 from ci_coordinator.api.http.ci_history_contracts import (
     HistoryMutationResponse,
+    HistoryPopulationBoundResponse,
     history_status_response,
 )
 from ci_coordinator.ci_economics.archive_retention import DetailRetentionPolicy
 from ci_coordinator.ci_economics.history_administration import HistoryStatus
 from ci_coordinator.ci_economics.history_configuration import HistoryConfiguration, HistoryDefaults
 from ci_coordinator.ci_economics.history_payload import HistoryDatasetPayload
+from ci_coordinator.ci_economics.history_population_bound import HistoryPopulationBound
 from ci_coordinator.ci_economics.history_scan import acquire_history_claim
 
 
@@ -61,8 +64,15 @@ def test_public_progress_is_allowlisted_and_effective_policy_has_exact_origin(
         "snapshot",
         "scan",
         "discovery",
+        "populationBound",
         "pendingRechecks",
         "observedAt",
+    }
+    assert body["populationBound"] == {
+        "createdFrom": "2019-01-01T00:00:00Z",
+        "source": "unrecorded",
+        "repositoryCreatedAt": None,
+        "recordedAt": None,
     }
     assert body["effectiveDetailRetention"] == {
         "source": "repository_override" if override else "service_default",
@@ -108,6 +118,7 @@ def test_unconfigured_status_has_defaults_without_invented_progress() -> None:
     )
     response = history_status_response(status)
     assert response.scan is None and response.snapshot is None
+    assert response.population_bound is None
     assert response.effective_detail_retention is None and response.pending_rechecks == 0
     assert response.defaults.detail_retention.to_policy() == status.defaults.detail_retention
 
@@ -150,3 +161,100 @@ def test_every_outcome_snapshot_pair_is_admitted_if_and_only_if_consistent(
     else:
         with pytest.raises(ValidationError, match="contradicts"):
             HistoryMutationResponse(operation_id="operation-1", outcome=outcome, snapshot=snapshot)
+
+
+@pytest.mark.parametrize(
+    "recorded,expected",
+    [
+        (
+            HistoryPopulationBound(
+                history_dataset().scope,
+                1,
+                ARCHIVE_TIME.replace(year=2019),
+                "repository_created_at",
+                ARCHIVE_TIME.replace(year=2019, hour=12, minute=34, second=56),
+                1,
+                ARCHIVE_TIME,
+            ),
+            {
+                "createdFrom": "2019-01-01T00:00:00Z",
+                "source": "repository_created_at",
+                "repositoryCreatedAt": "2019-01-01T12:34:56Z",
+                "recordedAt": "2020-01-01T00:00:00Z",
+            },
+        ),
+        (
+            HistoryPopulationBound(
+                history_dataset().scope,
+                1,
+                ARCHIVE_TIME.replace(year=2019),
+                "explicit",
+                None,
+                1,
+                ARCHIVE_TIME,
+            ),
+            {
+                "createdFrom": "2019-01-01T00:00:00Z",
+                "source": "explicit",
+                "repositoryCreatedAt": None,
+                "recordedAt": "2020-01-01T00:00:00Z",
+            },
+        ),
+        (
+            HistoryPopulationBound(
+                history_dataset().scope,
+                1,
+                ARCHIVE_TIME.replace(year=2019, month=6),
+                "explicit",
+                None,
+                1,
+                ARCHIVE_TIME,
+            ),
+            {
+                "createdFrom": "2019-01-01T00:00:00Z",
+                "source": "unrecorded",
+                "repositoryCreatedAt": None,
+                "recordedAt": None,
+            },
+        ),
+    ],
+)
+def test_history_status_population_bound_projection(
+    recorded: HistoryPopulationBound, expected: dict[str, object]
+) -> None:
+    # Kills: wire alias drift, a stale (non-current) row shown as provenance, or a null branch.
+    dataset = history_dataset()
+    status = HistoryStatus(
+        dataset.scope,
+        HistoryDefaults(1, DetailRetentionPolicy.default(), ARCHIVE_TIME),
+        dataset,
+        history_scan(dataset),
+        0,
+        ARCHIVE_TIME,
+        history_discovery(dataset),
+        recorded,
+    )
+    assert history_status_response(status).to_wire_mapping()["populationBound"] == expected
+
+
+@pytest.mark.parametrize(
+    "source,created_at,recorded_at",
+    [
+        ("unrecorded", None, ARCHIVE_TIME),
+        ("explicit", ARCHIVE_TIME, ARCHIVE_TIME),
+        ("explicit", None, None),
+        ("repository_created_at", None, ARCHIVE_TIME),
+    ],
+)
+def test_population_bound_response_rejects_contradictory_evidence(
+    source: Literal["explicit", "repository_created_at", "unrecorded"],
+    created_at: datetime | None,
+    recorded_at: datetime | None,
+) -> None:
+    with pytest.raises(ValidationError, match="contradicts its evidence"):
+        HistoryPopulationBoundResponse(
+            created_from=ARCHIVE_TIME,
+            source=source,
+            repository_created_at=created_at,
+            recorded_at=recorded_at,
+        )

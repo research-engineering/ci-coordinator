@@ -51,9 +51,56 @@ CommittedConfiguration(command) =>
 An initial request declares the lower bound explicitly; an update cannot
 silently change it. A rescan is an explicit operation on an existing dataset.
 The UI must distinguish all workflows from selected workflow identities and
-show the chosen interval. A provider creation date may supply a separately
-validated suggestion; neither an arbitrary old date nor an empty result proves
-that all available history was scanned.
+show the chosen interval. Neither an arbitrary old date, a repository creation
+date nor an empty result proves that all available history was scanned.
+
+### Catalog Population Source
+
+Provisional owner decision (2026-10-11), Q-007 (a). The optional
+`populationBoundSource` (`{kind: "repository_created_at", repositoryCreatedAt}`)
+marks an explicit "All available" choice. It is admitted only with exactly one
+population bound, initial `initialCreatedFrom` or `expandCreatedFrom`, equal to
+the UTC-day floor of the asserted instant; plain updates and rescans reject it.
+Absence is the only spelling of an explicit bound. Omitted and explicit `null`
+serialize without the key, so every existing command keeps its digest bytes;
+a present source is bound by `commandDigest`.
+
+```text
+CatalogSourceAdmitted(c) =>
+  exactlyOne(c.initialCreatedFrom, c.expandCreatedFrom) = utcDayFloor(c.repositoryCreatedAt)
+  and Authorized(c) precedes ProviderRead(c.scope)
+  and ProviderRead(c.scope).createdAt = c.repositoryCreatedAt
+  and c.repositoryCreatedAt <= DatabaseNow
+```
+
+Order inside the single administration deadline: repository authorization;
+for a catalog source only, a short transaction that classifies a retained
+receipt (replay or `operation_conflict`, with no provider read); then one
+installation-token `GET /repositories/{id}` through the existing
+`repositories.get_by_id` admission, response binding and creation-date grammar
+shared with the provider inventory; then the configuration transaction. No
+transaction is open during the provider read. Explicit-date requests take
+none of these steps.
+
+| Provider or database outcome                                    | Result                                                  |
+|-----------------------------------------------------------------|---------------------------------------------------------|
+| unavailable, malformed, foreign repository id, non-success read | 503 unavailable, retryable; no transaction              |
+| creation date absent or `null`                                  | 422 `creation_date_missing`; no transaction             |
+| creation date differs from the asserted instant                 | 422 `creation_date_mismatch`; no transaction            |
+| asserted instant later than database time                       | 422 `creation_date_in_future`; no audit and no writes   |
+| equal                                                           | ordinary configuration with recorded provenance         |
+
+Deadline expiry is unavailable and cancellation propagates. The store
+re-classifies a receipt first, so a concurrent identical commit still replays,
+and it refuses (unavailable) a catalog source without a server observation of
+the same scope and instant, so a caller that skips verification cannot record
+`repository_created_at`. Replay of a catalog-source receipt requires its
+provenance row for the receipt generation unless erasure has advanced the
+generation; an explicit receipt requires none because a predecessor binary may
+have committed it. The audit payload stays exactly `{commandDigest, snapshot}`.
+Verification proves only that, at save time, an installation-token read of the
+scoped repository reported this creation instant. GitHub unavailability refuses
+"All available" while an explicit date remains available.
 
 An exact successful receipt must match the requested scope, configuration and
 `expectedRevision + 1`. A replay receipt describes the original committed
@@ -67,6 +114,8 @@ count in one PostgreSQL statement snapshot. Use a left join from the required
 defaults singleton so an unconfigured scope has a real response. Decode each
 row with its existing persistence codec; reject missing defaults, half a pair,
 foreign identities and contradictory generation or configuration revisions.
+The same statement joins, laterally, the earliest current-generation row of
+`ci_history_population_bounds`; it adds no lock and no provider call.
 
 ```text
 StatusAdmitted(s) =>
@@ -78,6 +127,10 @@ StatusAdmitted(s) =>
     and dataset.generation = scan.generation
     and dataset.configurationRevision = scan.configurationRevision)
   and 0 <= pendingRechecks <= MaxHistoryRechecks
+  and (BoundPresent(s) =>
+    bound.scope = s.scope and bound.generation = dataset.generation
+    and bound.createdFrom >= scan.createdFrom)
+  and (CurrentProvenance(s) <=> BoundPresent(s) and bound.createdFrom = scan.createdFrom)
 ```
 
 The snapshot carries database observation time. It is not a lease or write
@@ -142,7 +195,18 @@ Unauthenticated is 401 with `WWW-Authenticate`, denied is 403, unavailable or
 overloaded is 503, and the body bound is 413. Errors disclose no internal cause.
 
 Status includes the technical defaults, separately resolved effective policy,
-optional dataset and scan, bounded pending count and observation time. Scan
+optional dataset and scan, bounded pending count and observation time.
+`populationBound` is `null` without a scan; otherwise it names the cursor's
+`createdFrom` with `source` `explicit` or `repository_created_at` (with the
+verified `repositoryCreatedAt` and `recordedAt`) or `unrecorded` (both `null`).
+The operator UI admits catalog provenance only when the creation instant is not
+later than `recordedAt`, the same relation the backend value type enforces.
+The status keeps `ci-economics-history-status/v1`, following the `discovery`
+precedent: strict clients fail closed, so an already-open tab rejects the
+added key and shows the status as unavailable rather than partial (O-2,
+resolved 2026-10-11). A version literal alone would not restore compatibility
+without negotiation. A catalog refusal is 422 with a `HistoryMutationResponse`
+whose closed `outcome` names the reason and whose snapshot is `null`. Scan
 progress exposes interval, current window/page, revision, cycle start, retry
 time, optional lease expiry, counters, last outcome and traversal completion.
 A lease expiry is scheduling information, not proof a worker is running.
@@ -167,7 +231,7 @@ not the router. Command bytes, aliases and digest remain unchanged. Independent
 witnesses must cover forged instances, actor spoofing, every shared numeric
 position, and the actual mounted adapter, not only standalone model admission.
 
-The five response models, route and transitive schema owners are registered in
+The response models, route and transitive schema owners are registered in
 the existing model inventory and OpenAPI provenance manifest. Exact inventory
 equality remains enforced; a generated schema alone is not proof of strict
 runtime admission or complete source provenance.
@@ -178,8 +242,24 @@ The repository Economics console owns a lazy History tab. It separates
 historical collection from the recent observation window and keeps the existing
 repository and session remount fence. The form offers an explicit initial UTC
 date, all or selected workflows, enabled/paused state and an explicit rescan.
-The provider catalog is reused, not copied. A selected initial date defines the
-requested population; it is not represented as the repository creation date.
+The provider catalog is reused, not copied. An initial import requires an
+explicit choice between "All available (from repository creation date)" and
+"From a specific date (UTC)"; enabling collection chooses neither and saves
+nothing. Only the explicit all-available choice is represented as the
+repository creation date, with the recorded catalog instant. Editing the date
+afterwards returns to the explicit mode and drops the source, so a stale source
+never accompanies a hand-edited date. Reloading the saved configuration clears
+the range choice together with its date, so neither mode survives a reload or a
+refused save without being chosen again. An existing dataset offers "Extend to all
+available" only when the floored date is strictly earlier than the current
+bound, under the existing expansion constraints. Missing or invalid catalog
+metadata, a deep link without catalog selection, or a floor not earlier than
+the current bound disables the choice with an explicit status text and no
+fallback date. Selecting or recording the choice shows that GitHub may no
+longer retain the oldest runs. Server refusals are shown as such; a mismatch
+asks the operator to reload the repository catalog. Progress labels the current
+bound as repository creation date (with the catalog instant), explicit date or
+provenance not recorded, from status after reload.
 Once visited, History and Observation remain mounted within that scoped console;
 switching sibling tabs preserves drafts and unresolved commands but suspends
 their status readers. A true scope or session-authority replacement still
@@ -194,7 +274,8 @@ owner's first-import rules, not as an implicit rewrite of already imported data.
 
 The client admits generated-contract responses with strict Zod schemas and
 exact scope, operation, revision, configuration and outcome relations. A400
-`invalid_population` is a known rejection, not an unknown transport result.
+`invalid_population` is a known rejection, not an unknown transport result;
+a 422 catalog refusal is admitted only for a command that carried the source.
 One in-flight mutation owns its frozen command. Unknown outcome freezes editing
 and permits only explicit retry of that same command; session recovery never
 replays it automatically. A new receipt triggers a current status read.

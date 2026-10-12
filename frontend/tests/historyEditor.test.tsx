@@ -27,7 +27,7 @@ function props() {
   return { scope: HISTORY_SCOPE, status: historyStatus(), session, stale: false, onSaved: vi.fn() };
 }
 
-test("repository creation date is an explicit UTC shortcut, not an automatic write", async () => {
+test("all available is an explicit catalog choice, not an automatic write", async () => {
   vi.stubGlobal("fetch", vi.fn());
   render(
     <HistoryEditor
@@ -37,48 +37,268 @@ test("repository creation date is an explicit UTC shortcut, not an automatic wri
     />,
   );
   expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("");
+  expect(screen.getByRole("radio", { name: /All available/ })).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "Save history" })).toBeDisabled();
+  await userEvent.click(screen.getByRole("checkbox", { name: "Collection enabled" }));
   expect(screen.getByRole("button", { name: "Save history" })).toBeDisabled();
   await userEvent.click(
-    screen.getByRole("button", { name: "Use repository creation date (2020-01-01)" }),
+    screen.getByRole("radio", { name: "All available (from repository creation date)" }),
   );
   expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("2020-01-01");
   expect(screen.getByRole("button", { name: "Save history" })).toBeEnabled();
   expect(fetch).not.toHaveBeenCalled();
 });
 
-test("creation shortcut only offers a genuinely earlier bound and leaves manual dates available", async () => {
+test("all available resolves the catalog creation date at save time and records its source", async () => {
+  const commands: HistoryCommand[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      const command: HistoryCommand = await request.json();
+      commands.push(command);
+      return Response.json(historyMutation(command));
+    }),
+  );
+  render(
+    <HistoryEditor
+      {...props()}
+      status={historyStatus(null)}
+      repositoryCreatedAt="2020-01-01T23:59:59Z"
+    />,
+  );
+  await userEvent.click(screen.getByRole("radio", { name: /All available/ }));
+  expect(
+    screen.getByText(
+      /Import starts at 2020-01-01 \(repository creation date, catalog 2020-01-01T23:59:59Z\)/,
+    ),
+  ).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Save history" }));
+  await screen.findByText(/Saved revision 1\./);
+  expect(commands).toHaveLength(1);
+  expect(commands[0]?.initialCreatedFrom).toBe("2020-01-01T00:00:00Z");
+  expect(commands[0]?.populationBoundSource).toEqual({
+    kind: "repository_created_at",
+    repositoryCreatedAt: "2020-01-01T23:59:59+00:00",
+  });
+});
+
+test("all-available notice states GitHub may not retain the oldest runs", async () => {
   vi.stubGlobal("fetch", vi.fn());
+  render(
+    <HistoryEditor
+      {...props()}
+      status={historyStatus(null)}
+      repositoryCreatedAt="2020-01-01T12:34:56Z"
+    />,
+  );
+  expect(screen.queryByText(/GitHub may no longer retain the oldest runs/)).toBeNull();
+  await userEvent.click(screen.getByRole("radio", { name: /All available/ }));
+  expect(screen.getByText(/GitHub may no longer retain the oldest runs/)).toBeVisible();
+});
+
+test("editing the date after choosing all available drops the catalog source", async () => {
+  const commands: HistoryCommand[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      const command: HistoryCommand = await request.json();
+      commands.push(command);
+      return Response.json(historyMutation(command));
+    }),
+  );
+  render(
+    <HistoryEditor
+      {...props()}
+      status={historyStatus(null)}
+      repositoryCreatedAt="2020-01-01T12:34:56Z"
+    />,
+  );
+  await userEvent.click(screen.getByRole("radio", { name: /All available/ }));
+  // React suppresses a change event whose value equals the tracked value, so the edit moves
+  // away from the creation day and back; the source must not return with the same date.
+  const dateInput = screen.getByLabelText("Import runs created since (UTC)");
+  fireEvent.change(dateInput, { target: { value: "2020-01-02" } });
+  expect(screen.getByRole("radio", { name: "From a specific date (UTC)" })).toBeChecked();
+  fireEvent.change(dateInput, { target: { value: "2020-01-01" } });
+  expect(dateInput).toHaveValue("2020-01-01");
+  expect(screen.getByRole("radio", { name: "From a specific date (UTC)" })).toBeChecked();
+  expect(screen.queryByText(/GitHub may no longer retain the oldest runs/)).toBeNull();
+  await userEvent.click(screen.getByRole("button", { name: "Save history" }));
+  await screen.findByText(/Saved revision 1\./);
+  expect(commands[0]?.initialCreatedFrom).toBe("2020-01-01T00:00:00Z");
+  expect(commands[0]).not.toHaveProperty("populationBoundSource");
+});
+
+test.each([
+  [undefined, "did not provide a creation date"],
+  ["2020-01-01T12:34:56+02:00", "creation date is invalid"],
+  ["2026-09-12T10:00:01Z", "creation date is invalid"],
+] as const)(
+  "catalog creation date %s refuses all available without a fallback",
+  (createdAt, reason) => {
+    vi.stubGlobal("fetch", vi.fn());
+    render(
+      <HistoryEditor {...props()} status={historyStatus(null)} repositoryCreatedAt={createdAt} />,
+    );
+    expect(screen.getByRole("radio", { name: /All available/ })).toBeDisabled();
+    expect(screen.getByText(new RegExp(`All available is unavailable: .*${reason}`))).toBeVisible();
+    expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "Save history" })).toBeDisabled();
+  },
+);
+
+test.each([
+  ["2026-09-12T10:00:00Z", true],
+  ["2019-12-31T23:59:59Z", true],
+] as const)("initial creation bound %s offers all available=%s", (createdAt, offered) => {
+  vi.stubGlobal("fetch", vi.fn());
+  render(
+    <HistoryEditor {...props()} status={historyStatus(null)} repositoryCreatedAt={createdAt} />,
+  );
+  expect(screen.getByRole("radio", { name: /All available/ })).toHaveProperty("disabled", !offered);
+  expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("");
+});
+
+test("extending to all available offers only a genuinely earlier bound and leaves manual dates available", async () => {
+  const commands: HistoryCommand[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      const command: HistoryCommand = await request.json();
+      commands.push(command);
+      return Response.json(historyMutation(command));
+    }),
+  );
   const view = render(<HistoryEditor {...props()} repositoryCreatedAt="2019-12-01T12:00:00Z" />);
-  await userEvent.click(screen.getByRole("button", { name: /Use repository creation date/ }));
+  await userEvent.click(
+    screen.getByRole("button", {
+      name: "Extend to all available (from repository creation date, 2019-12-01)",
+    }),
+  );
   expect(screen.getByLabelText("Extend import back to (UTC)")).toHaveValue("2019-12-01");
+  expect(screen.getByText(/GitHub may no longer retain the oldest runs/)).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Save history" }));
+  await screen.findByText(/Saved revision 2\./);
+  expect(commands[0]?.expandCreatedFrom).toBe("2019-12-01T00:00:00Z");
+  expect(commands[0]?.populationBoundSource?.repositoryCreatedAt).toBe("2019-12-01T12:00:00+00:00");
   view.rerender(<HistoryEditor {...props()} repositoryCreatedAt="2025-01-01T00:00:00Z" />);
-  expect(screen.queryByRole("button", { name: /Use repository creation date/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Extend to all available/ })).toBeNull();
   fireEvent.change(screen.getByLabelText("Extend import back to (UTC)"), {
     target: { value: "2019-11-01" },
   });
   expect(screen.getByLabelText("Extend import back to (UTC)")).toHaveValue("2019-11-01");
 });
 
-test.each([
-  [undefined, false],
-  ["2026-09-12T10:00:01Z", false],
-  ["2026-09-12T10:00:00Z", true],
-  ["2019-12-31T23:59:59Z", true],
-] as const)("initial creation bound %s offers shortcut=%s", (createdAt, offered) => {
-  vi.stubGlobal("fetch", vi.fn());
-  render(
-    <HistoryEditor {...props()} status={historyStatus(null)} repositoryCreatedAt={createdAt} />,
-  );
-  expect(Boolean(screen.queryByRole("button", { name: /Use repository creation date/ }))).toBe(
-    offered,
-  );
-  expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("");
-});
-
 test("creation date equal to the existing lower bound cannot request an empty expansion", () => {
   vi.stubGlobal("fetch", vi.fn());
   render(<HistoryEditor {...props()} repositoryCreatedAt="2020-01-01T00:00:00Z" />);
-  expect(screen.queryByRole("button", { name: /Use repository creation date/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Extend to all available/ })).toBeNull();
+  expect(
+    screen.getByText("History already starts at or before the repository creation date."),
+  ).toBeVisible();
+});
+
+test.each([
+  ["creation_date_missing", "GitHub did not report a creation date"],
+  ["creation_date_mismatch", "Reload the repository catalog"],
+  ["creation_date_in_future", "later than the current server time"],
+] as const)("server refusal %s is shown without substituting a date", async (outcome, message) => {
+  const commands: HistoryCommand[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      const command: HistoryCommand = await request.json();
+      commands.push(command);
+      return Response.json(
+        { ...historyMutation(command), outcome, snapshot: null },
+        { status: 422 },
+      );
+    }),
+  );
+  render(
+    <HistoryEditor
+      {...props()}
+      status={historyStatus(null)}
+      repositoryCreatedAt="2020-01-01T12:34:56Z"
+    />,
+  );
+  await userEvent.click(screen.getByRole("radio", { name: /All available/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Save history" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(message);
+  expect(commands).toHaveLength(1);
+  expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("2020-01-01");
+});
+
+test("reload before saving clears the all-available choice together with its date", async () => {
+  const commands: HistoryCommand[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      const command: HistoryCommand = await request.json();
+      commands.push(command);
+      return Response.json(historyMutation(command));
+    }),
+  );
+  render(
+    <HistoryEditor
+      {...props()}
+      status={historyStatus(null)}
+      repositoryCreatedAt="2020-01-01T12:34:56Z"
+    />,
+  );
+  await userEvent.click(screen.getByRole("radio", { name: /All available/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Reload saved configuration" }));
+  expect(screen.getByRole("radio", { name: /All available/ })).not.toBeChecked();
+  expect(screen.getByRole("radio", { name: "From a specific date (UTC)" })).not.toBeChecked();
+  expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("");
+  expect(screen.queryByText(/GitHub may no longer retain the oldest runs/)).toBeNull();
+  expect(screen.getByRole("button", { name: "Save history" })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("Import runs created since (UTC)"), {
+    target: { value: "2020-01-01" },
+  });
+  expect(screen.getByRole("radio", { name: "From a specific date (UTC)" })).toBeChecked();
+  await userEvent.click(screen.getByRole("button", { name: "Save history" }));
+  await screen.findByText(/Saved revision 1\./);
+  expect(commands).toHaveLength(1);
+  expect(commands[0]?.initialCreatedFrom).toBe("2020-01-01T00:00:00Z");
+  expect(commands[0]).not.toHaveProperty("populationBoundSource");
+});
+
+test("reload after a creation-date refusal requires choosing all available again", async () => {
+  const commands: HistoryCommand[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: Request) => {
+      const command: HistoryCommand = await request.json();
+      commands.push(command);
+      return commands.length === 1
+        ? Response.json(
+            { ...historyMutation(command), outcome: "creation_date_mismatch", snapshot: null },
+            { status: 422 },
+          )
+        : Response.json(historyMutation(command));
+    }),
+  );
+  render(
+    <HistoryEditor
+      {...props()}
+      status={historyStatus(null)}
+      repositoryCreatedAt="2020-01-01T12:34:56Z"
+    />,
+  );
+  await userEvent.click(screen.getByRole("radio", { name: /All available/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Save history" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Reload the repository catalog");
+  await userEvent.click(screen.getByRole("button", { name: "Reload saved configuration" }));
+  expect(screen.getByRole("radio", { name: /All available/ })).not.toBeChecked();
+  expect(screen.getByLabelText("Import runs created since (UTC)")).toHaveValue("");
+  expect(screen.getByRole("button", { name: "Save history" })).toBeDisabled();
+  await userEvent.click(screen.getByRole("radio", { name: /All available/ }));
+  await userEvent.click(screen.getByRole("button", { name: "Save history" }));
+  await screen.findByText(/Saved revision 1\./);
+  expect(commands).toHaveLength(2);
+  expect(commands[1]?.populationBoundSource).toEqual(commands[0]?.populationBoundSource);
+  expect(commands[1]?.operationId).not.toBe(commands[0]?.operationId);
 });
 
 test("explicit range, retention, workflow and quota configure once then pause and rescan", async () => {

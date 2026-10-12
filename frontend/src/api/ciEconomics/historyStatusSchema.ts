@@ -95,6 +95,35 @@ const discoverySchema = z
     );
   });
 
+const populationBoundSchema = z
+  .strictObject({
+    createdFrom: boundary,
+    source: z.enum(["explicit", "repository_created_at", "unrecorded"]),
+    repositoryCreatedAt: observationTimestamp.nullable(),
+    recordedAt: observationTimestamp.nullable(),
+  })
+  .refine((bound) => {
+    const from = observationMicroseconds(bound.createdFrom);
+    const recorded = bound.recordedAt === null ? null : observationMicroseconds(bound.recordedAt);
+    const created =
+      bound.repositoryCreatedAt === null ? null : observationInstant(bound.repositoryCreatedAt);
+    const createdAt =
+      bound.repositoryCreatedAt === null
+        ? null
+        : observationMicroseconds(bound.repositoryCreatedAt);
+    if (from === undefined || recorded === undefined || created === undefined) return false;
+    if (bound.source === "unrecorded") return recorded === null && created === null;
+    if (recorded === null || from > recorded) return false;
+    if (bound.source === "explicit") return created === null;
+    return (
+      created !== null &&
+      createdAt !== null &&
+      createdAt !== undefined &&
+      createdAt <= recorded &&
+      observationInstant(bound.createdFrom) === `${created.slice(0, 10)}T00:00:00.000000Z`
+    );
+  });
+
 export const historyStatusSchema: z.ZodType<HistoryStatus> = z
   .strictObject({
     ...repositoryScopeSchema.shape,
@@ -114,6 +143,7 @@ export const historyStatusSchema: z.ZodType<HistoryStatus> = z
     snapshot: historyDatasetSchema.nullable(),
     scan: scanSchema.nullable(),
     discovery: discoverySchema.nullable(),
+    populationBound: populationBoundSchema.nullable(),
     pendingRechecks: z.number().int().min(0).max(256),
     observedAt: observationTimestamp,
   })
@@ -122,11 +152,28 @@ export const historyStatusSchema: z.ZodType<HistoryStatus> = z
     const defaultsAt = observationMicroseconds(status.defaults.updatedAt);
     if (observed === undefined || defaultsAt === undefined || defaultsAt > observed) return false;
     const { snapshot, scan, discovery, effectiveDetailRetention: effective } = status;
+    const bound = status.populationBound;
     if (snapshot === null)
       return (
-        scan === null && discovery === null && effective === null && status.pendingRechecks === 0
+        scan === null &&
+        discovery === null &&
+        effective === null &&
+        bound === null &&
+        status.pendingRechecks === 0
       );
-    if (scan === null || discovery === null || effective === null || !sameScope(snapshot, status))
+    if (
+      scan === null ||
+      discovery === null ||
+      effective === null ||
+      bound === null ||
+      !sameScope(snapshot, status)
+    )
+      return false;
+    const recorded = bound.recordedAt === null ? null : observationMicroseconds(bound.recordedAt);
+    if (
+      observationMicroseconds(bound.createdFrom) !== observationMicroseconds(scan.createdFrom) ||
+      (recorded !== null && (recorded === undefined || recorded > observed))
+    )
       return false;
     const configured = observationMicroseconds(snapshot.configuredAt);
     const cycle = observationMicroseconds(scan.cycleStartedAt);

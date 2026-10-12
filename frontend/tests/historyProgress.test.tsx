@@ -109,3 +109,37 @@ test("does not render absent lease or discovery fields as present", () => {
     screen.queryByText("Recent discovery pages checked", { exact: true }),
   ).not.toBeInTheDocument();
 });
+
+test.each([
+  [
+    { source: "repository_created_at", repositoryCreatedAt: "2026-09-01T12:34:56Z" },
+    "Lower bound 2026-09-01 (repository creation date, catalog 2026-09-01T12:34:56Z)",
+    true,
+  ],
+  [
+    { source: "explicit", repositoryCreatedAt: null },
+    "Lower bound 2026-09-01 (explicit date)",
+    false,
+  ],
+  [
+    { source: "unrecorded", repositoryCreatedAt: null, recordedAt: null },
+    "Lower bound 2026-09-01 (provenance not recorded)",
+    false,
+  ],
+] as const)("population bound provenance %j is labelled", (provenance, label, notice) => {
+  const status = progressStatus();
+  render(
+    <HistoryProgress
+      status={{
+        ...status,
+        populationBound: {
+          createdFrom: TIMESTAMPS.requestedFrom,
+          recordedAt: TIMESTAMPS.observedAt,
+          ...provenance,
+        },
+      }}
+    />,
+  );
+  expect(screen.getByText(label)).toBeVisible();
+  expect(Boolean(screen.queryByText(/GitHub may no longer retain the oldest runs/))).toBe(notice);
+});

@@ -32,6 +32,9 @@ class HistoryMutationResponse(ResponseModel):
         "dataset_fenced",
         "pending_work",
         "invalid_population",
+        "creation_date_missing",
+        "creation_date_mismatch",
+        "creation_date_in_future",
     ]
     snapshot: HistoryDatasetPayload | None
 
@@ -77,6 +80,23 @@ class HistoryDiscoveryResponse(ResponseModel):
     progress: HistoryScanResponse
 
 
+class HistoryPopulationBoundResponse(ResponseModel):
+    """Provenance of the current backfill lower bound; unrecorded when none is retained."""
+
+    created_from: datetime
+    source: Literal["explicit", "repository_created_at", "unrecorded"]
+    repository_created_at: datetime | None
+    recorded_at: datetime | None
+
+    @model_validator(mode="after")
+    def admit_source(self) -> Self:
+        if (self.source == "unrecorded") != (self.recorded_at is None) or (
+            self.source == "repository_created_at"
+        ) != (self.repository_created_at is not None):
+            raise ValueError("history population bound source contradicts its evidence")
+        return self
+
+
 class HistoryStatusResponse(ResponseModel):
     schema_version: Literal["ci-economics-history-status/v1"] = "ci-economics-history-status/v1"
     installation_id: ObservationPositiveId
@@ -86,6 +106,7 @@ class HistoryStatusResponse(ResponseModel):
     snapshot: HistoryDatasetPayload | None
     scan: HistoryScanResponse | None
     discovery: HistoryDiscoveryResponse | None
+    population_bound: HistoryPopulationBoundResponse | None
     pending_rechecks: int = Field(ge=0, le=MAX_HISTORY_RECHECK_RUNS)
     observed_at: datetime
 
@@ -128,8 +149,29 @@ def history_status_response(status: HistoryStatus) -> HistoryStatusResponse:
         else HistoryDatasetPayload.model_validate(dataset.canonical_mapping()),
         scan=None if scan is None else _scan_response(scan),
         discovery=recent,
+        population_bound=None if scan is None else _population_bound_response(status),
         pending_rechecks=status.pending_rechecks,
         observed_at=status.observed_at,
+    )
+
+
+def _population_bound_response(status: HistoryStatus) -> HistoryPopulationBoundResponse:
+    if status.scan is None:
+        raise ValueError("history population bound requires a backfill scan")
+    created_from = status.scan.checkpoint.cursor.created_from
+    bound = status.current_population_bound
+    if bound is None:
+        return HistoryPopulationBoundResponse(
+            created_from=created_from,
+            source="unrecorded",
+            repository_created_at=None,
+            recorded_at=None,
+        )
+    return HistoryPopulationBoundResponse(
+        created_from=bound.created_from,
+        source=bound.source,
+        repository_created_at=bound.repository_created_at,
+        recorded_at=bound.recorded_at,
     )
 
 
