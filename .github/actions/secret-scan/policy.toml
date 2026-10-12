@@ -3,6 +3,13 @@ title = "CI assurance secret policy"
 [extend]
 useDefault = true
 
+[[rules]]
+id = "workstation-home-path"
+description = "Absolute macOS or Windows workstation home path with a user segment; publish repository-relative or synthetic paths."
+regex = '''(?:^|[^A-Za-z0-9._~%-])((?:[A-Za-z]:)?/Users/[A-Za-z0-9._-]+/|[A-Za-z]:\\{1,2}Users\\{1,2}[^\\/\r\n"'<>|:*?]+\\)'''
+secretGroup = 1
+keywords = ["/users/", '\users\']
+
 [[allowlists]]
 description = "Public cryptography type annotation in audit checkpoint fixtures; not key material."
 targetRules = ["generic-api-key"]
@@ -66,3 +73,11 @@ condition = "AND"
 regexTarget = "secret"
 paths = ['''^proofkit/routes/developer\-environment\.v2\.json$''']
 regexes = ['''^dev004\-secret\-falsifiers$''']
+
+[[allowlists]]
+description = "Synthetic cache placeholder in the exact upstream Grype database-status fixture; not a workstation path."
+targetRules = ["workstation-home-path"]
+condition = "AND"
+regexTarget = "secret"
+paths = ['''^scripts/tests/test_release_grype_db_status\.json$''']
+regexes = ['''^\/Users\/test\/$''']

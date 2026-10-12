@@ -24,3 +24,18 @@ See GitHub's guidance on
 Test only systems you own or have explicit permission to test. Access to this
 repository does not authorize testing third-party or corporate deployments.
 Use a controlled reproduction without exposing other users' data or credentials.
+
+## Telemetry and Data Retention
+
+CI Coordinator sends no usage telemetry, crash reports or analytics to the
+project maintainers or any other third party. The service connects only to the
+GitHub API and OAuth endpoints, the GitHub Actions OIDC key set, the configured
+Keycloak issuer and, when configured, the operator's outbound proxy. It exposes
+Prometheus metrics for an authorized scraper and writes redacted structured
+logs to standard error; the operator owns their collection and retention.
+
+The operator's PostgreSQL database holds provider metadata, imported Actions
+history, configuration, administrator sessions and the append-only audit
+ledger. Retention administration and destructive erasure remain open roadmap
+work (CI-010 and CI-011); see [history retention](docs/features/actions-history-retention.md).
+Backups, WAL and exports are additional operator-held copies.

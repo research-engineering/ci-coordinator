@@ -209,6 +209,11 @@ history identity fails when history is required. Tree-only manual inspection
 must not claim intermediate-commit coverage. A candidate-owned ignore file or
 scanner configuration must not silently override the admitted scanner policy.
 
+The admitted policy also rejects macOS and Windows workstation home paths with
+a user segment as an export-privacy guard. Its scope, exception and non-claims
+are owned by the [portability record](open-source-portability.md#qualification-record-2026-10-11);
+it is additive and does not weaken a secret rule or fixture exception.
+
 The action resolves its own packaged tooling through the action source path;
 it never assumes that caller checkout contains the platform implementation.
 General quality jobs use read-only contents access and no product credentials.
