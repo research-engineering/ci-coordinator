@@ -11,6 +11,8 @@ type JobItem = WorkflowItem["jobs"][number];
 type CallEdge = WorkflowDiscoveryReport["callEdges"][number];
 type SourceItem = WorkflowDiscoveryReport["sources"][number];
 type AdoptionItem = WorkflowDiscoveryReport["adoptionAssessments"][number];
+type RequiredChange = AdoptionItem["requiredChanges"][number];
+type UnknownItem = WorkflowDiscoveryReport["unknowns"][number];
 
 interface JobRow {
   readonly job: JobItem;
@@ -27,42 +29,72 @@ const SOURCE_COLUMNS: readonly DataColumn<SourceItem>[] = [
   { header: "Bytes", render: (source) => formatInteger(source.size) },
 ];
 
-const ADOPTION_COLUMNS: readonly DataColumn<AdoptionItem>[] = [
-  {
-    header: "Workflow",
-    render: (item) => <code>{item.workflowPath}</code>,
-  },
-  {
-    header: "State",
-    render: (item) => (
-      <StatusBadge
-        tone={
-          item.state === "in_place_job_set" ||
-          item.state === "reusable_workflow_set" ||
-          item.state === "witness_shards"
-            ? "positive"
-            : "warning"
-        }
-      >
-        {formatAdoptionValue(item.state)}
-      </StatusBadge>
-    ),
-  },
-  {
-    header: "Recommended adapter",
-    render: (item) => formatAdoptionValue(item.recommendedAdapter),
-  },
-  {
-    header: "Owner action",
-    render: (item) =>
-      item.requiredOwnerInputs.length === 0 ? "None" : item.requiredOwnerInputs.join(", "),
-  },
-  {
-    header: "Blockers",
-    render: (item) =>
-      item.blockers.length === 0 ? "None" : item.blockers.map(formatAdoptionValue).join(", "),
-  },
-];
+const JOB_ROLE_LABELS: Readonly<Record<NonNullable<RequiredChange["role"]>, string>> = {
+  execution: "execution",
+  fallback: "FullCI fallback",
+  gate: "aggregate gate",
+  invocation_classifier: "invocation classifier",
+  plan: "plan",
+  plan_request: "plan request",
+};
+
+function adoptionColumns(
+  unknownsById: ReadonlyMap<string, UnknownItem>,
+): readonly DataColumn<AdoptionItem>[] {
+  return [
+    {
+      header: "Workflow",
+      render: (item) => <code>{item.workflowPath}</code>,
+    },
+    {
+      header: "State",
+      render: (item) => (
+        <StatusBadge
+          tone={
+            item.state === "in_place_job_set" ||
+            item.state === "reusable_workflow_set" ||
+            item.state === "witness_shards"
+              ? "positive"
+              : "warning"
+          }
+        >
+          {formatAdoptionValue(item.state)}
+        </StatusBadge>
+      ),
+    },
+    {
+      header: "Recommended adapter",
+      render: (item) => formatAdoptionValue(item.recommendedAdapter),
+    },
+    {
+      header: "Support profile",
+      render: (item) =>
+        item.supportProfileId === null ? (
+          <StatusBadge tone="warning">unadmitted: full validation only</StatusBadge>
+        ) : (
+          <code>{item.supportProfileId}</code>
+        ),
+    },
+    {
+      header: "Consumer changes",
+      render: (item) => <RequiredChangeList changes={item.requiredChanges} />,
+    },
+    {
+      header: "Unknown semantics",
+      render: (item) => <UnknownList ids={item.unknownIds} unknownsById={unknownsById} />,
+    },
+    {
+      header: "Owner action",
+      render: (item) =>
+        item.requiredOwnerInputs.length === 0 ? "None" : item.requiredOwnerInputs.join(", "),
+    },
+    {
+      header: "Blockers",
+      render: (item) =>
+        item.blockers.length === 0 ? "None" : item.blockers.map(formatAdoptionValue).join(", "),
+    },
+  ];
+}
 
 const WORKFLOW_COLUMNS: readonly DataColumn<WorkflowItem>[] = [
   {
@@ -182,6 +214,7 @@ export function WorkflowDiscoveryInventory({ report }: WorkflowDiscoveryInventor
   const jobs: JobRow[] = report.workflows.flatMap((workflowItem) =>
     workflowItem.jobs.map((jobItem) => ({ job: jobItem, workflowPath: workflowItem.path })),
   );
+  const unknownsById = new Map(report.unknowns.map((entry) => [entry.unknownId, entry]));
   return (
     <div className="discovery-section-stack">
       <details className="evidence-section" open>
@@ -193,7 +226,7 @@ export function WorkflowDiscoveryInventory({ report }: WorkflowDiscoveryInventor
           <span>{formatCount(report.adoptionAssessments.length, "assessment")}</span>
         </summary>
         <DiscoveryTable
-          columns={ADOPTION_COLUMNS}
+          columns={adoptionColumns(unknownsById)}
           emptyLabel="No workflow assessments"
           keyOf={(item) => item.workflowPath}
           label="workflow adoption assessment"
@@ -259,6 +292,101 @@ export function WorkflowDiscoveryInventory({ report }: WorkflowDiscoveryInventor
       </details>
     </div>
   );
+}
+
+function RequiredChangeList({ changes }: { readonly changes: readonly RequiredChange[] }) {
+  if (changes.length === 0) return "None";
+  return (
+    <ul className="workflow-call-list">
+      {changes.map((change) => (
+        <li key={`${change.blocker}/${change.action}/${change.role ?? ""}/${change.jobId ?? ""}`}>
+          {describeRequiredChange(change)}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function UnknownList({
+  ids,
+  unknownsById,
+}: {
+  readonly ids: readonly string[];
+  readonly unknownsById: ReadonlyMap<string, UnknownItem>;
+}) {
+  if (ids.length === 0) return "None";
+  return (
+    <details>
+      <summary>{formatCount(ids.length, "unknown")}</summary>
+      <ul className="workflow-call-list">
+        {ids.map((id) => {
+          const unknown = unknownsById.get(id);
+          return (
+            <li key={id}>
+              {unknown ? (
+                <>
+                  <code>{unknown.field}</code>: {formatAdoptionValue(unknown.reason)}
+                  {unknown.criticality === "safety" ? (
+                    <>
+                      {" "}
+                      <StatusBadge tone="warning">safety</StatusBadge>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <code>{id}</code>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
+  );
+}
+
+function describeRequiredNeeds(change: RequiredChange): string {
+  const values = [
+    ...(change.needs === null
+      ? ["its execution dependencies declared statically (currently unknown)"]
+      : change.needs),
+    ...change.needsControlRoles.map((role) => `the owner-named ${JOB_ROLE_LABELS[role]} job`),
+  ];
+  return values.length === 0 ? "none" : values.join(", ");
+}
+
+function describeRequiredChange(change: RequiredChange): string {
+  const role = change.role === null ? "" : JOB_ROLE_LABELS[change.role];
+  const job = change.jobId ?? "";
+  const needs = describeRequiredNeeds(change);
+  const target = change.jobId === null ? `the owner-named ${role} job` : `${role} job ${job}`;
+  switch (change.action) {
+    case "add_control_job":
+      return `Add an owner-named ${role} job with needs: ${needs}`;
+    case "add_job":
+      return `Add ${role} job ${job} with needs: ${needs}`;
+    case "close_report_call_graph":
+      return "Resolve the unresolved reusable-workflow calls in other workflows";
+    case "declare_registry_workflow":
+      return "Declare this workflow in the target execution registry";
+    case "register_execution_job":
+      return `Register job ${job} as an execution job with needs: ${needs}`;
+    case "remove_or_register_job":
+      return `Remove job ${job} or register it in the target execution registry`;
+    case "repair_other_workflow_sources":
+      return "Repair the other workflow sources that failed to parse";
+    case "repair_target_registry":
+      return "Repair the target execution registry";
+    case "repair_workflow_syntax":
+      return "Repair this workflow's syntax";
+    case "resolve_reusable_workflow_call":
+      return `Resolve the reusable-workflow call in job ${job}`;
+    case "set_job_condition":
+      return `Set ${target} condition to ${change.expectedValue ?? ""}`;
+    case "set_job_name":
+      return `Set ${role} job ${job} name to ${change.expectedValue ?? ""}`;
+    case "set_job_needs":
+      return `Set ${role} job ${job} needs to: ${needs}`;
+  }
 }
 
 function CompactFacts({ values }: { readonly values: readonly (readonly [string, string])[] }) {

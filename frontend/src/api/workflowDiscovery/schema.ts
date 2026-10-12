@@ -16,6 +16,10 @@ const MAX_CALL_EDGES = 4_096;
 const MAX_EVIDENCE_ITEMS = 32_768;
 const MAX_COLLECTION_ITEMS = 20_000;
 const MAX_POLICY_SOURCE_BYTES = 1_572_864;
+const MAX_ADOPTION_REQUIRED_CHANGES = 4_096;
+const GITHUB_COM_SUPPORT_PROFILE_ID = "github.com/github-actions-static/v5";
+// Fixed by the target execution registry; never an owner-selected identity.
+const INVOCATION_CLASSIFIER_JOB_ID = "ci-invocation";
 
 const exactSha1 = z.string().regex(/^[0-9a-f]{40}$/);
 const exactSha256 = z.string().regex(/^[0-9a-f]{64}$/);
@@ -266,12 +270,54 @@ const adoptionNonClaims = z.tuple([
   z.literal("assessment is not runtime behavior proof"),
 ]);
 
+// Coordinator- or provider-side blockers that no consumer edit can remove.
+const NON_CONSUMER_ADOPTION_BLOCKERS: ReadonlySet<string> = new Set([
+  "support_profile_unknown",
+  "target_semantic_projection_unavailable",
+]);
+
+const adoptionRequiredChange = z
+  .strictObject({
+    action: z.enum([
+      "add_control_job",
+      "add_job",
+      "close_report_call_graph",
+      "declare_registry_workflow",
+      "register_execution_job",
+      "remove_or_register_job",
+      "repair_other_workflow_sources",
+      "repair_target_registry",
+      "repair_workflow_syntax",
+      "resolve_reusable_workflow_call",
+      "set_job_condition",
+      "set_job_name",
+      "set_job_needs",
+    ]),
+    blocker: identifier,
+    expectedValue: nullableText,
+    jobId: boundedText(128).nullable(),
+    needs: canonicalTextArray().nullable(),
+    needsControlRoles: z
+      .array(z.enum(["gate", "plan", "plan_request"]))
+      .max(3)
+      .superRefine((value, context) => requireCanonicalKeys(value, context)),
+    role: z
+      .enum(["execution", "fallback", "gate", "invocation_classifier", "plan", "plan_request"])
+      .nullable(),
+  })
+  .refine(
+    (change) =>
+      change.role !== "invocation_classifier" || change.jobId === INVOCATION_CLASSIFIER_JOB_ID,
+    "the invocation classifier job id is fixed",
+  );
+
 const adoptionAssessment = z
   .strictObject({
     blockers: canonicalTextArray(MAX_EVIDENCE_ITEMS),
     inventoryDigest: exactSha256,
     nonClaims: adoptionNonClaims,
     recommendedAdapter: z.enum(["in_place_job_set", "reusable_workflow_set", "full_only", "none"]),
+    requiredChanges: z.array(adoptionRequiredChange).max(MAX_ADOPTION_REQUIRED_CHANGES),
     requiredOwnerInputs: canonicalTextArray(MAX_EVIDENCE_ITEMS),
     state: z.enum([
       "in_place_job_set",
@@ -280,9 +326,28 @@ const adoptionAssessment = z
       "full_only",
       "invalid",
     ]),
+    supportProfileId: z.literal(GITHUB_COM_SUPPORT_PROFILE_ID).nullable(),
+    unknownIds: canonicalTextArray(MAX_EVIDENCE_ITEMS),
     workflowPath,
   })
   .superRefine((value, context) => {
+    const profileBlocked = value.blockers.includes("support_profile_unknown");
+    if ((value.supportProfileId === null) !== profileBlocked) {
+      context.addIssue({ code: "custom", message: "adoption support profile is contradictory" });
+    }
+    const changeBlockers = new Set(value.requiredChanges.map((change) => change.blocker));
+    const actionableBlockers = value.blockers.filter(
+      (blocker) => !NON_CONSUMER_ADOPTION_BLOCKERS.has(blocker),
+    );
+    if (
+      changeBlockers.size !== actionableBlockers.length ||
+      actionableBlockers.some((blocker) => !changeBlockers.has(blocker))
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "adoption required changes do not explain its blockers",
+      });
+    }
     const selectable =
       value.state === "in_place_job_set" || value.state === "reusable_workflow_set";
     if (
@@ -390,6 +455,22 @@ export const workflowDiscoverySchema: z.ZodType<WorkflowDiscoveryReport> = z
       context.addIssue({
         code: "custom",
         message: "adoption assessments do not totally bind the report",
+      });
+    }
+    if (
+      value.adoptionAssessments.some(
+        (assessment) =>
+          !sameValues(
+            assessment.unknownIds,
+            value.unknowns
+              .filter((entry) => entry.provenance.workflowPath === assessment.workflowPath)
+              .map((entry) => entry.unknownId),
+          ),
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "adoption unknowns are not attributed to their exact workflow",
       });
     }
     if (value.proposal.inventoryDigest !== value.inventoryDigest) {

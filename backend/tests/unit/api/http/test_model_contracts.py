@@ -106,6 +106,7 @@ _PROJECTED_RESPONSE_MODELS = {
     ("ci_coordinator.api.http.routers.workbench", "ShardedProfileCapacityResponse"),
     ("ci_coordinator.api.http.routers.workbench", "TruncationResponse"),
     ("ci_coordinator.api.http.workflow_discovery_contracts", "AdoptionAssessmentResponse"),
+    ("ci_coordinator.api.http.workflow_discovery_contracts", "AdoptionRequiredChangeResponse"),
     ("ci_coordinator.api.http.workflow_discovery_contracts", "CallEdgeResponse"),
     ("ci_coordinator.api.http.workflow_discovery_contracts", "ConcurrencyResponse"),
     ("ci_coordinator.api.http.workflow_discovery_contracts", "DiscoveryRepositoryResponse"),

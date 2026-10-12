@@ -12,7 +12,10 @@ import {
 } from "../src/api/providerInventory/schema";
 import { MAX_WORKBENCH_SECTION_ITEMS } from "../src/api/workbench/limits";
 import { workbenchSnapshotSchema } from "../src/api/workbench/schema";
-import { workflowDiscoverySchema } from "../src/api/workflowDiscovery/schema";
+import {
+  type WorkflowDiscoveryReport,
+  workflowDiscoverySchema,
+} from "../src/api/workflowDiscovery/schema";
 import {
   governanceObservationFixture,
   installationCatalogFixture,
@@ -662,6 +665,7 @@ describe("workflow discovery response admission", () => {
           ...assessment,
           blockers: [],
           recommendedAdapter: "none",
+          requiredChanges: [],
           requiredOwnerInputs: [],
           state: "witness_shards",
         },
@@ -669,6 +673,29 @@ describe("workflow discovery response admission", () => {
     });
 
     expect(report.adoptionAssessments[0]?.state).toBe("witness_shards");
+  });
+
+  test("admits an unadmitted support profile only as full-only without consumer changes", () => {
+    const value = workflowDiscoveryFixture();
+    const assessment = value.adoptionAssessments[0];
+    if (!assessment) throw new Error("workflow discovery fixture requires one assessment");
+
+    const report = workflowDiscoverySchema.parse({
+      ...value,
+      adoptionAssessments: [
+        {
+          ...assessment,
+          blockers: ["support_profile_unknown"],
+          requiredChanges: [],
+          supportProfileId: null,
+        },
+      ],
+    });
+
+    expect(report.adoptionAssessments[0]?.supportProfileId).toBeNull();
+    expect(report.adoptionAssessments[0]?.unknownIds).toEqual(
+      report.unknowns.map((entry) => entry.unknownId),
+    );
   });
 
   test("admits derived evidence at the originating YAML predicate", () => {
@@ -749,6 +776,83 @@ describe("workflow discovery response admission", () => {
           ],
         };
       },
+    ],
+    [
+      "adoption assessment whose actionable blocker has no required change",
+      () => withAssessment((assessment) => ({ ...assessment, requiredChanges: [] })),
+    ],
+    [
+      "adoption required change for a blocker the assessment does not report",
+      () =>
+        withAssessment((assessment) => ({
+          ...assessment,
+          requiredChanges: [
+            {
+              action: "set_job_condition",
+              blocker: "registered_gate_condition_unsafe",
+              expectedValue: "always()",
+              jobId: "gate",
+              needs: null,
+              needsControlRoles: [],
+              role: "gate",
+            },
+            ...assessment.requiredChanges,
+          ],
+        })),
+    ],
+    [
+      "selectable adoption carrying a required change",
+      () =>
+        withAssessment((assessment) => ({
+          ...assessment,
+          blockers: [],
+          recommendedAdapter: "in_place_job_set",
+          requiredOwnerInputs: [],
+          state: "in_place_job_set",
+        })),
+    ],
+    [
+      "owner-selected invocation classifier identity",
+      () =>
+        withAssessment((assessment) => ({
+          ...assessment,
+          requiredChanges: assessment.requiredChanges.map((change) =>
+            change.role === "invocation_classifier" ? { ...change, jobId: "classify" } : change,
+          ),
+        })),
+    ],
+    [
+      "non-canonical owner-named control dependencies",
+      () =>
+        withAssessment((assessment) => ({
+          ...assessment,
+          requiredChanges: assessment.requiredChanges.map((change) =>
+            change.role === "gate" && change.action === "add_control_job"
+              ? { ...change, needsControlRoles: ["plan", "plan"] }
+              : change,
+          ),
+        })),
+    ],
+    [
+      "unknown support profile without its explicit blocker",
+      () => withAssessment((assessment) => ({ ...assessment, supportProfileId: null })),
+    ],
+    [
+      "unadmitted support profile identity",
+      () => {
+        const value = workflowDiscoveryFixture();
+        return {
+          ...value,
+          adoptionAssessments: value.adoptionAssessments.map((assessment) => ({
+            ...assessment,
+            supportProfileId: "ghes/github-actions-static/v5",
+          })),
+        };
+      },
+    ],
+    [
+      "adoption unknowns attributed away from their exact workflow",
+      () => withAssessment((assessment) => ({ ...assessment, unknownIds: [] })),
     ],
     [
       "contradictory witness-shard assessment",
@@ -915,6 +1019,17 @@ describe("workflow discovery response admission", () => {
     expect(workflowDiscoverySchema.safeParse(candidate()).success).toBe(false);
   });
 });
+
+function withAssessment(
+  change: (
+    assessment: WorkflowDiscoveryReport["adoptionAssessments"][number],
+  ) => WorkflowDiscoveryReport["adoptionAssessments"][number],
+): WorkflowDiscoveryReport {
+  const value = workflowDiscoveryFixture();
+  const assessment = value.adoptionAssessments[0];
+  if (!assessment) throw new Error("workflow discovery fixture requires one assessment");
+  return { ...value, adoptionAssessments: [change(assessment)] };
+}
 
 function reportWithRemoteCall() {
   const value = workflowDiscoveryFixture();

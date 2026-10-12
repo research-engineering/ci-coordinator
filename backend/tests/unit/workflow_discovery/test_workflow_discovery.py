@@ -4,19 +4,32 @@ import asyncio
 import json
 from dataclasses import dataclass, replace
 from pathlib import Path
+from types import MappingProxyType
+from typing import Literal
 
 import pytest
 
 from ci_coordinator.config_control import RepositoryScope
-from ci_coordinator.execution_orchestration import parse_target_execution_registry
+from ci_coordinator.execution_orchestration import (
+    CONTROL_INVOCATION_JOB_ID,
+    LOCAL_PLAN_REQUEST_WORKFLOW_REF,
+    TargetJobBinding,
+    TargetWorkflowBinding,
+    parse_target_execution_registry,
+)
 from ci_coordinator.github_ingestion import load_bundled_profile
 from ci_coordinator.workflow_discovery import (
+    AdoptionAssessment,
+    AdoptionRequiredChange,
     AdoptionTargetJob,
     AdoptionTargetProjection,
     AdoptionTargetWorkflow,
+    assess_workflow_adoption,
 )
+from ci_coordinator.workflow_discovery import adoption as adoption_module
 from ci_coordinator.workflow_discovery._syntax_fields import PROPOSAL_EVENT_ACTIONS
 from ci_coordinator.workflow_discovery._yaml_preflight import preflight_yaml_events
+from ci_coordinator.workflow_discovery.adoption_target import INVOCATION_CLASSIFIER_JOB_ID
 from ci_coordinator.workflow_discovery.graph import analyze_call_graph
 from ci_coordinator.workflow_discovery.graph_model import GraphAnalysis
 from ci_coordinator.workflow_discovery.outcomes import (
@@ -24,6 +37,7 @@ from ci_coordinator.workflow_discovery.outcomes import (
     WorkflowDiscoveryForbidden,
 )
 from ci_coordinator.workflow_discovery.parser import parse_workflow
+from ci_coordinator.workflow_discovery.report import PARSER_VERSION
 from ci_coordinator.workflow_discovery.service import WorkflowDiscoveryService
 from ci_coordinator.workflow_discovery.source import (
     RepositoryIdentity,
@@ -32,7 +46,11 @@ from ci_coordinator.workflow_discovery.source import (
     WorkflowSourceFailure,
     git_blob_sha1,
 )
-from ci_coordinator.workflow_discovery.summary import ParsedWorkflow, WorkflowParseFailure
+from ci_coordinator.workflow_discovery.summary import (
+    JobSummary,
+    ParsedWorkflow,
+    WorkflowParseFailure,
+)
 
 SCOPE = RepositoryScope(7, 11)
 REVISION = "a" * 40
@@ -227,6 +245,30 @@ def test_adoption_assessment_is_total_and_fail_closed_without_owner_contract() -
         "target_semantic_projection_absent",
     )
     assert result.adoption_assessments[1].recommended_adapter == "none"
+    assert {item.support_profile_id for item in result.adoption_assessments} == {
+        "github.com/github-actions-static/v5"
+    }
+    assert _change_rows(result.adoption_assessments[1]) == (
+        ("workflow_parse_failed", "repair_workflow_syntax", None, None, None, None),
+    )
+    assert _change_rows(result.adoption_assessments[0])[0] == (
+        "inventory_incomplete",
+        "repair_other_workflow_sources",
+        None,
+        None,
+        None,
+        None,
+    )
+    assert result.adoption_assessments[1].unknown_ids == tuple(
+        unknown.unknown_id
+        for unknown in result.report.unknowns
+        if unknown.provenance.workflow_path == invalid.path
+    )
+    assert any(
+        unknown.unknown_id in result.adoption_assessments[1].unknown_ids
+        and unknown.field == "workflow.document"
+        for unknown in result.report.unknowns
+    )
 
 
 def test_adoption_recommends_reusable_shape_without_claiming_selectability() -> None:
@@ -253,6 +295,8 @@ def test_owner_registry_is_required_for_selectable_in_place_adoption() -> None:
     assert assessment.recommended_adapter == "in_place_job_set"
     assert assessment.blockers == ()
     assert assessment.required_owner_inputs == ()
+    assert assessment.required_changes == ()
+    assert assessment.support_profile_id == "github.com/github-actions-static/v5"
     assert result.target_projection.status == "available"
 
 
@@ -308,6 +352,9 @@ def test_adoption_rejects_registry_signal_drift() -> None:
 
     assert assessment.state == "full_only"
     assert assessment.blockers == ("registered_gate_signal_mismatch",)
+    assert _change_rows(assessment) == (
+        ("registered_gate_signal_mismatch", "set_job_name", "gate", "gate", None, "Different Gate"),
+    )
 
 
 @pytest.mark.parametrize(
@@ -379,6 +426,448 @@ def test_adoption_rejects_an_extra_gate_dependency_even_when_the_job_exists() ->
     assert result.adoption_assessments[0].state == "full_only"
     assert "registered_gate_dependencies_mismatch" in result.adoption_assessments[0].blockers
     assert "unregistered_workflow_job_present" in result.adoption_assessments[0].blockers
+
+
+def test_unmodified_workflow_receives_computed_registration_changes() -> None:
+    result = _completed(_source(_aggregate_document()))
+    assessment = result.adoption_assessments[0]
+
+    assert assessment.state == "full_only"
+    assert assessment.blockers == ("target_semantic_projection_absent",)
+    blocker = "target_semantic_projection_absent"
+    assert _unregistered_change_rows(assessment) == (
+        (blocker, "add_control_job", "gate", None, ("gate", "lint", "test"), ("plan",), None),
+        (blocker, "add_control_job", "plan", None, (), ("plan_request",), None),
+        (blocker, "add_control_job", "plan_request", None, ("ci-invocation",), (), None),
+        (blocker, "add_job", "invocation_classifier", "ci-invocation", (), (), None),
+        (blocker, "declare_registry_workflow", None, None, None, (), None),
+        (blocker, "register_execution_job", "execution", "gate", ("test",), ("plan",), None),
+        (blocker, "register_execution_job", "execution", "lint", (), ("plan",), None),
+        (blocker, "register_execution_job", "execution", "test", ("lint",), ("plan",), None),
+        (blocker, "set_job_condition", "gate", None, None, (), "always()"),
+    )
+
+
+def test_adoption_classifier_identity_is_the_target_registry_fixed_identity() -> None:
+    assert INVOCATION_CLASSIFIER_JOB_ID == CONTROL_INVOCATION_JOB_ID
+    with pytest.raises(ValueError, match="fixed id"):
+        replace(
+            _native_adoption_projection().workflows[0],
+            invocation_job_id="owner-classifier",
+        )
+    with pytest.raises(ValueError, match="fixed, not owner-selected"):
+        AdoptionRequiredChange(
+            blocker="target_semantic_projection_absent",
+            action="add_job",
+            role="invocation_classifier",
+            job_id="classify",
+            needs=(),
+            needs_control_roles=(),
+            expected_value=None,
+        )
+    with pytest.raises(ValueError, match="owner-named control roles"):
+        AdoptionRequiredChange(
+            blocker="target_semantic_projection_absent",
+            action="add_control_job",
+            role="invocation_classifier",
+            job_id=None,
+            needs=(),
+            needs_control_roles=(),
+            expected_value=None,
+        )
+    with pytest.raises(ValueError, match="directly on the plan job"):
+        AdoptionRequiredChange(
+            blocker="target_semantic_projection_absent",
+            action="register_execution_job",
+            role="execution",
+            job_id="test",
+            needs=(),
+            needs_control_roles=(),
+            expected_value=None,
+        )
+    with pytest.raises(ValueError, match="only before workflow registration"):
+        AdoptionRequiredChange(
+            blocker="registered_execution_dependencies_mismatch",
+            action="set_job_needs",
+            role="execution",
+            job_id="test",
+            needs=(),
+            needs_control_roles=("plan",),
+            expected_value=None,
+        )
+
+
+@pytest.mark.parametrize(
+    "case",
+    ("single-job", "aggregate", "occupied-classifier", "aliased-classifier"),
+)
+def test_unregistered_recommendation_is_a_registry_admitted_selectable_topology(
+    case: str,
+) -> None:
+    # Applying exactly the recommended changes with arbitrary owner-chosen
+    # control ids must yield the target registry's required topology and a
+    # selectable reassessment, not merely a list of current needs.
+    owner_job_ids = {"gate": "owner-gate", "plan": "owner-plan", "plan_request": "owner-request"}
+    result = _completed(_source(_unregistered_document(case)))
+    topology, gate_condition = _apply_unregistered_changes(
+        result.adoption_assessments[0],
+        result.report.workflows[0].jobs,
+        owner_job_ids,
+    )
+    execution_job_ids = sorted(set(topology) - {CONTROL_INVOCATION_JOB_ID, *owner_job_ids.values()})
+    binding = TargetWorkflowBinding(
+        workflow_path=".github/workflows/ci.yml",
+        execution_kind="native-job-set",
+        execution_jobs=tuple(
+            TargetJobBinding(job_id, topology[job_id]) for job_id in execution_job_ids
+        ),
+        plan_request_job_id=owner_job_ids["plan_request"],
+        plan_request_workflow_ref=LOCAL_PLAN_REQUEST_WORKFLOW_REF,
+        plan_job_id=owner_job_ids["plan"],
+        fallback_job_id=None,
+        gate_job_id=owner_job_ids["gate"],
+        gate_signal_name="Owner Gate",
+    )
+    assert binding.job_topology == tuple(sorted(topology.items()))
+    assert gate_condition == "always()"
+
+    adapted = _jobs_document(
+        "".join(
+            f"  {job_id}:\n"
+            + ("    name: Owner Gate\n    if: always()\n" if job_id == "owner-gate" else "")
+            + (f"    needs: [{', '.join(needs)}]\n" if needs else "")
+            + "    runs-on: ubuntu-latest\n    steps: []\n"
+            for job_id, needs in sorted(topology.items())
+        )
+    )
+    reassessed = _completed(
+        _source(adapted),
+        target_projection=AdoptionTargetProjection.available(
+            "e" * 64,
+            (
+                AdoptionTargetWorkflow(
+                    workflow_path=binding.workflow_path,
+                    execution_kind=binding.execution_kind,
+                    execution_jobs=tuple(
+                        AdoptionTargetJob(job.job_id, job.needs) for job in binding.execution_jobs
+                    ),
+                    invocation_job_id=binding.invocation_job_id,
+                    plan_request_job_id=binding.plan_request_job_id,
+                    plan_job_id=binding.plan_job_id,
+                    fallback_job_id=None,
+                    gate_job_id=binding.gate_job_id,
+                    gate_signal_name=binding.gate_signal_name,
+                ),
+            ),
+        ),
+    ).adoption_assessments[0]
+    assert reassessed.blockers == ()
+    assert reassessed.state == "in_place_job_set"
+
+
+@pytest.mark.parametrize(
+    ("mutations", "expected"),
+    (
+        (
+            (("    needs: [lint, plan]\n", "    needs: plan\n"),),
+            (
+                (
+                    "registered_execution_dependencies_mismatch",
+                    "set_job_needs",
+                    "execution",
+                    "test",
+                    ("lint", "plan"),
+                    None,
+                ),
+            ),
+        ),
+        (
+            (("    needs: [lint, plan, test]\n", "    needs: test\n"),),
+            (
+                (
+                    "registered_gate_dependencies_mismatch",
+                    "set_job_needs",
+                    "gate",
+                    "gate",
+                    ("lint", "plan", "test"),
+                    None,
+                ),
+            ),
+        ),
+        (
+            (("    if: always()\n", "    if: success()\n"),),
+            (
+                (
+                    "registered_gate_condition_unsafe",
+                    "set_job_condition",
+                    "gate",
+                    "gate",
+                    None,
+                    "always()",
+                ),
+            ),
+        ),
+        (
+            (
+                (
+                    "  plan:\n    name: Resolve plan\n    needs: plan-request\n",
+                    (
+                        "  rogue:\n    name: Rogue\n    runs-on: ubuntu-latest\n    steps: []\n"
+                        "  plan:\n    name: Resolve plan\n    needs: rogue\n"
+                    ),
+                ),
+            ),
+            (
+                (
+                    "registered_plan_dependencies_mismatch",
+                    "set_job_needs",
+                    "plan",
+                    "plan",
+                    ("plan-request",),
+                    None,
+                ),
+                (
+                    "unregistered_workflow_job_present",
+                    "remove_or_register_job",
+                    None,
+                    "rogue",
+                    None,
+                    None,
+                ),
+            ),
+        ),
+        (
+            (
+                (
+                    "  lint:\n    name: Lint\n    needs: plan\n"
+                    "    runs-on: ubuntu-latest\n    steps: []\n",
+                    "",
+                ),
+                ("    needs: [lint, plan]\n", "    needs: plan\n"),
+            ),
+            (
+                (
+                    "registered_execution_dependencies_mismatch",
+                    "set_job_needs",
+                    "execution",
+                    "test",
+                    ("lint", "plan"),
+                    None,
+                ),
+                (
+                    "registered_execution_job_absent",
+                    "add_job",
+                    "execution",
+                    "lint",
+                    ("plan",),
+                    None,
+                ),
+            ),
+        ),
+        (
+            (
+                (
+                    "  gate:\n    name: Pull Request Gate\n    if: always()\n"
+                    "    needs: [lint, plan, test]\n    runs-on: ubuntu-latest\n    steps: []\n",
+                    "",
+                ),
+            ),
+            (
+                (
+                    "registered_gate_job_absent",
+                    "add_job",
+                    "gate",
+                    "gate",
+                    ("lint", "plan", "test"),
+                    None,
+                ),
+                (
+                    "registered_gate_job_absent",
+                    "set_job_condition",
+                    "gate",
+                    "gate",
+                    None,
+                    "always()",
+                ),
+                (
+                    "registered_gate_job_absent",
+                    "set_job_name",
+                    "gate",
+                    "gate",
+                    None,
+                    "Pull Request Gate",
+                ),
+            ),
+        ),
+    ),
+)
+def test_registered_target_blockers_derive_exact_minimal_consumer_changes(
+    mutations: tuple[tuple[str, str], ...],
+    expected: tuple[tuple[object, ...], ...],
+) -> None:
+    document = _adapted_native_document()
+    for old, new in mutations:
+        assert old in document
+        document = document.replace(old, new, 1)
+
+    result = _completed(
+        _source(document),
+        target_projection=_native_adoption_projection(),
+    )
+    assessment = result.adoption_assessments[0]
+
+    assert assessment.state == "full_only"
+    assert assessment.blockers == tuple(sorted({str(row[0]) for row in expected}))
+    assert _change_rows(assessment) == expected
+
+
+def test_open_call_graph_names_the_open_caller_job_only_in_its_own_workflow() -> None:
+    caller = _source(
+        _call_document("./.github/workflows/missing.yml"),
+        ".github/workflows/a-caller.yml",
+    )
+    bystander = _source(_valid_document(), ".github/workflows/b-bystander.yml")
+
+    result = _completed(caller, bystander)
+
+    assert result.report.local_graph_closed is False
+    caller_changes = _change_rows(result.adoption_assessments[0])
+    bystander_changes = _change_rows(result.adoption_assessments[1])
+    assert ("local_graph_open", "resolve_reusable_workflow_call", None, "call", None, None) in (
+        caller_changes
+    )
+    assert [row for row in bystander_changes if row[0] == "local_graph_open"] == [
+        ("local_graph_open", "close_report_call_graph", None, None, None, None)
+    ]
+
+
+def test_assessment_unknowns_are_attributed_by_exact_workflow_path_not_name() -> None:
+    first = _source(_valid_document(), ".github/workflows/first.yml")
+    second = _source(
+        _valid_document().replace(
+            "    runs-on: ubuntu-latest\n", "    runs-on: ${{ inputs.os }}\n"
+        ),
+        ".github/workflows/second.yml",
+    )
+
+    result = _completed(first, second)
+
+    assert {workflow.name for workflow in result.report.workflows} == {"CI"}
+    by_path = {item.workflow_path: item.unknown_ids for item in result.adoption_assessments}
+    for path in (first.path, second.path):
+        assert by_path[path] == tuple(
+            unknown.unknown_id
+            for unknown in result.report.unknowns
+            if unknown.provenance.workflow_path == path
+        )
+    assert by_path[second.path]
+    assert set(by_path[first.path]).isdisjoint(by_path[second.path])
+    assert len(by_path[second.path]) > len(by_path[first.path])
+    assert {*by_path[first.path], *by_path[second.path]} == {
+        unknown.unknown_id for unknown in result.report.unknowns
+    }
+
+
+def test_unadmitted_support_profile_is_full_only_without_inventing_a_consumer_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result = _completed(
+        _source(_adapted_native_document()),
+        target_projection=_native_adoption_projection(),
+    )
+    assert adoption_module.support_profile_for(PARSER_VERSION) == (
+        "github.com/github-actions-static/v5"
+    )
+    assert adoption_module.support_profile_for("github-actions-static/v4") is None
+    monkeypatch.setattr(adoption_module, "_ADMITTED_SUPPORT_PROFILES", MappingProxyType({}))
+
+    assessment = assess_workflow_adoption(
+        result.report,
+        target_projection=_native_adoption_projection(),
+    )[0]
+
+    assert assessment.state == "full_only"
+    assert assessment.support_profile_id is None
+    assert assessment.blockers == ("support_profile_unknown",)
+    assert assessment.required_changes == ()
+    assert assessment.recommended_adapter == "in_place_job_set"
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    (
+        ("unavailable", ()),
+        (
+            "invalid",
+            (
+                (
+                    "target_semantic_projection_invalid",
+                    "repair_target_registry",
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+        ),
+    ),
+)
+def test_failed_target_projection_names_only_consumer_repairable_changes(
+    status: Literal["invalid", "unavailable"],
+    expected: tuple[tuple[object, ...], ...],
+) -> None:
+    result = _completed(
+        _source(_adapted_native_document()),
+        target_projection=AdoptionTargetProjection.failed(status),
+    )
+    assessment = result.adoption_assessments[0]
+
+    assert assessment.state == "full_only"
+    assert assessment.blockers == (f"target_semantic_projection_{status}",)
+    assert _change_rows(assessment) == expected
+
+
+def test_assessment_rejects_unexplained_missing_or_contradictory_changes() -> None:
+    full_only = _completed(
+        _source(_adapted_native_document()),
+        target_projection=_native_adoption_projection(gate_signal_name="Different Gate"),
+    ).adoption_assessments[0]
+    selectable = _completed(
+        _source(_adapted_native_document()),
+        target_projection=_native_adoption_projection(),
+    ).adoption_assessments[0]
+    foreign_change = AdoptionRequiredChange(
+        blocker="registered_gate_condition_unsafe",
+        action="set_job_condition",
+        role="gate",
+        job_id="gate",
+        needs=None,
+        needs_control_roles=(),
+        expected_value="always()",
+    )
+
+    with pytest.raises(ValueError, match="consumer-actionable blocker"):
+        replace(full_only, required_changes=())
+    with pytest.raises(ValueError, match="consumer-actionable blocker"):
+        replace(full_only, required_changes=(foreign_change, *full_only.required_changes))
+    with pytest.raises(ValueError, match="consumer-actionable blocker"):
+        replace(selectable, required_changes=(foreign_change,))
+    with pytest.raises(ValueError, match="unknown support profile"):
+        replace(full_only, support_profile_id=None)
+    with pytest.raises(ValueError, match="closed vocabulary"):
+        replace(full_only, blockers=(*full_only.blockers, "zz_unmapped_blocker"))
+    with pytest.raises(ValueError, match="not admitted for its blocker"):
+        AdoptionRequiredChange(
+            blocker="registered_gate_signal_mismatch",
+            action="set_job_needs",
+            role="gate",
+            job_id="gate",
+            needs=("plan",),
+            needs_control_roles=(),
+            expected_value=None,
+        )
+    with pytest.raises(ValueError, match="expected value"):
+        replace(foreign_change, expected_value=None)
 
 
 def test_explicit_historical_revision_cannot_claim_default_branch_fallback() -> None:
@@ -751,6 +1240,73 @@ def _call_graph(*sources: WorkflowSource) -> GraphAnalysis:
     return analyze_call_graph(tuple(parsed))
 
 
+def _change_rows(assessment: AdoptionAssessment) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        (
+            change.blocker,
+            change.action,
+            change.role,
+            change.job_id,
+            change.needs,
+            change.expected_value,
+        )
+        for change in assessment.required_changes
+    )
+
+
+def _unregistered_change_rows(assessment: AdoptionAssessment) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        (
+            change.blocker,
+            change.action,
+            change.role,
+            change.job_id,
+            change.needs,
+            change.needs_control_roles,
+            change.expected_value,
+        )
+        for change in assessment.required_changes
+    )
+
+
+def _apply_unregistered_changes(
+    assessment: AdoptionAssessment,
+    current_jobs: tuple[JobSummary, ...],
+    owner_job_ids: dict[str, str],
+) -> tuple[dict[str, tuple[str, ...]], str | None]:
+    topology: dict[str, tuple[str, ...]] = {}
+    for job in current_jobs:
+        assert job.needs is not None
+        topology[job.job_id] = job.needs
+    gate_condition: str | None = None
+    for change in assessment.required_changes:
+        assert change.blocker == "target_semantic_projection_absent"
+        needs = tuple(
+            sorted(
+                {
+                    *(change.needs or ()),
+                    *(owner_job_ids[role] for role in change.needs_control_roles),
+                }
+            )
+        )
+        if change.action == "add_control_job":
+            assert change.role is not None
+            topology[owner_job_ids[change.role]] = needs
+        elif change.action in {"add_job", "register_execution_job", "set_job_needs"}:
+            assert change.job_id is not None
+            topology[change.job_id] = needs
+        elif change.action == "remove_or_register_job":
+            assert change.job_id is not None
+            del topology[change.job_id]
+        elif change.action == "set_job_condition":
+            assert change.role == "gate"
+            assert change.job_id is None
+            gate_condition = change.expected_value
+        else:
+            assert change.action == "declare_registry_workflow"
+    return topology, gate_condition
+
+
 def _native_adoption_projection(
     *,
     gate_signal_name: str = "Pull Request Gate",
@@ -981,6 +1537,29 @@ on:
     steps:
       - run: pytest
 """
+
+
+def _unregistered_document(case: str) -> str:
+    if case == "single-job":
+        return _valid_document()
+    if case == "aggregate":
+        return _aggregate_document()
+    if case == "occupied-classifier":
+        return _jobs_document(
+            "  ci-invocation:\n    needs: lint\n    runs-on: ubuntu-latest\n    steps: []\n"
+            "  lint:\n    runs-on: ubuntu-latest\n    steps: []\n"
+            "  test:\n    needs: [ci-invocation, lint]\n    runs-on: ubuntu-latest\n"
+            "    steps: []\n"
+        )
+    assert case == "aliased-classifier"
+    return _jobs_document(
+        "  CI-Invocation:\n    runs-on: ubuntu-latest\n    steps: []\n"
+        "  test:\n    needs: CI-Invocation\n    runs-on: ubuntu-latest\n    steps: []\n"
+    )
+
+
+def _jobs_document(jobs: str) -> str:
+    return f"name: CI\non:\n  pull_request:\n  workflow_dispatch:\njobs:\n{jobs}"
 
 
 def _aggregate_document(

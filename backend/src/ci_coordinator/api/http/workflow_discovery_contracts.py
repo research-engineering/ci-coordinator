@@ -177,6 +177,40 @@ class ProposalResponse(ResponseModel):
     non_claims: tuple[str, ...]
 
 
+class AdoptionRequiredChangeResponse(ProjectedResponseModel):
+    blocker: str
+    action: Literal[
+        "add_control_job",
+        "add_job",
+        "close_report_call_graph",
+        "declare_registry_workflow",
+        "register_execution_job",
+        "remove_or_register_job",
+        "repair_other_workflow_sources",
+        "repair_target_registry",
+        "repair_workflow_syntax",
+        "resolve_reusable_workflow_call",
+        "set_job_condition",
+        "set_job_name",
+        "set_job_needs",
+    ]
+    role: (
+        Literal[
+            "execution",
+            "fallback",
+            "gate",
+            "invocation_classifier",
+            "plan",
+            "plan_request",
+        ]
+        | None
+    )
+    job_id: str | None
+    needs: tuple[str, ...] | None
+    needs_control_roles: tuple[Literal["gate", "plan", "plan_request"], ...] = Field(max_length=3)
+    expected_value: str | None
+
+
 class AdoptionAssessmentResponse(ProjectedResponseModel):
     workflow_path: str
     state: Literal[
@@ -192,8 +226,11 @@ class AdoptionAssessmentResponse(ProjectedResponseModel):
         "full_only",
         "none",
     ]
+    support_profile_id: Literal["github.com/github-actions-static/v5"] | None
     blockers: tuple[str, ...]
     required_owner_inputs: tuple[str, ...]
+    required_changes: tuple[AdoptionRequiredChangeResponse, ...] = Field(max_length=4_096)
+    unknown_ids: tuple[str, ...] = Field(max_length=32_768)
     inventory_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
     non_claims: tuple[str, ...]
 

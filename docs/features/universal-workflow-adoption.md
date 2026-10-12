@@ -388,26 +388,113 @@ AdoptionAssessment := {
   workflowPath,
   state,
   recommendedAdapter,
+  supportProfileId,
   blockers,
   requiredOwnerInputs,
+  requiredChanges,
+  unknownIds,
   inventoryDigest,
   nonClaims
 }
+
+RequiredChange := {blocker, action, role?, jobId?, needs?, needsControlRoles,
+                   expectedValue?}
 ```
 
 Decision order:
 
 1. parse failure => `invalid`;
-2. incomplete or open graph => `full_only`;
-3. no accepted target semantic contract => `full_only`;
-4. an accepted existing witness-shard target => `witness_shards`;
-5. static in-place graph and accepted owner policy => `in_place_job_set`;
-6. accepted reusable-only target contract when in-place is unavailable =>
+2. parser version without an admitted support profile => `full_only`;
+3. incomplete or open graph => `full_only`;
+4. no accepted target semantic contract => `full_only`;
+5. an accepted existing witness-shard target => `witness_shards`;
+6. static in-place graph and accepted owner policy => `in_place_job_set`;
+7. accepted reusable-only target contract when in-place is unavailable =>
    `reusable_workflow_set`;
-7. otherwise => `full_only`.
+8. otherwise => `full_only`.
 
 The assessment cannot activate policy, mutate provider state, or authorize
 omission.
+
+### 9.1 Support Profile
+
+Provisional owner decision (2026-10-11), D4: `supportProfileId` is a closed
+value derived from the [GitHub Actions semantics owner](../architecture/cross-cutting/github-actions-semantics.md)
+and one exact parser version. Exactly one profile is admitted:
+`github.com/github-actions-static/v5`, which binds the GitHub.com platform laws
+(including the GitHub.com-only GH-11 and GH-17 forms) to parser
+`github-actions-static/v5`. The provider adapter targets only the GitHub.com
+API, so no GitHub Enterprise Server profile exists.
+
+```text
+supportProfile(parserVersion) = admitted profile or none
+none => supportProfileId = null
+     and blockers contains support_profile_unknown
+     and state in {full_only, invalid}
+```
+
+A parser-version change therefore fails closed until the profile is
+re-admitted with the semantics it binds. Admitting a second provider, such as
+GitHub Enterprise Server, requires a separately owned profile input and its
+own platform-law review; it cannot inherit the GitHub.com profile.
+
+### 9.2 Unknown Semantics And Minimal Consumer Changes
+
+`unknownIds` lists, in report order, exactly the report unknowns whose
+provenance workflow path equals the assessed path. Attribution never uses
+workflow or job names, so two workflows named `CI` cannot exchange unknowns.
+Unknowns of a called workflow remain on that workflow's own assessment; an open
+call graph is reported separately through `local_graph_open`. This explains
+unknown semantics; it does not add a selection rule.
+
+`requiredChanges` complements the retained owner-input categories. It is a
+bounded, closed-vocabulary projection of the same blocker derivation, with no
+YAML generation:
+
+| Blocker | Consumer change |
+| --- | --- |
+| `workflow_parse_failed` | `repair_workflow_syntax` |
+| `inventory_incomplete` | `repair_other_workflow_sources` |
+| `local_graph_open` | `resolve_reusable_workflow_call` per open caller job in this workflow, otherwise `close_report_call_graph` |
+| `target_semantic_projection_absent` | `declare_registry_workflow`; `add_job` for the fixed `ci-invocation` classifier with no `needs` (or `set_job_needs` to none when that job already exists); one owner-named `add_control_job` for the plan-request role needing `ci-invocation`, the plan role needing the plan request and the gate role needing the plan and every execution job; `set_job_condition` `always()` on the owner-named gate; and `register_execution_job` for every other current job with its current execution-job `needs` plus the plan job |
+| `target_semantic_projection_invalid` | `repair_target_registry` |
+| `unregistered_workflow_job_present` | `remove_or_register_job` per unregistered job |
+| `*_job_absent` | `add_job` with the registered role, job id and exact `needs`; a missing gate also carries its signal name and `always()` condition |
+| `*_dependencies_mismatch` | `set_job_needs` with the exact registered `needs` |
+| `registered_gate_signal_mismatch` | `set_job_name` with the registered gate signal |
+| `registered_gate_condition_unsafe` | `set_job_condition` with `always()` |
+
+The already-unmodified case is the `target_semantic_projection_absent` row: its
+execution candidates are the current jobs, consistent with the structural
+adapter recommendation. The target registry fixes the invocation classifier
+identity, so it is never presented as owner-selectable; only the plan-request,
+plan and gate ids are owner-chosen, must be distinct from every current job id
+under GitHub's case-insensitive comparison, and are referenced by role in
+`needsControlRoles`. A change's complete required dependencies are `needs` plus
+the chosen ids of `needsControlRoles`. Current dependencies on other execution
+jobs are retained, the direct plan dependency the registry requires is added,
+and a current dependency on the classifier identity is dropped; a job whose
+current `needs` is an explicit unknown carries `needs = null` and must declare
+them statically. A case variant of `ci-invocation` aliases the classifier in
+GitHub expressions and is named by `remove_or_register_job`; it cannot hold a
+registered role. Applying the row with any distinct owner-chosen ids yields the
+exact control and execution topology the target registry admits, and the
+reassessed workflow has no remaining blocker. Missing and mismatched registered
+execution jobs are reported together so one edit pass reaches the registered
+graph.
+
+```text
+blockers subset closed vocabulary
+{change.blocker} = blockers - {support_profile_unknown,
+                               target_semantic_projection_unavailable}
+selectable or witness_shards => requiredChanges = {}
+```
+
+The two excluded blockers are coordinator- or provider-side; no consumer edit
+removes them, so no change is invented. Required changes are derived only from
+the exact report and target projection. The assessment accepts no agent input
+and has no write path, so optional advice cannot add coverage, select a state,
+or modify a consumer without separately authorized owner action.
 
 `in_place_job_set` and `reusable_workflow_set` describe the target-owned
 execution-job shape, not additional runtime execution kinds. Both compile to
@@ -500,6 +587,10 @@ the workflow DAG, job inventory, and timing.
 | UWA-24 | An unregistered job or prerequisite executes outside selected authority                               | exact equality of the complete top-level job and `needs` graph                  |
 | UWA-25 | Selecting `Lint` also activates registered job `lint`                                                 | ASCII-casefold uniqueness across every workflow job role                        |
 | UWA-26 | The remote requester cannot resolve, so an in-workflow fallback never starts                          | a separately triggered local Native Full Check remains required during adoption |
+| UWA-27 | A new parser version or GHES semantics yields a selectable assessment                                 | closed support profile; unknown profile is `full_only`                          |
+| UWA-28 | Two workflows with equal names exchange unknowns                                                      | unknown attribution by exact provenance workflow path                           |
+| UWA-29 | An actionable blocker has no consumer change, or a change names no reported blocker                   | blocker-to-change set equality in the assessment value                          |
+| UWA-30 | An unregistered workflow is told to pick a classifier id or to keep execution jobs off the plan job   | fixed classifier identity; recommended topology must admit the target registry  |
 
 ## 13. Acceptance
 
@@ -515,6 +606,9 @@ the workflow DAG, job inventory, and timing.
 - malformed kind combinations fail closed;
 - a workflow from a second fixture path uses the same implementation;
 - every discovery source has exactly one adoption assessment;
+- every assessment carries its support profile or an explicit unknown-profile
+  blocker, its exact-path unknowns, and the consumer changes for each
+  consumer-actionable blocker;
 - unsupported workflows are reported `full_only` or `invalid`, never guessed;
 - existing witness-shard bootstrap behavior remains green;
 - a native-job-set fixture proves dependency closure, selected, full, stale,

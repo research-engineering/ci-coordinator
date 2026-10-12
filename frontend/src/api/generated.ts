@@ -981,6 +981,8 @@ export interface components {
              * @enum {string}
              */
             readonly recommendedAdapter: "in_place_job_set" | "reusable_workflow_set" | "full_only" | "none";
+            /** Requiredchanges */
+            readonly requiredChanges: readonly components["schemas"]["AdoptionRequiredChangeResponse"][];
             /** Requiredownerinputs */
             readonly requiredOwnerInputs: readonly string[];
             /**
@@ -988,8 +990,32 @@ export interface components {
              * @enum {string}
              */
             readonly state: "in_place_job_set" | "reusable_workflow_set" | "witness_shards" | "full_only" | "invalid";
+            /** Supportprofileid */
+            readonly supportProfileId: "github.com/github-actions-static/v5" | null;
+            /** Unknownids */
+            readonly unknownIds: readonly string[];
             /** Workflowpath */
             readonly workflowPath: string;
+        };
+        /** AdoptionRequiredChangeResponse */
+        readonly AdoptionRequiredChangeResponse: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            readonly action: "add_control_job" | "add_job" | "close_report_call_graph" | "declare_registry_workflow" | "register_execution_job" | "remove_or_register_job" | "repair_other_workflow_sources" | "repair_target_registry" | "repair_workflow_syntax" | "resolve_reusable_workflow_call" | "set_job_condition" | "set_job_name" | "set_job_needs";
+            /** Blocker */
+            readonly blocker: string;
+            /** Expectedvalue */
+            readonly expectedValue: string | null;
+            /** Jobid */
+            readonly jobId: string | null;
+            /** Needs */
+            readonly needs: readonly string[] | null;
+            /** Needscontrolroles */
+            readonly needsControlRoles: readonly ("gate" | "plan" | "plan_request")[];
+            /** Role */
+            readonly role: ("execution" | "fallback" | "gate" | "invocation_classifier" | "plan" | "plan_request") | null;
         };
         /** AdoptionTargetProjectionResponse */
         readonly AdoptionTargetProjectionResponse: {

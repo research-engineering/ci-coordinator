@@ -200,6 +200,7 @@
     ["008","ui008-test-fixture","ui008-test-fixture","contract","frontend/tests/fixture.ts",["frontend.quality","selective.plan"],["local-node","local-python"]],
     ["008","operator-ui-008-shared-responseFailure-test","operator-ui-008-shared-responseFailure-test","contract","frontend/tests/responseFailure.test.ts",["architecture.ownership","frontend.quality","selective.plan"],["local-node","local-python"]],
     ["008","ui008-schema-falsifiers","ui008-schema-falsifiers","falsification","frontend/tests/schema.test.ts",["frontend.quality","selective.plan"],["local-node","local-python"]],
+    ["008","ui008-adoption-inventory-falsifiers","ui008-adoption-inventory-falsifiers","falsification","frontend/tests/workflowDiscoveryInventory.test.tsx",["frontend.quality","selective.plan"],["local-node","local-python"]],
     ["008","ui008-workflow-role-falsifiers","ui008-workflow-role-falsifiers","falsification","frontend/tests/workflowRoles.test.tsx",["frontend.quality","selective.plan"],["local-node","local-python"]],
     ["008","ui008-contract-projection","ui008-contract-projection","technical","scripts/frontend_contract.py",["frontend.contract-python","frontend.contract-types","python.lint","python.test","python.typecheck","selective.plan"],["local-node","local-python"]],
     ["008","ui008-contract-falsifiers","ui008-contract-falsifiers","falsification","scripts/tests/test_frontend_contract.py",["frontend.contract-python","frontend.contract-types","python.lint","python.test","python.typecheck","selective.plan"],["local-node","local-python"]],
