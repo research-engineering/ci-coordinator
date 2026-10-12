@@ -222,9 +222,22 @@ unless its claims bind the same immutable run identity consumed by issuance.
 `POST /webhooks/github` applies the profile-owned raw-body maximum before
 signature verification, preserves the received bytes and duplicate header
 field-lines, rejects any `Content-Encoding`, and admits only the exact JSON
-media contract. Signature verification, body hashing, strict JSON parsing,
-event-family binding, and normalization execute in one cancellable no-queue
-worker process per backend process. The runtime worker composes
+media contract. A pre-body stage of the body-limit policy runs after the
+declared-length checks and before the path lease and body read: content type
+and encoding (`400`), then exactly one canonical `X-Hub-Signature-256` field
+line (`401`), then one request bucket (burst 200, refill 50 per second) and
+one byte bucket (burst 32 MiB, refill 8 MiB per second) charged together.
+An unknown length is charged the route maximum. A refused charge is `503
+webhook ingestion overloaded`; a header-rejected request takes no token. The
+stage reuses the public token-bucket mechanism and changes precedence only
+for requests with several defects, as admitted by provisional owner decision
+4 (2026-10-11) of the [webhook ingress design](../../features/webhook-ingress-scheduling.md#pre-authentication-budgets-per-route-class).
+The route has its own 8-second deadline policy; the effective deadline is the
+smaller of 8 and the global request deadline, and expiry returns the existing
+`503 webhook ingestion unavailable`. Signature verification, body hashing,
+strict JSON parsing, event-family binding, and normalization execute in a
+bounded no-queue pool of four cancellable worker processes owned by one
+admission instance. The runtime worker composes
 `identity_admission` with the capability-owned `github_ingestion`
 preparation function; the HTTP boundary owns only the immutable ingress command
 and result port, and no application pass-through owns the same call. Its
@@ -370,9 +383,17 @@ session cookie and all current V2/legacy-completed operation contracts remain
 unchanged. See [browser credential isolation](../../features/browser-credential-isolation.md).
 
 Login start and callback each own an independent finite process-local token
-bucket and return `429` with `Retry-After` without queueing when exhausted.
-This bounds one process contribution; the ingress owner still owns source-wide
-and replica-wide abuse controls. Uvicorn access logging is disabled so OAuth
+bucket (burst 16, refill 4 per second) and return `429` with `Retry-After`
+without queueing when exhausted. Back-channel logout owns a separate declared
+envelope (burst 64, refill 32 per second) because forged and valid tokens
+share the path and are separated only by token verification after the bucket.
+The envelope, the header-shape checks before any key lookup and the
+fixed-cardinality `ci_coordinator_public_request_limited_total{route_class}`
+refusal counter claim only that valid logouts are delivered while invalid and
+valid arrivals stay within the envelope. These budgets are declared and
+unmeasured; CI-069 measures them. This bounds one process contribution; the
+ingress owner still owns source-wide and replica-wide abuse controls, and the
+edge filter is a CI-059/CI-062 deployment dependency. Uvicorn access logging is disabled so OAuth
 `code` and `state` query values do not enter generic access logs. Forwarded
 header trust is disabled; the edge owner validates public hosts and forwarding
 metadata, while application authorization never derives authority from `Host`.

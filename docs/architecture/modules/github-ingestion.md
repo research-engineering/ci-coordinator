@@ -40,6 +40,29 @@ does not prove completed preparation or survive a process restart. There is
 no durable seed inbox; acknowledgement as accepted durable queued work
 requires an atomic inbox before later processing can be promised.
 
+Runtime admission (`runtime/webhook_admission.py`) holds one of `N = 4`
+no-queue verifier permits from before verification until the commit result,
+so at most `N` worker processes and `N` webhook commits run per admission
+instance. A busy permit or a broken worker returns the existing `503 webhook
+ingestion unavailable`; a sibling permit is unaffected. Composition rejects
+`N < 2` and `N` above the body-admission width of eight. Together with the
+HTTP pre-body stage, each header refusal, budget refusal, permit or worker
+refusal and admission result increments one closed
+`ci_coordinator_webhook_admission_total{outcome}` value, and the permit hold
+is a fixed-bucket histogram. Body-limit refusals keep only the existing HTTP
+status counter, and an idempotency contract violation remains an
+unclassified `500`. This is the `REQ-CI-RUNTIME-008` successor of the former
+single-worker gate under provisional owner decision 3 (2026-10-11); `N` is
+declared and unmeasured.
+
+GitHub does not redeliver a refused delivery. The recovery owner of each
+refusal follows the [webhook ingress design](../../features/webhook-ingress-scheduling.md#refused-delivery-recovery-owner):
+completed workflow runs in a selected history dataset are found again by the
+bounded recent and discovery REST lanes, completed jobs of registered subjects
+by the economics REST collector, seeds need no recovery because planning uses
+the request-time path, and every other delivery requires operator redelivery
+after the `CIWebhookDeliveryUnavailable` alert within the provider window.
+
 ## 3. Sequencing Law
 
 ```text

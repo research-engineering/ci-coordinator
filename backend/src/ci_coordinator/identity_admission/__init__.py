@@ -26,6 +26,7 @@ from ci_coordinator.identity_admission.oidc_verifier import ActionsOidcJwkSet, v
 from ci_coordinator.identity_admission.rejection import RejectedIdentity
 from ci_coordinator.identity_admission.webhook_signature import (
     TrustedWebhook,
+    is_canonical_webhook_signature,
     verify_webhook,
     verify_webhook_at,
 )
@@ -47,6 +48,7 @@ __all__ = [
     "TrustedWebhook",
     "admit_actions_oidc_header",
     "admit_verified_actions_oidc_claims",
+    "is_canonical_webhook_signature",
     "is_workflow_path_identity",
     "verify_actions_oidc",
     "verify_webhook",

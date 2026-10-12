@@ -11,6 +11,8 @@ from time import monotonic
 from starlette.routing import compile_path
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from ci_coordinator.observability import RuntimeMetrics
+
 
 @dataclass(frozen=True, slots=True)
 class PublicRequestLimitPolicy:
@@ -19,10 +21,13 @@ class PublicRequestLimitPolicy:
     burst: int
     refill_rate_per_second: float
     rejection_response: Mapping[str, object]
+    route_class: str
 
     def __post_init__(self) -> None:
         if type(self.path) is not str or not self.path.startswith("/"):
             raise ValueError("public request-limit path must be absolute")
+        if not _is_route_class_token(self.route_class):
+            raise ValueError("public request-limit route class must be a lowercase token")
         if (
             type(self.methods) is not frozenset
             or not self.methods
@@ -46,9 +51,45 @@ class PublicRequestLimitPolicy:
 
 
 @dataclass(slots=True)
-class _TokenBucket:
+class TokenBucket:
+    """One finite process-local refill budget whose callers never wait."""
+
+    burst: float
+    refill_rate_per_second: float
     tokens: float
     updated_at: float
+
+    def refill(self, now: float) -> None:
+        elapsed = max(0.0, now - self.updated_at)
+        self.tokens = min(self.burst, self.tokens + elapsed * self.refill_rate_per_second)
+        if now >= self.updated_at:
+            self.updated_at = now
+
+
+def try_take_tokens(now: float, charges: tuple[tuple[TokenBucket, float], ...]) -> int | None:
+    """Take every charge or none; a refusal returns a whole-second retry hint."""
+    if not isfinite(now):
+        return 1
+    for bucket, _ in charges:
+        bucket.refill(now)
+    shortfalls = tuple(
+        (cost - bucket.tokens) / bucket.refill_rate_per_second
+        for bucket, cost in charges
+        if bucket.tokens < cost
+    )
+    if shortfalls:
+        return max(1, ceil(max(shortfalls)))
+    for bucket, cost in charges:
+        bucket.tokens -= cost
+    return None
+
+
+def _is_route_class_token(value: object) -> bool:
+    return (
+        type(value) is str
+        and 1 <= len(value) <= 64
+        and all(character in "abcdefghijklmnopqrstuvwxyz_" for character in value)
+    )
 
 
 class PublicRequestLimitMiddleware:
@@ -60,6 +101,7 @@ class PublicRequestLimitMiddleware:
         *,
         policies: tuple[PublicRequestLimitPolicy, ...],
         clock: Callable[[], float] = monotonic,
+        metrics: RuntimeMetrics | None = None,
     ) -> None:
         if type(policies) is not tuple:
             raise TypeError("public request-limit policies must be an exact tuple")
@@ -69,18 +111,26 @@ class PublicRequestLimitMiddleware:
         self._app = app
         self._matchers = tuple((compile_path(policy.path)[0], policy) for policy in policies)
         self._clock = clock
+        self._metrics = metrics
         now = clock()
         if not isfinite(now):
             raise ValueError("public request-limit clock must return a finite value")
-        self._buckets = {policy.path: _TokenBucket(float(policy.burst), now) for policy in policies}
+        self._buckets = {
+            policy.path: TokenBucket(
+                float(policy.burst), policy.refill_rate_per_second, float(policy.burst), now
+            )
+            for policy in policies
+        }
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         policy = self._policy_for_scope(scope) if scope["type"] == "http" else None
         if policy is None:
             await self._app(scope, receive, send)
             return
-        retry_after = self._consume(policy)
+        retry_after = try_take_tokens(self._clock(), ((self._buckets[policy.path], 1.0),))
         if retry_after is not None:
+            if self._metrics is not None:
+                self._metrics.public_request_limited(policy.route_class)
             await _send_rejection(send, policy.rejection_response, retry_after)
             return
         await self._app(scope, receive, send)
@@ -96,23 +146,6 @@ class PublicRequestLimitMiddleware:
         if len(matches) > 1:
             raise RuntimeError("public request-limit policies are ambiguous")
         return matches[0] if matches else None
-
-    def _consume(self, policy: PublicRequestLimitPolicy) -> int | None:
-        now = self._clock()
-        bucket = self._buckets[policy.path]
-        if not isfinite(now):
-            return 1
-        elapsed = max(0.0, now - bucket.updated_at)
-        bucket.tokens = min(
-            float(policy.burst),
-            bucket.tokens + elapsed * policy.refill_rate_per_second,
-        )
-        if now >= bucket.updated_at:
-            bucket.updated_at = now
-        if bucket.tokens >= 1.0:
-            bucket.tokens -= 1.0
-            return None
-        return max(1, ceil((1.0 - bucket.tokens) / policy.refill_rate_per_second))
 
 
 async def _send_rejection(

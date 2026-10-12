@@ -64,6 +64,11 @@ class CiHistoryCollectionService:
         self._worker_id = worker_id
         self._metrics = metrics
         self._diagnostics = diagnostics
+        # Process-local scheduling hints, not work, transactions or connections.
+        self._recheck_cursors: dict[Literal["recent", "repair"], RepositoryScope | None] = {
+            "recent": None,
+            "repair": None,
+        }
 
     async def run(self, abort_signal: asyncio.Event) -> tuple[HistoryItemOutcome, ...]:
         async with asyncio.TaskGroup() as group:
@@ -184,7 +189,9 @@ class CiHistoryCollectionService:
         if abort.is_set():
             return "aborted"
         with self._metrics.ci_history_stage(lane, "claim"):
-            claim = await self._store.claim_recheck(worker_id=self._worker_id, source=lane)
+            claim = await self._store.claim_recheck(
+                worker_id=self._worker_id, source=lane, after_scope=self._recheck_cursors[lane]
+            )
         if abort.is_set():
             return "aborted"
         if claim is None:
@@ -198,6 +205,7 @@ class CiHistoryCollectionService:
             or claim.state.hint.source != lane
         ):
             return "store_unavailable"
+        self._recheck_cursors[lane] = claim.state.cursor.scope
         hint = claim.state.hint
         result = await self._read_attempt(
             lane, claim.state.cursor, hint.workflow_id, hint.run_created_at, abort

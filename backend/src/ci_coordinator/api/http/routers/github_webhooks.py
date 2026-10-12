@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-from typing import Literal, Never, cast
+from collections.abc import Callable, Mapping, Sequence
+from math import isfinite
+from time import monotonic
+from typing import Final, Literal, Never, cast
 
 from fastapi import APIRouter, Request, status
 from fastapi.responses import JSONResponse
 
-from ci_coordinator.api.http.body_limits import BodyLimitPolicy
+from ci_coordinator.api.http.body_limits import BodyLimitPolicy, PreBodyRefusal
 from ci_coordinator.api.http.contracts import ErrorBody
 from ci_coordinator.api.http.dependencies import GitHubWebhookRouteDependencies
 from ci_coordinator.api.http.model_contracts import ResponseModel
+from ci_coordinator.api.http.public_request_limits import TokenBucket, try_take_tokens
+from ci_coordinator.api.http.request_admission import RequestAdmissionPolicy
 from ci_coordinator.api.http.webhook_ingress import (
     WebhookAdmissionUnavailable,
     WebhookIngressCommand,
@@ -27,20 +32,117 @@ from ci_coordinator.github_ingestion import (
     WorkflowRunObservation,
     load_bundled_profile,
 )
-from ci_coordinator.identity_admission import RejectedIdentity
+from ci_coordinator.identity_admission import RejectedIdentity, is_canonical_webhook_signature
+from ci_coordinator.observability import RuntimeMetrics, WebhookAdmissionOutcome
 
 GITHUB_WEBHOOK_PATH = "/webhooks/github"
 _IDENTITY_HEADER_NAMES = frozenset({"x-github-delivery", "x-github-event", "x-hub-signature-256"})
+# Declared, unmeasured budgets of the webhook ingress design; CI-069 measures them.
+WEBHOOK_RESPONSE_DEADLINE_SECONDS: Final = 8
+WEBHOOK_PREAUTH_REQUEST_BURST: Final = 200
+WEBHOOK_PREAUTH_REQUEST_REFILL_PER_SECOND: Final = 50.0
+WEBHOOK_PREAUTH_BYTE_BURST: Final = 32 * 1_024 * 1_024
+WEBHOOK_PREAUTH_BYTE_REFILL_PER_SECOND: Final = 8.0 * 1_024 * 1_024
+_INVALID_WEBHOOK: Final[Mapping[str, object]] = {"ok": False, "error": "invalid webhook"}
+_INVALID_SIGNATURE: Final[Mapping[str, object]] = {"ok": False, "error": "invalid signature"}
+_OVERLOADED: Final[Mapping[str, object]] = {"ok": False, "error": "webhook ingestion overloaded"}
+_UNAVAILABLE: Final[Mapping[str, object]] = {"ok": False, "error": "webhook ingestion unavailable"}
+
+GITHUB_WEBHOOK_REQUEST_ADMISSION: Final = RequestAdmissionPolicy(
+    path=GITHUB_WEBHOOK_PATH,
+    methods=frozenset({"POST"}),
+    overload_response=_OVERLOADED,
+    timeout_response=_UNAVAILABLE,
+    timeout_seconds=WEBHOOK_RESPONSE_DEADLINE_SECONDS,
+)
 
 
-def github_webhook_body_limit() -> BodyLimitPolicy:
+class WebhookPreAuthentication:
+    """Decide header defects, then charge request and declared-byte budgets, before any read."""
+
+    def __init__(
+        self,
+        *,
+        maximum_body_bytes: int,
+        metrics: RuntimeMetrics | None = None,
+        clock: Callable[[], float] = monotonic,
+    ) -> None:
+        if type(maximum_body_bytes) is not int or not 1 <= maximum_body_bytes <= (
+            WEBHOOK_PREAUTH_BYTE_BURST
+        ):
+            raise ValueError("webhook pre-authentication bytes must fit the byte budget")
+        now = clock()
+        if not isfinite(now):
+            raise ValueError("webhook pre-authentication clock must return a finite value")
+        self._maximum_body_bytes = maximum_body_bytes
+        self._metrics = metrics
+        self._clock = clock
+        self._requests = TokenBucket(
+            float(WEBHOOK_PREAUTH_REQUEST_BURST),
+            WEBHOOK_PREAUTH_REQUEST_REFILL_PER_SECOND,
+            float(WEBHOOK_PREAUTH_REQUEST_BURST),
+            now,
+        )
+        self._bytes = TokenBucket(
+            float(WEBHOOK_PREAUTH_BYTE_BURST),
+            WEBHOOK_PREAUTH_BYTE_REFILL_PER_SECOND,
+            float(WEBHOOK_PREAUTH_BYTE_BURST),
+            now,
+        )
+
+    def __call__(
+        self,
+        headers: Sequence[tuple[bytes, bytes]],
+        declared_body_bytes: int | None,
+        /,
+    ) -> PreBodyRefusal | None:
+        if _header_lines(headers, b"content-type") != (b"application/json",) or _header_lines(
+            headers, b"content-encoding"
+        ):
+            return self._refuse("header_rejected", status.HTTP_400_BAD_REQUEST, _INVALID_WEBHOOK)
+        signatures = _header_lines(headers, b"x-hub-signature-256")
+        if len(signatures) != 1 or not is_canonical_webhook_signature(
+            signatures[0].decode("latin-1")
+        ):
+            return self._refuse("header_rejected", status.HTTP_401_UNAUTHORIZED, _INVALID_SIGNATURE)
+        # An unknown length is charged the route maximum; the body is not read to learn it.
+        charged_bytes = (
+            self._maximum_body_bytes if declared_body_bytes is None else declared_body_bytes
+        )
+        if (
+            try_take_tokens(
+                self._clock(), ((self._requests, 1.0), (self._bytes, float(charged_bytes)))
+            )
+            is not None
+        ):
+            if self._metrics is not None:
+                self._metrics.public_request_limited("webhook")
+            return self._refuse("preauth_limited", status.HTTP_503_SERVICE_UNAVAILABLE, _OVERLOADED)
+        return None
+
+    def _refuse(
+        self,
+        outcome: WebhookAdmissionOutcome,
+        status_code: int,
+        payload: Mapping[str, object],
+    ) -> PreBodyRefusal:
+        if self._metrics is not None:
+            self._metrics.webhook_admission(outcome)
+        return PreBodyRefusal(status_code, payload)
+
+
+def github_webhook_body_limit(metrics: RuntimeMetrics | None = None) -> BodyLimitPolicy:
+    maximum_body_bytes = load_bundled_profile().limits.maximum_body_bytes
     return BodyLimitPolicy(
         path=GITHUB_WEBHOOK_PATH,
-        maximum_body_bytes=load_bundled_profile().limits.maximum_body_bytes,
-        invalid_content_length_response={"ok": False, "error": "invalid webhook"},
+        maximum_body_bytes=maximum_body_bytes,
+        invalid_content_length_response=_INVALID_WEBHOOK,
         too_large_response={"ok": False, "error": "request body too large"},
-        overload_response={"ok": False, "error": "webhook ingestion overloaded"},
-        timeout_response={"ok": False, "error": "webhook ingestion unavailable"},
+        overload_response=_OVERLOADED,
+        timeout_response=_UNAVAILABLE,
+        pre_body_admission=WebhookPreAuthentication(
+            maximum_body_bytes=maximum_body_bytes, metrics=metrics
+        ),
     )
 
 
@@ -154,6 +256,10 @@ def create_github_webhooks_router(
         return _application_response(result)
 
     return router
+
+
+def _header_lines(headers: Sequence[tuple[bytes, bytes]], name: bytes) -> tuple[bytes, ...]:
+    return tuple(value for raw_name, value in headers if raw_name.lower() == name)
 
 
 def _duplicate_capable_headers(request: Request) -> dict[str, tuple[str, ...]]:

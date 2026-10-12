@@ -100,6 +100,9 @@ class CollectionBoundary:
     errors: dict[str, BaseException] = field(default_factory=dict)
     hook: Callable[[str], Awaitable[None]] | None = None
     calls: list[tuple[str, object]] = field(default_factory=list)
+    recheck_cursors: list[tuple[HistoryRecheckSource, RepositoryScope | None]] = field(
+        default_factory=list
+    )
     metrics: RuntimeMetrics = field(default_factory=RuntimeMetrics)
 
     async def record(self, stage: str, value: object = None) -> None:
@@ -116,8 +119,13 @@ class CollectionBoundary:
         return self.history if lane == "backfill" else self.discovery_history
 
     async def claim_recheck(
-        self, *, worker_id: str, source: HistoryRecheckSource
+        self,
+        *,
+        worker_id: str,
+        source: HistoryRecheckSource,
+        after_scope: RepositoryScope | None = None,
     ) -> ClaimedHistoryRecheck:
+        self.recheck_cursors.append((source, after_scope))
         await self.record("claim_" + source, worker_id)
         return self.rechecks.get(source)
 

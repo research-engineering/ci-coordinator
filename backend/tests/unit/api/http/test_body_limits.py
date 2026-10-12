@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
+from dataclasses import replace
 
 import pytest
+from prometheus_support import prometheus_samples
 from starlette.types import Message, Receive, Scope, Send
 
 from ci_coordinator.api.http.body_limits import (
     BodyLimitPolicy,
     RequestBodyLimitMiddleware,
+)
+from ci_coordinator.api.http.routers.github_webhooks import (
+    GITHUB_WEBHOOK_PATH,
+    WEBHOOK_PREAUTH_REQUEST_BURST,
+    WebhookPreAuthentication,
+    github_webhook_body_limit,
 )
 from ci_coordinator.api.http.routers.operator_controls import (
     MAX_OPERATOR_OVERRIDE_BODY_BYTES,
@@ -18,6 +27,7 @@ from ci_coordinator.api.http.routers.plan_requests import (
     PLAN_REQUEST_BODY_LIMIT,
     PLAN_REQUEST_PATH,
 )
+from ci_coordinator.observability import RuntimeMetrics
 
 
 def test_chunked_plan_body_is_bounded_before_the_downstream_app() -> None:
@@ -501,3 +511,244 @@ def test_replayed_body_delegates_subsequent_receive_to_the_client() -> None:
     asyncio.run(RequestBodyLimitMiddleware(downstream, policies=(policy,))(scope, receive, send))
 
     assert observed == ["http.request", "http.disconnect"]
+
+
+_WEBHOOK_MAXIMUM = 26_214_400
+_SIGNATURE = (b"x-hub-signature-256", b"sha256=" + b"0" * 64)
+_JSON = (b"content-type", b"application/json")
+
+
+class _WebhookProbe:
+    """One webhook request whose receive and downstream calls are counted."""
+
+    def __init__(self, chunks: tuple[bytes, ...] = (b"{}",)) -> None:
+        self._chunks = list(chunks)
+        self.reads = 0
+        self.downstream_calls = 0
+        self.sent: list[Message] = []
+
+    async def downstream(self, _: Scope, receive: Receive, send: Send) -> None:
+        self.downstream_calls += 1
+        await receive()
+        await send({"type": "http.response.start", "status": 204, "headers": []})
+        await send({"type": "http.response.body", "body": b""})
+
+    async def receive(self) -> Message:
+        self.reads += 1
+        chunk = self._chunks.pop(0)
+        return {"type": "http.request", "body": chunk, "more_body": bool(self._chunks)}
+
+    async def send(self, message: Message) -> None:
+        self.sent.append(message)
+
+    @property
+    def response(self) -> tuple[int, bytes]:
+        return self.sent[0]["status"], self.sent[1].get("body", b"")
+
+
+def _webhook_scope(*headers: tuple[bytes, bytes]) -> Scope:
+    return {"type": "http", "method": "POST", "path": GITHUB_WEBHOOK_PATH, "headers": list(headers)}
+
+
+def _webhook_policy(
+    *, clock: Callable[[], float] = lambda: 0.0, metrics: RuntimeMetrics | None = None
+) -> BodyLimitPolicy:
+    return replace(
+        github_webhook_body_limit(),
+        pre_body_admission=WebhookPreAuthentication(
+            maximum_body_bytes=_WEBHOOK_MAXIMUM, metrics=metrics, clock=clock
+        ),
+    )
+
+
+def _invoke(
+    probe: _WebhookProbe,
+    scope: Scope,
+    policy: BodyLimitPolicy | None = None,
+) -> tuple[int, bytes]:
+    middleware = RequestBodyLimitMiddleware(
+        probe.downstream, policies=(policy or _webhook_policy(),)
+    )
+    asyncio.run(middleware(scope, probe.receive, probe.send))
+    return probe.response
+
+
+_INVALID = b'{"ok":false,"error":"invalid webhook"}'
+_UNSIGNED = b'{"ok":false,"error":"invalid signature"}'
+_TOO_LARGE = b'{"ok":false,"error":"request body too large"}'
+_OVERLOADED = b'{"ok":false,"error":"webhook ingestion overloaded"}'
+
+
+@pytest.mark.parametrize(
+    ("headers", "expected"),
+    [
+        (((b"content-length", b"1x"), _JSON, _SIGNATURE), (400, _INVALID)),
+        (((b"content-length", b"26214401"), _JSON, _SIGNATURE), (413, _TOO_LARGE)),
+        (
+            ((b"content-length", b"2"), (b"content-type", b"text/plain"), _SIGNATURE),
+            (400, _INVALID),
+        ),
+        (
+            ((b"content-length", b"2"), _JSON, (b"content-encoding", b"gzip"), _SIGNATURE),
+            (400, _INVALID),
+        ),
+        (((b"content-length", b"2"), _JSON), (401, _UNSIGNED)),
+        (
+            ((b"content-length", b"2"), _JSON, (b"x-hub-signature-256", b"sha256=00")),
+            (401, _UNSIGNED),
+        ),
+        (((b"content-length", b"2"), _JSON, _SIGNATURE, _SIGNATURE), (401, _UNSIGNED)),
+    ],
+    ids=(
+        "invalid-length",
+        "declared-oversize",
+        "content-type",
+        "content-encoding",
+        "missing-signature",
+        "malformed-signature",
+        "ambiguous-signature",
+    ),
+)
+def test_single_webhook_header_defects_keep_their_status_without_reading_the_body(
+    headers: tuple[tuple[bytes, bytes], ...], expected: tuple[int, bytes]
+) -> None:
+    """H1: kills header checks placed after the path lease or the body read."""
+    probe = _WebhookProbe()
+
+    assert _invoke(probe, _webhook_scope(*headers)) == expected
+    assert probe.reads == 0
+    assert probe.downstream_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("headers", "chunks", "expected"),
+    [
+        (((b"content-length", b"26214401"), _JSON), (b"{}",), (413, _TOO_LARGE)),
+        (
+            ((b"content-length", b"1x"), (b"content-type", b"application/x-www-form-urlencoded")),
+            (b"{}",),
+            (400, _INVALID),
+        ),
+        ((_JSON,), (b"x" * _WEBHOOK_MAXIMUM, b"x"), (401, _UNSIGNED)),
+        (((b"content-length", b"10"), _JSON), (b"x" * 12,), (401, _UNSIGNED)),
+        (
+            ((b"content-type", b"application/x-www-form-urlencoded"), _SIGNATURE),
+            (b"x" * _WEBHOOK_MAXIMUM, b"x"),
+            (400, _INVALID),
+        ),
+    ],
+    ids=(
+        "declared-oversize-unsigned-stays-413",
+        "malformed-length-form-stays-400",
+        "unknown-length-oversize-unsigned-is-401",
+        "length-mismatch-unsigned-is-401",
+        "unknown-length-oversize-form-is-400",
+    ),
+)
+def test_combined_webhook_defects_follow_the_admitted_precedence(
+    headers: tuple[tuple[bytes, bytes], ...],
+    chunks: tuple[bytes, ...],
+    expected: tuple[int, bytes],
+) -> None:
+    """H1: kills header checks reordered before the declared-length checks."""
+    probe = _WebhookProbe(chunks)
+
+    assert _invoke(probe, _webhook_scope(*headers)) == expected
+    assert probe.reads == 0
+
+
+def test_unsigned_webhook_is_401_even_when_its_path_lane_is_full() -> None:
+    """H1: kills a header check placed after the path lease."""
+
+    async def scenario() -> tuple[tuple[int, bytes], int]:
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def downstream(_: Scope, receive: Receive, send: Send) -> None:
+            await receive()
+            entered.set()
+            await release.wait()
+            await send({"type": "http.response.start", "status": 204, "headers": []})
+            await send({"type": "http.response.body", "body": b""})
+
+        middleware = RequestBodyLimitMiddleware(
+            downstream, policies=(_webhook_policy(),), max_concurrent_requests=1
+        )
+        held = _WebhookProbe()
+        task = asyncio.create_task(
+            middleware(
+                _webhook_scope((b"content-length", b"2"), _JSON, _SIGNATURE),
+                held.receive,
+                held.send,
+            )
+        )
+        await entered.wait()
+        unsigned = _WebhookProbe()
+        await middleware(
+            _webhook_scope((b"content-length", b"2"), _JSON), unsigned.receive, unsigned.send
+        )
+        release.set()
+        await task
+        return unsigned.response, unsigned.reads
+
+    assert asyncio.run(scenario()) == ((401, _UNSIGNED), 0)
+
+
+def test_header_rejected_webhooks_consume_no_preauthentication_tokens() -> None:
+    """H2: kills consume-then-check, where forged headers drain valid capacity."""
+    metrics = RuntimeMetrics()
+    stage = WebhookPreAuthentication(
+        maximum_body_bytes=_WEBHOOK_MAXIMUM, metrics=metrics, clock=lambda: 0.0
+    )
+    unsigned = [(b"content-type", b"application/json")]
+    signed = [*unsigned, _SIGNATURE]
+
+    rejected = [stage(unsigned, 2) for _ in range(WEBHOOK_PREAUTH_REQUEST_BURST + 1)]
+    admitted = [stage(signed, 2) for _ in range(WEBHOOK_PREAUTH_REQUEST_BURST)]
+
+    assert {refusal.status_code for refusal in rejected if refusal is not None} == {401}
+    assert None not in rejected
+    assert admitted == [None] * WEBHOOK_PREAUTH_REQUEST_BURST
+    limited = stage(signed, 2)
+    assert limited is not None and limited.status_code == 503
+    samples = prometheus_samples(metrics)
+    assert samples[_admission_sample("header_rejected")] == WEBHOOK_PREAUTH_REQUEST_BURST + 1
+    assert samples[_admission_sample("preauth_limited")] == 1
+    assert (
+        samples[("ci_coordinator_public_request_limited_total", (("route_class", "webhook"),))] == 1
+    )
+
+
+def test_webhook_byte_budget_charges_declared_length_and_unknown_length_as_maximum() -> None:
+    """H3: kills a count-only bucket and an unknown length charged as zero."""
+    now = 0.0
+    stage = WebhookPreAuthentication(maximum_body_bytes=_WEBHOOK_MAXIMUM, clock=lambda: now)
+    signed = [(b"content-type", b"application/json"), _SIGNATURE]
+
+    assert stage(signed, _WEBHOOK_MAXIMUM) is None
+    declared = stage(signed, _WEBHOOK_MAXIMUM)
+    assert declared is not None and declared.status_code == 503
+    assert stage(signed, 1_024) is None
+    now = 3.0
+    assert stage(signed, None) is None
+    unknown = stage(signed, None)
+    assert unknown is not None and unknown.status_code == 503
+
+
+def test_exhausted_webhook_budget_refuses_before_the_path_lease_or_body_read() -> None:
+    """H3: kills a bucket consulted after the body read."""
+    application = _WebhookProbe()
+    middleware = RequestBodyLimitMiddleware(application.downstream, policies=(_webhook_policy(),))
+    scope = _webhook_scope((b"content-length", b"26214400"), _JSON, _SIGNATURE)
+    admitted, refused = _WebhookProbe((b"x" * _WEBHOOK_MAXIMUM,)), _WebhookProbe()
+
+    asyncio.run(middleware(scope, admitted.receive, admitted.send))
+    asyncio.run(middleware(scope, refused.receive, refused.send))
+
+    assert admitted.response[0] == 204
+    assert refused.response == (503, _OVERLOADED)
+    assert refused.reads == 0
+    assert application.downstream_calls == 1
+
+
+def _admission_sample(outcome: str) -> tuple[str, tuple[tuple[str, str], ...]]:
+    return ("ci_coordinator_webhook_admission_total", (("outcome", outcome),))

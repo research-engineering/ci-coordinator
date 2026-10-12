@@ -1,6 +1,7 @@
 # Webhook Ingress Scheduling
 
-Status: design frozen for independent review; implementation pending
+Status: reviewed design; source delivered, native witnesses and exact-source
+qualification pending (CI-014 open); connection-share enforcement not adopted
 Date: 2026-10-11
 
 Owners: [GitHub ingestion](../architecture/modules/github-ingestion.md)
@@ -29,6 +30,46 @@ inbox in [Actions history storage](actions-history-storage.md#selected-delivery-
 All coordinates were validated at
 `62d7765d32f6bbb19848b1bba319b71bf9c379f9`. Paths below are relative to
 `backend/src/ci_coordinator/` unless stated otherwise.
+
+## Source Delivery
+
+The implementation delivers plan steps 1 to 5 and 7 to 9 in source:
+
+- the verifier pool `N = 4` in `runtime/webhook_admission.py`;
+- the webhook pre-body stage and the 8-second deadline policy in
+  `api/http/routers/github_webhooks.py`, through a generic pre-body hook in
+  `api/http/body_limits.py`;
+- the recheck lane rotation;
+- the back-channel logout envelope;
+- the closed outcome, refusal and permit-hold series.
+
+The coordinates in the as-is analysis below describe the base before this
+delivery.
+
+Step 6 is not adopted as designed. Counted from source, the lifecycle-owned
+background populations hold `B = 22` concurrent connections. The maintenance
+round runs reconciliation and all nine bounded operations concurrently:
+
+- reconciliation 1;
+- economics collection 4;
+- archive delivery 4;
+- observation discovery 2;
+- six single-connection cleanups.
+
+The history lanes hold 4 and preparation 1. With `N = 4` and `F_min = 4`,
+`N + B + F_min = 30`, so the declared pool of 16 cannot satisfy the sum, and
+a startup rejection would refuse the example deployment. This is a
+provisional owner decision (2026-10-11):
+
+- no startup rejection, no new pool and no separate engine is added;
+- `runtime/connection_shares.py` records the source-counted inventory, and
+  a witness pins it;
+- foreground contention under background and webhook load remains a recorded
+  residual. It is the "foreground pool wait rises" revision trigger below,
+  measured by CI-069.
+
+Raising the pool, bounding maintenance concurrency or a separate engine each
+need a new owner decision.
 
 ## As-Is Analysis
 
@@ -325,7 +366,7 @@ value is a design revision, not a tuning detail.
 | Retained body bytes | 32 MiB per process; eight bodies per path | Existing settings and middleware | `retained-request-body-bytes` |
 | Webhook pre-auth budget | Count burst 200, refill 50 per second; bytes burst 32 MiB, refill 8 MiB per second | Twice the declared arrival peak; bytes bounded by the retained-body budget | Refusals by route class |
 | Logout envelope budget | Burst 64, refill 32 per second | Cheap verification cost; above the current 4 per second | Valid logout success under invalid load |
-| Connection shares | Pool 16: `N = 4`, `F_min = 4`, `B` counted from source | Example deployment pool size | `database-pool-wait-p999-microseconds` per class |
+| Connection shares | Pool 16: `N = 4`, `F_min = 4`, `B = 22` counted from source; the sum 30 exceeds 16 and is not enforced (see Source Delivery) | Example deployment pool size | `database-pool-wait-p999-microseconds` per class |
 | Archive inbox drain | At most 1,600 sources per round (16 scopes of 100 rows); one round per reconciliation interval (example 30 seconds) | Existing constants | Pending age p99 at most 5 minutes; backlog growth |
 | Queue bytes | No raw-payload queue; compact rows only; 32 in-memory preparation epochs | Selected decision 1; `REQ-CI-RUNTIME-041` | Inbox row and index size growth |
 

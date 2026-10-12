@@ -33,6 +33,7 @@ from ci_coordinator.observability.runtime_metrics import (
     PlanningStage,
     PlanningUnavailabilityReason,
     RuntimeMetrics,
+    WebhookAdmissionOutcome,
 )
 
 __all__ = [
@@ -54,6 +55,7 @@ __all__ = [
     "RuntimeMetrics",
     "RuntimeReadinessUseCase",
     "StructuredEventLogger",
+    "WebhookAdmissionOutcome",
     "assess_readiness",
     "bind_plan_operation_diagnostic",
     "default_structured_event_logger",

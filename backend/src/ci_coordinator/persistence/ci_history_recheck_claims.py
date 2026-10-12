@@ -30,11 +30,18 @@ from ci_coordinator.persistence.ci_history_state_store import (
 
 
 async def claim_history_recheck(
-    connection: AsyncConnection, worker_id: str, source: HistoryRecheckSource
+    connection: AsyncConnection,
+    worker_id: str,
+    source: HistoryRecheckSource,
+    *,
+    after_scope: RepositoryScope | None = None,
 ) -> ClaimedHistoryRecheck:
+    """Claim one due row, visiting due scopes cyclically in key order after ``after_scope``."""
     digest(worker_id)
     if source not in {"recent", "repair"}:
         raise ValueError("history claim requires a known queue source")
+    if after_scope is not None and type(after_scope) is not RepositoryScope:
+        raise TypeError("history recheck cursor must be a repository scope")
     due = (
         rechecks.c.source == source,
         rechecks.c.next_attempt_at <= func.statement_timestamp(),
@@ -45,11 +52,7 @@ async def claim_history_recheck(
     )
     candidates = (
         await connection.execute(
-            select(
-                rechecks.c.installation_id,
-                rechecks.c.repository_id,
-                func.min(rechecks.c.next_attempt_at).label("due_at"),
-            )
+            select(rechecks.c.installation_id, rechecks.c.repository_id)
             .select_from(
                 rechecks.join(
                     datasets,
@@ -62,15 +65,29 @@ async def claim_history_recheck(
             )
             .where(datasets.c.state == "active", *due)
             .group_by(rechecks.c.installation_id, rechecks.c.repository_id)
-            .order_by("due_at", rechecks.c.installation_id, rechecks.c.repository_id)
+            .order_by(rechecks.c.installation_id, rechecks.c.repository_id)
             .limit(MAX_HISTORY_DATASETS + 1)
         )
     ).all()
     if len(candidates) > MAX_HISTORY_DATASETS:
         raise ValueError("history candidate scopes exceed their admitted bound")
+    scopes = [
+        RepositoryScope(installation_id, repository_id)
+        for installation_id, repository_id in candidates
+    ]
+    if after_scope is not None:
+        cursor = (after_scope.installation_id, after_scope.repository_id)
+        start = next(
+            (
+                index
+                for index, scope in enumerate(scopes)
+                if (scope.installation_id, scope.repository_id) > cursor
+            ),
+            0,
+        )
+        scopes = scopes[start:] + scopes[:start]
     capacity = False
-    for installation_id, repository_id, _ in candidates:
-        scope = RepositoryScope(installation_id, repository_id)
+    for scope in scopes:
         if not await lock_history_scope(connection, scope, try_only=True):
             continue
         dataset = await load_history_dataset(connection, scope, locked=True, skip_locked=True)

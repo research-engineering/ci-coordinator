@@ -108,7 +108,11 @@ class HistoryCollectionStore(Protocol):
     ) -> HistoryTransition: ...
 
     async def claim_recheck(
-        self, *, worker_id: str, source: HistoryRecheckSource
+        self,
+        *,
+        worker_id: str,
+        source: HistoryRecheckSource,
+        after_scope: RepositoryScope | None = None,
     ) -> ClaimedHistoryRecheck: ...
 
     async def record_recheck_statistics(

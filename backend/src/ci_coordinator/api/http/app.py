@@ -122,6 +122,7 @@ from ci_coordinator.api.http.routers.control_plane_identity import (
     build_control_plane_identity_router,
 )
 from ci_coordinator.api.http.routers.github_webhooks import (
+    GITHUB_WEBHOOK_REQUEST_ADMISSION,
     create_github_webhooks_router,
     github_webhook_body_limit,
 )
@@ -322,6 +323,7 @@ def create_app(
         app.add_middleware(
             PublicRequestLimitMiddleware,
             policies=public_request_limits,
+            metrics=None if routes.observability is None else routes.observability.metrics,
         )
     app.add_middleware(CorrelationIdMiddleware)
     app.add_middleware(
@@ -393,7 +395,11 @@ def _body_limit_policies(routes: HttpRouteDependencies) -> tuple[BodyLimitPolicy
     if routes.plan is not None:
         policies.append(PLAN_REQUEST_BODY_LIMIT)
     if routes.webhook is not None:
-        policies.append(github_webhook_body_limit())
+        policies.append(
+            github_webhook_body_limit(
+                None if routes.observability is None else routes.observability.metrics
+            )
+        )
     if routes.operator_controls is not None:
         policies.append(OPERATOR_OVERRIDE_BODY_LIMIT)
     if routes.config_management is not None:
@@ -427,6 +433,8 @@ def _request_admission_policies(
     routes: HttpRouteDependencies,
 ) -> tuple[RequestAdmissionPolicy, ...]:
     config_policies = _config_request_admission_policies(routes)
+    if routes.webhook is not None:
+        config_policies += (GITHUB_WEBHOOK_REQUEST_ADMISSION,)
     if routes.activity is not None:
         config_policies += ACTIVITY_REQUEST_LIMITS
     if routes.production_cutover is not None:

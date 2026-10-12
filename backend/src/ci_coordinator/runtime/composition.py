@@ -810,6 +810,7 @@ def _compose_connected_dependencies(
                         ingestion_store=TransactionalWebhookIngestionStore(webhook_uow),
                         clock=clock,
                         offer_preparation=preparation.offer,
+                        metrics=runtime_metrics,
                     ),
                 ),
                 operator_controls=OperatorControlsRouteDependencies(
