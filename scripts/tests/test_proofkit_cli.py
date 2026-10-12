@@ -36,6 +36,37 @@ USED_PROOFKIT_COMMANDS = (
     "text-policy",
     "witness-plan",
 )
+# Admitted (input, output) root-definition digests; a pin move must keep them.
+CONSUMED_ROOT_DEFINITION_DIGESTS = {
+    "repo-profile-admission": (
+        "sha256:7cb2357b227c2669b5322712ce6e032315e18b726dde8ead31b1feb29e14b418",
+        "sha256:acf8e7db39bfb1325d83c2cdfe68a7c243847d207e56691a3b2937b28f95d3e7",
+    ),
+    "requirement-bindings": (
+        "sha256:123984c0fbb3eeee5020af333f8a5628e10d6aa931b038e42e44fbee92682e1f",
+        "sha256:f31dd686f28fce4bf74265b557dc25428179cbc282753b4bea01439cd98f73c2",
+    ),
+    "requirement-source-admission": (
+        "sha256:b2b3982ca053794da607673db6258933960a4f67653871205ff03caab2012a9f",
+        "sha256:2527a19394b22efb4b14e39bf3b1f14283f179592c369b9c2ae34b612c7c69af",
+    ),
+    "requirement-source-transition": (
+        "sha256:f6783a812e7d0addd6fa4f077cd43b47df87c7b9fee93cdb3df429ca22cd238f",
+        "sha256:c1dc42e4388b9a43edd7254f8d4fff8076185c3fd05357296d7efb9fef8daf51",
+    ),
+    "selective-gate-plan": (
+        "sha256:b2f202d51f98d0e43191b015591f88b493916254d7d7fcc5942bd7c5fff2e6f8",
+        "sha256:45fd178ec9319a1f2394b45508cdd7164d5a836c06064ebc3f8ea8f4ba1349af",
+    ),
+    "text-policy": (
+        "sha256:af1e6196ddee9ee4262ca14c9cca1451c89241ebeef177af4a12be866b088f9a",
+        "sha256:a47795a1a72dcece9e3e513c8d33829fed187a959450d1ce007697a434b26df1",
+    ),
+    "witness-plan": (
+        "sha256:6670d1db21e0cc51e8811224b98e9160c6b8c52e841b18ba67e3e6426004831c",
+        "sha256:77a320105ae18dd507d1d44c51e3fe26ebe7efc8decdd436f9311c0daae57d57",
+    ),
+}
 
 
 @pytest.mark.parametrize("command", USED_PROOFKIT_COMMANDS)
@@ -60,6 +91,10 @@ def test_installed_carrier_preserves_consumed_cli_contract(command: str) -> None
         assert selected["schemaVersion"] == 1
         assert selected["rootType"] == "object"
         assert selected["closed"] is True
+    assert (
+        entry["inputContract"]["rootDefinitionDigest"],
+        entry["outputContract"]["rootDefinitionDigest"],
+    ) == CONSUMED_ROOT_DEFINITION_DIGESTS[command]
 
 
 @pytest.mark.parametrize("linked", [False, True])

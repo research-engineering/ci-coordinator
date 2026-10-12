@@ -171,7 +171,7 @@ An interruption, detected drift or write failure MUST NOT return success.
 Independent native enumeration and installed-resource equality remain required:
 two identical copies can have the same stale workflow fingerprint. Preserve
 native test/command populations, GitHub gate operands, independent trust roots
-and unknown/incomplete-to-FullCI. Retain Proofkit 0.14.18's seven-command
+and unknown/incomplete-to-FullCI. Retain Proofkit 0.14.21's seven-command
 consumer; no new materialization flow is admitted.
 
 Completing the existing generator and one cohesive projection helper avoids

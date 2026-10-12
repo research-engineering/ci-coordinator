@@ -104,12 +104,17 @@ See the upstream [configuration](https://pnpm.io/settings) and
 3. In the authorized GitHub maintenance environment, regenerate the applicable
    locks with the selected tools. The current native platform owner requires
    Linux arm64/x64 and macOS arm64/x64 for Node/Python/uv, and Linux arm64/x64 plus
-   macOS arm64 for pnpm. Preserve that asymmetric set; adding a platform needs
-   its own admission. For a coordinated update the explicit commands are:
+   macOS arm64 for pnpm and gitleaks. Intel macOS is not a supported developer
+   host (provisional owner decision (2026-10-11)); no use is evidenced. pnpm
+   12.5.1 and gitleaks 8.30.1 both publish darwin x64 archives, so their missing
+   `macos-x64` records are this support choice, not an artifact gap. The
+   Node/Python/uv `macos-x64` records do not establish Intel macOS support.
+   Preserve that asymmetric set; adding a platform needs evidence of use and its
+   own admission. For a coordinated update the explicit commands are:
 
    ```sh
    mise lock node python uv --platform linux-arm64,linux-x64,macos-arm64,macos-x64
-   mise lock pnpm --platform linux-arm64,linux-x64,macos-arm64
+   mise lock pnpm gitleaks --platform linux-arm64,linux-x64,macos-arm64
    mise exec -- uv lock --project backend
    mise exec -- uv export --project backend --all-groups --format requirements.txt \
      --output-file backend/requirements-dev.lock --no-emit-project --frozen

@@ -33,10 +33,51 @@ owns each utility predicate and its exact exceptions. Static assignment does not
 prove test adequacy or authorize omission. The native required gate remains
 independent until the existing production-admission contract is satisfied.
 
+## Proofkit 0.14.21 Revalidation
+
+The development dependency is `agentic-proofkit==0.14.21`, the latest 0.14.x
+patch. This is a provisional owner decision (2026-10-11): move within the 0.14
+line only when the seven consumed command contracts are identical, and defer
+0.15.0 and 0.16.0. It supersedes only the 0.14.18 version selection below; the
+seven-command boundary, wrappers and native routes are unchanged.
+
+Official release observations on 2026-10-12 cover the interval. Each release
+states no breaking contract change and no consumer migration:
+
+| Release                                                                                   | Relevant change                                                                     |
+|-------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
+| [0.14.19](https://github.com/research-engineering/agentic-proofkit/releases/tag/v0.14.19) | Lazy source-intake traceability recipes; command semantics unchanged.               |
+| [0.14.20](https://github.com/research-engineering/agentic-proofkit/releases/tag/v0.14.20) | Private requirement-source normalization allocation work; CLI semantics unchanged.  |
+| [0.14.21](https://github.com/research-engineering/agentic-proofkit/releases/tag/v0.14.21) | Rejected requirement-source branch retention fix; diagnostics and limits unchanged. |
+
+All four 0.14.21 PyPI wheels (macOS 13 and glibc 2.17 Linux, arm64/x86_64)
+match their registry SHA-256 values and the regenerated `uv.lock`. Each carries
+`proofkit/cli-contract.v2.json` with SHA-256
+`7a4a0bf93a1aca3dd91d84e7c0e6303944d301a665a3649293639c3c85d01fb1`, byte-equal
+to the [0.14.21 tag](https://github.com/research-engineering/agentic-proofkit/blob/v0.14.21/proofkit/cli-contract.v2.json).
+Compared offline with the 0.14.18 carrier, the seven consumed command records
+are identical, including their native-source digests. The process contract
+and all 168 contract definitions, which include the fourteen consumed root
+definitions, are also identical. The root and seven command help texts of the
+two macOS arm64 binaries are byte-identical. The only contract delta is in the
+native-source digests of sixteen unconsumed command records, including those
+referencing the shared `internal/app` package.
+
+This is a contract comparison, not runtime equivalence. Releases 0.14.20 and
+0.14.21 change private requirement-source internals behind
+`requirement-source-admission`, so the existing GitHub consumer tests remain
+the behavioral qualification. Dated APF-CI dispositions below were observed
+against 0.14.18 and carry over only at this identical-contract boundary. The
+APF-CI-009 installed-CLI recheck was not repeated on 0.14.21; the APF-CI-018
+input limit is requalified only by the native text-policy batch tests. A changed consumed record, root definition,
+help text, wheel identity or native consumer result reopens this selection.
+Adopting 0.15.0 or 0.16.0 requires its own consumed-contract comparison and
+admission.
+
 ## Proofkit 0.14.18 Revalidation
 
-The development dependency is `agentic-proofkit==0.14.18`. This version selection
-supersedes the pin in the [0.14.12 decision](../../decisions/proofkit-0-14-12-consumer-admission.md),
+The earlier selection was `agentic-proofkit==0.14.18`. That version selection
+superseded the pin in the [0.14.12 decision](../../decisions/proofkit-0-14-12-consumer-admission.md),
 whose historical bytes and qualification boundary remain unchanged. The bounded
 upgrade preserves the existing seven-command consumer integration; it does not
 adopt new materialization, browser, receipt or provider-enforcement commands.
@@ -52,7 +93,7 @@ Official release observations on 2026-09-20 cover the complete interval:
 | [0.14.17](https://github.com/research-engineering/agentic-proofkit/releases/tag/v0.14.17) | Lazy declaration-coverage and receipt-currentness recipes.           |
 | [0.14.18](https://github.com/research-engineering/agentic-proofkit/releases/tag/v0.14.18) | Source-compatibility regression boundaries; no public codec cutover. |
 
-The installed Python carrier's `proofkit/cli-contract.v2.json` has SHA-256
+The 0.14.18 Python carrier's `proofkit/cli-contract.v2.json` has SHA-256
 `40e21bb074eea37dba970d08cf06e1c5ee0ec1c1d7404fad1e7e28490a3924c4`
 and equals the [0.14.18 contract](https://github.com/research-engineering/agentic-proofkit/blob/v0.14.18/proofkit/cli-contract.v2.json).
 All seven consumed command records, their fourteen referenced input/output root

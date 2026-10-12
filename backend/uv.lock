@@ -7,13 +7,13 @@ prerelease-mode = "disallow"
 
 [[package]]
 name = "agentic-proofkit"
-version = "0.14.18"
+version = "0.14.21"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/3b/19222c1291de4c68565af03a570e23935fe043bd2e084e3f1d65c6c440ee/agentic_proofkit-0.14.18-py3-none-macosx_13_0_arm64.whl", hash = "sha256:ea51930da358b64d70df157fb9048455346936171d0f372b744e4d2f0105e9e9", size = 12215532, upload-time = "2026-09-14T18:56:04.191Z" },
-    { url = "https://files.pythonhosted.org/packages/9d/8b/7921a8df1e769697718d6b6a6f986f851e9067f0106d26c0eddae7ede6ad/agentic_proofkit-0.14.18-py3-none-macosx_13_0_x86_64.whl", hash = "sha256:d211fd7356d1134714b0e4d8659fe41b4cef087a98273b30da95a1d2ec12aaa1", size = 13124447, upload-time = "2026-09-14T18:56:07.224Z" },
-    { url = "https://files.pythonhosted.org/packages/a8/a3/d7e57534b8b3cdeb1ca7a4e5ff654f43fe29fc3f7fc6561718763fb575e9/agentic_proofkit-0.14.18-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:003ba939a4d9c589deb148aa2385c1e879608e10f8a4f3dfcdc2405c23319631", size = 11725460, upload-time = "2026-09-14T18:56:10.04Z" },
-    { url = "https://files.pythonhosted.org/packages/10/10/ad47420dedcb857d79ef8f0536a6cb05964e366f8f0d955d80cc314cd756/agentic_proofkit-0.14.18-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:521ddef23a133af77da6ba356e296c679c763363d43d8802df91cb4948f952c2", size = 12914528, upload-time = "2026-09-14T18:56:13.006Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/49/634f695ca86b4f428108e171d6ca629507e177b285e5cca1ca54206dde8c/agentic_proofkit-0.14.21-py3-none-macosx_13_0_arm64.whl", hash = "sha256:e7ee273c9a3de4b51f54fa039d6454fab3dc8178357247d6fa2b48ef87f2e114", size = 12222130, upload-time = "2026-09-20T22:37:54.928Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/bb/aa31b39c87bd7953daa808dc24bc95246aa2587f4bee019b2748ab8dd389/agentic_proofkit-0.14.21-py3-none-macosx_13_0_x86_64.whl", hash = "sha256:f464eae18f3e0b9d729279dc9a2dcb70a0507883af136387ced2a7b5b6838ee8", size = 13132048, upload-time = "2026-09-20T22:37:57.523Z" },
+    { url = "https://files.pythonhosted.org/packages/30/5c/25df0db21ad5bf14ca11138887f946d5b7ff52e6fad92681d92dfd77876f/agentic_proofkit-0.14.21-py3-none-manylinux_2_17_aarch64.whl", hash = "sha256:dfcb66c1b7ef90dff53cf04e73c6b0c11ae768c4105f8cf83352ff3af3aec23f", size = 11730425, upload-time = "2026-09-20T22:37:59.786Z" },
+    { url = "https://files.pythonhosted.org/packages/01/6e/437783b53befe7916f675bf1b8b4a24782a22462f9fe9b2ee1729614ee93/agentic_proofkit-0.14.21-py3-none-manylinux_2_17_x86_64.whl", hash = "sha256:b63b3777125049ca048db9d7a6525dd2b93fbaa91a19c7fed73158fc25330382", size = 12917294, upload-time = "2026-09-20T22:38:02.059Z" },
 ]
 
 [[package]]
@@ -276,7 +276,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 debug = [{ name = "debugpy", specifier = "==1.8.22" }]
 dev = [
-    { name = "agentic-proofkit", specifier = "==0.14.18" },
+    { name = "agentic-proofkit", specifier = "==0.14.21" },
     { name = "deptry", specifier = "==0.25.1" },
     { name = "docker", specifier = "==7.2.0" },
     { name = "import-linter", specifier = "==2.15" },
