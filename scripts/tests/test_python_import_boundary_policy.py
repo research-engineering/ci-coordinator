@@ -1527,6 +1527,7 @@ def test_proposal_review_edges_preserve_domain_and_transport_boundaries() -> Non
     for admitted in (
         "ci_coordinator.proposal_review",
         "ci_coordinator.app.proposal_review",
+        "ci_coordinator.app.registered_epoch_review",
     ):
         assert violating_rule_ids(dependency_path, admitted) == ()
         assert violating_rule_ids(review_route_path, admitted) == ()
@@ -1537,9 +1538,13 @@ def test_proposal_review_edges_preserve_domain_and_transport_boundaries() -> Non
         "ci_coordinator.persistence",
         "ci_coordinator.persistence.proposal_review_adapter",
         "ci_coordinator.persistence.proposal_review_unit_of_work",
+        "ci_coordinator.persistence.registered_epoch_review_adapter",
+        "ci_coordinator.persistence.registered_epoch_review_unit_of_work",
     ):
         assert "python.import-boundary.api-http" in violating_rule_ids(api_path, forbidden)
     assert not hasattr(app_facade, "ProposalReviewService")
+    assert not hasattr(app_facade, "RegisteredEpochReviewService")
+    assert not hasattr(persistence_facade, "TransactionalRegisteredEpochReviewStore")
     assert not hasattr(persistence_facade, "PostgresProposalReviewUnitOfWork")
     assert not hasattr(persistence_facade, "TransactionalProposalReviewStore")
 

@@ -182,6 +182,31 @@ PROPOSAL_REVIEW_REGISTRATION_V2 = replace(
     backfill_state_id="pre-cutover-pending-attestations-invalidated/v1",
 )
 
+REGISTERED_EPOCH_REVIEW = CapabilityDefinition(
+    capability_id="registered-epoch-review/v1",
+    schema_requirements=(
+        "ci_coordinator.registered_epoch_attestation_transactions/v1",
+        "ci_coordinator.registered_epoch_reviews/v1",
+    ),
+    read_domain_id="registered-epoch-review-with-earliest-standalone-registrant/v1",
+    write_domain_id="one-use-registered-epoch-attestation-review-and-explicit-activation-guard/v1",
+    codec_id="registered-epoch-review-audit-and-config-activation-audit-v3/v1",
+    backfill_state_id="no-registered-epoch-review-state-created-by-migration/v1",
+    bridge_constraint_ids=(
+        "ci_coordinator.ck_registered_epoch_attestation_transactions_subject/v1",
+        "ci_coordinator.ck_registered_epoch_reviews_base_shape/v1",
+        "ci_coordinator.ck_registered_epoch_reviews_diff_evidence/v1",
+        "ci_coordinator.ck_registered_epoch_reviews_attestation_identity/v1",
+        "ci_coordinator.ck_registered_epoch_reviews_attestation_time/v1",
+        "ci_coordinator.fk_registered_epoch_reviews_registration/v1",
+    ),
+    routine_requirements=("ci_coordinator.reject_proposal_review_mutation/v1",),
+    privilege_requirements=(
+        "runtime-registered-epoch-attestation-select-insert-delete/v1",
+        "runtime-registered-epoch-review-select-insert/v1",
+    ),
+)
+
 
 GOVERNANCE_BASELINE_STATE = CapabilityDefinition(
     capability_id="governance-baseline-state/v1",
@@ -562,6 +587,7 @@ _CAPABILITY_DEFINITIONS = {
     GOVERNANCE_BASELINE_STATE.capability_id: GOVERNANCE_BASELINE_STATE,
     CONTROL_PLANE_IDENTITY_STATE.capability_id: CONTROL_PLANE_IDENTITY_STATE,
     CONTROL_PLANE_LOGOUT_FENCE.capability_id: CONTROL_PLANE_LOGOUT_FENCE,
+    REGISTERED_EPOCH_REVIEW.capability_id: REGISTERED_EPOCH_REVIEW,
     RUNTIME_INGRESS_ISSUANCE_STATE.capability_id: RUNTIME_INGRESS_ISSUANCE_STATE,
     WEBHOOK_BODY_IDENTITY.capability_id: WEBHOOK_BODY_IDENTITY,
     SHADOW_RECONCILIATION_STATE.capability_id: SHADOW_RECONCILIATION_STATE,
@@ -622,6 +648,19 @@ def proposal_review_registration_requirements(
             CONFIG_EPOCH_LIFECYCLE_V2.declaration(),
             PROPOSAL_REVIEW_REGISTRATION_V2.declaration(),
             CONTROL_PLANE_IDENTITY_STATE.declaration(),
+        ),
+    )
+
+
+def registered_epoch_review_requirements(
+    profile: CompatibilityProfile,
+) -> tuple[CapabilityDeclaration, ...]:
+    return required_capabilities(
+        profile,
+        (
+            *proposal_review_registration_requirements(profile),
+            CONFIG_EPOCH_REGISTRATION_OPERATIONS.declaration(),
+            REGISTERED_EPOCH_REVIEW.declaration(),
         ),
     )
 

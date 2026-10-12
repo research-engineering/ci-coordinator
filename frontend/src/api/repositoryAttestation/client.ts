@@ -97,7 +97,10 @@ async function attestationFailure(response: Response): Promise<RepositoryAttesta
     overloaded: 503,
     rate_limited: 429,
     replayed: 409,
+    source_mismatch: 409,
     stale: 409,
+    target_ineligible: 409,
+    target_missing: 404,
     unauthenticated: 401,
     unavailable: 503,
   };

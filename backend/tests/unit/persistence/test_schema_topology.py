@@ -29,6 +29,9 @@ from ci_coordinator.persistence import _schema_runtime_state as runtime_state_sc
 from ci_coordinator.persistence import _schema_shadow as shadow_schema
 from ci_coordinator.persistence import operator_override_schema
 from ci_coordinator.persistence import _schema_production_cutover as production_cutover_schema
+from ci_coordinator.persistence import (
+    _schema_registered_epoch_reviews as registered_epoch_review_schema,
+)
 
 _EXPECTED_SCHEMA_EXPORTS = {
     "APPLICATION_SCHEMA",
@@ -79,6 +82,8 @@ _EXPECTED_SCHEMA_EXPORTS = {
     "reconciliation_observations",
     "reconciliation_results",
     "reconciliation_subjects",
+    "registered_epoch_attestation_transactions",
+    "registered_epoch_reviews",
     "repository_attestation_transactions",
     "shadow_evidence",
     "webhook_deliveries",
@@ -284,6 +289,16 @@ _EXPECTED_TABLE_TOPOLOGY: tuple[tuple[str, str, Table], ...] = (
         "ci_coordinator.production_scope_states",
         "production_scope_states",
         production_cutover_schema.production_scope_states,
+    ),
+    (
+        "ci_coordinator.registered_epoch_attestation_transactions",
+        "registered_epoch_attestation_transactions",
+        registered_epoch_review_schema.registered_epoch_attestation_transactions,
+    ),
+    (
+        "ci_coordinator.registered_epoch_reviews",
+        "registered_epoch_reviews",
+        registered_epoch_review_schema.registered_epoch_reviews,
     ),
 )
 

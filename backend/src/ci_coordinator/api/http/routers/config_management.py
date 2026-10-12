@@ -19,6 +19,7 @@ from ci_coordinator.api.http.config_lifecycle_contracts import (
     ConfigEpochRollbackBody,
     ExplicitConfigEpochActivationBody,
     PolicyDiagnosticBody,
+    RegisteredEpochConfigActivationBody,
     admit_config_request,
     config_admission_error,
     config_error,
@@ -202,7 +203,11 @@ def build_config_management_router(
         },
     )
     async def activate_config_epoch(
-        body: ConfigEpochActivationBody | ExplicitConfigEpochActivationBody,
+        body: (
+            ConfigEpochActivationBody
+            | ExplicitConfigEpochActivationBody
+            | RegisteredEpochConfigActivationBody
+        ),
         request: Request,
         _security: Annotated[
             HTTPAuthorizationCredentials | None,
@@ -218,6 +223,22 @@ def build_config_management_router(
             return rejected
         if not isinstance(admission, RoleAdmissionGranted):
             raise RuntimeError("control-plane mutation admission was not granted")
+        if isinstance(body, RegisteredEpochConfigActivationBody):
+            return _activation_response(
+                await dependencies.use_case.activate(
+                    ActivateConfigEpoch(
+                        actor=admission.principal.actor_id,
+                        scope=RepositoryScope(body.installation_id, body.repository_id),
+                        target_epoch_id=body.target_epoch_id,
+                        proposal_manifest_id=None,
+                        activation_version=3,
+                        review_operation_id=body.registered_epoch_review_operation_id,
+                        expected_source_hash=body.expected_source_hash,
+                        expected_revision=body.expected_revision,
+                        operation_id=body.operation_id,
+                    )
+                )
+            )
         result = await dependencies.use_case.activate(
             ActivateConfigEpoch(
                 actor=admission.principal.actor_id,

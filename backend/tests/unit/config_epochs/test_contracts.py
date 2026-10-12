@@ -132,6 +132,80 @@ def test_explicit_receipt_payload_keeps_pair_family_and_legacy_bytes() -> None:
     assert replay.review_operation_id == "review-2"
 
 
+def test_registered_epoch_receipt_payload_is_a_distinct_v3_generation() -> None:
+    # Kills: emitting proposalManifestId in v3 or reusing the v2 schema label.
+    command = ConfigEpochActivationCommand(
+        scope=RepositoryScope(1, 2),
+        target_epoch_id="a" * 64,
+        expected_revision=None,
+        operation_id="activate-1",
+        actor="operator:123",
+        occurred_at="2026-07-14T12:00:00.000Z",
+        authority_evidence_hash="c" * 64,
+        authority_observed_at="2026-07-14T11:59:59.000Z",
+        activation_version=3,
+        review_operation_id="registered-review-1",
+        expected_source_hash="d" * 64,
+    )
+    event = prepare_config_epoch_activation(command)._take_audit_event()
+
+    assert event.event_type == "config-epoch-activation/v1"
+    assert event.idempotency_key == "config-epoch-activation:1:2:activate-1"
+    assert event.payload_canonical_bytes == (
+        b'{"authorityEvidenceHash":"'
+        + b"c" * 64
+        + b'","authorityObservedAt":"2026-07-14T11:59:59.000Z",'
+        b'"expectedRevision":null,"expectedSourceHash":"'
+        + b"d"
+        * 64
+        + b'","operationId":"activate-1",'
+        b'"registeredEpochReviewOperationId":"registered-review-1",'
+        b'"schemaVersion":"config-epoch-activation-audit/v3",'
+        b'"targetEpochId":"' + b"a" * 64 + b'"}'
+    )
+    replay = ConfigEpochReplayCommand.from_activation(command)
+    assert (replay.activation_version, replay.expected_source_hash) == (3, "d" * 64)
+    assert replay.proposal_manifest_id is None
+
+
+@pytest.mark.parametrize(
+    ("version", "manifest", "source_hash"),
+    [
+        (3, "proposal:" + "b" * 32, "d" * 64),
+        (3, None, None),
+        (3, None, "D" * 64),
+        (2, "proposal:" + "b" * 32, "d" * 64),
+        (2, None, "d" * 64),
+        (1, "proposal:" + "b" * 32, "d" * 64),
+    ],
+    ids=(
+        "v3-with-manifest",
+        "v3-without-source",
+        "v3-noncanonical-source",
+        "v2-with-source",
+        "v2-without-manifest",
+        "v1-with-source",
+    ),
+)
+def test_activation_selector_cannot_cross_review_subjects(
+    version: int, manifest: str | None, source_hash: str | None
+) -> None:
+    from typing import Any, cast
+
+    with pytest.raises((TypeError, ValueError)):
+        ConfigEpochReplayCommand(
+            scope=RepositoryScope(1, 2),
+            target_epoch_id="a" * 64,
+            expected_revision=None,
+            operation_id="activate-1",
+            actor="operator:123",
+            proposal_manifest_id=manifest,
+            activation_version=cast(Any, version),
+            review_operation_id=None if version == 1 else "review-1",
+            expected_source_hash=source_hash,
+        )
+
+
 @pytest.mark.parametrize(
     ("version", "selector"),
     [(1, "review-1"), (2, None), (2, ""), (2, "x\0y"), (2, "x" * 257), (3, None), (True, None)],

@@ -1,4 +1,4 @@
-"""One-use repository-attestation values for proposal review."""
+"""One-use repository-attestation values for proposal and registered-epoch review."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from ci_coordinator.control_plane_identity import (
     GitHubReviewerPrincipal,
+    RegisteredEpochStepUpBinding,
     ReviewerStepUpBinding,
 )
 
@@ -39,6 +40,37 @@ class RepositoryAttestationEvidence:
             or self.reviewer.expires_at != binding.expires_at
         ):
             raise ValueError("repository-attestation observation exceeds its exact transaction")
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredEpochAttestationTransaction:
+    transaction_digest: bytes = field(repr=False)
+    binding: RegisteredEpochStepUpBinding
+
+    def __post_init__(self) -> None:
+        if type(self.transaction_digest) is not bytes or len(self.transaction_digest) != 32:
+            raise ValueError("registered-epoch attestation transaction digest must be exact")
+        if type(self.binding) is not RegisteredEpochStepUpBinding:
+            raise TypeError("registered-epoch attestation transaction binding must be exact")
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredEpochAttestationEvidence:
+    transaction: RegisteredEpochAttestationTransaction
+    reviewer: GitHubReviewerPrincipal
+
+    def __post_init__(self) -> None:
+        if type(self.transaction) is not RegisteredEpochAttestationTransaction:
+            raise TypeError("registered-epoch attestation evidence requires an exact transaction")
+        if type(self.reviewer) is not GitHubReviewerPrincipal:
+            raise TypeError("registered-epoch attestation evidence requires an exact reviewer")
+        binding = self.transaction.binding
+        if (
+            self.reviewer.observed_at < binding.issued_at
+            or self.reviewer.observed_at >= binding.expires_at
+            or self.reviewer.expires_at != binding.expires_at
+        ):
+            raise ValueError("registered-epoch observation exceeds its exact transaction")
 
 
 @dataclass(frozen=True, slots=True)

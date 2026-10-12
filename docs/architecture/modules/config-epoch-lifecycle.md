@@ -131,6 +131,17 @@ legacy operations reject before fresh authority, clock or writes, while exact
 retained legacy operations replay. Rollback, shared idempotency namespace,
 historical serializers/hashes and generic audit/Activity semantics are unchanged.
 
+A reviewed registered epoch (ROADMAP CI-018) activates through
+ci-config-epoch-activation/v3, which carries registeredEpochReviewOperationId
+and expectedSourceHash and no proposalManifestId. Its audit payload is
+config-epoch-activation-audit/v3 under the same outer family and idempotency
+namespace; replay compares the selector and source hash, so a v2 selector
+cannot replay a v3 receipt or the reverse, and v1/v2 bytes are unchanged. The
+pointer compare-and-set, revision algebra and lock order are those above.
+Reviewing a registered epoch never changes the active pointer by itself; only
+this attested activation does. Rollback admission is unchanged by this
+addition (owner decision D8 is a separate change).
+
 ## 3. Safety Laws
 
 ```text

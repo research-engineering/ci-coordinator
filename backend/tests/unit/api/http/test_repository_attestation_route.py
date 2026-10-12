@@ -13,6 +13,11 @@ from control_plane_http_support import (
     human_principal,
 )
 from fastapi.testclient import TestClient
+from registered_epoch_review_support import (
+    admitted_draft,
+    discovered_inventory,
+    registered_review_record,
+)
 from repository_activation_support import review_record
 
 from ci_coordinator.api.http.app import create_app
@@ -27,14 +32,19 @@ from ci_coordinator.api.http.routers.repository_attestations import (
     REPOSITORY_ATTESTATION_START_PATH,
 )
 from ci_coordinator.app.proposal_review import ProposalReviewOutcome
+from ci_coordinator.app.registered_epoch_review import (
+    RegisteredEpochReviewOutcome,
+    RegisteredEpochReviewState,
+)
 from ci_coordinator.app.repository_attestation import (
     RepositoryAttestationCallbackOutcome,
     RepositoryAttestationStartOutcome,
+    RepositoryAttestationStartState,
     RepositoryAttestationUseCase,
 )
 from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.control_plane_identity import KeycloakHumanPrincipal
-from ci_coordinator.proposal_review import ProposalReviewCommand
+from ci_coordinator.proposal_review import ProposalReviewCommand, RegisteredEpochReviewCommand
 
 _PUBLIC_ORIGIN = "https://ci.example.test"
 _TRANSACTION_COOKIE = "__Host-ci_coordinator_reviewer_transaction"
@@ -45,6 +55,15 @@ _BODY = {
     "repositoryId": 2,
     "operationId": "review-1",
     "expectedManifestId": "proposal:" + "a" * 32,
+    "expectedActive": None,
+}
+_REGISTERED_BODY = {
+    "schemaVersion": "ci-registered-epoch-attestation-start/v1",
+    "installationId": 1,
+    "repositoryId": 2,
+    "operationId": "registered-review-1",
+    "targetEpochId": "c" * 64,
+    "expectedSourceHash": "d" * 64,
     "expectedActive": None,
 }
 
@@ -81,6 +100,15 @@ class _AttestationService:
     ) -> RepositoryAttestationStartOutcome:
         self.legacy_modes.append(legacy_replay_only)
         self.calls.append(("start", principal, command))
+        return self.start_result
+
+    async def start_registered_epoch(
+        self,
+        *,
+        principal: KeycloakHumanPrincipal,
+        command: RegisteredEpochReviewCommand,
+    ) -> RepositoryAttestationStartOutcome:
+        self.calls.append(("start_registered_epoch", principal, command))
         return self.start_result
 
     async def complete(
@@ -485,6 +513,134 @@ def test_callback_rejects_duplicate_query_or_missing_transaction_before_effect()
     )
     assert "Max-Age=0" in response.headers["set-cookie"]
     assert service.calls == []
+
+
+def test_registered_epoch_start_selects_only_the_registered_subject() -> None:
+    service = _AttestationService()
+
+    response = _client(service).post(
+        REPOSITORY_ATTESTATION_START_PATH,
+        json={**_REGISTERED_BODY, "expectedActive": {"epochId": "b" * 64, "revision": 7}},
+        headers=_mutation_headers(),
+    )
+
+    assert response.status_code == 200
+    assert [call[0] for call in service.calls] == ["start_registered_epoch"]
+    command = cast(RegisteredEpochReviewCommand, service.calls[0][2])
+    assert command.scope == RepositoryScope(1, 2)
+    assert command.operation_id == "registered-review-1"
+    assert command.target_epoch_id == "c" * 64
+    assert command.expected_source_hash == "d" * 64
+    assert command.actor == _PRINCIPAL.actor_id
+    assert command.expected_active is not None
+    assert (command.expected_active.epoch_id, command.expected_active.revision) == ("b" * 64, 7)
+    assert service.legacy_modes == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {**_REGISTERED_BODY, "expectedManifestId": "proposal:" + "a" * 32},
+        {**_BODY, "targetEpochId": "c" * 64, "expectedSourceHash": "d" * 64},
+        {**_REGISTERED_BODY, "schemaVersion": "ci-repository-attestation-start/v2"},
+        {key: value for key, value in _REGISTERED_BODY.items() if key != "expectedSourceHash"},
+    ],
+    ids=("registered-with-manifest", "proposal-with-epoch", "wrong-version", "no-source-hash"),
+)
+def test_start_refuses_cross_subject_or_partial_selectors_before_effect(
+    body: dict[str, object],
+) -> None:
+    service = _AttestationService()
+
+    response = _client(service).post(
+        REPOSITORY_ATTESTATION_START_PATH, json=body, headers=_mutation_headers()
+    )
+
+    assert response.status_code == 422
+    assert service.calls == []
+
+
+@pytest.mark.parametrize(
+    ("state", "status_code"),
+    [("target_missing", 404), ("target_ineligible", 409), ("source_mismatch", 409)],
+)
+def test_registered_start_keeps_missing_ineligible_and_mismatch_distinct(
+    state: RepositoryAttestationStartState, status_code: int
+) -> None:
+    service = _AttestationService(start_result=RepositoryAttestationStartOutcome(state))
+
+    response = _client(service).post(
+        REPOSITORY_ATTESTATION_START_PATH, json=_REGISTERED_BODY, headers=_mutation_headers()
+    )
+
+    assert (response.status_code, response.json()) == (status_code, {"ok": False, "error": state})
+
+
+def test_callback_projects_retained_registered_epoch_review_identity() -> None:
+    record = registered_review_record(discovered_inventory(), admitted_draft())
+    service = _AttestationService(
+        callback_result=RepositoryAttestationCallbackOutcome(
+            "completed",
+            registered_epoch_review=RegisteredEpochReviewOutcome("accepted", record=record),
+        )
+    )
+    client = _client(service)
+    client.cookies.set(_TRANSACTION_COOKIE, "sealed-review")
+
+    response = client.get(
+        REPOSITORY_ATTESTATION_CALLBACK_PATH,
+        params={"code": "provider-code", "state": "s" * 43},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    query = parse_qs(urlsplit(response.headers["location"]).query)
+    assert query == {
+        "installationId": ["1"],
+        "repositoryId": ["2"],
+        "limit": ["10"],
+        "repositoryAttestation": ["registered-epoch-reviewed"],
+        "targetEpochId": [record.command.target_epoch_id],
+        "expectedSourceHash": [record.command.expected_source_hash],
+        "reviewOperationId": [record.command.operation_id],
+    }
+    assert "proposalManifestId" not in query
+    assert "Max-Age=0" in response.headers["set-cookie"]
+
+
+@pytest.mark.parametrize(
+    ("state", "status_code", "error"),
+    [
+        ("target_missing", 404, "target_missing"),
+        ("target_ineligible", 409, "target_ineligible"),
+        ("source_mismatch", 409, "source_mismatch"),
+        ("stale", 409, "stale"),
+        ("blocked", 409, "blocked"),
+        ("attestation_conflict", 409, "replayed"),
+        ("diff_limit", 422, "diff_limit"),
+        ("unavailable", 503, "unavailable"),
+    ],
+)
+def test_registered_callback_preserves_its_failure_algebra(
+    state: RegisteredEpochReviewState, status_code: int, error: str
+) -> None:
+    service = _AttestationService(
+        callback_result=RepositoryAttestationCallbackOutcome(
+            "completed",
+            registered_epoch_review=RegisteredEpochReviewOutcome(state),
+        )
+    )
+    client = _client(service)
+    client.cookies.set(_TRANSACTION_COOKIE, "sealed-review")
+
+    response = client.get(
+        REPOSITORY_ATTESTATION_CALLBACK_PATH,
+        params={"code": "provider-code", "state": "s" * 43},
+        follow_redirects=False,
+    )
+
+    assert (response.status_code, response.json()) == (status_code, {"ok": False, "error": error})
+    assert "Max-Age=0" in response.headers["set-cookie"]
 
 
 def _client(

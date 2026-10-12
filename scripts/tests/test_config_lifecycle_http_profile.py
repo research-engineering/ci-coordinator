@@ -27,6 +27,7 @@ _ACTIVATION_REQUEST = (
 )
 _LEGACY_ACTIVATION = {"$ref": "#/components/schemas/ConfigEpochActivationBody"}
 _CURRENT_ACTIVATION = {"$ref": "#/components/schemas/ExplicitConfigEpochActivationBody"}
+_REGISTERED_ACTIVATION = {"$ref": "#/components/schemas/RegisteredEpochConfigActivationBody"}
 
 
 @pytest.fixture(scope="module")
@@ -56,11 +57,15 @@ def test_repository_profile_is_exact_and_matches_openapi(
     assert_config_lifecycle_openapi(document, profile)
 
 
-def test_activation_union_preserves_both_versions_independent_of_order(
+def test_activation_union_preserves_every_version_independent_of_order(
     openapi_document: dict[str, object],
 ) -> None:
     document = openapi_document
-    _replace(document, _ACTIVATION_REQUEST, {"anyOf": [_CURRENT_ACTIVATION, _LEGACY_ACTIVATION]})
+    _replace(
+        document,
+        _ACTIVATION_REQUEST,
+        {"anyOf": [_REGISTERED_ACTIVATION, _CURRENT_ACTIVATION, _LEGACY_ACTIVATION]},
+    )
 
     assert_config_lifecycle_openapi(document, load_config_lifecycle_http_profile())
 
@@ -75,6 +80,12 @@ def test_activation_union_preserves_both_versions_independent_of_order(
         {"anyOf": [_LEGACY_ACTIVATION, _CURRENT_ACTIVATION, {}]},
         {"anyOf": [_LEGACY_ACTIVATION, {}]},
         {"anyOf": [_LEGACY_ACTIVATION, _CURRENT_ACTIVATION], "nullable": True},
+        {"anyOf": [_LEGACY_ACTIVATION, _CURRENT_ACTIVATION]},
+        {"anyOf": [_LEGACY_ACTIVATION, _REGISTERED_ACTIVATION, _REGISTERED_ACTIVATION]},
+        {
+            "anyOf": [_LEGACY_ACTIVATION, _CURRENT_ACTIVATION, _REGISTERED_ACTIVATION],
+            "nullable": True,
+        },
     ],
 )
 def test_activation_projection_rejects_widened_or_incomplete_union(
@@ -119,6 +130,27 @@ def test_activation_projection_rejects_widened_or_incomplete_union(
             ("properties", "reviewOperationId", "x-max-utf8-bytes"),
             257,
         ),
+        (
+            "RegisteredEpochConfigActivationBody",
+            ("properties", "proposalManifestId"),
+            {"type": "string"},
+        ),
+        (
+            "RegisteredEpochConfigActivationBody",
+            ("properties", "schemaVersion", "const"),
+            "ci-config-epoch-activation/v2",
+        ),
+        ("RegisteredEpochConfigActivationBody", ("additionalProperties",), True),
+        (
+            "RegisteredEpochConfigActivationBody",
+            ("properties", "registeredEpochReviewOperationId", "maxLength"),
+            257,
+        ),
+        (
+            "RegisteredEpochConfigActivationBody",
+            ("properties", "registeredEpochReviewOperationId", "minLength"),
+            0,
+        ),
     ],
 )
 def test_activation_projection_rejects_version_or_selector_drift(
@@ -140,6 +172,8 @@ def test_activation_projection_rejects_version_or_selector_drift(
         ("ConfigEpochActivationBody", "schemaVersion"),
         ("ExplicitConfigEpochActivationBody", "schemaVersion"),
         ("ExplicitConfigEpochActivationBody", "reviewOperationId"),
+        ("RegisteredEpochConfigActivationBody", "registeredEpochReviewOperationId"),
+        ("RegisteredEpochConfigActivationBody", "expectedSourceHash"),
     ],
 )
 def test_activation_projection_requires_version_and_current_selector(

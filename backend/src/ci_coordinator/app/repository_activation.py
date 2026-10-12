@@ -2,12 +2,21 @@
 
 from __future__ import annotations
 
+from ci_coordinator.app.registered_epoch_review import (
+    admit_registered_epoch_target,
+    discover_current_inventory,
+)
 from ci_coordinator.config_control import RepositoryScope, ValidatedEpochDraft
 from ci_coordinator.proposal_review import (
     GitHubReviewerPermissionReader,
     GitHubReviewerRejected,
     GitHubReviewerUnavailable,
     ProposalReviewStoreUnavailable,
+    RegisteredEpochActivationAuthority,
+    RegisteredEpochActivationAuthorization,
+    RegisteredEpochActivationGranted,
+    RegisteredEpochActivationStore,
+    RegisteredEpochSubject,
     RepositoryActivationAuthority,
     RepositoryActivationAuthorization,
     RepositoryActivationGranted,
@@ -16,6 +25,7 @@ from ci_coordinator.proposal_review import (
     RepositoryActivationUnavailable,
 )
 from ci_coordinator.workflow_discovery import (
+    DiscoveryReport,
     WorkflowDiscoveryCompleted,
     WorkflowDiscoveryForbidden,
     WorkflowDiscoveryUnavailable,
@@ -30,6 +40,7 @@ class RepositoryActivationAuthorityService:
         self,
         *,
         store: RepositoryActivationStore,
+        registered_epoch_store: RegisteredEpochActivationStore,
         permission_reader: GitHubReviewerPermissionReader,
         discovery: WorkflowDiscoveryUseCase,
         authority_profile_digest: str,
@@ -41,6 +52,7 @@ class RepositoryActivationAuthorityService:
         ):
             raise ValueError("repository activation authority profile is invalid")
         self._store = store
+        self._registered_epoch_store = registered_epoch_store
         self._permission_reader = permission_reader
         self._discovery = discovery
         self._authority_profile_digest = authority_profile_digest
@@ -117,3 +129,76 @@ class RepositoryActivationAuthorityService:
         except (TypeError, ValueError):
             return RepositoryActivationRejected()
         return RepositoryActivationGranted(authority)
+
+    async def authorize_registered_epoch(
+        self,
+        *,
+        actor: str,
+        scope: RepositoryScope,
+        target_epoch_id: str,
+        expected_source_hash: str,
+        review_operation_id: str,
+    ) -> RegisteredEpochActivationAuthorization:
+        store = self._registered_epoch_store
+        try:
+            review = await store.load_activation_candidate(
+                scope=scope,
+                target_epoch_id=target_epoch_id,
+                expected_source_hash=expected_source_hash,
+                review_operation_id=review_operation_id,
+            )
+        except ProposalReviewStoreUnavailable:
+            return RepositoryActivationUnavailable()
+        if (
+            review is None
+            or review.command.scope != scope
+            or review.command.operation_id != review_operation_id
+            or review.command.target_epoch_id != target_epoch_id
+            or review.command.expected_source_hash != expected_source_hash
+        ):
+            return RepositoryActivationRejected()
+        retained = review.attestation
+        if retained.transaction.binding.authority_profile_digest != self._authority_profile_digest:
+            return RepositoryActivationRejected()
+        try:
+            active = await store.load_active(scope)
+            if (None if active is None else active.active) != review.command.expected_active:
+                return RepositoryActivationRejected()
+            target = admit_registered_epoch_target(
+                await store.load_registered_epoch(scope, target_epoch_id),
+                review.command,
+            )
+            observed_at = await store.current_time()
+        except ProposalReviewStoreUnavailable:
+            return RepositoryActivationUnavailable()
+        if not isinstance(target, RegisteredEpochSubject) or target.registrant != review.registrant:
+            return RepositoryActivationRejected()
+        try:
+            rechecked = await self._permission_reader.recheck(
+                scope=scope,
+                reviewer_user_id=retained.reviewer.user_id,
+                reviewer_login=retained.reviewer.login,
+            )
+        except GitHubReviewerRejected:
+            return RepositoryActivationRejected()
+        except GitHubReviewerUnavailable:
+            return RepositoryActivationUnavailable()
+        report = await discover_current_inventory(self._discovery, actor=actor, scope=scope)
+        if not isinstance(report, DiscoveryReport):
+            if report in ("overloaded", "unavailable"):
+                return RepositoryActivationUnavailable()
+            return RepositoryActivationRejected()
+        if (
+            report.revision != review.provider_revision
+            or report.inventory_digest != review.inventory_digest
+        ):
+            return RepositoryActivationRejected()
+        try:
+            authority = RegisteredEpochActivationAuthority(
+                review=review,
+                rechecked=rechecked,
+                rechecked_at=observed_at,
+            )
+        except (TypeError, ValueError):
+            return RepositoryActivationRejected()
+        return RegisteredEpochActivationGranted(authority)

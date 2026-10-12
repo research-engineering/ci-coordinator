@@ -7,6 +7,9 @@ from typing import Final, NoReturn
 from ci_coordinator.audit_replay import AuditEventInput, PreparedAuditEvent, prepare_audit_event
 from ci_coordinator.proposal_review.attestation import RepositoryAttestationEvidence
 from ci_coordinator.proposal_review.model import ProposalReviewDraft
+from ci_coordinator.proposal_review.registered_epoch import (
+    REGISTERED_EPOCH_REVIEW_ACCEPTED_EVENT_TYPE,
+)
 
 PROPOSAL_REVIEW_ACCEPTED_EVENT_TYPE: Final = "workflow-proposal-accepted/v1"
 _AUDIT_SCHEMA: Final = "workflow-proposal-acceptance-audit/v1"
@@ -156,4 +159,7 @@ def prepare_proposal_review(
 
 
 def is_pair_owned_proposal_review_event_type(value: object) -> bool:
-    return value == PROPOSAL_REVIEW_ACCEPTED_EVENT_TYPE
+    return type(value) is str and value in {
+        PROPOSAL_REVIEW_ACCEPTED_EVENT_TYPE,
+        REGISTERED_EPOCH_REVIEW_ACCEPTED_EVENT_TYPE,
+    }

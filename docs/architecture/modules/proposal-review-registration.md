@@ -313,3 +313,82 @@ omission authority, live deployment proof, or proof that the provider head
 remains current after the retained observation. Those capabilities require
 separate owners and must not be inferred from a registered reviewed epoch. It
 also does not claim deployment approval.
+
+## 12. Registered-Epoch Review Subject
+
+ROADMAP CI-018 adds a second review subject to this owner: an epoch that was
+already registered through `POST /api/v1/config/epochs`. It reuses the
+attestation, one-use consumption, GitHub recheck and scope-lock mechanisms of
+sections 2-8 through one discriminated subject, not a new framework. A
+rediscovered proposal manifest cannot substitute for this subject, and this
+subject cannot authorize a proposal.
+
+```text
+RegisteredEpochReviewCommand =
+  (scope, operationId, targetEpochId, expectedSourceHash, expectedActive, actor)
+
+Subject(S, E) := LoadEpoch(S, E) re-admitted
+  and EarliestStandaloneReceipt(S, E) by audit ledger sequence
+Lookup(S, E) = absent | WithoutReceipt | Subject(draft, registrant)
+
+Ready(start) iff Configure(U) and not O and B0 and Subject(S, E)
+  and draft.sourceHash = expectedSourceHash
+  and CurrentHead(S).complete and CurrentHead(S).localGraphClosed
+Accepted(callback) iff Consume(T) once and not O and B1 and Subject unchanged
+  and CurrentHead(S).revision = T.revision
+  and CurrentHead(S).inventoryDigest = T.inventoryDigest and D
+Accepted => Review and Audit, never ActivePointer change
+```
+
+Missing, ineligible, mismatched, blocked and stale stay distinct:
+`target_missing` (no in-scope epoch, including a foreign-scope identity),
+`target_ineligible` (an existing epoch without a standalone registration
+receipt, for example one created only by proposal acceptance),
+`source_mismatch` (the retained source hash differs from the request),
+`blocked` (incomplete inventory or open local graph) and `stale` (the default
+head or inventory digest moved after start). Forbidden, overloaded and
+unavailable keep their section 4 meanings.
+
+Owner decisions: D5 requires report `complete` and `localGraphClosed`; D7 adds
+no separation-of-duties rule, and the earliest standalone registrant's
+operation, actor and audit event are recorded in the review row (by foreign
+key) and in its audit payload. Provisional owner decision (2026-10-11), D4:
+freshness is the exact default-head revision and inventory digest at callback
+and at activation; there is no revision-independent workflow hash. Provisional
+owner decision (2026-10-11), D6: one forward expand revision `20261011_0019`
+adds capability `registered-epoch-review/v1` with the one-use relation
+`registered_epoch_attestation_transactions` and the immutable relation
+`registered_epoch_reviews` (guarded by the existing review immutability
+routine), plus activation wire v3. Provisional owner decision (2026-10-11),
+D9: this change delivers the API and the generated client only; CI-019 owns
+the UI journey. Rollback admission (D8) is a separate change.
+
+Persistence order is unchanged: compatibility shared fence, repository-scope
+lock, consume this subject's pending row, resolve the operation, re-read the
+complete active pointer, re-load the subject and require equality, append the
+pair-owned `registered-epoch-review-accepted/v1` event, insert the review row.
+The consume statement reads and deletes only the registered-epoch pending
+relation, so neither subject can consume or retire the other's challenge.
+Pending proposal challenges, the proposal cookie bytes and both proposal
+relations are unchanged by 0019, so no pending challenge is invalidated.
+
+Activation selects the review explicitly through
+`ci-config-epoch-activation/v3` (`registeredEpochReviewOperationId` and
+`expectedSourceHash`; no `proposalManifestId`). Authority loads the unexpired
+receipt, compares the baseline, re-loads the subject and registrant, samples
+database time, rechecks GitHub permission and rediscovers the current default
+head; it hashes `registered-epoch-activation-authority/v1`. The lock-time
+check repeats receipt, baseline and recheck-age predicates before the pointer
+compare-and-set, and the audit payload is `config-epoch-activation-audit/v3`.
+Exact replay precedes provider I/O. v1/v2 wire, audit bytes and replay are
+unchanged, and a v2 selector never replays a v3 receipt or the reverse.
+
+Additional falsifiers: a receipt-less or foreign epoch is reviewable; a
+source-hash mismatch reaches provider I/O; an incomplete or open graph is
+reviewable; a moved head or changed inventory is accepted at callback or
+activation; an `A@r -> B -> A@r+2` baseline passes; a second consume or replayed
+handoff creates another review; a proposal cookie opens as a registered-epoch
+cookie or the reverse; a review changes `active_config_epochs`; a proposal
+selector activates a registered-epoch review or the reverse. This section does
+not claim UI coverage, a revision-independent freshness predicate, rollback
+restriction, live provider behavior or deployment readiness.

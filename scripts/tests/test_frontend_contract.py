@@ -227,11 +227,11 @@ def test_rendered_contract_has_exact_control_plane_workbench_surface() -> None:
         ),
         ("get", "/api/v1/repository-attestations/github/callback"): (
             "complete_github_repository_attestation",
-            {"303", "400", "401", "403", "409", "422", "429", "503"},
+            {"303", "400", "401", "403", "404", "409", "422", "429", "503"},
         ),
         ("post", "/api/v1/repository-attestations/github/start"): (
             "start_github_repository_attestation",
-            {"200", "400", "401", "403", "409", "413", "422", "503"},
+            {"200", "400", "401", "403", "404", "409", "413", "422", "503"},
         ),
         ("get", "/api/v1/workbench/installations"): (
             "list_operator_provider_installations",

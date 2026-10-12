@@ -99,6 +99,10 @@ from ci_coordinator.persistence._schema_production_cutover import (
     production_scope_states as production_scope_states,
     production_staged_grants as production_staged_grants,
 )
+from ci_coordinator.persistence._schema_registered_epoch_reviews import (
+    registered_epoch_attestation_transactions as registered_epoch_attestation_transactions,
+    registered_epoch_reviews as registered_epoch_reviews,
+)
 
 __all__ = (
     "APPLICATION_SCHEMA",
@@ -149,6 +153,8 @@ __all__ = (
     "reconciliation_observations",
     "reconciliation_results",
     "reconciliation_subjects",
+    "registered_epoch_attestation_transactions",
+    "registered_epoch_reviews",
     "repository_attestation_transactions",
     "shadow_evidence",
     "webhook_deliveries",

@@ -11,9 +11,11 @@ from ci_coordinator.control_plane_identity import GitHubReviewerEvidence
 from ci_coordinator.proposal_review.acceptance import PreparedProposalReview
 from ci_coordinator.proposal_review.activation import (
     AttestedConfigActivationResult,
+    RegisteredEpochActivationAuthority,
     RepositoryActivationAuthority,
 )
 from ci_coordinator.proposal_review.attestation import (
+    RegisteredEpochAttestationTransaction,
     RepositoryAttestationRegistration,
     RepositoryAttestationTransaction,
 )
@@ -22,6 +24,14 @@ from ci_coordinator.proposal_review.model import (
     ProposalReviewRecord,
     ProposalReviewResolution,
     ProposalReviewWriteResult,
+)
+from ci_coordinator.proposal_review.registered_epoch import (
+    PreparedRegisteredEpochReview,
+    RegisteredEpochLookup,
+    RegisteredEpochReviewCommand,
+    RegisteredEpochReviewRecord,
+    RegisteredEpochReviewResolution,
+    RegisteredEpochReviewWriteResult,
 )
 
 
@@ -98,6 +108,72 @@ class RepositoryActivationStore(Protocol):
         self,
         prepared: PreparedConfigEpochActivation,
         authority: RepositoryActivationAuthority,
+    ) -> AttestedConfigActivationResult: ...
+
+
+class RegisteredEpochReviewStore(Protocol):
+    """Durable one-use attestation and immutable review capability for a registered epoch."""
+
+    async def current_time(self) -> datetime: ...
+
+    async def register_attestation(
+        self,
+        transaction: RegisteredEpochAttestationTransaction,
+    ) -> RepositoryAttestationRegistration: ...
+
+    async def attestation_is_pending(
+        self,
+        transaction: RegisteredEpochAttestationTransaction,
+    ) -> bool: ...
+
+    async def retire_attestation(
+        self,
+        transaction: RegisteredEpochAttestationTransaction,
+    ) -> None: ...
+
+    async def resolve_operation(
+        self,
+        command: RegisteredEpochReviewCommand,
+    ) -> RegisteredEpochReviewResolution: ...
+
+    async def load_active(self, scope: RepositoryScope) -> ActiveConfigEpochSnapshot | None: ...
+
+    async def load_registered_epoch(
+        self,
+        scope: RepositoryScope,
+        epoch_id: str,
+    ) -> RegisteredEpochLookup: ...
+
+    async def accept(
+        self,
+        prepared: PreparedRegisteredEpochReview,
+    ) -> RegisteredEpochReviewWriteResult: ...
+
+
+class RegisteredEpochActivationStore(Protocol):
+    async def current_time(self) -> datetime: ...
+
+    async def load_activation_candidate(
+        self,
+        *,
+        scope: RepositoryScope,
+        target_epoch_id: str,
+        expected_source_hash: str,
+        review_operation_id: str,
+    ) -> RegisteredEpochReviewRecord | None: ...
+
+    async def load_active(self, scope: RepositoryScope) -> ActiveConfigEpochSnapshot | None: ...
+
+    async def load_registered_epoch(
+        self,
+        scope: RepositoryScope,
+        epoch_id: str,
+    ) -> RegisteredEpochLookup: ...
+
+    async def activate_config(
+        self,
+        prepared: PreparedConfigEpochActivation,
+        authority: RegisteredEpochActivationAuthority,
     ) -> AttestedConfigActivationResult: ...
 
 

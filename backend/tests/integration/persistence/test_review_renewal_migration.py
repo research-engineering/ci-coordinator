@@ -351,8 +351,14 @@ def test_each_current_review_requirement_is_independently_required(
 
 
 def _project_runtime_acl_before_logout_fence(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Current grants include the relations created by 20261011_0018; earlier revisions lack them.
-    fence = {"control_plane_logout_fences", "control_plane_logout_fence_generation"}
+    # Current grants include the relations created by 20261011_0018 and 20261011_0019;
+    # earlier revisions lack them.
+    fence = {
+        "control_plane_logout_fences",
+        "control_plane_logout_fence_generation",
+        "registered_epoch_attestation_transactions",
+        "registered_epoch_reviews",
+    }
     table_grants = MappingProxyType(
         {
             relation: privileges

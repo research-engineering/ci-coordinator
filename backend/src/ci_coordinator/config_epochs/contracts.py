@@ -18,12 +18,15 @@ MAX_ROLLBACK_REASON_UTF8_BYTES: Final = 512
 _ACTIVATION_EVENT_TYPE: Final = "config-epoch-activation/v1"
 _ACTIVATION_AUDIT_SCHEMA: Final = "config-epoch-activation-audit/v1"
 _EXPLICIT_ACTIVATION_AUDIT_SCHEMA: Final = "config-epoch-activation-audit/v2"
+_REGISTERED_EPOCH_ACTIVATION_AUDIT_SCHEMA: Final = "config-epoch-activation-audit/v3"
 _ROLLBACK_EVENT_TYPE: Final = "config-epoch-rollback/v1"
 _ROLLBACK_AUDIT_SCHEMA: Final = "config-epoch-rollback-audit/v1"
 _PAIR_OWNED_EVENT_TYPES: Final = frozenset({_ACTIVATION_EVENT_TYPE, _ROLLBACK_EVENT_TYPE})
 _PREPARED_ACTIVATION_TOKEN = object()
 
 type ConfigEpochMutationKind = Literal["activation", "rollback"]
+# 1: legacy proposal replay, 2: explicit proposal review, 3: registered-epoch review.
+type ConfigEpochActivationVersion = Literal[1, 2, 3]
 type ProvenCoverageRelation = Literal["equal", "greater"]
 
 
@@ -66,8 +69,9 @@ class ConfigEpochActivationCommand:
     expected_active_epoch_id: str | None = None
     coverage_relation: ProvenCoverageRelation | None = None
     reason: str | None = None
-    activation_version: Literal[1, 2] = 1
+    activation_version: ConfigEpochActivationVersion = 1
     review_operation_id: str | None = None
+    expected_source_hash: str | None = None
 
     def __post_init__(self) -> None:
         _require_scope(self.scope)
@@ -84,8 +88,13 @@ class ConfigEpochActivationCommand:
         _require_activation_selection(
             self.mutation_kind, self.activation_version, self.review_operation_id
         )
+        _require_review_subject(
+            self.mutation_kind,
+            self.activation_version,
+            self.proposal_manifest_id,
+            self.expected_source_hash,
+        )
         if self.mutation_kind == "activation":
-            _require_proposal_manifest_id(self.proposal_manifest_id)
             _require_epoch_id(self.authority_evidence_hash)
             _require_nonempty_scalar_text(
                 self.authority_observed_at,
@@ -132,8 +141,9 @@ class ConfigEpochReplayCommand:
     proposal_manifest_id: str | None = None
     mutation_kind: ConfigEpochMutationKind = "activation"
     reason: str | None = None
-    activation_version: Literal[1, 2] = 1
+    activation_version: ConfigEpochActivationVersion = 1
     review_operation_id: str | None = None
+    expected_source_hash: str | None = None
 
     def __post_init__(self) -> None:
         _require_scope(self.scope)
@@ -149,8 +159,13 @@ class ConfigEpochReplayCommand:
         _require_activation_selection(
             self.mutation_kind, self.activation_version, self.review_operation_id
         )
+        _require_review_subject(
+            self.mutation_kind,
+            self.activation_version,
+            self.proposal_manifest_id,
+            self.expected_source_hash,
+        )
         if self.mutation_kind == "activation":
-            _require_proposal_manifest_id(self.proposal_manifest_id)
             if self.reason is not None:
                 raise ValueError("ordinary activation cannot carry a rollback reason")
             return
@@ -177,6 +192,7 @@ class ConfigEpochReplayCommand:
             reason=command.reason,
             activation_version=command.activation_version,
             review_operation_id=command.review_operation_id,
+            expected_source_hash=command.expected_source_hash,
         )
 
 
@@ -390,6 +406,21 @@ def validate_rollback_reason(value: object) -> str:
 def _audit_projection(
     command: ConfigEpochActivationCommand,
 ) -> tuple[str, str, JsonValue]:
+    if command.mutation_kind == "activation" and command.activation_version == 3:
+        return (
+            "config-epoch-activation",
+            _ACTIVATION_EVENT_TYPE,
+            {
+                "schemaVersion": _REGISTERED_EPOCH_ACTIVATION_AUDIT_SCHEMA,
+                "operationId": command.operation_id,
+                "expectedRevision": command.expected_revision,
+                "targetEpochId": command.target_epoch_id,
+                "expectedSourceHash": command.expected_source_hash,
+                "registeredEpochReviewOperationId": command.review_operation_id,
+                "authorityEvidenceHash": command.authority_evidence_hash,
+                "authorityObservedAt": command.authority_observed_at,
+            },
+        )
     if command.mutation_kind == "activation":
         payload: dict[str, JsonValue] = {
             "schemaVersion": (
@@ -434,7 +465,7 @@ def _require_activation_selection(
     version: object,
     review_operation_id: object,
 ) -> None:
-    if type(version) is not int or version not in (1, 2):
+    if type(version) is not int or version not in (1, 2, 3):
         raise ValueError("activation version is not admitted")
     if version == 1:
         if review_operation_id is not None:
@@ -447,6 +478,26 @@ def _require_activation_selection(
             "review_operation_id",
             maximum_utf8_bytes=MAX_CONFIG_OPERATION_ID_UTF8_BYTES,
         )
+
+
+def _require_review_subject(
+    mutation_kind: ConfigEpochMutationKind,
+    version: ConfigEpochActivationVersion,
+    proposal_manifest_id: object,
+    expected_source_hash: object,
+) -> None:
+    if mutation_kind != "activation":
+        if expected_source_hash is not None:
+            raise ValueError("rollback cannot carry a registered-epoch review subject")
+        return
+    if version == 3:
+        if proposal_manifest_id is not None:
+            raise ValueError("registered-epoch activation cannot carry a proposal manifest")
+        _require_epoch_id(expected_source_hash)
+        return
+    if expected_source_hash is not None:
+        raise ValueError("proposal activation cannot carry a registered-epoch source hash")
+    _require_proposal_manifest_id(proposal_manifest_id)
 
 
 def _audit_subject_id(scope: RepositoryScope) -> str:

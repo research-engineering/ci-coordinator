@@ -29,6 +29,7 @@ from ci_coordinator.config_epochs import (
     ConfigEpochActivationResult,
     ConfigEpochActivationRevisionConflict,
     ConfigEpochActivationTargetUnavailable,
+    ConfigEpochActivationVersion,
     ConfigEpochOperationResolution,
     ConfigEpochRegistrationCommand,
     ConfigEpochRegistrationCommitted,
@@ -53,6 +54,9 @@ from ci_coordinator.kernel import Clock
 from ci_coordinator.observability import RuntimeMetrics
 from ci_coordinator.planning_core import ConservativeEpochCoverageComparator
 from ci_coordinator.proposal_review import (
+    RegisteredEpochActivationAuthorization,
+    RegisteredEpochActivationGranted,
+    RegisteredEpochActivationStore,
     RepositoryActivationAuthorityConflict,
     RepositoryActivationAuthorization,
     RepositoryActivationGranted,
@@ -75,11 +79,12 @@ class ActivateConfigEpoch:
     actor: str
     scope: RepositoryScope
     target_epoch_id: str
-    proposal_manifest_id: str
+    proposal_manifest_id: str | None
     expected_revision: int | None
     operation_id: str
-    activation_version: Literal[1, 2] = 1
+    activation_version: ConfigEpochActivationVersion = 1
     review_operation_id: str | None = None
+    expected_source_hash: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,6 +193,16 @@ class RepositoryActivationAuthorizer(Protocol):
         review_operation_id: str,
     ) -> RepositoryActivationAuthorization: ...
 
+    async def authorize_registered_epoch(
+        self,
+        *,
+        actor: str,
+        scope: RepositoryScope,
+        target_epoch_id: str,
+        expected_source_hash: str,
+        review_operation_id: str,
+    ) -> RegisteredEpochActivationAuthorization: ...
+
 
 class ConfigEpochStore(Protocol):
     """Minimum config-epoch capability required by mutation orchestration."""
@@ -227,6 +242,7 @@ class ConfigManagementService:
         clock: Clock,
         activation_authorizer: RepositoryActivationAuthorizer,
         attested_activation_store: RepositoryActivationStore,
+        registered_epoch_activation_store: RegisteredEpochActivationStore,
         runtime_metrics: RuntimeMetrics | None = None,
         rollback_comparator: EpochCoverageComparator | None = None,
     ) -> None:
@@ -236,6 +252,7 @@ class ConfigManagementService:
         self._clock = clock
         self._activation_authorizer = activation_authorizer
         self._attested_activation_store = attested_activation_store
+        self._registered_epoch_activation_store = registered_epoch_activation_store
         self._runtime_metrics = runtime_metrics
         self._rollback_comparator = rollback_comparator
 
@@ -288,6 +305,7 @@ class ConfigManagementService:
                     proposal_manifest_id=command.proposal_manifest_id,
                     activation_version=command.activation_version,
                     review_operation_id=command.review_operation_id,
+                    expected_source_hash=command.expected_source_hash,
                 )
             )
         except ConfigEpochStoreUnavailable:
@@ -300,6 +318,10 @@ class ConfigManagementService:
             )
         if command.review_operation_id is None:
             raise RuntimeError("admitted current activation omitted its review selector")
+        if command.activation_version == 3:
+            return await self._activate_registered_epoch(command, command.review_operation_id)
+        if command.proposal_manifest_id is None:
+            raise RuntimeError("admitted proposal activation omitted its manifest selector")
         authorization = await self._activation_authorizer.authorize(
             actor=command.actor,
             scope=command.scope,
@@ -334,6 +356,53 @@ class ConfigManagementService:
         )
         try:
             result = await self._attested_activation_store.activate_config(prepared, authority)
+        except ConfigEpochStoreUnavailable:
+            return self._observe_activation(ConfigActivationOutcome("unavailable"))
+        if isinstance(result, RepositoryActivationAuthorityConflict):
+            return self._observe_activation(ConfigActivationOutcome("attestation_invalid"))
+        return self._activation_outcome(result)
+
+    async def _activate_registered_epoch(
+        self,
+        command: ActivateConfigEpoch,
+        review_operation_id: str,
+    ) -> ConfigActivationOutcome:
+        if command.expected_source_hash is None or command.proposal_manifest_id is not None:
+            raise RuntimeError("admitted registered-epoch activation has a foreign selector")
+        authorization = await self._activation_authorizer.authorize_registered_epoch(
+            actor=command.actor,
+            scope=command.scope,
+            target_epoch_id=command.target_epoch_id,
+            expected_source_hash=command.expected_source_hash,
+            review_operation_id=review_operation_id,
+        )
+        if isinstance(authorization, RepositoryActivationRejected):
+            return self._observe_activation(ConfigActivationOutcome("attestation_invalid"))
+        if isinstance(authorization, RepositoryActivationUnavailable):
+            return self._observe_activation(ConfigActivationOutcome("unavailable"))
+        if not isinstance(authorization, RegisteredEpochActivationGranted):
+            raise RuntimeError("registered-epoch activation authorization algebra is incomplete")
+        authority = authorization.authority
+        prepared = prepare_config_epoch_activation(
+            ConfigEpochActivationCommand(
+                scope=command.scope,
+                target_epoch_id=command.target_epoch_id,
+                expected_revision=command.expected_revision,
+                operation_id=command.operation_id,
+                actor=command.actor,
+                occurred_at=_clock_timestamp(self._clock.now()),
+                activation_version=3,
+                review_operation_id=review_operation_id,
+                expected_source_hash=command.expected_source_hash,
+                authority_evidence_hash=authority.evidence_hash,
+                authority_observed_at=_clock_timestamp(authority.rechecked_at),
+            )
+        )
+        try:
+            result = await self._registered_epoch_activation_store.activate_config(
+                prepared,
+                authority,
+            )
         except ConfigEpochStoreUnavailable:
             return self._observe_activation(ConfigActivationOutcome("unavailable"))
         if isinstance(result, RepositoryActivationAuthorityConflict):

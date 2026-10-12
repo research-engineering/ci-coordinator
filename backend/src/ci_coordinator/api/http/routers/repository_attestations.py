@@ -1,4 +1,4 @@
-"""HTTP projection for one proposal-bound GitHub reviewer step-up."""
+"""HTTP projection for one proposal- or registered-epoch-bound GitHub reviewer step-up."""
 
 from __future__ import annotations
 
@@ -28,11 +28,12 @@ from ci_coordinator.api.http.security import (
     WWW_AUTHENTICATE_OPENAPI,
 )
 from ci_coordinator.app.proposal_review import ProposalReviewOutcome
+from ci_coordinator.app.registered_epoch_review import RegisteredEpochReviewOutcome
 from ci_coordinator.config_control import RepositoryScope
 from ci_coordinator.config_epochs import ActiveConfigEpoch
 from ci_coordinator.control_plane_identity import KeycloakHumanPrincipal, RoleAdmissionGranted
 from ci_coordinator.kernel.canonical_json import MAX_SAFE_JSON_INTEGER
-from ci_coordinator.proposal_review import ProposalReviewCommand
+from ci_coordinator.proposal_review import ProposalReviewCommand, RegisteredEpochReviewCommand
 
 REPOSITORY_ATTESTATION_START_PATH = "/api/v1/repository-attestations/github/start"
 REPOSITORY_ATTESTATION_CALLBACK_PATH = "/api/v1/repository-attestations/github/callback"
@@ -100,17 +101,41 @@ class LegacyRepositoryAttestationStartRequest(RequestModel):
     @field_validator("operation_id")
     @classmethod
     def operation_id_is_bounded_scalar_text(cls, value: str) -> str:
-        if "\0" in value or any(0xD800 <= ord(character) <= 0xDFFF for character in value):
-            raise ValueError("operation id must contain Unicode scalar text")
-        if len(value.encode("utf-8")) > 256:
-            raise ValueError("operation id exceeds its byte bound")
-        return value
+        return _bounded_operation_id(value)
 
 
 class RepositoryAttestationStartRequest(LegacyRepositoryAttestationStartRequest):
     schema_version: Literal["ci-repository-attestation-start/v2"] = Field(
         validation_alias="schemaVersion"
     )
+
+
+class RegisteredEpochAttestationStartRequest(RequestModel):
+    schema_version: Literal["ci-registered-epoch-attestation-start/v1"] = Field(
+        validation_alias="schemaVersion"
+    )
+    installation_id: int = Field(
+        validation_alias="installationId",
+        ge=1,
+        le=MAX_SAFE_JSON_INTEGER,
+    )
+    repository_id: int = Field(
+        validation_alias="repositoryId",
+        ge=1,
+        le=MAX_SAFE_JSON_INTEGER,
+    )
+    operation_id: str = Field(validation_alias="operationId", min_length=1, max_length=256)
+    target_epoch_id: str = Field(validation_alias="targetEpochId", pattern=r"^[0-9a-f]{64}$")
+    expected_source_hash: str = Field(
+        validation_alias="expectedSourceHash",
+        pattern=r"^[0-9a-f]{64}$",
+    )
+    expected_active: ExpectedActiveRequest | None = Field(validation_alias="expectedActive")
+
+    @field_validator("operation_id")
+    @classmethod
+    def operation_id_is_bounded_scalar_text(cls, value: str) -> str:
+        return _bounded_operation_id(value)
 
 
 class RepositoryAttestationStartResponse(ResponseModel):
@@ -131,7 +156,10 @@ type RepositoryAttestationErrorCode = Literal[
     "overloaded",
     "rate_limited",
     "replayed",
+    "source_mismatch",
     "stale",
+    "target_ineligible",
+    "target_missing",
     "unauthenticated",
     "unavailable",
 ]
@@ -158,6 +186,7 @@ def build_repository_attestation_router(
                 "headers": WWW_AUTHENTICATE_OPENAPI,
             },
             status.HTTP_403_FORBIDDEN: {"model": RepositoryAttestationErrorResponse},
+            status.HTTP_404_NOT_FOUND: {"model": RepositoryAttestationErrorResponse},
             status.HTTP_409_CONFLICT: {"model": RepositoryAttestationErrorResponse},
             status.HTTP_413_CONTENT_TOO_LARGE: {"model": RepositoryAttestationErrorResponse},
             status.HTTP_503_SERVICE_UNAVAILABLE: {"model": RepositoryAttestationErrorResponse},
@@ -165,7 +194,11 @@ def build_repository_attestation_router(
     )
     async def start_github_repository_attestation(
         request: Request,
-        body: RepositoryAttestationStartRequest | LegacyRepositoryAttestationStartRequest,
+        body: (
+            RepositoryAttestationStartRequest
+            | LegacyRepositoryAttestationStartRequest
+            | RegisteredEpochAttestationStartRequest
+        ),
         _session: Annotated[str | None, Security(CONTROL_PLANE_SESSION)] = None,
     ) -> Response:
         admission = await authenticate_and_admit_roles(
@@ -194,17 +227,30 @@ def build_repository_attestation_router(
                 body.expected_active.revision,
             )
         )
-        outcome = await dependencies.service.start(
-            principal=principal,
-            legacy_replay_only=type(body) is LegacyRepositoryAttestationStartRequest,
-            command=ProposalReviewCommand(
-                scope=scope,
-                operation_id=body.operation_id,
-                expected_manifest_id=body.expected_manifest_id,
-                expected_active=expected_active,
-                actor=principal.actor_id,
-            ),
-        )
+        if isinstance(body, RegisteredEpochAttestationStartRequest):
+            outcome = await dependencies.service.start_registered_epoch(
+                principal=principal,
+                command=RegisteredEpochReviewCommand(
+                    scope=scope,
+                    operation_id=body.operation_id,
+                    target_epoch_id=body.target_epoch_id,
+                    expected_source_hash=body.expected_source_hash,
+                    expected_active=expected_active,
+                    actor=principal.actor_id,
+                ),
+            )
+        else:
+            outcome = await dependencies.service.start(
+                principal=principal,
+                legacy_replay_only=type(body) is LegacyRepositoryAttestationStartRequest,
+                command=ProposalReviewCommand(
+                    scope=scope,
+                    operation_id=body.operation_id,
+                    expected_manifest_id=body.expected_manifest_id,
+                    expected_active=expected_active,
+                    actor=principal.actor_id,
+                ),
+            )
         if outcome.state == "ready":
             if outcome.authorization_url is None or outcome.transaction_cookie is None:
                 raise RuntimeError("ready repository attestation omitted its redirect state")
@@ -227,13 +273,17 @@ def build_repository_attestation_router(
             return response
         if outcome.state == "forbidden":
             return _error(status.HTTP_403_FORBIDDEN, "forbidden")
+        if outcome.state == "target_missing":
+            return _error(status.HTTP_404_NOT_FOUND, "target_missing")
         if outcome.state in {
             "already_reviewed",
             "legacy_new_operation_unsupported",
             "baseline_conflict",
             "blocked",
             "operation_conflict",
+            "source_mismatch",
             "stale",
+            "target_ineligible",
         }:
             return _error(status.HTTP_409_CONFLICT, outcome.state)
         if outcome.state == "overloaded":
@@ -255,6 +305,7 @@ def build_repository_attestation_router(
                 "headers": WWW_AUTHENTICATE_OPENAPI,
             },
             status.HTTP_403_FORBIDDEN: {"model": RepositoryAttestationErrorResponse},
+            status.HTTP_404_NOT_FOUND: {"model": RepositoryAttestationErrorResponse},
             status.HTTP_409_CONFLICT: {"model": RepositoryAttestationErrorResponse},
             status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": RepositoryAttestationErrorResponse},
             status.HTTP_429_TOO_MANY_REQUESTS: {"model": RepositoryAttestationErrorResponse},
@@ -295,9 +346,12 @@ def build_repository_attestation_router(
         elif outcome.state == "unavailable":
             response = _error(status.HTTP_503_SERVICE_UNAVAILABLE, "unavailable")
         elif outcome.state == "completed":
-            if outcome.review is None:
+            if outcome.registered_epoch_review is not None:
+                response = _registered_epoch_review_response(outcome.registered_epoch_review)
+            elif outcome.review is not None:
+                response = _review_response(outcome.review)
+            else:
                 raise RuntimeError("completed repository attestation omitted review outcome")
-            response = _review_response(outcome.review)
         else:
             raise RuntimeError("unsupported repository-attestation callback outcome")
         return response
@@ -353,6 +407,68 @@ def _review_response(outcome: ProposalReviewOutcome) -> Response:
     if outcome.state == "unavailable":
         return _error(status.HTTP_503_SERVICE_UNAVAILABLE, "unavailable")
     raise RuntimeError("unsupported proposal review outcome")
+
+
+def _registered_epoch_review_response(outcome: RegisteredEpochReviewOutcome) -> Response:
+    if outcome.state in {"accepted", "duplicate"}:
+        if outcome.record is None:
+            raise RuntimeError("accepted registered-epoch attestation omitted its retained review")
+        command = outcome.record.command
+        query = urlencode(
+            {
+                "installationId": command.scope.installation_id,
+                "repositoryId": command.scope.repository_id,
+                "limit": 10,
+                "repositoryAttestation": "registered-epoch-reviewed",
+                "targetEpochId": command.target_epoch_id,
+                "expectedSourceHash": command.expected_source_hash,
+                "reviewOperationId": command.operation_id,
+                "reviewBaseEpochId": (
+                    "" if command.expected_active is None else command.expected_active.epoch_id
+                ),
+                "reviewBaseRevision": (
+                    "" if command.expected_active is None else str(command.expected_active.revision)
+                ),
+            }
+        )
+        response = RedirectResponse(
+            f"{_WORKBENCH_PATH}?{query}",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+        response.headers.update(_NO_STORE)
+        return response
+    if outcome.state == "forbidden":
+        return _error(status.HTTP_403_FORBIDDEN, "forbidden")
+    if outcome.state == "target_missing":
+        return _error(status.HTTP_404_NOT_FOUND, "target_missing")
+    if outcome.state in {
+        "attestation_conflict",
+        "baseline_conflict",
+        "blocked",
+        "operation_conflict",
+        "source_mismatch",
+        "stale",
+        "target_ineligible",
+    }:
+        code: RepositoryAttestationErrorCode = (
+            "replayed" if outcome.state == "attestation_conflict" else outcome.state
+        )
+        return _error(status.HTTP_409_CONFLICT, code)
+    if outcome.state == "diff_limit":
+        return _error(status.HTTP_422_UNPROCESSABLE_CONTENT, "diff_limit")
+    if outcome.state == "overloaded":
+        return _error(status.HTTP_503_SERVICE_UNAVAILABLE, "overloaded")
+    if outcome.state == "unavailable":
+        return _error(status.HTTP_503_SERVICE_UNAVAILABLE, "unavailable")
+    raise RuntimeError("unsupported registered-epoch review outcome")
+
+
+def _bounded_operation_id(value: str) -> str:
+    if "\0" in value or any(0xD800 <= ord(character) <= 0xDFFF for character in value):
+        raise ValueError("operation id must contain Unicode scalar text")
+    if len(value.encode("utf-8")) > 256:
+        raise ValueError("operation id exceeds its byte bound")
+    return value
 
 
 def _admission_error(admission: object) -> JSONResponse | None:

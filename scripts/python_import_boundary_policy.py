@@ -299,6 +299,10 @@ HTTP_CONCRETE_SERVICE_POLICY = (
         "ProductionRequestAuthorityService",
     ),
     HttpConcreteServicePolicy(
+        "ci_coordinator.app.registered_epoch_review",
+        "RegisteredEpochReviewService",
+    ),
+    HttpConcreteServicePolicy(
         "ci_coordinator.app.repository_activation",
         "RepositoryActivationAuthorityService",
     ),
@@ -1119,6 +1123,7 @@ IMPORT_RULES = (
         applies=_api_http_non_review_surface_rule_applies,
         forbidden=(
             "ci_coordinator.app.proposal_review",
+            "ci_coordinator.app.registered_epoch_review",
             "ci_coordinator.proposal_review",
         ),
         rule_id="python.import-boundary.api-proposal-review",

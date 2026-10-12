@@ -449,6 +449,12 @@ function attestationFailureLabel(kind: RepositoryAttestationFailure): string {
       return "Verification service is unavailable";
     case "rate_limited":
       return "GitHub rate limited the verification request";
+    case "target_missing":
+      return "Registered configuration epoch was not found";
+    case "target_ineligible":
+      return "Configuration epoch has no standalone registration";
+    case "source_mismatch":
+      return "Registered configuration source differs from the request";
     case "invalid_callback":
     case "replayed":
       return "GitHub verification callback was rejected";

@@ -3767,6 +3767,47 @@ export interface components {
             readonly snapshot: components["schemas"]["PurposeSettingsSnapshot"] | null;
         };
         readonly QueryId: number;
+        /** RegisteredEpochAttestationStartRequest */
+        readonly RegisteredEpochAttestationStartRequest: {
+            readonly expectedActive: components["schemas"]["ExpectedActiveRequest"] | null;
+            /** Expectedsourcehash */
+            readonly expectedSourceHash: string;
+            /** Installationid */
+            readonly installationId: number;
+            /** Operationid */
+            readonly operationId: string;
+            /** Repositoryid */
+            readonly repositoryId: number;
+            /**
+             * Schemaversion
+             * @constant
+             */
+            readonly schemaVersion: "ci-registered-epoch-attestation-start/v1";
+            /** Targetepochid */
+            readonly targetEpochId: string;
+        };
+        /** RegisteredEpochConfigActivationBody */
+        readonly RegisteredEpochConfigActivationBody: {
+            /** Expectedrevision */
+            readonly expectedRevision?: number | null;
+            /** Expectedsourcehash */
+            readonly expectedSourceHash: string;
+            /** Installationid */
+            readonly installationId: number;
+            /** Operationid */
+            readonly operationId: string;
+            /** Registeredepochreviewoperationid */
+            readonly registeredEpochReviewOperationId: string;
+            /** Repositoryid */
+            readonly repositoryId: number;
+            /**
+             * Schemaversion
+             * @constant
+             */
+            readonly schemaVersion: "ci-config-epoch-activation/v3";
+            /** Targetepochid */
+            readonly targetEpochId: string;
+        };
         /** RelativeReductionResponse */
         readonly RelativeReductionResponse: {
             readonly denominator: components["schemas"]["PositiveCounter"];
@@ -3825,7 +3866,7 @@ export interface components {
             readonly runnerClassDigest: components["schemas"]["_Digest"];
         };
         /** @enum {string} */
-        readonly RepositoryAttestationErrorCode: "already_reviewed" | "legacy_new_operation_unsupported" | "baseline_conflict" | "blocked" | "diff_limit" | "epoch_conflict" | "forbidden" | "invalid_callback" | "operation_conflict" | "overloaded" | "rate_limited" | "replayed" | "stale" | "unauthenticated" | "unavailable";
+        readonly RepositoryAttestationErrorCode: "already_reviewed" | "legacy_new_operation_unsupported" | "baseline_conflict" | "blocked" | "diff_limit" | "epoch_conflict" | "forbidden" | "invalid_callback" | "operation_conflict" | "overloaded" | "rate_limited" | "replayed" | "source_mismatch" | "stale" | "target_ineligible" | "target_missing" | "unauthenticated" | "unavailable";
         /** RepositoryAttestationErrorResponse */
         readonly RepositoryAttestationErrorResponse: {
             readonly error: components["schemas"]["RepositoryAttestationErrorCode"];
@@ -4913,7 +4954,7 @@ export interface operations {
         };
         readonly requestBody: {
             readonly content: {
-                readonly "application/json": components["schemas"]["ConfigEpochActivationBody"] | components["schemas"]["ExplicitConfigEpochActivationBody"];
+                readonly "application/json": components["schemas"]["ConfigEpochActivationBody"] | components["schemas"]["ExplicitConfigEpochActivationBody"] | components["schemas"]["RegisteredEpochConfigActivationBody"];
             };
         };
         readonly responses: {
@@ -5684,6 +5725,15 @@ export interface operations {
                     readonly "application/json": components["schemas"]["RepositoryAttestationErrorResponse"];
                 };
             };
+            /** @description Not Found */
+            readonly 404: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryAttestationErrorResponse"];
+                };
+            };
             /** @description Conflict */
             readonly 409: {
                 headers: {
@@ -5740,7 +5790,7 @@ export interface operations {
         };
         readonly requestBody: {
             readonly content: {
-                readonly "application/json": components["schemas"]["RepositoryAttestationStartRequest"] | components["schemas"]["LegacyRepositoryAttestationStartRequest"];
+                readonly "application/json": components["schemas"]["RepositoryAttestationStartRequest"] | components["schemas"]["LegacyRepositoryAttestationStartRequest"] | components["schemas"]["RegisteredEpochAttestationStartRequest"];
             };
         };
         readonly responses: {
@@ -5775,6 +5825,15 @@ export interface operations {
             };
             /** @description Forbidden */
             readonly 403: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "application/json": components["schemas"]["RepositoryAttestationErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            readonly 404: {
                 headers: {
                     readonly [name: string]: unknown;
                 };

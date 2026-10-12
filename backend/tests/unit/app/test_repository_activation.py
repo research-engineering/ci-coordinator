@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import cast
 
 import pytest
+from registered_epoch_review_support import RegisteredEpochStore
 from repository_activation_support import (
     ACTOR,
     NOW,
@@ -26,6 +27,7 @@ from ci_coordinator.proposal_review import (
     GitHubReviewerUnavailable,
     ProposalReviewRecord,
     ProposalReviewStoreUnavailable,
+    RegisteredEpochActivationStore,
     RepositoryActivationGranted,
     RepositoryActivationRejected,
     RepositoryActivationStore,
@@ -378,6 +380,7 @@ def _service(
 ) -> RepositoryActivationAuthorityService:
     return RepositoryActivationAuthorityService(
         store=cast(RepositoryActivationStore, store),
+        registered_epoch_store=cast(RegisteredEpochActivationStore, RegisteredEpochStore()),
         permission_reader=permission,
         discovery=discovery,
         authority_profile_digest=PROFILE_DIGEST,

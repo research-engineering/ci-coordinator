@@ -278,6 +278,23 @@ an absent original baseline. These are not authority: exact authenticated
 replay must compare them. The UI cannot substitute a newer active read for the
 original baseline or automatically submit after callback or reauthentication.
 
+A second, domain-separated subject reviews an already registered epoch
+(ROADMAP CI-018). Its start body is ci-registered-epoch-attestation-start/v1
+with targetEpochId and expectedSourceHash instead of expectedManifestId; it
+binds session, scope, operation id, target epoch, source hash, current
+default-head revision, inventory digest, expected active pointer, profile and
+expiry. Its sealed cookie uses distinct AEAD associated data and an exact key
+set with subjectKind registered-epoch, so neither subject's cookie opens as
+the other; the callback dispatches by the cookie that opens and consumes only
+that subject's pending relation. The proposal cookie bytes are unchanged, so
+this addition invalidates no pending challenge. Its redirect hint uses
+repositoryAttestation=registered-epoch-reviewed with targetEpochId,
+expectedSourceHash and reviewOperationId, never proposalManifestId. Missing
+(404 target_missing), receipt-less (409 target_ineligible), mismatched
+(409 source_mismatch), blocked and stale outcomes stay distinct. The
+[registered-epoch review subject](proposal-review-registration.md#12-registered-epoch-review-subject)
+owns its algebra and provisional owner decisions (2026-10-11).
+
 Current activation/v2 supplies required reviewOperationId. Activation loads
 that exact unexpired receipt, never a manifest-only or latest match, and compares its complete expected
 active pointer with current durable state before any provider call. It then
@@ -285,7 +302,11 @@ uses the GitHub App to recheck the recorded reviewer's current repository
 permission. A changed proposal, revision, installation, reviewer, permission,
 profile, baseline, or expiry rejects activation. Provider unavailability
 cannot become approval. The same active-pointer comparison is repeated under
-the final repository lock before mutation.
+the final repository lock before mutation. Activation v3 instead supplies
+registeredEpochReviewOperationId and expectedSourceHash, loads that exact
+registered-epoch receipt, re-loads the retained epoch and registrant, and
+requires the exact reviewed default-head revision and inventory digest after
+the same GitHub App recheck; a proposal selector cannot select it.
 
 ## 7. State Machines
 
