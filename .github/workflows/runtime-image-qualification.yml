@@ -393,28 +393,9 @@ jobs:
              and .descriptor.name == "grype" and .descriptor.version == "0.119.0"
              and .descriptor.configuration["fail-on-severity"] == ""
              and (.ignoredMatches|length==0)' "${root}/scan.json" > /dev/null
-          QUALIFICATION_ROOT="${root}" backend/.venv/bin/python - <<'PY'
-          import json
-          import os
-          from datetime import UTC, datetime
-          from pathlib import Path
-          from scripts.release_repair_admission import RepairEvidence, read_policy, validate_observations, occurrence_is_repaired
-          root = Path(os.environ["QUALIFICATION_ROOT"])
-          digest, policy = read_policy(Path("docker/runtime/security/repaired-matches.v1.json"), Path.cwd())
-          proof = RepairEvidence.model_validate_json((root / "repair-evidence.json").read_bytes())
-          validate_observations(policy=policy, policy_sha256=digest, evidence=proof, observed=datetime.now(UTC))
-          report = json.loads((root / "vulnerabilities.json").read_bytes())
-          assert proof.sourceKind == "local" and proof.imageId == report["imageId"]
-          assert proof.subject == json.loads((root / "image.json").read_bytes())["Id"]
-          for match in report["matches"]:
-              assert match["severity"] in {"Negligible", "Low", "Medium", "High", "Critical"}
-              if match["severity"] in {"High", "Critical"}:
-                  assert occurrence_is_repaired(
-                      policy, proof, cve=match["id"], severity=match["severity"],
-                      package=match["package"], version=match["version"], package_type=match["type"],
-                      purl=match["purl"], locations=tuple((loc["path"], loc["annotations"].get("evidence", ""), loc["layerID"]) for loc in match["locations"]),
-                  ), match["id"]
-          PY
+          backend/.venv/bin/python -I -B scripts/release_repair_admission.py \
+            --qualification-root "${root}" \
+            --policy docker/runtime/security/repaired-matches.v1.json
       - name: Retain qualification failure diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

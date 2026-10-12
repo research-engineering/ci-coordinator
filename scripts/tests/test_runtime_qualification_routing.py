@@ -164,8 +164,7 @@ def test_runtime_scanner_collects_all_findings_with_an_unambiguous_process_resul
         assert "grep -Fq 'owner-invalid-presenter'" in scripts
         assert 'test ! -s "${root}/invalid-presenter.json"' in scripts
         assert "printf 'Raw scanner exit status: %s\\n'" in scripts
-        assert 'if match["severity"] in {"High", "Critical"}' in scripts
-        assert "assert occurrence_is_repaired(" in scripts
+        assert "python -I -B scripts/release_repair_admission.py" in scripts
 
 
 def _qualification_steps() -> list[dict[str, Any]]:
@@ -203,12 +202,12 @@ def test_runtime_scan_diagnostics_precede_repair_evidence_binding_and_admission(
     diagnostics = run.index('"${root}/scan.json" > "${root}/vulnerabilities.json"')
     evidence = run.index('config_id="$(jq -r .imageId "${root}/repair-evidence.json")"')
     binding = run.index('jq -e --arg id "${config_id}" --arg input "${image_id}"')
-    admission = run.index("validate_observations(policy=policy, policy_sha256=digest")
-    assert run.count("repair-evidence.json") == 2
+    admission = run.index("backend/.venv/bin/python -I -B scripts/release_repair_admission.py")
+    assert run.count("repair-evidence.json") == 1
     assert run.index("set -euo pipefail") < run.index('test "${code}" -eq 0') < diagnostics
     assert diagnostics < evidence < binding < admission
     assert ".source.target.imageID == $id and .source.target.userInput == $input" in run
-    assert 'proof.imageId == report["imageId"]' in run
+    assert '--qualification-root "${root}"' in run[admission:]
 
 
 def test_runtime_failure_diagnostics_do_not_weaken_required_result_retention() -> None:
