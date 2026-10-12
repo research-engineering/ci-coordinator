@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "ledgerId": "ci-coordinator.agentic-proofkit-adoption-feedback",
-  "evaluatedDependency": "agentic-proofkit==0.14.18",
+  "evaluatedDependency": "agentic-proofkit==0.14.21",
   "records": [
     {
       "id": "APF-CI-001",

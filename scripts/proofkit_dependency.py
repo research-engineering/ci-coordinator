@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 from scripts.bounded_process import spawn
 
 PACKAGE_NAME: Final = "agentic-proofkit"
-PACKAGE_VERSION: Final = "0.14.18"
+PACKAGE_VERSION: Final = "0.14.21"
 PACKAGE_SPEC: Final = f"{PACKAGE_NAME}=={PACKAGE_VERSION}"
 PYPI_REGISTRY: Final = "https://pypi.org/simple"
 WHEEL_SUFFIXES: Final = frozenset(

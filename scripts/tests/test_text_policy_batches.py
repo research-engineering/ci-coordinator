@@ -660,7 +660,7 @@ def _repository(root: Path, files: dict[str, bytes]) -> None:
 
 
 def test_native_whole_and_forced_batches_have_independent_literal_counts(tmp_path: Path) -> None:
-    assert version("agentic-proofkit") == "0.14.18"
+    assert version("agentic-proofkit") == "0.14.21"
     files = {
         ".png": b"not text",
         "a.txt": b"a\tb\n",
@@ -704,7 +704,7 @@ def test_native_whole_and_forced_batches_have_independent_literal_counts(tmp_pat
 def test_native_violation_in_last_batch_cannot_be_hidden(
     tmp_path: Path, bad: bytes, diagnostic: str
 ) -> None:
-    assert version("agentic-proofkit") == "0.14.18"
+    assert version("agentic-proofkit") == "0.14.21"
     _repository(tmp_path, {"a.txt": b"ok\n", "z.txt": bad})
     limit = max(
         len(_encode(_document([_wire(name, data)], f"{REPORT_ID}.batch-1")).encode())
@@ -715,7 +715,7 @@ def test_native_violation_in_last_batch_cannot_be_hidden(
 
 
 def test_native_actual_32_mib_counterfactual_and_complete_batches(tmp_path: Path) -> None:
-    assert version("agentic-proofkit") == "0.14.18"
+    assert version("agentic-proofkit") == "0.14.21"
     content = b"a" * 999_999 + b"\n"
     _repository(tmp_path, {f"{index:02d}.txt": content for index in range(26)})
     original = inputs.text_policy_input(tmp_path)

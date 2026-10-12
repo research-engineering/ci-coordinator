@@ -6,7 +6,9 @@ Owner: ci-coordinator.proofkit-adoption
 
 ## Scope And Decision
 
-Keep `agentic-proofkit==0.14.18` and its seven consumed commands. Compose only
+Keep the pinned `agentic-proofkit` (now `==0.14.21`; selected in the
+[adoption specification](../specs/ci-coordinator-proofkit-adoption/overview.md#proofkit-01421-revalidation))
+and its seven consumed commands. Compose only
 the existing `text-policy` command over deterministic bounded inputs. The
 [adoption specification](../architecture/cross-cutting/proofkit-adoption.md)
 owns the reusable-mechanics boundary; `REQ-CI-PROOFKIT-001` owns executable

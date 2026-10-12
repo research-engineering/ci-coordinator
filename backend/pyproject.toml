@@ -36,7 +36,7 @@ ci-coordinator-target-authority-evidence = "ci_coordinator.target_authority_evid
 [dependency-groups]
 debug = ["debugpy==1.8.22"]
 dev = [
-  "agentic-proofkit==0.14.18",
+  "agentic-proofkit==0.14.21",
   "deptry==0.25.1",
   "docker==7.2.0",
   "import-linter==2.15",

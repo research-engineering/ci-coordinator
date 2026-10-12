@@ -21,7 +21,7 @@ def test_repository_proofkit_distribution_is_admitted() -> None:
         REPO_ROOT / "backend" / "uv.lock",
     )
 
-    assert admission.version == "0.14.18"
+    assert admission.version == "0.14.21"
     assert len(admission.wheels) == 4
     assert all(wheel.digest.startswith("sha256:") for wheel in admission.wheels)
 
@@ -37,7 +37,7 @@ def test_malformed_dependency_shape_produces_a_failure_report(tmp_path: Path) ->
     backend = tmp_path / "backend"
     backend.mkdir()
     (backend / "pyproject.toml").write_text(
-        '[dependency-groups]\ndev = "agentic-proofkit==0.14.18"\n',
+        '[dependency-groups]\ndev = "agentic-proofkit==0.14.21"\n',
         encoding="utf-8",
     )
 

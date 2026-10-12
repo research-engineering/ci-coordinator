@@ -68,9 +68,12 @@ The supported host contract is x86-64 or ARM64 Linux, Apple Silicon macOS, plus
 those Linux architectures under WSL2 with Docker integration. Native Windows
 is outside the contract because the bounded process and private-state locks
 require POSIX process groups and file locking. Intel macOS is outside the
-locked contract because pnpm 11.25.0 publishes a checksum-bearing standalone
-macOS artifact only for ARM64; silently changing the installer backend on one
-platform would weaken reproducibility. Docker Compose 2.22.0 is the minimum
+locked contract: `mise.lock` has no `macos-x64` record for pnpm or gitleaks.
+The original reason, an ARM64-only standalone pnpm 11.25.0 macOS artifact, no
+longer holds: pnpm 12.5.1 and gitleaks 8.30.1 publish darwin x64 archives. The
+exclusion is retained as a provisional owner decision (2026-10-11) because no
+Intel macOS use is evidenced. Admitting that host needs locked records and its
+own host qualification. Docker Compose 2.22.0 is the minimum
 admitted plugin version because it is the first release supporting the
 declared Compose Watch surface. The lifecycle owner checks this version before
 starting a project.
