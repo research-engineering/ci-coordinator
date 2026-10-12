@@ -1,6 +1,6 @@
 # Workspace Session Continuity
 
-Status: proposed successor for navigation presentation only.
+Status: implemented successor for navigation presentation only; merged exact-source native and deployed (CI-062) qualification pending.
 Owners: operator UI requirements 005, 009, 016, 017 and 023.
 Execution: [implementation plan](workspace-session-continuity-plan.md).
 

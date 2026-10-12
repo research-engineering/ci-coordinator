@@ -1,6 +1,6 @@
 # Logout Revocation Fence
 
-Status: selected design; source implemented, native qualification pending
+Status: selected design; source implemented; native population green only on unmerged PR #62 head `f9ed14f`; merged exact-source native and deployed qualification pending
 Date: 2026-10-11
 
 Owners: [identity and attestation](../architecture/modules/control-plane-identity-and-repository-attestation.md),
