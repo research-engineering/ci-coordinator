@@ -69,10 +69,39 @@ export function RepositoryCatalog({ itemLimit, onSelect }: RepositoryCatalogProp
   const columns: readonly DataColumn<Repository>[] = [
     {
       header: "Repository",
+      presentation: "identity",
       render: (repository) => (
-        <div className="repository-name">
-          <strong>{repository.name}</strong>
-          <span>{repository.ownerLogin}</span>
+        <div className="repository-identity">
+          <div className="repository-name">
+            <strong>{repository.name}</strong>
+            <span>{repository.ownerLogin}</span>
+          </div>
+          <button
+            type="button"
+            className="button button--compact"
+            aria-label={`Open ${repository.fullName}`}
+            disabled={!repository.workbenchAuthorized}
+            title={
+              repository.workbenchAuthorized
+                ? `Open ${repository.fullName}`
+                : repository.disabled
+                  ? "Repository disabled by GitHub"
+                  : "Repository restricted by deployment policy"
+            }
+            onClick={() =>
+              onSelect(
+                {
+                  installationId: repository.scope.installationId,
+                  repositoryId: repository.scope.repositoryId,
+                  limit: itemLimit,
+                },
+                repository.fullName,
+                repository.createdAt ?? undefined,
+              )
+            }
+          >
+            Open
+          </button>
         </div>
       ),
     },
@@ -115,36 +144,6 @@ export function RepositoryCatalog({ itemLimit, onSelect }: RepositoryCatalogProp
             )
           ) : null}
         </div>
-      ),
-    },
-    {
-      header: "Action",
-      render: (repository) => (
-        <button
-          type="button"
-          className="button button--compact"
-          disabled={!repository.workbenchAuthorized}
-          title={
-            repository.workbenchAuthorized
-              ? `Open ${repository.fullName}`
-              : repository.disabled
-                ? "Repository disabled by GitHub"
-                : "Repository restricted by deployment policy"
-          }
-          onClick={() =>
-            onSelect(
-              {
-                installationId: repository.scope.installationId,
-                repositoryId: repository.scope.repositoryId,
-                limit: itemLimit,
-              },
-              repository.fullName,
-              repository.createdAt ?? undefined,
-            )
-          }
-        >
-          Open
-        </button>
       ),
     },
   ];

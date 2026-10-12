@@ -111,6 +111,10 @@ First-visit witnesses must observe capability content and its scoped request,
 not merely the shell heading. Hold an actual command response pending while
 leaving and returning to its form; revoke authority while the form is hidden,
 then release the response and prove that no obsolete receipt returns.
+Catalog return is witnessed separately: after paging and searching, leave for
+a repository, then return through browser history and through primary
+navigation, which is the mobile menu below the breakpoint. Search, page and
+heading focus must survive without another catalog request.
 
 The existing GitHub browser job retains only synthetic-fixture PNG screenshots,
 identified by run and attempt, for seven days. Upload follows an executed

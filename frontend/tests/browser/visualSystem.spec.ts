@@ -200,7 +200,7 @@ test("renders the reference visual system with same-origin fonts under the shell
     await expect(page.getByText("bart.simpson", { exact: true })).toBeVisible();
   }
   await capture(page, "portfolio-expanded");
-  await page.getByRole("button", { name: "Open", exact: true }).first().click();
+  await page.getByRole("button", { name: "Open example-org/ci-coordinator", exact: true }).click();
   await expect(page.getByRole("cell", { name: "runner_capacity_unavailable" })).toBeVisible();
   if (test.info().project.name === "desktop-chromium") {
     const plans = page.getByRole("region", { name: "plans in this snapshot. table" });
@@ -247,7 +247,9 @@ for (const outcome of ["ready", "empty", "failure"] as const) {
     });
     try {
       await page.goto(consoleUrl());
-      await page.getByRole("button", { name: "Open", exact: true }).first().click();
+      await page
+        .getByRole("button", { name: "Open example-org/ci-coordinator", exact: true })
+        .click();
       const progress = page.getByRole("progressbar", { name: "Loading snapshot" });
       await expect(progress).toBeVisible();
       await expect(progress).not.toHaveAttribute("aria-valuenow");
@@ -278,7 +280,7 @@ test("retrying a failed governance read does not claim a retained observation", 
     route.fulfill({ status: 503, json: { ok: false, error: "unavailable" } }),
   );
   await page.goto(consoleUrl());
-  await page.getByRole("button", { name: "Open", exact: true }).first().click();
+  await page.getByRole("button", { name: "Open example-org/ci-coordinator", exact: true }).click();
   await navigate(page, "Governance");
   await expect(page.getByRole("button", { name: "Retry", exact: true })).toBeVisible();
   const pending = Promise.withResolvers<void>();
@@ -305,7 +307,7 @@ test("post-approval refresh preserves the receipt and reason while pausing basel
 }) => {
   await prepare(page);
   await page.goto(consoleUrl());
-  await page.getByRole("button", { name: "Open", exact: true }).first().click();
+  await page.getByRole("button", { name: "Open example-org/ci-coordinator", exact: true }).click();
   await navigate(page, "Governance");
   await expect(page.getByRole("button", { name: "Replace baseline" })).toBeVisible();
   await page.getByLabel("Approval reason").fill("Confirm repository governance intent");

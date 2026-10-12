@@ -596,6 +596,13 @@ main {
   width: 24px;
   height: 24px;
 }
+.repository-identity {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
 .repository-name {
   min-width: 0;
   display: grid;
@@ -603,10 +610,7 @@ main {
 }
 .repository-name strong,
 .repository-name span {
-  max-width: 320px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .repository-name span {
   color: var(--text-muted);

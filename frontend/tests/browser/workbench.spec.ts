@@ -7,6 +7,7 @@ import {
   controlPlaneSessionFixture,
   installationCatalogFixture,
   installationFixture,
+  repositoryFixture,
   repositoryPageFixture,
   workbenchFixture,
   workflowDiscoveryFixture,
@@ -290,6 +291,149 @@ test("sidebar retains named navigation in both modes and across the mobile break
   await expectNoViewportOverflow(page);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({ path: test.info().outputPath("sidebar-preference.png"), fullPage: true });
+});
+
+test("named navigation icons keep a fixed gap from their labels in every presentation", async ({
+  page,
+}) => {
+  await routeReadyPortfolio(page);
+  await page.goto(workbenchUrl());
+  await page.getByRole("button", { name: "Open example-org/ci-coordinator", exact: true }).click();
+  await expect(page.getByText("Ledger revision")).toBeVisible();
+  const names = [
+    "Repositories",
+    "Activity",
+    "Overview",
+    "Workflows",
+    "Configuration",
+    "CI economics",
+    "Governance",
+    "Audit log",
+  ];
+  const toggle = page.getByRole("button", { name: "Toggle navigation" });
+  const mobile = await toggle.isVisible();
+  if (mobile) await toggle.click();
+  else await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
+  for (const name of names) {
+    const spacing = await page.getByRole("link", { name, exact: true }).evaluate((link) => {
+      const icon = link.querySelector("svg")?.getBoundingClientRect();
+      const label = link.querySelector(".navigation-label")?.getBoundingClientRect();
+      if (!icon || !label) throw new Error("Navigation link requires an icon and label");
+      return {
+        gap: label.left - icon.right,
+        centerDelta: Math.abs(icon.top + icon.height / 2 - label.top - label.height / 2),
+      };
+    });
+    expect(spacing.gap).toBeGreaterThanOrEqual(8);
+    expect(spacing.gap).toBeLessThanOrEqual(12);
+    expect(spacing.centerDelta).toBeLessThanOrEqual(1);
+  }
+  const signIn = await page.getByRole("link", { name: "Sign in" }).evaluate((link) => {
+    const icon = link.querySelector("svg")?.getBoundingClientRect();
+    const text = document.createRange();
+    const label = [...link.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
+    if (!icon || !label) throw new Error("Sign-in action requires an icon and text");
+    text.selectNodeContents(label);
+    return text.getBoundingClientRect().left - icon.right;
+  });
+  expect(signIn).toBeGreaterThanOrEqual(6);
+  expect(signIn).toBeLessThanOrEqual(12);
+  if (!mobile) {
+    await page.getByRole("button", { name: "Collapse sidebar" }).click();
+    for (const name of names) {
+      const offset = await page.getByRole("link", { name, exact: true }).evaluate((link) => {
+        const box = link.getBoundingClientRect();
+        const icon = link.querySelector("svg")?.getBoundingClientRect();
+        if (!icon) throw new Error("Compact navigation link requires an icon");
+        return Math.abs(box.left + box.width / 2 - icon.left - icon.width / 2);
+      });
+      expect(offset).toBeLessThanOrEqual(1.5);
+    }
+  }
+  await expectNoViewportOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("navigation-icon-spacing.png") });
+});
+
+test("catalog return paths keep search, page and heading focus without catalog reads", async ({
+  page,
+}) => {
+  await routeReadyPortfolio(page);
+  const catalogReads: string[] = [];
+  await page.route("**/api/v1/workbench/installations?*", (route) => {
+    catalogReads.push(route.request().url());
+    return route.fulfill({ json: installationCatalogFixture() });
+  });
+  const secondPage = [
+    repositoryFixture(),
+    repositoryFixture({
+      scope: { installationId: 1, repositoryId: 9 },
+      nodeId: "R_9",
+      name: "ci-coordinator-archive",
+      fullName: "example-org/ci-coordinator-archive",
+    }),
+    repositoryFixture({
+      scope: { installationId: 1, repositoryId: 10 },
+      nodeId: "R_10",
+      name: "unrelated-tool",
+      fullName: "example-org/unrelated-tool",
+    }),
+  ];
+  await page.route("**/api/v1/workbench/installations/1/repositories?*", (route) => {
+    catalogReads.push(route.request().url());
+    const current = Number(new URL(route.request().url()).searchParams.get("page"));
+    return route.fulfill({
+      json: repositoryPageFixture({
+        page: current,
+        hasNextPage: current === 1,
+        repositories:
+          current === 1
+            ? [
+                repositoryFixture({
+                  scope: { installationId: 1, repositoryId: 5 },
+                  nodeId: "R_5",
+                  name: "first-page-service",
+                  fullName: "example-org/first-page-service",
+                }),
+              ]
+            : secondPage,
+        totalCount: 103,
+      }),
+    });
+  });
+  await page.goto(workbenchUrl());
+  await page.getByRole("button", { name: "Next repository page" }).click();
+  const pages = page.getByRole("navigation", { name: "Repository pages" });
+  await expect(pages).toHaveText("Page 2");
+  const search = page.getByRole("searchbox", { name: "Search loaded page" });
+  await search.fill("coordinator");
+  await expect(page.getByText("2 loaded of 103")).toBeVisible();
+  const reads = catalogReads.length;
+  const target = page.getByRole("button", { name: "Open example-org/ci-coordinator", exact: true });
+  await target.click();
+  await expect(page.getByRole("heading", { name: "Overview", level: 1 })).toBeFocused();
+  await expect(page.getByText("Ledger revision")).toBeVisible();
+
+  async function expectRetainedCatalog(path: string) {
+    await expect(page.getByRole("heading", { name: "Repositories", level: 1 })).toBeFocused();
+    await expect(search).toHaveValue("coordinator");
+    await expect(pages).toHaveText("Page 2");
+    await expect(page.getByText("2 loaded of 103")).toBeVisible();
+    await expect(target).toBeVisible();
+    await expect(page.getByText("unrelated-tool", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Ledger revision")).not.toBeVisible();
+    expect(catalogReads).toHaveLength(reads);
+    await expectNoViewportOverflow(page);
+    await page.screenshot({ path: test.info().outputPath(`catalog-return-${path}.png`) });
+  }
+
+  await page.goBack();
+  await expectRetainedCatalog("history");
+  await page.goForward();
+  await expect(page.getByRole("heading", { name: "Overview", level: 1 })).toBeFocused();
+  await navigateTo(page, "Repositories");
+  const toggle = page.getByRole("button", { name: "Toggle navigation" });
+  if (await toggle.isVisible()) await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expectRetainedCatalog("navigation");
 });
 
 test("scope errors identify their inputs without requesting an invalid scope", async ({ page }) => {
