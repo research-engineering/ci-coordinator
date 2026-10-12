@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
-from collections.abc import Iterator, Mapping
+import os
+import re
+import types
+from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from io import StringIO
@@ -17,6 +21,8 @@ from prometheus_support import SampleKey, prometheus_samples
 from starlette.routing import Route
 from starlette.types import Message, Receive, Scope, Send
 
+import ci_coordinator
+from ci_coordinator.api.http.errors import UnexpectedErrorMiddleware
 from ci_coordinator.app.config_management import ConfigActivationState
 from ci_coordinator.observability import (
     BackgroundHealth,
@@ -1137,6 +1143,388 @@ def test_runtime_diagnostics_exclude_exception_messages_and_arguments() -> None:
     assert record["level"] == "ERROR"
     assert record["correlationId"] == "d" * 32
     assert "provider response contains a secret" not in output.getvalue()
+
+
+_DIAGNOSTIC_CANARY = "canary-value-91d2"
+_PROBE_MODULE = "ci_coordinator.diagnostic_probe"
+_PACKAGE_DIRECTORY = os.path.dirname(ci_coordinator.__file__)
+_DIAGNOSTIC_RECORD_FIELDS = frozenset(
+    {
+        "correlationId",
+        "event",
+        "exceptionType",
+        "failureFingerprint",
+        "level",
+        "observedAt",
+        "reason",
+        "releaseIdentity",
+        "service",
+        "sourceCommit",
+        "sourceLine",
+        "sourceModule",
+        "sourceQualname",
+        "stage",
+    }
+)
+
+
+def _probe_raise_at(site: str, secret_argument: str) -> None:
+    secret_local = f"{secret_argument}-local"
+    if site == "first":
+        raise LookupError(f"first {secret_local}")
+    raise LookupError(f"second {secret_local}")
+
+
+def _probe_call_external(callback: Callable[[str], None], secret_argument: str) -> None:
+    callback(secret_argument)
+
+
+def _probe_recurse(depth: int) -> None:
+    if depth:
+        _probe_recurse(depth - 1)
+        return
+    raise RuntimeError("recursion floor")
+
+
+def _probe_raise_given(error: BaseException) -> None:
+    raise error
+
+
+def _external_callback(secret_argument: str) -> None:
+    secret_local = f"{secret_argument}-callback"
+    error = RuntimeError(f"external {secret_local}")
+    error.add_note(secret_local)
+    raise error
+
+
+def _as_module_function[**P](
+    function: Callable[P, None],
+    relative_path: str = "diagnostic_probe.py",
+    *,
+    root: str = _PACKAGE_DIRECTORY,
+    qualname: str | None = None,
+) -> Callable[P, None]:
+    # Relocate the code into a package source path: the code filename is the module identity.
+    code = cast("types.FunctionType", function).__code__.replace(
+        co_filename=os.path.join(root, *relative_path.split("/"))
+    )
+    if qualname is not None:
+        code = code.replace(co_qualname=qualname)
+    namespace: dict[str, Any] = {}
+    rebound = types.FunctionType(code, namespace, function.__name__)
+    namespace[function.__name__] = rebound
+    return cast("Callable[P, None]", rebound)
+
+
+def _source_line(function: Callable[..., object], fragment: str) -> int:
+    lines, first_line = inspect.getsourcelines(function)
+    matches = [index for index, line in enumerate(lines) if fragment in line]
+    assert len(matches) == 1
+    return first_line + matches[0]
+
+
+def _diagnostic_record(
+    error: BaseException,
+    stage: Literal["candidate_context", "http_request"] = "candidate_context",
+) -> tuple[dict[str, Any], str]:
+    output = StringIO()
+    logger = logging.Logger("diagnostic-coordinates")
+    logger.addHandler(logging.StreamHandler(output))
+    structured = StructuredEventLogger(logger, source_commit="a" * 40, release_identity="b" * 64)
+    RuntimeDiagnosticObserver(structured).unexpected_failure(stage, error, correlation_id="e" * 32)
+    rendered = output.getvalue()
+    return json.loads(rendered), rendered
+
+
+def test_runtime_diagnostics_locate_the_innermost_first_party_frame_without_failure_data() -> None:
+    with pytest.raises(RuntimeError) as raised:
+        _as_module_function(_probe_call_external)(_external_callback, _DIAGNOSTIC_CANARY)
+
+    record, rendered = _diagnostic_record(raised.value)
+
+    assert set(record) == _DIAGNOSTIC_RECORD_FIELDS
+    assert (record["sourceModule"], record["sourceQualname"], record["sourceLine"]) == (
+        _PROBE_MODULE,
+        "_probe_call_external",
+        _source_line(_probe_call_external, "callback(secret_argument)"),
+    )
+    assert record["exceptionType"] == "RuntimeError"
+    assert re.fullmatch(r"[0-9a-f]{16}", record["failureFingerprint"])
+    assert (record["sourceCommit"], record["releaseIdentity"]) == ("a" * 40, "b" * 64)
+    assert record["correlationId"] == "e" * 32
+    assert _DIAGNOSTIC_CANARY not in rendered
+    assert "test_observability" not in rendered and ".py" not in rendered
+
+
+def test_same_type_failures_at_distinct_sites_have_distinct_fingerprints() -> None:
+    def probe_record(site: str) -> dict[str, Any]:
+        with pytest.raises(LookupError) as raised:
+            _as_module_function(_probe_raise_at)(site, _DIAGNOSTIC_CANARY)
+        record, rendered = _diagnostic_record(raised.value)
+        assert _DIAGNOSTIC_CANARY not in rendered
+        return record
+
+    first, repeated, second = probe_record("first"), probe_record("first"), probe_record("second")
+    assert first["exceptionType"] == second["exceptionType"] == "LookupError"
+    assert first["sourceLine"] == _source_line(_probe_raise_at, 'raise LookupError(f"first')
+    assert second["sourceLine"] == _source_line(_probe_raise_at, 'raise LookupError(f"second')
+    assert first["failureFingerprint"] != second["failureFingerprint"]
+    assert {key: repeated[key] for key in ("failureFingerprint", "sourceLine")} == {
+        key: first[key] for key in ("failureFingerprint", "sourceLine")
+    }
+
+    with pytest.raises(TypeError) as observer_error:
+        RuntimeDiagnosticObserver(cast(Any, object()))
+    with pytest.raises(TypeError) as logger_error:
+        StructuredEventLogger(cast(Any, object()))
+    observer_record, _ = _diagnostic_record(observer_error.value)
+    logger_record, _ = _diagnostic_record(logger_error.value)
+    assert (observer_record["sourceModule"], observer_record["sourceQualname"]) == (
+        "ci_coordinator.observability.diagnostics",
+        "RuntimeDiagnosticObserver.__init__",
+    )
+    assert (logger_record["sourceModule"], logger_record["sourceQualname"]) == (
+        "ci_coordinator.observability.logging",
+        "StructuredEventLogger.__init__",
+    )
+    assert observer_record["failureFingerprint"] != logger_record["failureFingerprint"]
+
+    http_record, _ = _diagnostic_record(observer_error.value, "http_request")
+    assert http_record["sourceLine"] == observer_record["sourceLine"]
+    assert http_record["failureFingerprint"] != observer_record["failureFingerprint"]
+
+
+def test_same_named_exception_classes_have_distinct_fingerprints() -> None:
+    shadow_class = cast(
+        "type[Exception]", type("LookupError", (Exception,), {"__module__": "shadow_errors"})
+    )
+    records: list[dict[str, Any]] = []
+    for error_class in (LookupError, shadow_class):
+        with pytest.raises(error_class) as raised:
+            _as_module_function(_probe_raise_given)(error_class(_DIAGNOSTIC_CANARY))
+        records.append(_diagnostic_record(raised.value)[0])
+    builtin_record, shadow_record = records
+    assert builtin_record["exceptionType"] == shadow_record["exceptionType"] == "LookupError"
+    assert builtin_record["sourceLine"] == shadow_record["sourceLine"]
+    assert builtin_record["failureFingerprint"] != shadow_record["failureFingerprint"]
+
+    opaque_module_class = cast(
+        "type[Exception]", type("OpaqueModuleError", (Exception,), {"__module__": object()})
+    )
+    opaque_record, _ = _diagnostic_record(opaque_module_class(_DIAGNOSTIC_CANARY))
+    assert opaque_record["exceptionType"] == "OpaqueModuleError"
+    assert re.fullmatch(r"[0-9a-f]{16}", opaque_record["failureFingerprint"])
+
+
+def test_failures_without_first_party_frames_have_no_source_coordinates() -> None:
+    with pytest.raises(json.JSONDecodeError) as third_party:
+        json.loads("{" + _DIAGNOSTIC_CANARY)
+    outside_package: list[BaseException] = []
+    for relative_path, root in (
+        ("diagnostic_probe.py", _PACKAGE_DIRECTORY + "_shadow"),
+        ("../ci_coordinator_shadow/diagnostic_probe.py", _PACKAGE_DIRECTORY),
+        ("diagnostic_probe.py", os.path.dirname(_PACKAGE_DIRECTORY)),
+        ("diagnostic-probe.py", _PACKAGE_DIRECTORY),
+        ("diagnostic_probe", _PACKAGE_DIRECTORY),
+    ):
+        with pytest.raises(LookupError) as raised:
+            _as_module_function(_probe_raise_at, relative_path, root=root)(
+                "first", _DIAGNOSTIC_CANARY
+            )
+        outside_package.append(raised.value)
+    never_raised = RuntimeError(_DIAGNOSTIC_CANARY)
+
+    for error in (third_party.value, *outside_package, never_raised):
+        record, rendered = _diagnostic_record(error)
+        assert set(record) == _DIAGNOSTIC_RECORD_FIELDS
+        assert (record["sourceModule"], record["sourceQualname"], record["sourceLine"]) == (
+            None,
+            None,
+            None,
+        )
+        assert re.fullmatch(r"[0-9a-f]{16}", record["failureFingerprint"])
+        assert _DIAGNOSTIC_CANARY not in rendered
+
+
+def test_diagnostic_coordinates_and_fingerprint_frames_are_bounded() -> None:
+    def recursion_record(depth: int) -> dict[str, Any]:
+        with pytest.raises(RuntimeError) as raised:
+            _as_module_function(_probe_recurse)(depth)
+        return _diagnostic_record(raised.value)[0]
+
+    shallow, deep, deeper = recursion_record(3), recursion_record(20), recursion_record(30)
+    assert deep["sourceLine"] == _source_line(_probe_recurse, 'raise RuntimeError("recursion')
+    assert deep["sourceQualname"] == "_probe_recurse"
+    assert deep["failureFingerprint"] == deeper["failureFingerprint"]
+    assert shallow["failureFingerprint"] != deep["failureFingerprint"]
+
+    with pytest.raises(LookupError) as package_error:
+        _as_module_function(_probe_raise_at, "diagnostic_probe/__init__.py")(
+            "first", _DIAGNOSTIC_CANARY
+        )
+    assert _diagnostic_record(package_error.value)[0]["sourceModule"] == _PROBE_MODULE
+
+    with pytest.raises(LookupError) as long_error:
+        _as_module_function(_probe_raise_at, "m" * 300 + ".py", qualname="q" * 300)(
+            "first", _DIAGNOSTIC_CANARY
+        )
+    record, _ = _diagnostic_record(long_error.value)
+    assert record["sourceModule"] == ("ci_coordinator." + "m" * 300)[:256]
+    assert record["sourceQualname"] == "q" * 256
+
+    prefix_sharing: list[dict[str, Any]] = []
+    for suffix in ("a", "b"):
+        with pytest.raises(LookupError) as prefix_error:
+            _as_module_function(_probe_raise_at, "m" * 300 + suffix + ".py")(
+                "first", _DIAGNOSTIC_CANARY
+            )
+        prefix_sharing.append(_diagnostic_record(prefix_error.value)[0])
+    assert prefix_sharing[0]["sourceModule"] == prefix_sharing[1]["sourceModule"]
+    assert prefix_sharing[0]["failureFingerprint"] != prefix_sharing[1]["failureFingerprint"]
+
+
+def _raise_diagnostic_canary(_: object) -> object:
+    raise RuntimeError(_DIAGNOSTIC_CANARY)
+
+
+def _forged_first_party_traceback(_: object) -> object:
+    code = types.SimpleNamespace(
+        co_filename=os.path.join(_PACKAGE_DIRECTORY, "diagnostic_probe.py"),
+        co_qualname=_DIAGNOSTIC_CANARY,
+    )
+    return types.SimpleNamespace(
+        tb_frame=types.SimpleNamespace(f_code=code), tb_lineno=1, tb_next=None
+    )
+
+
+def _hostile_class(
+    name: str, metaclass_namespace: dict[str, object], namespace: dict[str, object]
+) -> type[Exception]:
+    metaclass = type(f"{name}Meta", (type,), metaclass_namespace)
+    return cast("type[Exception]", metaclass(name, (Exception,), namespace))
+
+
+def _hostile_diagnostic_errors() -> tuple[tuple[BaseException, str | None], ...]:
+    raising_traceback = _hostile_class(
+        "RaisingTracebackError", {}, {"__traceback__": property(_raise_diagnostic_canary)}
+    )
+    forged_traceback = _hostile_class(
+        "ForgedTracebackError", {}, {"__traceback__": property(_forged_first_party_traceback)}
+    )
+    raising_module = _hostile_class(
+        "RaisingModuleError", {"__module__": property(_raise_diagnostic_canary)}, {}
+    )
+    with pytest.raises(raising_module) as raised_module:
+        _as_module_function(_probe_raise_given)(raising_module(_DIAGNOSTIC_CANARY))
+    raising_name = _hostile_class(
+        "RaisingNameError", {"__name__": property(_raise_diagnostic_canary)}, {}
+    )
+    return (
+        (raising_traceback(_DIAGNOSTIC_CANARY), "RaisingTracebackError"),
+        (forged_traceback(_DIAGNOSTIC_CANARY), "ForgedTracebackError"),
+        (raised_module.value, "RaisingModuleError"),
+        (raising_name(_DIAGNOSTIC_CANARY), None),
+    )
+
+
+def test_hostile_exception_projection_degrades_to_one_counted_class_only_record() -> None:
+    for error, exception_type in _hostile_diagnostic_errors():
+        output = StringIO()
+        logger = logging.Logger("hostile-diagnostic-projection")
+        logger.addHandler(logging.StreamHandler(output))
+        structured = StructuredEventLogger(logger)
+
+        RuntimeDiagnosticObserver(structured).unexpected_failure(
+            "candidate_context", error, correlation_id="e" * 32
+        )
+
+        rendered = output.getvalue()
+        assert rendered.count("\n") == 1
+        record = json.loads(rendered)
+        assert set(record) == _DIAGNOSTIC_RECORD_FIELDS
+        assert record["exceptionType"] == exception_type
+        assert (record["event"], record["stage"], record["correlationId"]) == (
+            "unexpected_failure",
+            "candidate_context",
+            "e" * 32,
+        )
+        assert [
+            record[key] for key in ("failureFingerprint", "sourceModule", "sourceQualname")
+        ] == [
+            None,
+            None,
+            None,
+        ]
+        assert record["sourceLine"] is None
+        assert structured.failure_count == 1
+        assert _DIAGNOSTIC_CANARY not in rendered
+
+
+def test_cancellation_from_diagnostic_projection_still_propagates() -> None:
+    def cancel(_: object) -> object:
+        raise asyncio.CancelledError
+
+    cancelling = _hostile_class("CancellingTracebackError", {}, {"__traceback__": property(cancel)})
+    output = StringIO()
+    logger = logging.Logger("cancelled-diagnostic-projection")
+    logger.addHandler(logging.StreamHandler(output))
+    structured = StructuredEventLogger(logger)
+
+    with pytest.raises(asyncio.CancelledError):
+        RuntimeDiagnosticObserver(structured).unexpected_failure(
+            "candidate_context", cancelling(_DIAGNOSTIC_CANARY)
+        )
+
+    assert output.getvalue() == ""
+    assert structured.failure_count == 0
+
+
+def test_unexpected_http_failure_response_survives_a_hostile_diagnostic_projection() -> None:
+    hostile_error = _hostile_diagnostic_errors()[0][0]
+    output = StringIO()
+    logger = logging.Logger("hostile-http-diagnostic")
+    logger.addHandler(logging.StreamHandler(output))
+    structured = StructuredEventLogger(logger)
+
+    async def scenario() -> list[Message]:
+        sent: list[Message] = []
+        scope: Scope = {
+            "type": "http",
+            "method": "GET",
+            "path": "/diagnostic-probe",
+            "headers": [],
+            "state": {"correlation_id": "f" * 32},
+        }
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        async def downstream(_scope: Scope, _receive: Receive, _send: Send) -> None:
+            raise hostile_error
+
+        await UnexpectedErrorMiddleware(
+            downstream, diagnostics=RuntimeDiagnosticObserver(structured)
+        )(scope, receive, send)
+        return sent
+
+    start, body = asyncio.run(scenario())
+
+    assert start["type"] == "http.response.start" and start["status"] == 500
+    headers = dict(start["headers"])
+    assert headers[b"cache-control"] == b"no-store"
+    assert headers[b"x-correlation-id"] == b"f" * 32
+    assert body["body"] == b'{"code":"internal_error"}'
+    record = json.loads(output.getvalue())
+    assert (record["stage"], record["correlationId"], record["failureFingerprint"]) == (
+        "http_request",
+        "f" * 32,
+        None,
+    )
+    assert structured.failure_count == 1
+    assert _DIAGNOSTIC_CANARY not in output.getvalue() + repr((start, body))
 
 
 @pytest.mark.parametrize("severity,level", [("INFO", 20), ("WARNING", 30), ("ERROR", 40)])

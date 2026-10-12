@@ -222,11 +222,63 @@ The bounded rationale and alternatives are in
 Ordinary structured events default to native and JSON `INFO`. The emitter's
 trusted severity parameter admits only `INFO`, `WARNING`, and `ERROR`; caller
 fields cannot override it. `unexpected_failure` uses native and JSON `ERROR`,
-retaining only exception class, a closed stage and fixed reason plus service,
-build, time and correlation metadata. Messages, arguments, causes, notes,
-tracebacks, source lines, locals and frame coordinates remain excluded.
+retaining exception class name, a closed stage, a fixed reason, first-party
+source coordinates and a failure fingerprint, plus service, build, time and
+correlation metadata. Messages, arguments, causes, notes, traceback locals,
+source text, file paths and provider data remain excluded.
 `reconciliation_loop` distinguishes an unexpected terminal periodic-loop
 exception from an ordinary failed `reconciliation_round`.
+
+`sourceModule`, `sourceQualname` and `sourceLine` name the innermost traceback
+frame whose code file is a `.py` source under the loaded `ci_coordinator`
+package directory. The dotted module is derived as text from that code
+filename, which is never emitted; qualname and line come from the code object
+and traceback. Locals, frame globals (a reserved dynamic-import authority)
+and source text are never read. Emitted module and
+qualname are truncated to 256 characters. All three are null when no such
+frame exists, for example a never-raised exception, a stack containing only
+standard-library or third-party frames, or code whose recorded filename lies
+outside the loaded package directory. `failureFingerprint` is the first 16
+hexadecimal characters of SHA-256 over the admitted stage, the exception
+class's module and qualname, and at most the eight innermost first-party
+coordinates. It hashes the untruncated module and qualname, so two modules
+whose dotted names share their first 256 characters can emit identical
+coordinates yet keep distinct fingerprints. Line numbers make it build-scoped:
+compare fingerprints only under equal `sourceCommit` and `releaseIdentity`.
+Coordinates and fingerprints are log fields, never metric labels.
+
+The projection reads attributes of an arbitrary exception object, so it is
+itself instrumentation. If reading the class name, traceback or class
+identity raises an `Exception`, or the traceback is not an interpreter
+traceback object, the record degrades to the class-only form: null
+fingerprint and coordinates, and a null `exceptionType` only when the class
+name itself is unreadable. The logger's existing failure counter is
+incremented, and the caller's outcome, such as the redacted HTTP 500 response
+or the planning fallback, is unchanged. A `BaseException` that is not an
+`Exception`, such as cancellation, still propagates. A successful projection
+always yields a fingerprint, so a null fingerprint identifies a degraded
+record.
+
+This is a provisional owner decision (2026-10-11) for CI-066: the source is
+public under Apache-2.0, so first-party code coordinates disclose no runtime
+data, and the build identity they need is already logged. Two failures of the
+same class at different first-party raise sites, call paths within the eight
+innermost first-party frames, stages or same-named classes from different
+modules receive different fingerprints, barring a 64-bit truncated-hash
+collision or a degraded projection; repeating the same failure yields the same fingerprint. Failures
+without first-party frames share a fingerprint per stage and class, and call
+paths that differ only beyond the eight retained frames collide. A fingerprint
+alone would need a private symbol map to locate a site, and the earlier
+class-only projection merged same-class failures. Revisit this choice if the
+source stops being public or a coordinate is shown to carry runtime data.
+
+Emission count is unchanged: one record per observed unexpected failure, so
+the correlation identity returned with an internal-error response still finds
+its diagnostic. There is no per-fingerprint rate limiting; a repeated failure
+emits once per occurrence, bounded only by its caller's loop cadence or
+ingress admission. Rate limiting remains a residual owned by CI-069 load
+measurement. Its falsifier is an observed storm of identical
+`unexpected_failure` records under an admitted workload.
 
 The dedicated runtime's stream handler reports formatting/write/flush failure
 back to the structured boundary without stdlib's raw `handleError` output.
@@ -254,17 +306,20 @@ CancelledPlanningWork => propagate cancellation
 
 ## 9. Proof Obligations
 
-| Claim                           | Smallest falsifier                                                    |
-|---------------------------------|-----------------------------------------------------------------------|
-| Exposition is standard.         | `/metrics` returns JSON or a non-Prometheus content type.             |
-| Cardinality is bounded.         | A raw path, repository, ref, or exception becomes a label.            |
-| Telemetry is non-authoritative. | A metric or logger exception changes an issued plan.                  |
-| Readiness is observable.        | A failed required dependency leaves `ci_coordinator_ready` at one.    |
-| Correlation is service-owned.   | A caller controls the response correlation identity.                  |
-| Readiness state is epoch-local. | A readiness response is cacheable across a dependency transition.     |
-| Issuance is traceable.          | A successful plan log lacks provider-run or durable-plan coordinates. |
-| Safety failures are alertable.  | Unsafe omission or replay mismatch has no executable alert.           |
-| Rules match emitted series.     | A rule references a metric or label value the runtime cannot emit.    |
+| Claim                              | Smallest falsifier                                                       |
+|------------------------------------|--------------------------------------------------------------------------|
+| Exposition is standard.            | `/metrics` returns JSON or a non-Prometheus content type.                |
+| Cardinality is bounded.            | A raw path, repository, ref, or exception becomes a label.               |
+| Telemetry is non-authoritative.    | A metric or logger exception changes an issued plan.                     |
+| Readiness is observable.           | A failed required dependency leaves `ci_coordinator_ready` at one.       |
+| Correlation is service-owned.      | A caller controls the response correlation identity.                     |
+| Readiness state is epoch-local.    | A readiness response is cacheable across a dependency transition.        |
+| Issuance is traceable.             | A successful plan log lacks provider-run or durable-plan coordinates.    |
+| Safety failures are alertable.     | Unsafe omission or replay mismatch has no executable alert.              |
+| Rules match emitted series.        | A rule references a metric or label value the runtime cannot emit.       |
+| Failure sites are distinguishable. | Same-class failures at two first-party raise sites share a fingerprint.  |
+| Diagnostics exclude failure data.  | A message, argument, local or note value appears in a diagnostic record. |
+| Failure projection is contained.   | A hostile exception attribute escapes or alters the redacted response.   |
 
 ## 10. Implementation Mapping
 
@@ -273,6 +328,7 @@ ci_coordinator/observability/metrics.py
 ci_coordinator/observability/runtime_metrics.py
 ci_coordinator/observability/request_observation.py
 ci_coordinator/observability/logging.py
+ci_coordinator/observability/diagnostics.py
 ci_coordinator/observability/readiness.py
 ci_coordinator/api/http/correlation.py
 ci_coordinator/api/http/routers/observability.py
@@ -287,6 +343,12 @@ deploy/observability/ci-coordinator.rules.yml
 - Local rule validation does not prove a production Prometheus scrape,
   Alertmanager route, notification delivery, retention policy, or dashboard.
 - Request correlation is not distributed tracing and does not establish trust.
+- A failure fingerprint is a build-scoped grouping hint, not a unique failure
+  identity, a rate limit or proof that two records share a cause.
+- Source coordinates assume that loaded code records its filename under the
+  loaded package directory. A sourceless deployment, or bytecode compiled at
+  another path, yields null coordinates; path segments such as `..` are not
+  resolved and also yield null rather than a guessed module.
 - SLO formulas do not authorize dynamic omission or prove provider correctness.
 - Metrics do not replace the authenticated workbench, audit replay, or database
   evidence.
